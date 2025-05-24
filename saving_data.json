@@ -1,0 +1,20 @@
+[
+    {
+        "user_name": "root",
+        "password": "roots",
+        "cash": "15000",
+        "lock": "False"
+    },
+    {
+        "user_name": "user02",
+        "password": "password02",
+        "cash": "2081900.88",
+        "lock": "False"
+    },
+    {
+        "user_name": "test03",
+        "password": "testing03",
+        "cash": "568.50",
+        "lock": "False"
+    }
+]
