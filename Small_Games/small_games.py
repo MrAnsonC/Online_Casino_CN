@@ -12,6 +12,7 @@ from Small_Games import minus
 from Small_Games import RPS
 from Small_Games import plinko
 from Small_Games import slot_machine
+from Small_Games import Sicbo
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -43,7 +44,7 @@ def display_menu():
     print("① 小鸡过马路  ② 上塔游戏  ③ 基诺")
     print("④ 剪刀石头布  ⑤ 飞天倍数  ⑥ 扫雷")
     print("⑦ 小钢珠跌落  ⑧ 猜数字1-100")
-    print("⑨ 数字老虎机")
+    print("⑨ 数字老虎机  ⑩ 骰宝")
     
 def main(balance, user):
     while True:
@@ -71,8 +72,10 @@ def main(balance, user):
                 balance = guess_number.main(balance, user) 
             elif choice == '9':
                 balance = slot_machine.main(balance, user)
+            elif choice == '10':
+                balance = Sicbo.main(user, balance)
             else:
-                print("无效选择，请输入1-9。")
+                print("无效选择，请输入1-10。")
                 time.sleep(1.5)
             update_balance_in_json(user, balance)
         except ValueError:

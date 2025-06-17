@@ -1,7 +1,10 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
 import random
 import json
-import time
 import os
+import time
+import math
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -67,192 +70,487 @@ odds_difficult = {
     10: [0, 0, 0, 0, 3.5, 8, 13, 63, 500, 800, 1000]
 }
 
-def game_round(difficulty, bet_amount, balance):
-    # 根据难度选择赔率表
-    if difficulty == "1":
-        odds = odds_easy
-        odds_word = "简单"
-    elif difficulty == "2":
-        odds = odds_medium
-        odds_word = "中等"
-    else:
-        odds = odds_difficult
-        odds_word = "地狱"
-
-    # 用户选择的数字
-    user_numbers = []
-    i = 1
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print(f"\t{odds_word}模式")
-    print("请输入数字1-50，不输入结束")
-    print(" 输入数字88，获得幸运数字！\n")
-
-    while i <= 10:
-        try:
-            user_input = input(f"请输入第{i}个数字: ")
-            if user_input == "88":  # 用户输入88，随机生成一个数字
-                random_number = random.randint(1, 50)
-                while random_number in user_numbers:  # 确保随机数字不重复
-                    random_number = random.randint(1, 50)
-                print(f"幸运生成的第{i}个数字为: {random_number}\n")
-                number = int(random_number)
-            elif user_input == "":
-                break
-            else:
-                number = int(user_input)
-
-            if 1 <= number <= 50:
-                if number not in user_numbers:
-                    user_numbers.append(number)
-                    i += 1
-                else:
-                    print("数字已选，请选择其他数字!\n")
-            else:
-                print("请输入1到50之间的数字!\n")
-        except ValueError:
-            print("请输入一个有效的数字!\n")
-        if i == 11:
-            time.sleep(3)
+class CircleButton(tk.Canvas):
+    """自定义圆形按钮"""
+    def __init__(self, master, text, bg_color, fg_color, command=None, radius=30, *args, **kwargs):
+        super().__init__(master, width=radius*2, height=radius*2, 
+                         highlightthickness=0, bg="#16213e", *args, **kwargs)  # 背景色与父容器一致
+        self.radius = radius
+        self.bg_color = bg_color
+        self.fg_color = fg_color
+        self.text = text
+        self.command = command
+        
+        # 绘制圆形按钮
+        self.create_oval(0, 0, radius*2, radius*2, fill=bg_color, outline="#16213e", width=2)
+        self.create_text(radius, radius, text=text, fill=fg_color, 
+                        font=("Arial", 10, "bold"))
+        
+        # 绑定点击事件
+        self.bind("<Button-1>", self.on_click)
     
-    if len(user_numbers) == 0:
-        print("您没有选择任何数字，本轮下注作废。")
-        time.sleep(5)
-        return balance
+    def on_click(self, event):
+        if self.command:
+            self.command()
+
+class KenoGame:
+    def __init__(self, root, initial_balance, username):
+        self.root = root
+        self.root.title("基诺游戏")
+        self.root.geometry("1000x700")
+        self.root.configure(bg="#1a1a2e")
+        
+        # 绑定窗口关闭事件
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
+        # 游戏数据
+        self.balance = float(initial_balance)
+        self.username = username
+        self.bet_amount = 0
+        self.difficulty = "1"
+        self.user_numbers = []
+        self.winning_numbers = []
+        self.game_active = False
+        self.last_win = 0.0
+        self.chip_buttons = []  # 存储筹码按钮的引用
+        self.current_bet = 0.0  # 当前下注金额
+        self.number_buttons = []  # 存储数字按钮的引用
+        self.matches = 0  # 匹配的数字数量
+        self.multiplier = 0.0  # 赔率倍数
+        
+        # 创建UI
+        self.create_widgets()
+        self.update_display()
     
-    user_numbers.sort()
-    formatted_numbers = ""
-    for i in range(len(user_numbers)):
-        # 在第6个数字之后换行
-        if i > 0 and i % 5 == 0:
-            formatted_numbers += "\n"
+    def create_widgets(self):
+        # 主框架
+        main_frame = tk.Frame(self.root, bg="#1a1a2e")
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # 左侧 - 数字选择区域
+        left_frame = tk.Frame(main_frame, bg="#16213e", bd=2, relief=tk.RIDGE)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        tk.Label(left_frame, text="基诺游戏", font=("Arial", 20, "bold"), 
+                bg="#16213e", fg="#e94560").pack(pady=10)
+        
+        # 数字网格框架
+        numbers_frame = tk.Frame(left_frame, bg="#0f3460")
+        numbers_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 创建1-50的数字按钮
+        self.create_number_buttons(numbers_frame)
+        
+        # 右侧 - 控制面板
+        right_frame = tk.Frame(main_frame, bg="#16213e", bd=2, relief=tk.RIDGE)
+        right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
+        
+        # 余额显示
+        balance_frame = tk.Frame(right_frame, bg="#16213e")
+        balance_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        tk.Label(balance_frame, text="余额:", font=("Arial", 14), 
+                bg="#16213e", fg="#f1f1f1").pack(side=tk.LEFT)
+        
+        self.balance_var = tk.StringVar()
+        self.balance_var.set(f"${self.balance:.2f}")
+        tk.Label(balance_frame, textvariable=self.balance_var, font=("Arial", 14, "bold"), 
+                bg="#16213e", fg="#ffd369").pack(side=tk.LEFT, padx=(5, 0))
+        
+        # 筹码按钮
+        chips_frame = tk.Frame(right_frame, bg="#16213e")
+        chips_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        chips = [
+            ("$5", '#ff0000', 'white'),    # 红色背景，白色文字
+            ("$25", '#00ff00', 'black'),    # 绿色背景，黑色文字
+            ("$100", '#000000', 'white'),   # 黑色背景，白色文字
+            ("$500", "#FF7DDA", 'black'),   # 粉色背景，黑色文字
+            ("$1K", '#ffffff', 'black')     # 白色背景，黑色文字
+        ]
+        
+        self.chip_buttons = []  # 存储所有筹码按钮
+        for text, bg_color, fg_color in chips:
+            btn = CircleButton(
+                chips_frame, text=text, bg_color=bg_color, fg_color=fg_color,
+                command=lambda t=text: self.add_chip(t[1:])  # 去掉$符号
+            )
+            btn.pack(side=tk.LEFT, padx=5, pady=5)
+            self.chip_buttons.append(btn)
+        
+        # 难度选择
+        difficulty_frame = tk.Frame(right_frame, bg="#16213e")
+        difficulty_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        tk.Label(difficulty_frame, text="难度:", font=("Arial", 12), 
+                bg="#16213e", fg="#f1f1f1").pack(anchor=tk.W)
+        
+        self.difficulty_var = tk.StringVar()
+        self.difficulty_var.set("1")
+        
+        difficulties = [
+            ("简单", "1"),
+            ("中等", "2"),
+            ("地狱", "3")
+        ]
+        
+        self.difficulty_buttons = []  # 存储所有难度按钮
+        for text, value in difficulties:
+            btn = tk.Button(
+                difficulty_frame, text=text, font=("Arial", 10),
+                bg="#4e9de0" if value == "1" else "#2d4059", fg="white", 
+                width=6, height=1, relief=tk.RAISED,
+                command=lambda v=value: self.set_difficulty(v)
+            )
+            btn.pack(side=tk.LEFT, padx=2, pady=2)
+            self.difficulty_buttons.append(btn)
+        
+        # 游戏按钮 - 使用两行布局
+        button_frame = tk.Frame(right_frame, bg="#16213e")
+        button_frame.pack(fill=tk.X, padx=10, pady=10)
+        
+        # 第一行按钮
+        row1_frame = tk.Frame(button_frame, bg="#16213e")
+        row1_frame.pack(fill=tk.X, pady=5)
+        
+        self.start_button = tk.Button(
+            row1_frame, text="开始游戏", font=("Arial", 12, "bold"),
+            bg="#27ae60", fg="white", width=12, command=self.start_game
+        )
+        self.start_button.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.lucky_button = tk.Button(
+            row1_frame, text="幸运数字", font=("Arial", 12),
+            bg="#9b59b6", fg="white", width=12, command=self.add_lucky_number
+        )
+        self.lucky_button.pack(side=tk.RIGHT)
+        
+        # 第二行按钮
+        row2_frame = tk.Frame(button_frame, bg="#16213e")
+        row2_frame.pack(fill=tk.X, pady=5)
+        
+        self.clear_button = tk.Button(
+            row2_frame, text="清空选择", font=("Arial", 12),
+            bg="#e67e22", fg="white", width=12, command=self.clear_selection
+        )
+        self.clear_button.pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.reset_bet_button = tk.Button(
+            row2_frame, text="重设下注金额", font=("Arial", 12),
+            bg="#3498db", fg="white", width=12, command=self.reset_bet
+        )
+        self.reset_bet_button.pack(side=tk.RIGHT)
+                
+        # 游戏信息
+        info_frame = tk.Frame(right_frame, bg="#16213e")
+        info_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        tk.Label(info_frame, text="游戏规则:", font=("Arial", 12, "bold"), 
+                bg="#16213e", fg="#f1f1f1").pack(anchor=tk.W, pady=(0, 5))
+        
+        rules = [
+            "1. 选择下注金额和难度",
+            "2. 点击开始游戏按钮",
+            "3. 选择1-10个数字(1-50)",
+            "4. 点击'幸运数字'随机添加",
+            "5. 系统将随机抽取10个中奖数字",
+            "6. 根据匹配数量和难度获得奖金"
+        ]
+        
+        for rule in rules:
+            tk.Label(info_frame, text=rule, font=("Arial", 10), 
+                    bg="#16213e", fg="#bdc3c7", justify=tk.LEFT).pack(anchor=tk.W, pady=2)
             
-        # 格式化数字，单个数字时前面加0
-        formatted_numbers += f"{user_numbers[i]:02}"
+        # 下注金额和上局获胜金额显示
+        bet_win_frame = tk.Frame(right_frame, bg="#16213e")
+        bet_win_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         
-        # 每行最后一个数字不加逗号和空格，其他加逗号和空格
-        if (i + 1) % 5 != 0 and i < len(user_numbers) - 1:
-            formatted_numbers += ", "
-
-    # 系统随机生成10个数字
-    # 初始化一个空列表用于存储中奖数字
-    system_numbers = []
-
-    # 循环直到生成10个不重复的中奖数字
-    while len(system_numbers) < 10:
-        number = random.randint(1, 50)  # 随机生成1到50之间的数字
-        if number not in system_numbers:  # 检查数字是否已存在
-            system_numbers.append(number)  # 添加到中奖数字列表
-
-    system_numbers_sorted = sorted(system_numbers)  # 对数字排序
-
-    # 数字对应的中文数字
-    chinese_numbers = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
-
-    # 显示每个中奖数字（两位数格式）
-    drawn_numbers = []
-    for i, number in enumerate(system_numbers, start=1):
-        os.system('cls' if os.name == 'nt' else 'clear')
-        drawn_numbers.append(number)
-        print("你的中奖数字是...")
-        print(f"{formatted_numbers}\n")
-        print("中奖详情：")
-        print(f"第{chinese_numbers[i-1]}个中奖数字为： {number:02d}")
-        print("\n==========")
-        print("现在抽中的幸运数字有：")
-        for index, num in enumerate(sorted(drawn_numbers)):
-            if index > 0 and index % 5 == 0:  # 每5个数字换行
-                print()  # 换行
-            if index == len(drawn_numbers) - 1 or index % 5 == 4:  # 如果是最后一个数字或是行的最后一个数字
-                print(f"{num:02d}", end="")  # 不加逗号
-            else:
-                print(f"{num:02d}", end=", ")  # 加逗号
-        time.sleep(1.25)
-
+        # 下注金额
+        bet_frame = tk.Frame(bet_win_frame, bg="#16213e")
+        bet_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+        
+        tk.Label(bet_frame, text="下注金额:", font=("Arial", 12), 
+                bg="#16213e", fg="#f1f1f1").pack(anchor=tk.W)
+        
+        self.bet_var = tk.StringVar()
+        self.bet_var.set("$0.00")  # 初始显示格式
+        tk.Label(bet_frame, textvariable=self.bet_var, font=("Arial", 20, "bold"), 
+                bg="#16213e", fg="#4cc9f0").pack(anchor=tk.W, pady=(5, 0))
+        
+        # 上局获胜金额
+        win_frame = tk.Frame(bet_win_frame, bg="#16213e")
+        win_frame.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=(10, 0))
+        
+        tk.Label(win_frame, text="上局获胜金额:", font=("Arial", 12), 
+                bg="#16213e", fg="#f1f1f1").pack(anchor=tk.W)
+        
+        self.last_win_var = tk.StringVar()
+        self.last_win_var.set("$0.00")  # 初始显示格式
+        tk.Label(win_frame, textvariable=self.last_win_var, font=("Arial", 20, "bold"), 
+                bg="#16213e", fg="#4cc9f0").pack(anchor=tk.W, pady=(5, 0))
+        
+        # 状态信息
+        self.status_var = tk.StringVar()
+        self.status_var.set("请选择下注金额和难度")
+        status_label = tk.Label(right_frame, textvariable=self.status_var, 
+                               font=("Arial", 12), bg="#16213e", fg="#ffd369")
+        status_label.pack(fill=tk.X, padx=10, pady=(0, 10))
+        
+        # 匹配信息
+        self.matches_var = tk.StringVar()
+        self.matches_var.set("匹配: 0 | 倍数: 0.0x")
+        matches_label = tk.Label(right_frame, textvariable=self.matches_var, 
+                               font=("Arial", 12, "bold"), bg="#16213e", fg="#4cc9f0")
+        matches_label.pack(fill=tk.X, padx=10, pady=(0, 10))
     
-    # 显示排序后的中奖数字
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print("...你的中奖数字是...")
-    print(f"{formatted_numbers}\n")
-    print("所有中奖数字分别为：")
-    for index, num in enumerate(system_numbers_sorted):
-        if index % 5 == 4:  # 每5个数字后换行
-            print(f"{num:02d}")
-        else:
-            print(f"{num:02d}, ", end="")
-
-    # 计算匹配的数字数量
-    matches_set = set(user_numbers) & set(system_numbers)
-    matches = len(set(user_numbers) & set(system_numbers))
-    print(f"\n您匹配了 {matches} 个数字。")
-    if matches > 0:
-        print(f"分别为： \n{' '.join([f'{num:02d}' for num in sorted(matches_set)])}")
-
-    # 根据匹配的数量计算奖金
-    num_choices = len(user_numbers)
-    if matches < len(odds[num_choices]):
-        multiplier = odds[num_choices][matches]
-        winnings = bet_amount * multiplier
-        balance += winnings
-        print()
-        if winnings > bet_amount:
-            print(f"您赢得了 {winnings:.2f} 元，赔率为 {multiplier:.2f}")
-        elif multiplier > 0:
-            print(f"安慰奖：获得奖金的{multiplier:.2f}X")
-        else:
-            print("没有匹配足够的数字，未获得奖金。")
-
-    time.sleep(5)
-    return balance
-
-def main(balance, username):
-    while True:
-        os.system('cls' if os.name == 'nt' else 'clear')
-        print(" 基诺游戏")
-        print(f"\n当前余额：{balance:.2f}")
+    def create_number_buttons(self, parent):
+        """创建1-50的数字按钮网格"""
+        # 创建框架来容纳数字按钮
+        grid_frame = tk.Frame(parent, bg="#0f3460")
+        grid_frame.pack(fill=tk.BOTH, expand=True)
         
+        # 创建10x5的网格
+        self.number_buttons = []
+        for row in range(10):
+            grid_frame.rowconfigure(row, weight=1)
+            for col in range(5):
+                grid_frame.columnconfigure(col, weight=1)
+                num = row * 5 + col + 1
+                btn = tk.Button(
+                    grid_frame, text=str(num), font=("Arial", 10, "bold"),
+                    bg="#2d4059", fg="white", width=4, height=2,  # 正方形按钮
+                    command=lambda n=num: self.toggle_number(n)
+                )
+                btn.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
+                self.number_buttons.append(btn)
+    
+    def toggle_number(self, number):
+        """切换数字的选中状态"""
+        if number in self.user_numbers:
+            self.user_numbers.remove(number)
+            self.number_buttons[number-1].config(bg="#2d4059", fg="white")
+        elif len(self.user_numbers) < 10:  # 最多选择10个数字
+            self.user_numbers.append(number)
+            self.number_buttons[number-1].config(bg="#4e9de0", fg="white")
+        
+        self.update_status()
+    
+    def add_chip(self, amount):
         try:
-            bet_input = input("输入您的下注金额(0退出)：")
-            if bet_input == "0":
-                print("退出当前游戏，返回主菜单。")
-                return balance  
-            else:
-                bet_input = int(bet_input)
-
-            if bet_input > balance or bet_input <= 0:
-                print("下注金额无效，请输入有效的金额。")
-                time.sleep(2)
-                continue
+            amount_val = float(amount)
+            new_bet = self.current_bet + amount_val
+            if new_bet <= self.balance:
+                self.current_bet = new_bet
+                self.bet_var.set(f"${self.current_bet:.2f}")  # 格式化为两位小数
+                self.update_status()
         except ValueError:
-            print("请输入一个有效的数字。")
-            time.sleep(2)
-            continue
+            pass
+    
+    def reset_bet(self):
+        self.current_bet = 0.0
+        self.bet_var.set("$0.00")  # 格式化为两位小数
+        self.update_status()
+    
+    def set_difficulty(self, difficulty):
+        self.difficulty = difficulty
+        # 更新按钮样式
+        for i, (text, value) in enumerate([("简单", "1"), ("中等", "2"), ("地狱", "3")]):
+            if value == difficulty:
+                self.difficulty_buttons[i].configure(bg="#4e9de0")
+            else:
+                self.difficulty_buttons[i].configure(bg="#2d4059")
         
-        balance -= bet_input
-        if username != "demo_player":
-            update_balance_in_json(username, balance)
+        self.update_status()
+    
+    def update_status(self):
+        """更新状态信息"""
+        if self.current_bet <= 0:
+            self.status_var.set("请选择下注金额")
+        elif not self.user_numbers:
+            self.status_var.set("请选择1-10个数字")
+        else:
+            difficulty_text = { "1": "简单", "2": "中等", "3": "地狱" }[self.difficulty]
+            self.status_var.set(f"已选 {len(self.user_numbers)} 个数字 | {difficulty_text}模式 | 下注 ${self.current_bet:.2f}")
+    
+    def update_display(self):
+        self.balance_var.set(f"${self.balance:.2f}")
+        self.last_win_var.set(f"${self.last_win:.2f}")  # 格式化为两位小数
+    
+    def add_lucky_number(self):
+        """添加幸运数字"""
+        if len(self.user_numbers) >= 10:
+            return
+        
+        # 找到所有未选择的数字
+        available_numbers = [n for n in range(1, 51) if n not in self.user_numbers]
+        
+        if available_numbers:
+            lucky_num = random.choice(available_numbers)
+            self.user_numbers.append(lucky_num)
+            self.number_buttons[lucky_num-1].config(bg="#4e9de0", fg="white")
+            self.update_status()
+    
+    def clear_selection(self):
+        """清空选择的数字"""
+        self.user_numbers = []
+        for btn in self.number_buttons:
+            btn.config(bg="#2d4059", fg="white", state=tk.NORMAL)
+        self.update_status()
+    
+    def start_game(self):
+        if self.current_bet <= 0:
+            messagebox.showwarning("错误", "请先下注")
+            return
+        if not self.user_numbers:
+            messagebox.showwarning("错误", "请至少选择一个数字")
+            return
+        
+        # 扣除下注金额
+        self.balance -= self.current_bet
+        self.update_display()
+        
+        # 更新JSON余额
+        update_balance_in_json(self.username, self.balance)
+        
+        # 禁用按钮
+        self.start_button.config(state=tk.DISABLED)
+        self.lucky_button.config(state=tk.DISABLED)
+        self.clear_button.config(state=tk.DISABLED)
+        self.reset_bet_button.config(state=tk.DISABLED)
+        for btn in self.chip_buttons:
+            btn.configure(state=tk.DISABLED)
+        for btn in self.difficulty_buttons:
+            btn.configure(state=tk.DISABLED)
+        for btn in self.number_buttons:
+            btn.config(state=tk.DISABLED)
+        
+        # 重置匹配信息
+        self.matches = 0
+        self.multiplier = 0.0
+        self.matches_var.set(f"匹配: 0 | 倍数: 0.0x")
+        
+        # 生成中奖号码
+        self.winning_numbers = []
+        while len(self.winning_numbers) < 10:
+            num = random.randint(1, 50)
+            if num not in self.winning_numbers:
+                self.winning_numbers.append(num)
+        
+        # 开始抽奖动画
+        self.draw_index = 0
+        self.draw_numbers()
+    
+    def draw_numbers(self):
+        """逐个显示中奖号码"""
+        if self.draw_index >= 10:
+            self.finish_game()
+            return
+        
+        # 获取当前抽出的数字
+        num = self.winning_numbers[self.draw_index]
+        
+        # 高亮显示该数字
+        btn = self.number_buttons[num-1]
+        if num in self.user_numbers:
+            btn.config(bg="#27ae60", fg="white")  # 匹配成功 - 绿色
+            self.matches += 1
+        else:
+            btn.config(bg="#e74c3c", fg="white")  # 未匹配 - 红色
+        
+        # 更新状态
+        self.status_var.set(f"第 {self.draw_index+1} 个中奖数字: {num}")
+        
+        # 更新匹配信息
+        num_choices = len(self.user_numbers)
+        if self.difficulty == "1":
+            odds_table = odds_easy
+        elif self.difficulty == "2":
+            odds_table = odds_medium
+        else:
+            odds_table = odds_difficult
+        
+        if num_choices in odds_table and self.matches < len(odds_table[num_choices]):
+            self.multiplier = odds_table[num_choices][self.matches]
+            self.matches_var.set(f"匹配: {self.matches} | 倍数: {self.multiplier:.2f}x")
+        
+        # 准备下一个数字
+        self.draw_index += 1
+        self.root.after(750, self.draw_numbers)  # 0.75秒后显示下一个数字
 
-        while True:
-            try:
-                print("\n①简单 ②中等 ③地狱")
-                difficulty = input("请选择难度：")
+    def auto_clear(self):
+        """自动清空选择"""
+        self.clear_selection()
+        # 重置匹配信息显示
+        self.matches_var.set("匹配: 0 | 倍数: 0.0x")
+    
+    def finish_game(self):
+        """完成游戏，计算奖金"""
+        # 计算匹配数量
+        matches = len(set(self.user_numbers) & set(self.winning_numbers))
+        
+        # 根据难度和选择数量获取赔率
+        num_choices = len(self.user_numbers)
+        if self.difficulty == "1":
+            odds_table = odds_easy
+        elif self.difficulty == "2":
+            odds_table = odds_medium
+        else:
+            odds_table = odds_difficult
+        
+        if num_choices in odds_table and matches < len(odds_table[num_choices]):
+            multiplier = odds_table[num_choices][matches]
+        else:
+            multiplier = 0.0
+        
+        # 计算奖金
+        winnings = self.current_bet * multiplier
+        self.balance += winnings
+        self.last_win = winnings
+        self.update_display()
+        
+        # 更新状态信息
+        difficulty_text = { "1": "简单", "2": "中等", "3": "地狱" }[self.difficulty]
+        self.status_var.set(
+            f"匹配了 {matches} 个数字! 获得奖金 ${winnings:.2f} ({multiplier:.2f}X)"
+        )
+        
+        # 更新JSON余额
+        update_balance_in_json(self.username, self.balance)
 
-                if difficulty not in ["1", "2", "3"]:
-                    print("无效选择，请重新选择难度。")
-                    time.sleep(2)
-                    continue
-                break
-            except ValueError:
-                print("请输入一个有效的数字。")
-                time.sleep(2)
-                continue
+        self.root.after(5000, self.auto_clear)
+        time.sleep(5)
+        
+        # 启用按钮
+        self.start_button.config(state=tk.NORMAL)
+        self.lucky_button.config(state=tk.NORMAL)
+        self.clear_button.config(state=tk.NORMAL)
+        self.reset_bet_button.config(state=tk.NORMAL)
+        for btn in self.chip_buttons:
+            btn.configure(state=tk.NORMAL)
+        for btn in self.difficulty_buttons:
+            btn.configure(state=tk.NORMAL)
+        
+        # 启用数字按钮
+        for btn in self.number_buttons:
+            btn.config(state=tk.NORMAL)
+    
+    def on_closing(self):
+        """窗口关闭事件处理"""
+        # 更新余额到JSON
+        update_balance_in_json(self.username, self.balance)
+        self.root.destroy()
 
-        balance = game_round(difficulty, bet_input, balance)
-        if username != "demo_player":
-            update_balance_in_json(username, balance)
-
-        if balance <= 0:
-            print("你已经输光了本金，游戏结束。")
-            return balance
+def main(initial_balance, username):
+    """供small_games.py调用的主函数"""
+    root = tk.Tk()
+    game = KenoGame(root, initial_balance, username)
+    root.mainloop()
+    # 返回更新后的余额
+    return game.balance
 
 if __name__ == "__main__":
-    main(100, "demo_player")
+    # 单独运行时的测试代码
+    root = tk.Tk()
+    # 使用测试余额和用户名
+    game = KenoGame(root, 1000.0, "test_user")
+    root.mainloop()

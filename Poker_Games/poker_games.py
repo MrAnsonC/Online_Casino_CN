@@ -4,7 +4,8 @@ import time
 
 ## Poker games import
 from Poker_Games import Blackjack
-from Poker_Games import UTH
+from Poker_Games import UTH_GUI
+from Poker_Games import transfer_baccarat
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -33,7 +34,7 @@ def update_balance_in_json(username, new_balance):
 def display_menu():
     print("欢迎来到扑克中心!\n")
     print("请选择以下的游戏种类(0返回主目录):")
-    print("① 21点 ② 终极德州扑克")
+    print("① 21点 ② 终极德州扑克 ③ 百家乐")
 
 def main(balance, user):
     while True:
@@ -46,16 +47,13 @@ def main(balance, user):
             elif choice == "1":
                 balance = Blackjack.main(balance, user)  # 运行 Blackjack 并更新余额
             elif choice == "2":
-                balance = UTH.play_game(balance, user)  # 运行 UTH 并更新余额   
+                balance = UTH_GUI.main(balance, user)  # 运行 UTH 并更新余额   
+            elif choice == "3":
+                balance = transfer_baccarat.play_game(balance, user)
             else:
-                print("无效选择，请输入1或2。")
+                print("无效选择，请输入1到3。")
                 time.sleep(1.5)
             update_balance_in_json(user, balance)
         except ValueError:
             print("请输入一个有效的数字。")
             continue
-    
-
-
-
-

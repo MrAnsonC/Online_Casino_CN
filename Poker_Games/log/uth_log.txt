@@ -1,649 +1,649 @@
 User: root01
-Funds: 1751990.00
+Funds: 53518873.00
 === Bet 下注 ===
 Play: 400
 Ante/Blind: 200
 Trips: 50
-Jackpot: True "MAX: 275124.09"
+Jackpot: True "MAX: 285027.76"
 Total_bet: 852.50
 === Card 卡牌 ===
-Dealer Card: 3♠ 9♠
-Community: 5♣ 4♥ 8♥ 7♦ 5♦
-Player Card: 8♠ 3♦
+Dealer Card: K♦ 7♠
+Community: 8♠ J♣ J♦ 7♦ T♥
+Player Card: T♠ A♣
 === Best 5 组合 ===
-Dealer: 5♣ 5♦ 9♠ 8♥ 7♦  <对子>
-Player: 8♠ 8♥ 5♣ 5♦ 7♦  <两对>
+Dealer: J♣ J♦ 7♠ 7♦ K♦  <两对>
+Player: J♣ J♦ T♠ T♥ A♣  <两对>
 === Win / Lost ===
 Win: 547.50
-Date and Time: 24 of May, 2025. 20:52:11
+Date and Time: 13 of June, 2025. 02:11:30
 ====================
 
 ====================
 User: root01
-Funds: 1751442.50
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 275115.56"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: 5♦ 9♥
-Community: 9♦ A♣ K♠ 8♠ 3♣
-Player Card: 4♠ A♠
-=== Best 5 组合 ===
-Dealer: 9♥ 9♦ A♣ K♠ 8♠  <对子>
-Player: A♠ A♣ K♠ 9♦ 8♠  <对子>
-=== Win / Lost ===
-Win: 547.50
-Date and Time: 24 of May, 2025. 20:51:54
-====================
-
-====================
-User: root01
-Funds: 1751295.00
-=== Bet 下注 ===
-Play: 200
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 275107.03"
-Total_bet: 652.50
-=== Card 卡牌 ===
-Dealer Card: 6♣ 7♣
-Community: T♦ 5♦ Q♠ 2♠ 8♦
-Player Card: A♣ 7♠
-=== Best 5 组合 ===
-Dealer: Q♠ T♦ 8♦ 7♣ 6♣  <高牌>
-Player: A♣ Q♠ T♦ 8♦ 7♠  <高牌>
-=== Win / Lost ===
-Win: 147.50
-Date and Time: 24 of May, 2025. 20:51:36
-====================
-
-====================
-User: root01
-Funds: 1751347.50
-=== Bet 下注 ===
-Play: 200
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 275102.50"
-Total_bet: 652.50
-=== Card 卡牌 ===
-Dealer Card: A♦ K♥
-Community: 6♠ 5♦ J♠ A♥ J♥
-Player Card: K♠ A♣
-=== Best 5 组合 ===
-Dealer: A♦ A♥ J♠ J♥ K♥  <两对>
-Player: A♣ A♥ J♠ J♥ K♠  <两对>
-=== Win / Lost ===
-Lost: 52.50
-Date and Time: 24 of May, 2025. 20:50:49
-====================
-
-====================
-User: root01
-Funds: 1752200.00
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 275092.71"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: A♣ Q♦
-Community: T♦ 6♦ 7♥ T♠ 3♠
-Player Card: 2♦ 8♦
-=== Best 5 组合 ===
-Dealer: T♦ T♠ A♣ Q♦ 7♥  <对子>
-Player: T♦ T♠ 8♦ 7♥ 6♦  <对子>
-=== Win / Lost ===
-Lost: 852.50
-Date and Time: 24 of May, 2025. 20:50:41
-====================
-
-====================
-User: root01
-Funds: 1751852.50
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274922.21"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: Q♥ 2♠
-Community: 5♥ 4♥ K♣ 7♥ 9♠
-Player Card: 5♣ J♦
-=== Best 5 组合 ===
-Dealer: K♣ Q♥ 9♠ 7♥ 5♥  <高牌>
-Player: 5♣ 5♥ K♣ J♦ 9♠  <对子>
-=== Win / Lost ===
-Win: 347.50
-Date and Time: 24 of May, 2025. 20:50:26
-====================
-
-====================
-User: root01
-Funds: 1752705.00
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274915.68"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: T♦ 8♦
-Community: T♣ 5♠ 9♠ 5♥ 4♦
-Player Card: J♣ K♥
-=== Best 5 组合 ===
-Dealer: T♦ T♣ 5♠ 5♥ 9♠  <两对>
-Player: 5♠ 5♥ K♥ J♣ T♣  <对子>
-=== Win / Lost ===
-Lost: 852.50
-Date and Time: 24 of May, 2025. 20:50:18
-====================
-
-====================
-User: root01
-Funds: 1752157.50
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274745.18"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: 6♠ 4♦
-Community: 7♥ T♦ 9♣ T♣ 2♥
-Player Card: 2♦ J♠
-=== Best 5 组合 ===
-Dealer: T♦ T♣ 9♣ 7♥ 6♠  <对子>
-Player: T♦ T♣ 2♦ 2♥ J♠  <两对>
-=== Win / Lost ===
-Win: 547.50
-Date and Time: 24 of May, 2025. 20:49:18
-====================
-
-====================
-User: root01
-Funds: 1753010.00
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274736.65"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: 7♦ 9♣
-Community: 4♥ 7♠ K♥ K♠ J♣
-Player Card: 8♥ 6♥
-=== Best 5 组合 ===
-Dealer: K♥ K♠ 7♦ 7♠ J♣  <两对>
-Player: K♥ K♠ J♣ 8♥ 7♠  <对子>
-=== Win / Lost ===
-Lost: 852.50
-Date and Time: 24 of May, 2025. 20:47:52
-====================
-
-====================
-User: root01
-Funds: 1753062.50
-=== Bet 下注 ===
-Play: 200
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274566.15"
-Total_bet: 652.50
-=== Card 卡牌 ===
-Dealer Card: 2♠ Q♦
-Community: T♦ A♣ 8♠ 7♣ 4♣
-Player Card: Q♥ 6♦
-=== Best 5 组合 ===
-Dealer: A♣ Q♦ T♦ 8♠ 7♣  <高牌>
-Player: A♣ Q♥ T♦ 8♠ 7♣  <高牌>
-=== Win / Lost ===
-Lost: 52.50
-Date and Time: 24 of May, 2025. 20:47:36
-====================
-
-====================
-User: root01
-Funds: 1753915.00
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274559.36"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: A♥ 4♥
-Community: A♠ 2♦ 6♥ J♦ T♦
-Player Card: K♥ 8♠
-=== Best 5 组合 ===
-Dealer: A♥ A♠ J♦ T♦ 6♥  <对子>
-Player: A♠ K♥ J♦ T♦ 8♠  <高牌>
-=== Win / Lost ===
-Lost: 852.50
-Date and Time: 24 of May, 2025. 20:47:27
-====================
-
-====================
-User: root01
-Funds: 1752467.50
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274388.86"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: 9♦ 8♥
-Community: T♥ 9♠ 4♥ Q♥ 6♥
-Player Card: 4♦ A♥
-=== Best 5 组合 ===
-Dealer: Q♥ T♥ 8♥ 6♥ 4♥  <同花>
-Player: A♥ Q♥ T♥ 6♥ 4♥  <同花>
-=== Win / Lost ===
-Win: 1447.50
-Date and Time: 24 of May, 2025. 20:46:32
-====================
-
-====================
-User: root01
-Funds: 1753120.00
-=== Bet 下注 ===
-Play: 200
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274380.33"
-Total_bet: 652.50
-=== Card 卡牌 ===
-Dealer Card: Q♠ 9♦
-Community: T♦ Q♥ 8♦ 2♥ 8♣
-Player Card: 4♣ 2♦
-=== Best 5 组合 ===
-Dealer: Q♠ Q♥ 8♦ 8♣ T♦  <两对>
-Player: 8♦ 8♣ 2♦ 2♥ Q♥  <两对>
-=== Win / Lost ===
-Lost: 652.50
-Date and Time: 24 of May, 2025. 20:45:57
-====================
-
-====================
-User: root01
-Funds: 1753572.50
-=== Bet 下注 ===
-Play: 0
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274249.83"
-Total_bet: 452.50
-=== Card 卡牌 ===
-Dealer Card: 8♥ 7♦
-Community: 3♥ Q♣ J♥ 8♠ 6♦
-Player Card: K♥ 4♦
-=== Best 5 组合 ===
-Dealer: 8♥ 8♠ Q♣ J♥ 7♦  <对子>
-Player: K♥ Q♣ J♥ 8♠ 6♦  <高牌>
-=== Win / Lost ===
-Lost: 455.00
-Date and Time: 24 of May, 2025. 20:45:21
-====================
-
-====================
-User: root01
-Funds: 1753625.00
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274204.58"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: 4♦ 5♥
-Community: J♦ 8♣ 8♥ 9♠ 9♦
-Player Card: 3♦ 3♥
-=== Best 5 组合 ===
-Dealer: 9♠ 9♦ 8♣ 8♥ J♦  <两对>
-Player: 9♠ 9♦ 8♣ 8♥ J♦  <两对>
-=== Win / Lost ===
-Lost: 52.50
-Date and Time: 24 of May, 2025. 20:45:08
-====================
-
-====================
-User: root01
-Funds: 1754277.50
-=== Bet 下注 ===
-Play: 200
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274191.79"
-Total_bet: 652.50
-=== Card 卡牌 ===
-Dealer Card: 4♦ 4♣
-Community: 2♠ 2♦ 3♥ 4♠ 6♣
-Player Card: J♥ K♠
-=== Best 5 组合 ===
-Dealer: 4♦ 4♣ 4♠ 2♠ 2♦  <葫芦>
-Player: 2♠ 2♦ K♠ J♥ 6♣  <对子>
-=== Win / Lost ===
-Lost: 652.50
-Date and Time: 24 of May, 2025. 20:44:37
-====================
-
-====================
-User: root01
-Funds: 1753730.00
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274061.29"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: 8♥ K♠
-Community: 8♠ T♦ 4♥ 7♥ Q♣
-Player Card: J♦ T♠
-=== Best 5 组合 ===
-Dealer: 8♥ 8♠ K♠ Q♣ T♦  <对子>
-Player: T♠ T♦ Q♣ J♦ 8♠  <对子>
-=== Win / Lost ===
-Win: 547.50
-Date and Time: 24 of May, 2025. 20:44:13
-====================
-
-====================
-User: root01
-Funds: 1753382.50
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274052.76"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: A♦ 3♣
-Community: 7♦ T♥ 5♥ 2♣ 8♠
-Player Card: 8♣ T♦
-=== Best 5 组合 ===
-Dealer: A♦ T♥ 8♠ 7♦ 5♥  <高牌>
-Player: T♦ T♥ 8♣ 8♠ 7♦  <两对>
-=== Win / Lost ===
-Win: 347.50
-Date and Time: 24 of May, 2025. 20:44:08
-====================
-
-====================
-User: root01
-Funds: 1752835.00
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274046.23"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: Q♠ 5♠
-Community: T♦ 5♦ 9♣ 8♥ 3♥
-Player Card: K♣ T♥
-=== Best 5 组合 ===
-Dealer: 5♠ 5♦ Q♠ T♦ 9♣  <对子>
-Player: T♥ T♦ K♣ 9♣ 8♥  <对子>
-=== Win / Lost ===
-Win: 547.50
-Date and Time: 24 of May, 2025. 20:43:51
-====================
-
-====================
-User: root01
-Funds: 1753287.50
-=== Bet 下注 ===
-Play: 0
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 274037.70"
-Total_bet: 452.50
-=== Card 卡牌 ===
-Dealer Card: 5♠ T♦
-Community: 6♣ 3♦ J♦ A♦ Q♥
-Player Card: 4♥ T♥
-=== Best 5 组合 ===
-Dealer: A♦ Q♥ J♦ T♦ 6♣  <高牌>
-Player: A♦ Q♥ J♦ T♥ 6♣  <高牌>
-=== Win / Lost ===
-Lost: 455.00
-Date and Time: 24 of May, 2025. 20:43:32
-====================
-
-====================
-User: root01
-Funds: 1753740.00
-=== Bet 下注 ===
-Play: 0
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 273992.45"
-Total_bet: 452.50
-=== Card 卡牌 ===
-Dealer Card: 2♥ A♠
-Community: 3♠ 7♣ 8♦ 3♣ T♣
-Player Card: J♦ 5♦
-=== Best 5 组合 ===
-Dealer: 3♠ 3♣ A♠ T♣ 8♦  <对子>
-Player: 3♠ 3♣ J♦ T♣ 8♦  <对子>
-=== Win / Lost ===
-Lost: 455.00
-Date and Time: 24 of May, 2025. 20:42:07
-====================
-
-====================
-User: root01
-Funds: 1753792.50
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 273947.20"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: 6♦ 7♥
-Community: 6♣ 4♠ Q♣ K♦ T♦
-Player Card: 6♠ 5♦
-=== Best 5 组合 ===
-Dealer: 6♦ 6♣ K♦ Q♣ T♦  <对子>
-Player: 6♠ 6♣ K♦ Q♣ T♦  <对子>
-=== Win / Lost ===
-Lost: 52.50
-Date and Time: 24 of May, 2025. 20:41:50
-====================
-
-====================
-User: root01
-Funds: 1753445.00
-=== Bet 下注 ===
-Play: 200
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 273934.41"
-Total_bet: 652.50
-=== Card 卡牌 ===
-Dealer Card: T♥ K♠
-Community: J♥ Q♠ 5♣ J♠ 4♥
-Player Card: 5♥ A♦
-=== Best 5 组合 ===
-Dealer: J♥ J♠ K♠ Q♠ T♥  <对子>
-Player: J♥ J♠ 5♥ 5♣ A♦  <两对>
-=== Win / Lost ===
-Win: 347.50
-Date and Time: 24 of May, 2025. 20:40:18
-====================
-
-====================
-User: root01
-Funds: 1752897.50
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 273927.88"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: 2♥ 8♠
-Community: A♣ J♥ K♥ 9♥ J♦
-Player Card: 5♦ Q♦
-=== Best 5 组合 ===
-Dealer: J♥ J♦ A♣ K♥ 9♥  <对子>
-Player: J♥ J♦ A♣ K♥ Q♦  <对子>
-=== Win / Lost ===
-Win: 547.50
-Date and Time: 24 of May, 2025. 20:40:10
-====================
-
-====================
-User: root01
-Funds: 1753550.00
-=== Bet 下注 ===
-Play: 200
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 273919.35"
-Total_bet: 652.50
-=== Card 卡牌 ===
-Dealer Card: 6♠ J♥
-Community: 6♥ 6♣ 2♦ 4♥ 7♦
-Player Card: 8♣ 9♥
-=== Best 5 组合 ===
-Dealer: 6♠ 6♥ 6♣ J♥ 7♦  <三条>
-Player: 6♥ 6♣ 9♥ 8♣ 7♦  <对子>
-=== Win / Lost ===
-Lost: 652.50
-Date and Time: 24 of May, 2025. 20:31:32
-====================
-
-====================
-User: root01
-Funds: 1753402.50
-=== Bet 下注 ===
-Play: 200
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 273788.85"
-Total_bet: 652.50
-=== Card 卡牌 ===
-Dealer Card: 6♥ 9♥
-Community: K♣ 2♣ 7♠ 3♥ 4♦
-Player Card: J♥ 8♥
-=== Best 5 组合 ===
-Dealer: K♣ 9♥ 7♠ 6♥ 4♦  <高牌>
-Player: K♣ J♥ 8♥ 7♠ 4♦  <高牌>
-=== Win / Lost ===
-Win: 147.50
-Date and Time: 24 of May, 2025. 20:31:20
-====================
-
-====================
-User: root01
-Funds: 1753055.00
-=== Bet 下注 ===
-Play: 400
-Ante/Blind: 200
-Trips: 50
-Jackpot: True "MAX: 273784.32"
-Total_bet: 852.50
-=== Card 卡牌 ===
-Dealer Card: T♠ 4♠
-Community: 9♠ 8♦ J♠ 3♣ 2♥
-Player Card: 9♣ 7♠
-=== Best 5 组合 ===
-Dealer: J♠ T♠ 9♠ 8♦ 4♠  <高牌>
-Player: 9♣ 9♠ J♠ 8♦ 7♠  <对子>
-=== Win / Lost ===
-Win: 347.50
-Date and Time: 24 of May, 2025. 20:31:06
-====================
-
-====================
-User: demo_player
-Funds: 495.00
-=== Bet 下注 ===
-Play: 200
-Ante/Blind: 100
-Trips: 45
-Jackpot: True "MAX: 273777.79"
-Total_bet: 447.50
-=== Card 卡牌 ===
-Dealer Card: 4♦ A♣
-Community: 2♦ K♣ 7♠ 5♦ A♦
-Player Card: 3♦ 2♠
-=== Best 5 组合 ===
-Dealer: A♣ A♦ K♣ 7♠ 5♦  <对子>
-Player: 2♠ 2♦ A♦ K♣ 7♠  <对子>
-=== Win / Lost ===
-Lost: 447.50
-Date and Time: 24 of May, 2025. 20:21:17
-====================
-
-====================
-User: demo_player
-Funds: 542.50
+Funds: 53518920.50
 === Bet 下注 ===
 Play: 0
 Ante/Blind: 20
 Trips: 5
-Jackpot: True "MAX: 273688.29"
+Jackpot: True "MAX: 285019.23"
 Total_bet: 47.50
 === Card 卡牌 ===
-Dealer Card: J♠ 4♦
-Community: 4♣ A♣ 4♠ 2♣ 6♥
-Player Card: 8♦ Q♠
+Dealer Card: Q♦ 8♥
+Community: 5♥ Q♣ 2♠ 6♣ J♣
+Player Card: 8♠ 4♥
 === Best 5 组合 ===
-Dealer: 4♦ 4♣ 4♠ A♣ J♠  <三条>
-Player: 4♣ 4♠ A♣ Q♠ 8♦  <对子>
+Dealer: Q♦ Q♣ J♣ 8♥ 6♣  <对子>
+Player: Q♣ J♣ 8♠ 6♣ 5♥  <高牌>
 === Win / Lost ===
 Lost: 50.00
-Date and Time: 24 of May, 2025. 20:12:54
+Date and Time: 13 of June, 2025. 02:11:18
 ====================
 
 ====================
-User: demo_player
-Funds: 630.00
-=== Bet 下注 ===
-Play: 40
-Ante/Blind: 20
-Trips: 5
-Jackpot: True "MAX: 273683.54"
-Total_bet: 87.50
-=== Card 卡牌 ===
-Dealer Card: T♦ T♥
-Community: A♥ A♦ 4♥ 8♥ 6♠
-Player Card: K♣ 4♣
-=== Best 5 组合 ===
-Dealer: A♥ A♦ T♦ T♥ 8♥  <两对>
-Player: A♥ A♦ 4♣ 4♥ K♣  <两对>
-=== Win / Lost ===
-Lost: 87.50
-Date and Time: 24 of May, 2025. 20:06:24
-====================
-
-====================
-User: demo_player
-Funds: 697.50
+User: root01
+Funds: 53518985.50
 === Bet 下注 ===
 Play: 20
 Ante/Blind: 20
 Trips: 5
-Jackpot: True "MAX: 273666.04"
+Jackpot: False "MAX: 285014.48"
+Total_bet: 65.00
+=== Card 卡牌 ===
+Dealer Card: 5♣ K♥
+Community: J♥ 4♠ 8♥ 9♥ 3♥
+Player Card: 8♠ 7♦
+=== Best 5 组合 ===
+Dealer: K♥ J♥ 9♥ 8♥ 3♥  <同花>
+Player: 8♠ 8♥ J♥ 9♥ 7♦  <对子>
+=== Win / Lost ===
+Lost: 65.00
+Date and Time: 13 of June, 2025. 02:11:06
+====================
+
+====================
+User: root01
+Funds: 53519638.00
+=== Bet 下注 ===
+Play: 200
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 285001.48"
+Total_bet: 652.50
+=== Card 卡牌 ===
+Dealer Card: K♠ J♦
+Community: A♦ 6♣ Q♦ 4♦ 3♦
+Player Card: J♥ 5♠
+=== Best 5 组合 ===
+Dealer: A♦ Q♦ J♦ 4♦ 3♦  <同花>
+Player: A♦ Q♦ J♥ 6♣ 5♠  <高牌>
+=== Win / Lost ===
+Lost: 652.50
+Date and Time: 13 of June, 2025. 02:10:51
+====================
+
+====================
+User: root01
+Funds: 2741765.50
+=== Bet 下注 ===
+Play: 800
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284870.98"
+Total_bet: 1252.50
+=== Card 卡牌 ===
+Dealer Card: 6♠ Q♠
+Community: 4♥ J♣ 8♣ A♣ 5♠
+Player Card: Q♥ Q♦
+=== Best 5 组合 ===
+Dealer: A♣ Q♠ J♣ 8♣ 6♠  <高牌>
+Player: Q♥ Q♦ A♣ J♣ 8♣  <对子>
+=== Win / Lost ===
+Win: 747.50
+Date and Time: 04 of June, 2025. 17:26:30
+====================
+
+====================
+User: root01
+Funds: 2742218.00
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284860.45"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: T♣ 9♦
+Community: T♠ 3♦ 9♣ A♦ 4♣
+Player Card: 2♣ Q♥
+=== Best 5 组合 ===
+Dealer: T♣ T♠ 9♦ 9♣ A♦  <两对>
+Player: A♦ Q♥ T♠ 9♣ 4♣  <高牌>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:26:20
+====================
+
+====================
+User: root01
+Funds: 2742670.50
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284815.20"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: 2♦ Q♠
+Community: 3♣ 8♠ T♣ K♠ A♥
+Player Card: 9♦ 4♣
+=== Best 5 组合 ===
+Dealer: A♥ K♠ Q♠ T♣ 8♠  <高牌>
+Player: A♥ K♠ T♣ 9♦ 8♠  <高牌>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:26:11
+====================
+
+====================
+User: root01
+Funds: 2743323.00
+=== Bet 下注 ===
+Play: 200
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284769.95"
+Total_bet: 652.50
+=== Card 卡牌 ===
+Dealer Card: 7♣ Q♦
+Community: 5♥ Q♣ 5♠ 6♦ 2♣
+Player Card: 6♣ K♠
+=== Best 5 组合 ===
+Dealer: Q♦ Q♣ 5♥ 5♠ 7♣  <两对>
+Player: 6♣ 6♦ 5♥ 5♠ K♠  <两对>
+=== Win / Lost ===
+Lost: 652.50
+Date and Time: 04 of June, 2025. 17:26:04
+====================
+
+====================
+User: root01
+Funds: 2743775.50
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284639.45"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: J♠ 6♠
+Community: T♣ 4♠ 8♦ Q♠ A♦
+Player Card: K♦ 3♦
+=== Best 5 组合 ===
+Dealer: A♦ Q♠ J♠ T♣ 8♦  <高牌>
+Player: A♦ K♦ Q♠ T♣ 8♦  <高牌>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:25:56
+====================
+
+====================
+User: root01
+Funds: 2744228.00
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284594.20"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: K♣ K♦
+Community: 3♠ J♣ T♥ K♥ A♦
+Player Card: 6♣ 9♠
+=== Best 5 组合 ===
+Dealer: K♣ K♦ K♥ A♦ J♣  <三条>
+Player: A♦ K♥ J♣ T♥ 9♠  <高牌>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:25:47
+====================
+
+====================
+User: root01
+Funds: 2744680.50
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284548.95"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: J♣ 5♦
+Community: 7♠ 3♠ 4♦ T♠ 4♣
+Player Card: 3♦ K♣
+=== Best 5 组合 ===
+Dealer: 4♦ 4♣ J♣ T♠ 7♠  <对子>
+Player: 4♦ 4♣ 3♦ 3♠ K♣  <两对>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:25:41
+====================
+
+====================
+User: root01
+Funds: 2744133.00
+=== Bet 下注 ===
+Play: 400
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284503.70"
+Total_bet: 852.50
+=== Card 卡牌 ===
+Dealer Card: K♦ 5♦
+Community: 9♠ Q♣ 8♠ T♣ 8♣
+Player Card: A♥ A♦
+=== Best 5 组合 ===
+Dealer: 8♠ 8♣ K♦ Q♣ T♣  <对子>
+Player: A♥ A♦ 8♠ 8♣ Q♣  <两对>
+=== Win / Lost ===
+Win: 547.50
+Date and Time: 04 of June, 2025. 17:25:30
+====================
+
+====================
+User: root01
+Funds: 2744585.50
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284495.17"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: 3♠ 6♥
+Community: 8♣ 2♦ 5♠ 9♦ K♣
+Player Card: J♥ Q♠
+=== Best 5 组合 ===
+Dealer: K♣ 9♦ 8♣ 6♥ 5♠  <高牌>
+Player: K♣ Q♠ J♥ 9♦ 8♣  <高牌>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:25:23
+====================
+
+====================
+User: root01
+Funds: 2745238.00
+=== Bet 下注 ===
+Play: 200
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284449.92"
+Total_bet: 652.50
+=== Card 卡牌 ===
+Dealer Card: J♦ A♣
+Community: 6♠ 8♣ 2♠ J♥ 9♣
+Player Card: 7♠ 6♥
+=== Best 5 组合 ===
+Dealer: J♦ J♥ A♣ 9♣ 8♣  <对子>
+Player: 6♥ 6♠ J♥ 9♣ 8♣  <对子>
+=== Win / Lost ===
+Lost: 652.50
+Date and Time: 04 of June, 2025. 17:25:10
+====================
+
+====================
+User: root01
+Funds: 2745690.50
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284319.42"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: A♣ 6♦
+Community: 3♦ 7♣ 8♦ 4♣ 8♣
+Player Card: K♥ 5♠
+=== Best 5 组合 ===
+Dealer: 8♦ 8♣ A♣ 7♣ 6♦  <对子>
+Player: 8♦ 8♣ K♥ 7♣ 5♠  <对子>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:25:02
+====================
+
+====================
+User: root01
+Funds: 2746143.00
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284274.17"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: 7♦ A♦
+Community: 9♣ 4♥ 9♠ 3♣ 8♦
+Player Card: 2♠ Q♠
+=== Best 5 组合 ===
+Dealer: 9♣ 9♠ A♦ 8♦ 7♦  <对子>
+Player: 9♣ 9♠ Q♠ 8♦ 4♥  <对子>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:24:53
+====================
+
+====================
+User: root01
+Funds: 2746595.50
+=== Bet 下注 ===
+Play: 400
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284228.92"
+Total_bet: 852.50
+=== Card 卡牌 ===
+Dealer Card: 9♥ 8♠
+Community: T♠ Q♥ 9♠ 4♠ J♠
+Player Card: T♦ 6♠
+=== Best 5 组合 ===
+Dealer: J♠ T♠ 9♠ 8♠ 4♠  <同花>
+Player: J♠ T♠ 9♠ 6♠ 4♠  <同花>
+=== Win / Lost ===
+Lost: 452.50
+Date and Time: 04 of June, 2025. 17:08:24
+====================
+
+====================
+User: root01
+Funds: 2747048.00
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284058.42"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: J♦ A♦
+Community: 9♠ K♦ 9♥ 5♣ 4♦
+Player Card: 7♠ 8♠
+=== Best 5 组合 ===
+Dealer: 9♠ 9♥ A♦ K♦ J♦  <对子>
+Player: 9♠ 9♥ K♦ 8♠ 7♠  <对子>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:08:15
+====================
+
+====================
+User: root01
+Funds: 2747700.50
+=== Bet 下注 ===
+Play: 200
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 284013.17"
+Total_bet: 652.50
+=== Card 卡牌 ===
+Dealer Card: 8♠ 5♠
+Community: J♦ 5♥ 6♠ 3♦ 3♠
+Player Card: A♠ K♠
+=== Best 5 组合 ===
+Dealer: 5♠ 5♥ 3♦ 3♠ J♦  <两对>
+Player: 3♦ 3♠ A♠ K♠ J♦  <对子>
+=== Win / Lost ===
+Lost: 652.50
+Date and Time: 04 of June, 2025. 17:08:06
+====================
+
+====================
+User: root01
+Funds: 2748353.00
+=== Bet 下注 ===
+Play: 200
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283882.67"
+Total_bet: 652.50
+=== Card 卡牌 ===
+Dealer Card: 2♥ T♥
+Community: 8♠ J♥ 9♣ 5♠ 2♣
+Player Card: 2♠ 4♠
+=== Best 5 组合 ===
+Dealer: 2♥ 2♣ J♥ T♥ 9♣  <对子>
+Player: 2♠ 2♣ J♥ 9♣ 8♠  <对子>
+=== Win / Lost ===
+Lost: 652.50
+Date and Time: 04 of June, 2025. 17:07:46
+====================
+
+====================
+User: root01
+Funds: 2748320.50
+=== Bet 下注 ===
+Play: 20
+Ante/Blind: 20
+Trips: 5
+Jackpot: True "MAX: 283752.17"
 Total_bet: 67.50
 === Card 卡牌 ===
-Dealer Card: 3♠ A♣
-Community: J♣ A♠ 7♥ 5♦ 6♣
-Player Card: 4♠ K♣
+Dealer Card: 3♦ 5♠
+Community: 9♠ A♦ 4♣ T♦ 9♦
+Player Card: 8♥ J♥
 === Best 5 组合 ===
-Dealer: A♣ A♠ J♣ 7♥ 6♣  <对子>
-Player: A♠ K♣ J♣ 7♥ 6♣  <高牌>
+Dealer: 9♠ 9♦ A♦ T♦ 5♠  <对子>
+Player: 9♠ 9♦ A♦ J♥ T♦  <对子>
 === Win / Lost ===
-Lost: 67.50
-Date and Time: 24 of May, 2025. 20:06:17
+Win: 32.50
+Date and Time: 04 of June, 2025. 17:07:36
+====================
+
+====================
+User: root01
+Funds: 2748773.00
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283751.50"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: K♥ 7♠
+Community: T♠ T♦ 5♣ Q♥ A♦
+Player Card: 2♥ 8♠
+=== Best 5 组合 ===
+Dealer: T♠ T♦ A♦ K♥ Q♥  <对子>
+Player: T♠ T♦ A♦ Q♥ 8♠  <对子>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:07:21
+====================
+
+====================
+User: root01
+Funds: 2749225.50
+=== Bet 下注 ===
+Play: 0
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283706.25"
+Total_bet: 452.50
+=== Card 卡牌 ===
+Dealer Card: 6♣ A♥
+Community: Q♣ Q♦ 8♦ 4♦ K♥
+Player Card: 3♣ 6♦
+=== Best 5 组合 ===
+Dealer: Q♣ Q♦ A♥ K♥ 8♦  <对子>
+Player: Q♣ Q♦ K♥ 8♦ 6♦  <对子>
+=== Win / Lost ===
+Lost: 455.00
+Date and Time: 04 of June, 2025. 17:06:56
+====================
+
+====================
+User: demo_player
+Funds: 1000.00
+=== Bet 下注 ===
+Play: 40
+Ante/Blind: 20
+Trips: 5
+Jackpot: True "MAX: 283661.00"
+Total_bet: 87.50
+=== Card 卡牌 ===
+Dealer Card: J♠ 9♠
+Community: K♠ T♠ 3♦ A♣ T♣
+Player Card: 6♣ 8♣
+=== Best 5 组合 ===
+Dealer: T♠ T♣ A♣ K♠ J♠  <对子>
+Player: T♠ T♣ A♣ K♠ 8♣  <对子>
+=== Win / Lost ===
+Lost: 87.50
+Date and Time: 27 of May, 2025. 04:13:25
+====================
+
+====================
+User: root01
+Funds: 1749305.00
+=== Bet 下注 ===
+Play: 400
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283643.50"
+Total_bet: 852.50
+=== Card 卡牌 ===
+Dealer Card: 3♦ 2♠
+Community: 2♣ 4♥ 5♥ 9♥ A♥
+Player Card: 3♠ Q♦
+=== Best 5 组合 ===
+Dealer: A♥ 2♠ 3♦ 4♥ 5♥  <顺子>
+Player: A♥ 2♣ 3♠ 4♥ 5♥  <顺子>
+=== Win / Lost ===
+Win: 197.50
+Date and Time: 26 of May, 2025. 15:25:48
+====================
+
+====================
+User: root01
+Funds: 1748957.50
+=== Bet 下注 ===
+Play: 200
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283630.71"
+Total_bet: 652.50
+=== Card 卡牌 ===
+Dealer Card: A♦ 5♠
+Community: T♥ 6♦ 4♦ 5♥ J♦
+Player Card: 3♠ T♦
+=== Best 5 组合 ===
+Dealer: 5♠ 5♥ A♦ J♦ T♥  <对子>
+Player: T♦ T♥ J♦ 6♦ 5♥  <对子>
+=== Win / Lost ===
+Win: 347.50
+Date and Time: 26 of May, 2025. 15:25:37
+====================
+
+====================
+User: root01
+Funds: 1749810.00
+=== Bet 下注 ===
+Play: 400
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283624.18"
+Total_bet: 852.50
+=== Card 卡牌 ===
+Dealer Card: J♣ 6♠
+Community: 7♣ J♦ 4♠ 3♠ Q♥
+Player Card: 7♠ K♥
+=== Best 5 组合 ===
+Dealer: J♣ J♦ Q♥ 7♣ 6♠  <对子>
+Player: 7♠ 7♣ K♥ Q♥ J♦  <对子>
+=== Win / Lost ===
+Lost: 852.50
+Date and Time: 26 of May, 2025. 15:25:19
+====================
+
+====================
+User: root01
+Funds: 1749262.50
+=== Bet 下注 ===
+Play: 400
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283453.68"
+Total_bet: 852.50
+=== Card 卡牌 ===
+Dealer Card: 5♥ 9♠
+Community: 3♠ 4♥ A♣ 5♠ Q♥
+Player Card: 3♣ 5♦
+=== Best 5 组合 ===
+Dealer: 5♥ 5♠ A♣ Q♥ 9♠  <对子>
+Player: 5♦ 5♠ 3♣ 3♠ A♣  <两对>
+=== Win / Lost ===
+Win: 547.50
+Date and Time: 26 of May, 2025. 15:23:42
+====================
+
+====================
+User: root01
+Funds: 1749915.00
+=== Bet 下注 ===
+Play: 200
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283445.15"
+Total_bet: 652.50
+=== Card 卡牌 ===
+Dealer Card: 9♣ A♣
+Community: T♥ 2♣ 8♦ 8♥ 3♦
+Player Card: K♠ J♣
+=== Best 5 组合 ===
+Dealer: 8♦ 8♥ A♣ T♥ 9♣  <对子>
+Player: 8♦ 8♥ K♠ J♣ T♥  <对子>
+=== Win / Lost ===
+Lost: 652.50
+Date and Time: 26 of May, 2025. 15:23:32
+====================
+
+====================
+User: root01
+Funds: 1750517.50
+=== Bet 下注 ===
+Play: 400
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283314.65"
+Total_bet: 852.50
+=== Card 卡牌 ===
+Dealer Card: 7♥ 8♥
+Community: 5♥ 2♣ 3♠ 6♣ 4♣
+Player Card: J♥ 5♣
+=== Best 5 组合 ===
+Dealer: 4♣ 5♥ 6♣ 7♥ 8♥  <顺子>
+Player: 2♣ 3♠ 4♣ 5♣ 6♣  <顺子>
+=== Win / Lost ===
+Lost: 602.50
+Date and Time: 26 of May, 2025. 15:23:01
+====================
+
+====================
+User: root01
+Funds: 1750170.00
+=== Bet 下注 ===
+Play: 400
+Ante/Blind: 200
+Trips: 50
+Jackpot: True "MAX: 283144.15"
+Total_bet: 852.50
+=== Card 卡牌 ===
+Dealer Card: 9♠ Q♦
+Community: 6♣ 5♥ 2♣ 4♠ T♠
+Player Card: 5♠ A♦
+=== Best 5 组合 ===
+Dealer: Q♦ T♠ 9♠ 6♣ 5♥  <高牌>
+Player: 5♠ 5♥ A♦ T♠ 6♣  <对子>
+=== Win / Lost ===
+Win: 347.50
+Date and Time: 26 of May, 2025. 15:22:56
 ====================

@@ -1,1 +1,0 @@
-jackpot_amount
