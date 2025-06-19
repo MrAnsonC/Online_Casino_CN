@@ -707,7 +707,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         self.bet_widgets["call"] = self.call_display
 
         # 新增提示文字 - 在下注模块下方
-        self.hint_label = tk.Label(call_frame, text="庄家是高牌 Ante退还", 
+        self.hint_label = tk.Label(call_frame, text="庄家玩对子4或以上", 
                                 font=('Arial', 18), bg='#2a4a3c', fg='#FFD700')
         self.hint_label.pack(pady=(0, 10))
 
