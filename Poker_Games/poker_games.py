@@ -6,6 +6,7 @@ import time
 from Poker_Games import Blackjack
 from Poker_Games import UTH_GUI
 from Poker_Games import transfer_baccarat
+from Poker_Games import Three_Card_Poker
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -35,6 +36,7 @@ def display_menu():
     print("欢迎来到扑克中心!\n")
     print("请选择以下的游戏种类(0返回主目录):")
     print("① 21点 ② 终极德州扑克 ③ 百家乐")
+    print("④ 三張牌撲克")
 
 def main(balance, user):
     while True:
@@ -50,8 +52,10 @@ def main(balance, user):
                 balance = UTH_GUI.main(balance, user)  # 运行 UTH 并更新余额   
             elif choice == "3":
                 balance = transfer_baccarat.play_game(balance, user)
+            elif choice == "4":
+                balance = Three_Card_Poker.main(balance, user)
             else:
-                print("无效选择，请输入1到3。")
+                print("无效选择，请输入1到4。")
                 time.sleep(1.5)
             update_balance_in_json(user, balance)
         except ValueError:
