@@ -3,10 +3,12 @@ import os
 import time
 
 ## Poker games import
-from Poker_Games import Blackjack
-from Poker_Games import UTH_GUI
-from Poker_Games import transfer_baccarat
-from Poker_Games import Three_Card_Poker
+from Casino_Games import Blackjack
+from Casino_Games import UTH_GUI
+from Casino_Games import transfer_baccarat
+from Casino_Games import Three_Card_Poker
+from Casino_Games import Sicbo
+from Casino_Games import Casino_Holdem
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -33,10 +35,10 @@ def update_balance_in_json(username, new_balance):
     save_user_data(users)  # 保存更新后的数据
     
 def display_menu():
-    print("欢迎来到扑克中心!\n")
+    print("欢迎来到赌场!\n")
     print("请选择以下的游戏种类(0返回主目录):")
     print("① 21点 ② 终极德州扑克 ③ 百家乐")
-    print("④ 三張牌撲克")
+    print("④ 三張牌撲克 ⑤ 骰宝 ⑥ 赌场扑克")
 
 def main(balance, user):
     while True:
@@ -47,15 +49,19 @@ def main(balance, user):
             if choice == "0":
                 return balance 
             elif choice == "1":
-                balance = Blackjack.main(balance, user)  # 运行 Blackjack 并更新余额
+                balance = Blackjack.main(balance, user)
             elif choice == "2":
-                balance = UTH_GUI.main(balance, user)  # 运行 UTH 并更新余额   
+                balance = UTH_GUI.main(balance, user)
             elif choice == "3":
                 balance = transfer_baccarat.play_game(balance, user)
             elif choice == "4":
                 balance = Three_Card_Poker.main(balance, user)
+            elif choice == "5":
+                balance = Sicbo.main(user, balance)
+            elif choice == "6":
+                balance = Casino_Holdem.main(balance, user)
             else:
-                print("无效选择，请输入1到4。")
+                print("无效选择，请输入1到6。")
                 time.sleep(1.5)
             update_balance_in_json(user, balance)
         except ValueError:

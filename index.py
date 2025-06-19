@@ -7,7 +7,7 @@ import register
 import charge
 
 # Games import
-from Poker_Games import poker_games
+from Casino_Games import casino_games
 from Lotto import lotto
 from Small_Games import small_games
 
@@ -74,7 +74,7 @@ def display_menu():
     os.system('cls' if os.name == 'nt' else 'clear')
     print("欢迎来到游戏中心!\n")
     print("选择一下游戏:")
-    print("① 扑克牌  ② 街机小游戏  ③ 刮刮乐")
+    print("① 赌场游戏  ② 街机小游戏  ③ 刮刮乐")
 
     print("⑨ 账号服务")
 
@@ -107,7 +107,7 @@ def main():
             choice = input("\n请输入你的选择: ")
 
             if choice == '1':
-                balance = poker_games.main(balance, username)
+                balance = casino_games.main(balance, username)
             elif choice == '2':
                 balance = small_games.main(balance, username)
             elif choice == '3':

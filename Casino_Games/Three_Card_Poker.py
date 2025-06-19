@@ -238,13 +238,13 @@ class ThreeCardPokerGame:
         # 规则2：如果是高牌，检查是否有Q以上牌（Q, K, A）
         max_value = max(card.value for card in self.dealer_hand)
         # Q=12, K=13, A=14
-        return max_value >= 13
+        return max_value >= 12
 
 class ThreeCardPokerGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
         self.title("Three Card Poker")
-        self.geometry("1050x675")
+        self.geometry("1050x680")
         self.configure(bg='#35654d')
         
         self.username = username
@@ -272,6 +272,18 @@ class ThreeCardPokerGUI(tk.Tk):
         self.bet_widgets = {}  # 存储下注显示控件
         self.jackpot_bet_var = tk.IntVar(value=0)  # Jackpot下注变量
         self.six_card_bet_var = tk.IntVar(value=0)  # 6 Card下注变量
+
+        self.six_card_hand_names = {
+            "6_card_super_royal": "6张牌超级皇家同花顺",
+            "royal_flush": "皇家同花顺",
+            "straight_flush": "同花顺",
+            "four_of_a_kind": "四条",
+            "full_house": "葫芦",
+            "flush": "同花",
+            "straight": "顺子",
+            "three_of_a_kind": "三条",
+            "other": "其他"
+        }
         
         self._load_assets()
         self._create_widgets()
@@ -386,7 +398,7 @@ class ThreeCardPokerGUI(tk.Tk):
         # 在庄家和玩家区域之间添加提示文字
         self.ante_info_label = tk.Label(
             table_canvas, 
-            text="庄家手牌Q或以下 Ante退还", 
+            text="庄家玩高牌Q或以上", 
             font=('Arial', 20), 
             bg='#35654d', 
             fg='#FFD700'
@@ -1005,15 +1017,15 @@ class ThreeCardPokerGUI(tk.Tk):
             self.last_six_card_state = self.six_card_bet_var.get()  # 保存6 Card状态
             
             # 检查Ante至少5块
-            if self.ante < 5:
-                messagebox.showerror("错误", "Ante至少需要5块")
+            if self.ante < 5 and self.pair_plus < 5:  # 修改这里：改为检查两者总和
+                messagebox.showerror("错误", "Ante或Pair Plus至少需要5块")
                 return
-            
+                
             # 计算总下注
             total_bet = self.ante + self.pair_plus + self.jackpot_bet + self.six_card_bet
                 
-            if total_bet > self.balance:
-                messagebox.showerror("错误", "余额不足")
+            if self.balance < total_bet + self.ante:
+                messagebox.showwarning("警告", "余额不足以支付Bet")
                 return
                 
             self.balance -= total_bet
@@ -1070,6 +1082,17 @@ class ThreeCardPokerGUI(tk.Tk):
             # 更新游戏状态
             self.stage_label.config(text="阶段: 决策")
             self.status_label.config(text="做出决策: 弃牌或下注Bet")
+
+            # 如果Ante为0，则跳过决策阶段
+            if self.ante == 0:  # 添加这个判断
+                # 直接进入摊牌阶段
+                self.game.stage = "showdown"
+                self.stage_label.config(text="阶段: 摊牌")
+                self.status_label.config(text="摊牌中...")
+                self.after(5000, self.show_showdown)
+                
+                # 不需要创建决策按钮
+                return
             
             # 创建操作按钮 - 替换开始按钮
             for widget in self.action_frame.winfo_children():
@@ -1292,7 +1315,6 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 重置显示金额为0
         self.ante_var.set("0")
-        self.pair_plus_var.set("0")
         self.play_var.set("0")
         
         # 翻开庄家牌
@@ -1310,6 +1332,7 @@ class ThreeCardPokerGUI(tk.Tk):
             pair_plus_win = pair_plus_bet * (payout + 1)
             self.balance += pair_plus_win
             self.update_balance()
+            self.pair_plus_var.set(str(int(pair_plus_win)))
         
         # 结算Bonus (如果下注了Jackpot)
         bonus_win = 0
@@ -1320,7 +1343,7 @@ class ThreeCardPokerGUI(tk.Tk):
                 self.balance += bonus_win
                 self.update_balance()
                 player_hand_type = HAND_RANK_NAMES.get(player_eval[0], "高牌")
-                bonus_text = f"恭喜中了JP大奖${bonus_win:.2f}~ 牌型{player_hand_type}"
+                bonus_text = f"恭喜中了JP大奖${bonus_win:.2f} ~ 牌型{player_hand_type}"
         
         # 结算6 Card (如果下注了)
         six_card_win = 0
@@ -1374,20 +1397,19 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 设置30秒后自动重置
         self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
-    
+        
     def get_best_six_card_hand_type(self):
-        """获取6张牌的最佳牌型"""
-        # 合并玩家和庄家的牌
         all_cards = self.game.player_hand + self.game.dealer_hand
-        
-        # 检查6-Card Super Royal (9-10-J-Q-K-A 同花顺)
+
         if self.is_six_card_super_royal(all_cards):
-            return SIX_CARD_PAYOUT["6_card_super_royal"] * (self.game.six_card_bet / 10), "6-Card Super Royal"
+            # 返回中文牌型名称
+            return SIX_CARD_PAYOUT["6_card_super_royal"] * (self.game.six_card_bet / 10), "6张牌超级皇家同花顺"
+
+        best_value, best_name = self.evaluate_best_five_card_hand(all_cards)
+        # 将英文牌型名称转换为中文
+        chinese_name = self.six_card_hand_names.get(best_name, best_name)
+        return best_value, chinese_name
         
-        # 检查其他牌型
-        best_value, best_hand_name = self.evaluate_best_five_card_hand(all_cards)
-        return best_value * (self.game.six_card_bet / 10), best_hand_name
-    
     def show_showdown(self):
         # 翻开庄家牌
         self.reveal_dealer_cards()
@@ -1411,13 +1433,25 @@ class ThreeCardPokerGUI(tk.Tk):
         # 设置背景色：赢为金色，平局为浅蓝色，输为白色
         for bet_type in ["ante", "pair_plus", "play"]:
             widget = self.bet_widgets.get(bet_type)
-            if widget:
-                if details[bet_type] > 0 and details[bet_type] != self.game.ante:  # 赢
-                    widget.config(bg='gold')
-                elif details[bet_type] == self.game.ante:  # 平局
-                    widget.config(bg='light blue')
-                else:  # 输
-                    widget.config(bg='white')
+            if not widget:
+                continue
+
+            # 对应的下注金额，如果是 play（Bet），取 self.game.play_bet
+            bet_amount = (
+                self.game.play_bet if bet_type == "play"
+                else getattr(self.game, bet_type)
+            )
+            win_amount = details[bet_type]
+
+            # 赢（任何注项赢都染金色）
+            if details[bet_type] > 0 and details[bet_type] != self.game.ante:  # 赢
+                widget.config(bg='gold')
+            # 平局且确实有下注（注额>0）
+            elif win_amount == bet_amount and bet_amount > 0:
+                widget.config(bg='light blue')
+            # 其他情况（输了，或根本没下注）都保持白色
+            else:
+                widget.config(bg='white')
         
         # 构建主消息
         dealer_qualifies = self.game.dealer_qualifies()
@@ -1427,7 +1461,10 @@ class ThreeCardPokerGUI(tk.Tk):
             base_text = "本局您赢了"
         else:
             if comparison > 0:  # 玩家赢
-                base_text = "本局您赢了"
+                if dealer_qualifies != True:
+                    base_text = "本局Ante退还"
+                else:
+                    base_text = "本局您赢了"
             elif comparison < 0:  # 玩家输
                 base_text = "本局您输了"
             else:  # 平局
@@ -1445,6 +1482,7 @@ class ThreeCardPokerGUI(tk.Tk):
             bonus_text = f"恭喜中了JP大奖${bonus_win:.2f}~ 牌型{player_hand_type}"
         
         if six_card_win > 0:
+            # 获取6张牌的最佳牌型
             _, hand_type = self.get_best_six_card_hand_type()
             six_card_text = f"恭喜中了6 Card大奖${six_card_win:.2f} ~ 牌型{hand_type}"
         
@@ -1608,18 +1646,16 @@ class ThreeCardPokerGUI(tk.Tk):
         return 0
     
     def calculate_six_card_bonus(self):
-        """计算6 Card奖励"""
-        # 合并玩家和庄家的牌
         all_cards = self.game.player_hand + self.game.dealer_hand
-        
-        # 检查6-Card Super Royal (9-10-J-Q-K-A 同花顺)
+
+        # 先检查6-Card Super Royal
         if self.is_six_card_super_royal(all_cards):
             return SIX_CARD_PAYOUT["6_card_super_royal"] * (self.game.six_card_bet / 10)
+
+        # 其余牌型：直接解包
+        best_value, _ = self.evaluate_best_five_card_hand(all_cards)
+        return best_value * (self.game.six_card_bet / 10)
         
-        # 检查其他牌型
-        best_hand_value = self.evaluate_best_five_card_hand(all_cards)
-        return best_hand_value * (self.game.six_card_bet / 10)
-    
     def is_six_card_super_royal(self, cards):
         """检查是否是6-Card Super Royal (9-10-J-Q-K-A 同花顺)"""
         # 首先检查花色是否全部相同
@@ -1634,19 +1670,24 @@ class ThreeCardPokerGUI(tk.Tk):
         return card_ranks == required_ranks
     
     def evaluate_best_five_card_hand(self, cards):
-        """评估6张牌中最好的5张牌组合"""
-        # 生成所有可能的5张牌组合
+        """评估6张牌中最好的5张牌组合，返回 (最佳支付值, 牌型名称)"""
         from itertools import combinations
+
         best_value = 0
-        
-        # 遍历所有5张牌组合
+        best_name = "other"
+        # 遍历所有5张组合
         for combo in combinations(cards, 5):
-            hand_value = self.evaluate_five_card_hand(list(combo))
-            if hand_value > best_value:
-                best_value = hand_value
+            val = self.evaluate_five_card_hand(list(combo))
+            if val > best_value:
+                best_value = val
+                # 根据 payout 表反查牌型名称
+                for name, payout in SIX_CARD_PAYOUT.items():
+                    if payout == val:
+                        best_name = name
+                        break
+
+        return best_value, best_name
         
-        return best_value
-    
     def evaluate_five_card_hand(self, cards):
         """评估5张牌的牌型"""
         # 按点数排序
