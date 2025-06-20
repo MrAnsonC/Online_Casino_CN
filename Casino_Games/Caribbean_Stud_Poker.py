@@ -11,43 +11,39 @@ SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 RANK_VALUES = {r: i for i, r in enumerate(RANKS, start=2)}
 HAND_RANK_NAMES = {
-    6: '同花顺', 
-    5: '三条', 
+    9: '同花大顺', 
+    8: '同花顺', 
+    7: '四条', 
+    6: '葫芦', 
+    5: '同花', 
     4: '顺子', 
-    3: '同花', 
-    2: '对子', 
-    1: '高牌'
+    3: '三条', 
+    2: '两对', 
+    1: '对子', 
+    0: '高牌'
 }
 
-# Pair Plus支付表 (已修复)
-PAIR_PLUS_PAYOUT = {
-    6: 40,  # 同花顺 40:1
-    5: 30,  # 三条 30:1
-    4: 6,   # 顺子 6:1
-    3: 3,   # 同花 3:1
-    2: 1    # 对子 1:1
+# 加勒比扑克赔付表
+CARIBBEAN_STUD_PAYOUT = {
+    9: 100,  # 同花大顺 100:1
+    8: 50,   # 同花顺 50:1
+    7: 20,   # 四条 20:1
+    6: 7,    # 葫芦 7:1
+    5: 5,    # 同花 5:1
+    4: 4,    # 顺子 4:1
+    3: 3,    # 三条 3:1
+    2: 2,    # 两对 2:1
+    1: 1,    # 对子 1:1
+    0: 1     # 高牌 1:1
 }
 
-# Bonus支付表
+# Bonus赔付表
 BONUS_PAYOUT = {
-    "black_royal_flush": "赢得整个Jackpot",
-    "royal_flush": "赢得Jackpot的10%",
-    "straight_flush": "$500",
-    "three_of_a_kind": "$400",
-    "straight": "$40"
-}
-
-# 6 Card支付表
-SIX_CARD_PAYOUT = {
-    "6_card_super_royal": 100010,  # 6-Card Super Royal
-    "royal_flush": 10010,          # 皇家同花顺
-    "straight_flush": 2010,        # 同花顺
-    "four_of_a_kind": 510,         # 四条
-    "full_house": 210,             # 葫芦
-    "flush": 160,                  # 同花
-    "straight": 110,               # 顺子
-    "three_of_a_kind": 60,         # 三条
-    "other": 0                     # 其他
+    "royal_flush": "赢得整个Jackpot",
+    "straight_flush": "赢得Jackpot的10%",
+    "four_of_a_kind": "$500",
+    "full_house": "$100",
+    "flush": "$75"
 }
 
 def get_data_file_path():
@@ -87,11 +83,11 @@ def load_jackpot():
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             for item in data:
-                if item.get('Games') == '3CP':
+                if item.get('Games') == 'CSP':
                     return False, float(item.get('jackpot', default_jackpot))
     except Exception:
         return True, default_jackpot
-    # 未找到 UTH 条目时也使用默认
+    # 未找到 CSP 条目时也使用默认
     return True, default_jackpot
 
 def save_jackpot(jackpot):
@@ -105,16 +101,16 @@ def save_jackpot(jackpot):
         except:
             data = []
     
-    # 查找是否已有UTH的记录
+    # 查找是否已有CSP的记录
     found = False
     for item in data:
-        if item.get('Games') == '3CP':
+        if item.get('Games') == 'CSP':
             item['jackpot'] = jackpot
             found = True
             break
     
     if not found:
-        data.append({"Games": "3CP", "jackpot": jackpot})
+        data.append({"Games": "CSP", "jackpot": jackpot})
     
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4)
@@ -141,48 +137,82 @@ class Deck:
         self.pointer += n
         return dealt
 
-def evaluate_three_card_hand(cards):
-    """评估三张牌的手牌"""
+def evaluate_five_card_hand(cards):
+    """评估五张牌的手牌"""
+    # 按牌面值排序（从大到小）
     values = sorted([c.value for c in cards], reverse=True)
     suits = [c.suit for c in cards]
     
-    # 检查同花顺
-    if len(set(suits)) == 1:
-        # A-2-3 顺子 (最小的顺子)
-        if values == [14, 3, 2]:
-            return (6, [3])  # 最大牌为3
-        # 其他顺子
-        if values[0] - values[1] == 1 and values[1] - values[2] == 1:
-            return (6, [values[0]])   # 返回最大牌
-    
-    # 检查三条
-    if values[0] == values[1] == values[2]:
-        return (5, [values[0]])
+    # 检查同花
+    is_flush = len(set(suits)) == 1
     
     # 检查顺子
-    if values == [14, 3, 2]:  # A-2-3
-        return (4, [3])
-    if values[0] - values[1] == 1 and values[1] - values[2] == 1:
-        return (4, [values[0]])
+    values_sorted_asc = sorted([c.value for c in cards])  # 升序排序
+    is_straight = False
+    straight_values = None
     
-    # 检查同花
-    if len(set(suits)) == 1:
-        return (3, values)  # 返回所有点数用于比较
+    # 检查普通顺子
+    if len(set(values_sorted_asc)) == 5:
+        # 检查最大减最小是否为4
+        if values_sorted_asc[-1] - values_sorted_asc[0] == 4:
+            is_straight = True
+            straight_values = sorted(values, reverse=True)  # 降序排列
+        # 检查特殊顺子 A-2-3-4-5
+        elif values_sorted_asc == [2, 3, 4, 5, 14]:
+            is_straight = True
+            straight_values = [5, 4, 3, 2, 1]  # 作为5-high顺子
     
-    # 检查对子
-    if values[0] == values[1]:
-        # 对子在前两张，第三张是单张
-        return (2, [values[0], values[2]])
-    elif values[1] == values[2]:
-        # 对子在后两张，第一张是单张
-        return (2, [values[1], values[0]])
+    # 检查同花大顺（A,K,Q,J,10 同花）
+    is_royal = is_straight and is_flush and values[0] == 14 and values[4] == 10
     
-    return (1, values)  # 高牌
+    # 同花顺（包括同花大顺）
+    if is_straight and is_flush:
+        return (9 if is_royal else 8, straight_values)
+    
+    # 计算每种点数的出现次数
+    value_count = {}
+    for v in values:
+        value_count[v] = value_count.get(v, 0) + 1
+    
+    # 按出现次数和点数排序
+    sorted_counts = sorted(value_count.items(), key=lambda x: (x[1], x[0]), reverse=True)
+    sorted_values = [item[0] for item in sorted_counts]
+    
+    # 检查四条
+    if sorted_counts[0][1] == 4:
+        return (7, sorted_values)
+    
+    # 检查葫芦（三条+一对）
+    if sorted_counts[0][1] == 3 and sorted_counts[1][1] == 2:
+        return (6, sorted_values)
+    
+    # 同花
+    if is_flush:
+        return (5, values)
+    
+    # 顺子
+    if is_straight:
+        return (4, straight_values)
+    
+    # 三条
+    if sorted_counts[0][1] == 3:
+        return (3, sorted_values)
+    
+    # 两对
+    if sorted_counts[0][1] == 2 and sorted_counts[1][1] == 2:
+        return (2, sorted_values)
+    
+    # 一对
+    if sorted_counts[0][1] == 2:
+        return (1, sorted_values)
+    
+    # 高牌
+    return (0, values)
 
 def compare_hands(hand1, hand2):
     """比较两手牌，返回1表示hand1赢，0表示平局，-1表示hand2赢"""
-    rank1, values1 = evaluate_three_card_hand(hand1)
-    rank2, values2 = evaluate_three_card_hand(hand2)
+    rank1, values1 = evaluate_five_card_hand(hand1)
+    rank2, values2 = evaluate_five_card_hand(hand2)
     
     if rank1 > rank2:
         return 1
@@ -190,15 +220,25 @@ def compare_hands(hand1, hand2):
         return -1
     else:
         # 相同牌型，比较点数
-        # 逐个比较每张牌
-        for v1, v2 in zip(values1, values2):
-            if v1 > v2:
+        # 对于对子、两对等牌型，values列表长度可能不同
+        min_len = min(len(values1), len(values2))
+        for i in range(min_len):
+            if values1[i] > values2[i]:
                 return 1
-            elif v1 < v2:
+            elif values1[i] < values2[i]:
+                return -1
+        
+        # 如果前min_len个值相同，比较原始牌值
+        values1_full = sorted([c.value for c in hand1], reverse=True)
+        values2_full = sorted([c.value for c in hand2], reverse=True)
+        for i in range(len(values1_full)):
+            if values1_full[i] > values2_full[i]:
+                return 1
+            elif values1_full[i] < values2_full[i]:
                 return -1
         return 0
 
-class ThreeCardPokerGame:
+class CaribbeanStudGame:
     def __init__(self):
         self.reset_game()
         # 初始化Jackpot
@@ -210,81 +250,57 @@ class ThreeCardPokerGame:
         self.player_hand = []
         self.dealer_hand = []
         self.ante = 0
-        self.pair_plus = 0
+        self.jackpot_bet = 0
         self.play_bet = 0
-        self.jackpot_bet = 0  # 新增Jackpot下注
-        self.six_card_bet = 0  # 新增6 Card下注
         self.stage = "pre_flop"  # pre_flop, decision, showdown
         self.folded = False
         self.cards_revealed = {
-            "player": [False, False, False],
-            "dealer": [False, False, False]
+            "player": [False, False, False, False, False],
+            "dealer": [False, False, False, False, False]
         }
     
     def deal_initial(self):
-        """发初始牌：玩家3张，庄家3张"""
-        self.player_hand = self.deck.deal(3)
-        self.dealer_hand = self.deck.deal(3)
+        """发初始牌：玩家5张，庄家5张"""
+        self.player_hand = self.deck.deal(5)
+        self.dealer_hand = self.deck.deal(5)
     
     def dealer_qualifies(self):
-        """庄家是否合格（至少有一张Q高或更好牌型）"""
-        # 首先评估庄家牌型
-        hand_rank, _ = evaluate_three_card_hand(self.dealer_hand)
-        
-        # 规则1：如果牌型不是高牌（即有任何特殊牌型），自动合格
-        if hand_rank != 1:  # 1 表示高牌
-            return True
-        
-        # 规则2：如果是高牌，检查是否有Q以上牌（Q, K, A）
-        max_value = max(card.value for card in self.dealer_hand)
-        # Q=12, K=13, A=14
-        return max_value >= 12
+        """庄家是否合格（至少有一张A和K）"""
+        # 检查庄家是否有A和K
+        has_ace = any(card.rank == 'A' for card in self.dealer_hand)
+        has_king = any(card.rank == 'K' for card in self.dealer_hand)
+        rank, _ = evaluate_five_card_hand(self.dealer_hand)
+        return has_ace and has_king or rank >= 1
 
-class ThreeCardPokerGUI(tk.Tk):
+class CaribbeanStudGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
-        self.title("Three Card Poker")
-        self.geometry("1050x680")
+        self.title("加勒比扑克")
+        self.geometry("1050x660")
         self.configure(bg='#35654d')
         
         self.username = username
         self.balance = initial_balance
-        self.game = ThreeCardPokerGame()
+        self.game = CaribbeanStudGame()
         self.card_images = {}
         self.animation_queue = []
         self.animation_in_progress = False
         self.card_positions = {}
-        self.active_card_labels = []  # 追踪所有活动中的卡片标签
+        self.active_card_labels = []  # 跟踪所有活动中的卡片标签
         self.selected_chip = None  # 当前选中的筹码
         self.chip_buttons = []  # 筹码按钮列表
         self.last_win = 0
         self.auto_reset_timer = None
         self.buttons_disabled = False  # 跟踪按钮是否被禁用
         self.last_jackpot_state = 0
-        self.last_six_card_state = 0  # 新增：保存上局6 Card状态
         self.win_details = {
             "ante": 0,
-            "pair_plus": 0,
             "play": 0,
-            "bonus": 0,
-            "six_card": 0
+            "bonus": 0
         }
         self.bet_widgets = {}  # 存储下注显示控件
         self.jackpot_bet_var = tk.IntVar(value=0)  # Jackpot下注变量
-        self.six_card_bet_var = tk.IntVar(value=0)  # 6 Card下注变量
 
-        self.six_card_hand_names = {
-            "6_card_super_royal": "6张牌超级皇家同花顺",
-            "royal_flush": "皇家同花顺",
-            "straight_flush": "同花顺",
-            "four_of_a_kind": "四条",
-            "full_house": "葫芦",
-            "flush": "同花",
-            "straight": "顺子",
-            "three_of_a_kind": "三条",
-            "other": "其他"
-        }
-        
         self._load_assets()
         self._create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -297,7 +313,7 @@ class ThreeCardPokerGUI(tk.Tk):
         self.quit()
         
     def _load_assets(self):
-        card_size = (100, 140)
+        card_size = (80, 120)  # 缩小卡片尺寸以适应5张牌
         base_dir = os.path.dirname(os.path.abspath(__file__))
         card_dir = os.path.join(base_dir, 'Card')
         
@@ -343,14 +359,14 @@ class ThreeCardPokerGUI(tk.Tk):
                         except Exception as e:
                             print(f"Error loading {path}: {e}")
                 
-                # 如果没有找到图片，创建一个占位图片
+                # 如果没有找到图片，创建一个占位图
                 if not img_found:
                     print(f"Card image not found for {suit}{rank}")
                     img = Image.new('RGB', card_size, 'blue')
                     draw = ImageDraw.Draw(img)
                     # 在图片上绘制花色和点数
                     try:
-                        font = ImageFont.truetype("arial.ttf", 24)
+                        font = ImageFont.truetype("arial.ttf", 18)
                         text = f"{suit}{rank}"
                         draw.text((10, 10), text, font=font, fill="white")
                     except:
@@ -371,9 +387,6 @@ class ThreeCardPokerGUI(tk.Tk):
         if bet_type == "ante":
             current = float(self.ante_var.get())
             self.ante_var.set(str(int(current + chip_value)))
-        elif bet_type == "pair_plus":
-            current = float(self.pair_plus_var.get())
-            self.pair_plus_var.set(str(int(current + chip_value)))
     
     def _create_widgets(self):
         # 主框架 - 左右布局
@@ -389,7 +402,7 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 庄家区域 - 固定高度200
         dealer_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        dealer_frame.place(x=50, y=50, width=500, height=230)
+        dealer_frame.place(x=50, y=50, width=500, height=230)  # 加宽以适应5张牌
         self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.dealer_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.dealer_cards_frame = tk.Frame(dealer_frame, bg='#2a4a3c')
@@ -398,13 +411,13 @@ class ThreeCardPokerGUI(tk.Tk):
         # 在庄家和玩家区域之间添加提示文字
         self.ante_info_label = tk.Label(
             table_canvas, 
-            text="庄家玩高牌Q或以上", 
+            text="庄家玩高牌A和K", 
             font=('Arial', 20), 
             bg='#35654d', 
             fg='#FFD700'
         )
 
-        # 更新以便获取宽度
+        # 更新以获取宽度
         self.ante_info_label.update_idletasks()
         label_width = self.ante_info_label.winfo_width()
 
@@ -418,7 +431,7 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 玩家区域 - 固定高度200
         player_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        player_frame.place(x=50, y=350, width=500, height=230)
+        player_frame.place(x=50, y=350, width=500, height=230)  # 加宽以适应5张牌
         self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.player_cards_frame = tk.Frame(player_frame, bg='#2a4a3c')
@@ -457,11 +470,11 @@ class ThreeCardPokerGUI(tk.Tk):
         # 创建一个内部框架用于居中
         jackpot_inner_frame = tk.Frame(jackpot_frame, bg='#2a4a3c')
         jackpot_inner_frame.pack(expand=True, pady=5)  # 使用expand和居中
-        
+
         jackpot_label = tk.Label(jackpot_inner_frame, text="Jackpot:", 
                                 font=('Arial', 18), bg='#2a4a3c', fg='gold')
         jackpot_label.pack(side=tk.LEFT, padx=(0, 5))  # 右侧留5像素间距
-        
+
         self.jackpot_var = tk.StringVar()
         self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
         self.jackpot_display = tk.Label(jackpot_inner_frame, textvariable=self.jackpot_var, 
@@ -506,7 +519,7 @@ class ThreeCardPokerGUI(tk.Tk):
         bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
         bet_frame.pack(fill=tk.X, pady=10)
         
-        # Jackpot和6 Card下注区域 - 放在同一行
+        # Jackpot下注区域
         bonus_bet_frame = tk.Frame(bet_frame, bg='#2a4a3c')
         bonus_bet_frame.pack(fill=tk.X, padx=20, pady=5)
         
@@ -522,26 +535,9 @@ class ThreeCardPokerGUI(tk.Tk):
         )
         self.jackpot_check.pack(side=tk.LEFT)
         
-        # 6 Card下注 - 放在Jackpot旁边
-        self.six_card_check = tk.Checkbutton(
-            bonus_bet_frame, 
-            text="6 Card ($10)", 
-            variable=self.six_card_bet_var,
-            font=('Arial', 12), 
-            bg='#2a4a3c', 
-            fg='white', 
-            selectcolor='black',
-            command=self.update_six_card_bet
-        )
-        self.six_card_check.pack(side=tk.LEFT, padx=(20, 0))  # 左边留20像素间距
-        
-        # 创建一行放置Ante和Pair Plus
-        ante_pair_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        ante_pair_frame.pack(fill=tk.X, padx=20, pady=5)
-        
-        # Ante 区域（左侧）
-        ante_frame = tk.Frame(ante_pair_frame, bg='#2a4a3c')
-        ante_frame.pack(side=tk.LEFT, padx=(0, 20))  # 右侧留出间距
+        # Ante 区域
+        ante_frame = tk.Frame(bet_frame, bg='#2a4a3c')
+        ante_frame.pack(fill=tk.X, padx=20, pady=5)
         
         ante_label = tk.Label(ante_frame, text="Ante:", font=('Arial', 12), bg='#2a4a3c', fg='white')
         ante_label.pack(side=tk.LEFT)
@@ -553,21 +549,7 @@ class ThreeCardPokerGUI(tk.Tk):
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.bet_widgets["ante"] = self.ante_display
         
-        # Pair Plus 区域（右侧）
-        pair_plus_frame = tk.Frame(ante_pair_frame, bg='#2a4a3c')
-        pair_plus_frame.pack(side=tk.LEFT)
-        
-        pair_plus_label = tk.Label(pair_plus_frame, text="Pair Plus:", font=('Arial', 12), bg='#2a4a3c', fg='white')
-        pair_plus_label.pack(side=tk.LEFT)
-        
-        self.pair_plus_var = tk.StringVar(value="0")
-        self.pair_plus_display = tk.Label(pair_plus_frame, textvariable=self.pair_plus_var, font=('Arial', 12), 
-                                        bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
-        self.pair_plus_display.pack(side=tk.LEFT, padx=5)
-        self.pair_plus_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("pair_plus"))
-        self.bet_widgets["pair_plus"] = self.pair_plus_display
-        
-        # Bet 区域（单独一行）
+        # Bet 区域
         self.play_frame = tk.Frame(bet_frame, bg='#2a4a3c')
         self.play_frame.pack(fill=tk.X, padx=20, pady=5)
         
@@ -589,14 +571,14 @@ class ThreeCardPokerGUI(tk.Tk):
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
         start_button_frame.pack(pady=10)
 
-        # 添加"重设金额"按钮
+        # 添加"重置金额"按钮
         self.reset_bets_button = tk.Button(
-            start_button_frame, text="重设金额", 
+            start_button_frame, text="重置金额", 
             command=self.reset_bets, font=('Arial', 14),
             bg='#F44336', fg='white', width=10
         )
         self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
-        
+
         # 开始游戏按钮
         self.start_button = tk.Button(
             start_button_frame, text="开始游戏", 
@@ -645,19 +627,11 @@ class ThreeCardPokerGUI(tk.Tk):
         )
         rules_btn.pack(side=tk.RIGHT, padx=10, pady=5)
     
-    def update_six_card_bet(self):
-        """更新6 Card下注状态"""
-        if self.six_card_bet_var.get() == 1:
-            # 如果勾选，确保下注金额为10
-            self.six_card_bet_var.set(1)
-        else:
-            self.six_card_bet_var.set(0)
-    
     def show_game_instructions(self):
         """显示游戏规则说明"""
         # 创建自定义弹窗
         win = tk.Toplevel(self)
-        win.title("三张牌扑克游戏规则")
+        win.title("加勒比扑克游戏规则")
         win.geometry("800x650")
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
@@ -681,58 +655,49 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 游戏规则文本
         rules_text = """
-        Three Card Poker 游戏规则
+        加勒比扑克 (Caribbean Stud Poker) 游戏规则
 
         1. 游戏开始前下注:
            - Ante: 基础下注（必须）
-           - Pair Plus: 可选副注（支付表见下方）
            - Jackpot: 可选$1下注（参与Bonus奖励）
-           - 6 Card: 可选$10下注（参与6张牌组合奖励）
 
         2. 游戏流程:
            a. 下注阶段:
-               - 玩家下注Ante和可选的Pair Plus
+               - 玩家下注Ante
                - 可选择下注$1参与Jackpot奖金
-               - 可选择下注$10参与6 Card奖金
                - 点击"开始游戏"按钮开始
 
            b. 发牌:
-               - 玩家和庄家各发三张牌
-               - 玩家牌面朝上，庄家牌面朝下
+               - 玩家和庄家各发五张牌
+               - 玩家牌面朝上，庄家牌面朝下（只显示第一张）
 
            c. 决策阶段:
-               - 玩家查看自己的三张牌后选择:
-                 * 弃牌: 输掉Ante下注，但Pair Plus和Bonus可能赢
+               - 玩家查看自己的五张牌后选择:
+                 * 弃牌: 输掉Ante下注，但Jackpot可能赢
                  * 下注Bet: 下注金额等于Ante
 
            d. 摊牌:
                - 庄家开牌
-               - 庄家必须有一张Q高或更好才合格
+               - 庄家必须有一张A和K才能合格
                - 结算所有下注
 
         3. 结算规则:
-           - Pair Plus:
-             * 根据玩家的三张牌支付（无论庄家是否合格）
-             * 支付表见下方
-           
            - Ante和Bet:
              * 如果庄家不合格:
-                 - Ante: 支付1:1
+                 - 比较玩家和庄家的牌:
+                   - 玩家赢: Ante支付1:1
+                   - 平局: Ante退还
+                   - 玩家输: 输掉Ante
                  - Bet: 退还
              * 如果庄家合格:
                  - 比较玩家和庄家的牌:
-                   - 玩家赢: Ante和Bet都支付1:1
+                   - 玩家赢: Ante支付1:1，Bet根据玩家牌型支付（见赔率表）
                    - 平局: Ante和Bet都退还
                    - 玩家输: 输掉Ante和Bet
                    
-           - Bonus (需下注Jackpot):
+           - Jackpot (需下注Jackpot):
              * 根据玩家手牌支付（无论庄家是否合格）
-             * 支付表见下方
-             
-           - 6 Card (需下注$10):
-             * 将玩家和庄家的6张牌组合
-             * 选出最好的5张牌组合
-             * 根据牌型支付（支付表见下方）
+             * 赔付表见下方
         """
         
         rules_label = tk.Label(
@@ -746,10 +711,10 @@ class ThreeCardPokerGUI(tk.Tk):
         )
         rules_label.pack(fill=tk.X, padx=10, pady=5)
         
-        # Pair Plus支付表
+        # Bet赔付表
         tk.Label(
             content_frame, 
-            text="Pair Plus 支付表",
+            text="Bet 赔付表",
             font=('微软雅黑', 12, 'bold'),
             bg='#F0F0F0'
         ).pack(fill=tk.X, padx=10, pady=(20, 5), anchor='w')
@@ -759,11 +724,16 @@ class ThreeCardPokerGUI(tk.Tk):
 
         headers = ["牌型", "赔率"]
         odds_data = [
-            ("同花顺", "40:1"),
-            ("三条", "30:1"),
-            ("顺子", "6:1"),
-            ("同花", "3:1"),
-            ("对子", "1:1")
+            ("同花大顺", "100:1"),
+            ("同花顺", "50:1"),
+            ("四条", "20:1"),
+            ("葫芦", "7:1"),
+            ("同花", "5:1"),
+            ("顺子", "4:1"),
+            ("三条", "3:1"),
+            ("两对", "2:1"),
+            ("对子", "1:1"),
+            ("高牌", "1:1")
         ]
 
         # 表头
@@ -800,30 +770,30 @@ class ThreeCardPokerGUI(tk.Tk):
         for r in range(len(odds_data) + 1):
             odds_frame.rowconfigure(r, weight=1)
             
-        # Bonus支付表
+        # Jackpot赔付表
         tk.Label(
             content_frame, 
-            text="Bonus 支付表 (需下注Jackpot)",
+            text="Jackpot 赔付表 (需下注Jackpot)",
             font=('微软雅黑', 12, 'bold'),
             bg='#F0F0F0'
         ).pack(fill=tk.X, padx=10, pady=(20, 5), anchor='w')
         
-        bonus_frame = tk.Frame(content_frame, bg='#F0F0F0')
-        bonus_frame.pack(fill=tk.X, padx=20, pady=5)
+        jackpot_frame = tk.Frame(content_frame, bg='#F0F0F0')
+        jackpot_frame.pack(fill=tk.X, padx=20, pady=5)
 
         headers = ["牌型", "奖励"]
-        bonus_data = [
-            ("黑桃同花大顺 (QKA♠)", "赢得整个Jackpot"),
-            ("同花大顺 (QKA其他花色)", "赢得Jackpot的10%"),
-            ("同花顺", "$500"),
-            ("三条", "$400"),
-            ("顺子", "$40")
+        jackpot_data = [
+            ("同花大顺", "赢得整个Jackpot"),
+            ("同花顺", "赢得Jackpot的10%"),
+            ("四条", "$500"),
+            ("葫芦", "$100"),
+            ("同花", "$75")
         ]
 
         # 表头
         for col, h in enumerate(headers):
             tk.Label(
-                bonus_frame,
+                jackpot_frame,
                 text=h,
                 font=('微软雅黑', 10, 'bold'),
                 bg='#4B8BBE',
@@ -834,11 +804,11 @@ class ThreeCardPokerGUI(tk.Tk):
             ).grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
 
         # 表格内容
-        for r, row_data in enumerate(bonus_data, start=1):
+        for r, row_data in enumerate(jackpot_data, start=1):
             bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
             for c, txt in enumerate(row_data):
                 tk.Label(
-                    bonus_frame,
+                    jackpot_frame,
                     text=txt,
                     font=('微软雅黑', 10),
                     bg=bg,
@@ -849,72 +819,16 @@ class ThreeCardPokerGUI(tk.Tk):
 
         # 平均分配每列宽度
         for c in range(len(headers)):
-            bonus_frame.columnconfigure(c, weight=1)
+            jackpot_frame.columnconfigure(c, weight=1)
             
-        # 6 Card支付表
-        tk.Label(
-            content_frame, 
-            text="6 Card 支付表 (需下注$10)",
-            font=('微软雅黑', 12, 'bold'),
-            bg='#F0F0F0'
-        ).pack(fill=tk.X, padx=10, pady=(20, 5), anchor='w')
-        
-        six_card_frame = tk.Frame(content_frame, bg='#F0F0F0')
-        six_card_frame.pack(fill=tk.X, padx=20, pady=5)
-
-        headers = ["牌型", "赔率"]
-        six_card_data = [
-            ("6-Card Super Royal (9–A同花顺)", "10,000:1"),
-            ("皇家同花顺 (Royal Flush)", "1,000:1"),
-            ("同花顺 (Straight Flush)", "200:1"),
-            ("四条 (Four of a Kind)", "50:1"),
-            ("葫芦 (Full House)", "20:1"),
-            ("同花 (Flush)", "15:1"),
-            ("顺子 (Straight)", "10:1"),
-            ("三条 (Three of a Kind)", "5:1")
-        ]
-
-        # 表头
-        for col, h in enumerate(headers):
-            tk.Label(
-                six_card_frame,
-                text=h,
-                font=('微软雅黑', 10, 'bold'),
-                bg='#4B8BBE',
-                fg='white',
-                padx=10, pady=5,
-                anchor='center',
-                justify='center'
-            ).grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
-
-        # 表格内容
-        for r, row_data in enumerate(six_card_data, start=1):
-            bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
-            for c, txt in enumerate(row_data):
-                tk.Label(
-                    six_card_frame,
-                    text=txt,
-                    font=('微软雅黑', 10),
-                    bg=bg,
-                    padx=10, pady=5,
-                    anchor='center',
-                    justify='center'
-                ).grid(row=r, column=c, sticky='nsew', padx=1, pady=1)
-
-        # 平均分配每列宽度
-        for c in range(len(headers)):
-            six_card_frame.columnconfigure(c, weight=1)
-        
         # 注释
         notes = """
         注: 
-        * Pair Plus 下注独立于主游戏结算，只取决于玩家的三张牌
-        * 庄家必须至少有一张Q高才合格
+        * 庄家必须至少有一张A和K才合格
         * Bet 金额等于Ante下注金额
-        * Bonus奖励需要下注Jackpot($1)才有效
-        * 6 Card奖励需要下注$10才有效
-        * 黑桃同花大顺赢得整个Jackpot后，Jackpot将重置为初始值
-        * 其他花色的同花大顺赢得当前Jackpot的10%
+        * Jackpot奖励需要下注Jackpot($1)才有效
+        * 同花大顺赢得整个Jackpot后，Jackpot将重置为初始值
+        * 同花顺赢得当前Jackpot的10%
         """
         
         notes_label = tk.Label(
@@ -984,14 +898,14 @@ class ThreeCardPokerGUI(tk.Tk):
         """更新玩家和庄家的手牌标签显示牌型"""
         # 计算玩家当前牌型
         if self.game.player_hand:
-            player_eval = evaluate_three_card_hand(self.game.player_hand)
+            player_eval = evaluate_five_card_hand(self.game.player_hand)
             player_hand_name = HAND_RANK_NAMES[player_eval[0]] if player_eval else ""
             self.player_label.config(text=f"玩家 - {player_hand_name}" if player_hand_name else "玩家")
         
         # 计算庄家当前牌型（只有在摊牌时）
         if self.game.stage == "showdown" or self.game.folded:
             if self.game.dealer_hand:
-                dealer_eval = evaluate_three_card_hand(self.game.dealer_hand)
+                dealer_eval = evaluate_five_card_hand(self.game.dealer_hand)
                 dealer_hand_name = HAND_RANK_NAMES[dealer_eval[0]] if dealer_eval else ""
                 self.dealer_label.config(text=f"庄家 - {dealer_hand_name}" if dealer_hand_name else "庄家")
     
@@ -999,32 +913,33 @@ class ThreeCardPokerGUI(tk.Tk):
         """禁用所有操作按钮"""
         self.buttons_disabled = True
         for widget in self.action_frame.winfo_children():
-            widget.config(state=tk.DISABLED)
-    
+            # 只对按钮控件禁用
+            if isinstance(widget, tk.Button):
+                widget.config(state=tk.DISABLED)
+        
     def enable_action_buttons(self):
         """启用所有操作按钮"""
         self.buttons_disabled = False
         for widget in self.action_frame.winfo_children():
-            widget.config(state=tk.NORMAL)
+            # 只对按钮控件启用
+            if isinstance(widget, tk.Button):
+                widget.config(state=tk.NORMAL)
     
     def start_game(self):
         try:
             self.ante = int(self.ante_var.get())
-            self.pair_plus = int(self.pair_plus_var.get())
             self.jackpot_bet = self.jackpot_bet_var.get()  # 获取Jackpot下注
-            self.six_card_bet = self.six_card_bet_var.get() * 10  # 获取6 Card下注 (固定$10)
             self.last_jackpot_state = self.jackpot_bet_var.get()   
-            self.last_six_card_state = self.six_card_bet_var.get()  # 保存6 Card状态
             
             # 检查Ante至少5块
-            if self.ante < 5 and self.pair_plus < 5:  # 修改这里：改为检查两者总和
-                messagebox.showerror("错误", "Ante或Pair Plus至少需要5块")
+            if self.ante < 5:
+                messagebox.showerror("错误", "Ante至少需要5块")
                 return
                 
             # 计算总下注
-            total_bet = self.ante + self.pair_plus + self.jackpot_bet + self.six_card_bet
+            total_bet = self.ante + self.jackpot_bet
                 
-            if self.balance < total_bet + self.ante:
+            if self.balance < total_bet + self.ante * 2:  # 确保有足够余额下注Bet
                 messagebox.showwarning("警告", "余额不足以支付Bet")
                 return
                 
@@ -1037,9 +952,7 @@ class ThreeCardPokerGUI(tk.Tk):
             self.game.reset_game()
             self.game.deal_initial()
             self.game.ante = self.ante
-            self.game.pair_plus = self.pair_plus
             self.game.jackpot_bet = self.jackpot_bet  # 保存Jackpot下注
-            self.game.six_card_bet = self.six_card_bet  # 保存6 Card下注
             
             # 清除所有卡片
             for widget in self.dealer_cards_frame.winfo_children():
@@ -1055,47 +968,28 @@ class ThreeCardPokerGUI(tk.Tk):
             # 初始化卡片位置
             self.card_positions = {}
             
-            # 添加所有卡片到动画队列
-            self.animation_queue = []
-            
-            # 玩家牌 - 放置在中心位置
-            for i in range(3):
+            # 玩家牌 - 放置在中中心位置
+            for i in range(5):
                 card_id = f"player_{i}"
                 self.card_positions[card_id] = {
                     "current": (50, 50), 
-                    "target": (i * 120, 0)  # 水平排列
+                    "target": (i * 90, 0)  # 水平排列
                 }
                 self.animation_queue.append(card_id)
             
-            # 庄家牌 - 放置在中心位置
-            for i in range(3):
+            # 庄家牌 - 放置在中中心位置
+            for i in range(5):
                 card_id = f"dealer_{i}"
                 self.card_positions[card_id] = {
                     "current": (50, 50), 
-                    "target": (i * 120, 0)  # 水平排列
+                    "target": (i * 90, 0)  # 水平排列
                 }
                 self.animation_queue.append(card_id)
-            
-            # 开始动画
-            self.animate_deal()
             
             # 更新游戏状态
             self.stage_label.config(text="阶段: 决策")
             self.status_label.config(text="做出决策: 弃牌或下注Bet")
 
-            # 如果Ante为0，则跳过决策阶段
-            if self.ante == 0:  # 添加这个判断
-                # 直接进入摊牌阶段
-                self.game.stage = "showdown"
-                self.stage_label.config(text="阶段: 摊牌")
-                self.status_label.config(text="摊牌中...")
-                self.after(5000, self.show_showdown)
-                self.start_button.config(state=tk.DISABLED)
-                self.reset_bets_button.config(state=tk.DISABLED)
-                
-                # 不需要创建决策按钮
-                return
-            
             # 创建操作按钮 - 替换开始按钮
             for widget in self.action_frame.winfo_children():
                 widget.destroy()
@@ -1118,16 +1012,17 @@ class ThreeCardPokerGUI(tk.Tk):
                 font=('Arial', 14), bg='#4CAF50', fg='white', width=10
             )
             self.play_button.pack(side=tk.LEFT)
-            
+
             # 禁用下注区域
             self.ante_display.unbind("<Button-1>")
-            self.pair_plus_display.unbind("<Button-1>")
             for chip in self.chip_buttons:
                 chip.unbind("<Button-1>")
             
-            # 禁用Jackpot和6 Card的Checkbutton
+            # 禁用Jackpot的Checkbutton
             self.jackpot_check.config(state=tk.DISABLED)
-            self.six_card_check.config(state=tk.DISABLED)
+            
+            # 开始动画
+            self.animate_deal()
             
         except ValueError:
             messagebox.showerror("错误", "请输入有效的下注金额")
@@ -1220,6 +1115,9 @@ class ThreeCardPokerGUI(tk.Tk):
     
     def reveal_player_cards(self):
         """翻开玩家牌（带动画）"""
+        if self.animation_in_progress:
+            return
+        
         for i, card_label in enumerate(self.player_cards_frame.winfo_children()):
             if hasattr(card_label, "card") and not card_label.is_face_up:
                 self.flip_card_animation(card_label)
@@ -1229,20 +1127,39 @@ class ThreeCardPokerGUI(tk.Tk):
         # 更新玩家牌型
         self.update_hand_labels()
 
+        # 玩家牌都翻完后，再翻庄家第一张
+        self.after(500, self.reveal_dealer_first_card)
+
+    def reveal_dealer_first_card(self):
+        """只翻开庄家第一张牌"""
+        # 确保没有动画在进行
+        if self.animation_in_progress:
+            return
+        
+        dealer_cards = self.dealer_cards_frame.winfo_children()
+        if dealer_cards:
+            first_card = dealer_cards[0]
+            if hasattr(first_card, "card") and not first_card.is_face_up:
+                # 设置动画标志
+                self.animation_in_progress = True
+                self.flip_card_animation(first_card)
+        
         self.fold_button.config(state=tk.NORMAL)
         self.play_button.config(state=tk.NORMAL)
     
     def reveal_dealer_cards(self):
-        """翻开庄家牌（带动画）"""
+        """翻开庄家所有牌（带动画）"""
         for i, card_label in enumerate(self.dealer_cards_frame.winfo_children()):
             if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flip_card_animation(card_label)
+                # 在摊牌阶段翻开所有牌
+                if self.game.stage == "showdown" or self.game.folded:
+                    self.flip_card_animation(card_label)
                 # 标记庄家牌已翻开
                 self.game.cards_revealed["dealer"][i] = True
         
         # 更新庄家牌型
         self.update_hand_labels()
-    
+        
     def flip_card_animation(self, card_label):
         """卡片翻转动画"""
         # 获取卡片正面图像
@@ -1259,21 +1176,22 @@ class ThreeCardPokerGUI(tk.Tk):
         if step > steps:
             # 动画结束
             card_label.is_face_up = True
+            self.animation_in_progress = False  # 清除动画标志
             return
-        
+            
         if step <= steps // 2:
             # 第一阶段：从背面翻转到侧面（宽度减小）
-            width = 100 - (step * 20)
+            width = 80 - (step * 16)
             if width <= 0:
                 width = 1
             # 创建缩放后的背面图像
-            back_img = Image.new('RGBA', (width, 140), (0, 0, 0, 0))
+            back_img = Image.new('RGBA', (width, 120), (0, 0, 0, 0))
             orig_back = self.back_image
-            # 这里简化处理，实际应该缩放图片
+            # 这里简化处理，实际应该缩放图像
             card_label.config(image=orig_back)
         else:
             # 第二阶段：从侧面翻转到正面（宽度增加）
-            width = (step - steps // 2) * 20
+            width = (step - steps // 2) * 16
             if width <= 0:
                 width = 1
             # 创建缩放后的正面图像
@@ -1284,12 +1202,12 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 下一步
         step += 1
-        card_label.after(50, lambda: self.animate_flip(card_label, front_img, step))
+        self.after(50, lambda: self.animate_flip(card_label, front_img, step))
     
     def play_action(self):
         """玩家选择下注Bet"""
-        # Bet下注等于Ante
-        play_bet = self.game.ante
+        # Bet下注等于Ante的2倍
+        play_bet = self.game.ante * 2  # 修改为2倍
         
         if play_bet > self.balance:
             messagebox.showerror("错误", "余额不足")
@@ -1303,7 +1221,7 @@ class ThreeCardPokerGUI(tk.Tk):
         self.play_var.set(str(play_bet))
         
         # 更新本局下注显示
-        total_bet = self.ante + self.pair_plus + play_bet + self.jackpot_bet + self.six_card_bet
+        total_bet = self.ante + play_bet + self.jackpot_bet
         self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
         
         # 进入摊牌阶段
@@ -1318,7 +1236,6 @@ class ThreeCardPokerGUI(tk.Tk):
 
         # 保存下注金额用于结算
         ante_bet = int(self.ante_var.get())
-        pair_plus_bet = int(self.pair_plus_var.get())
         
         # 重置显示金额为0
         self.ante_var.set("0")
@@ -1330,18 +1247,7 @@ class ThreeCardPokerGUI(tk.Tk):
         # 更新庄家牌型
         self.update_hand_labels()
         
-        # 结算Pair Plus (已修复)
-        player_eval = evaluate_three_card_hand(self.game.player_hand)
-        pair_plus_win = 0
-        if player_eval[0] in PAIR_PLUS_PAYOUT:
-            payout = PAIR_PLUS_PAYOUT[player_eval[0]]
-            # 修正：包括本金返还
-            pair_plus_win = pair_plus_bet * (payout + 1)
-            self.balance += pair_plus_win
-            self.update_balance()
-            self.pair_plus_var.set(str(int(pair_plus_win)))
-        
-        # 结算Bonus (如果下注了Jackpot)
+        # 计算Jackpot (如果下注了Jackpot)
         bonus_win = 0
         bonus_text = ""
         if self.game.jackpot_bet:
@@ -1349,45 +1255,26 @@ class ThreeCardPokerGUI(tk.Tk):
             if bonus_win > 0:
                 self.balance += bonus_win
                 self.update_balance()
+                player_eval = evaluate_five_card_hand(self.game.player_hand)
                 player_hand_type = HAND_RANK_NAMES.get(player_eval[0], "高牌")
                 bonus_text = f"恭喜中了JP大奖${bonus_win:.2f} ~ 牌型{player_hand_type}"
         
-        # 结算6 Card (如果下注了)
-        six_card_win = 0
-        six_card_text = ""
-        if self.game.six_card_bet:
-            six_card_win = self.calculate_six_card_bonus()
-            if six_card_win > 0:
-                self.balance += six_card_win
-                self.update_balance()
-                # 获取6张牌的最佳牌型
-                _, hand_type = self.get_best_six_card_hand_type()
-                six_card_text = f"恭喜中了6 Card大奖${six_card_win:.2f} ~ 牌型{hand_type}"
-        
-        # 更新Jackpot彩池
-        self.update_jackpot(0, 0, ante_bet, 0, 0)
-        
         # 设置背景色
         self.ante_display.config(bg='white')  # 输
-        self.pair_plus_display.config(bg='gold' if pair_plus_win > 0 else 'white')
         
-        # 计算总赢取金额（不包括输掉的Ante）
-        total_win = pair_plus_win + bonus_win + six_card_win
+        # 计算总赢得金额
+        total_win = bonus_win
         self.last_win = total_win
         
-        # 更新上局获胜金额显示
+        # 更新上局赢得金额显示
         self.last_win_label.config(text=f"上局获胜: ${total_win:.2f}")
         
         # 构建主消息
         result_text = "本局您选择弃牌"
         
         # 添加中奖信息
-        if bonus_text and six_card_text:
-            result_text = bonus_text + "\n" + six_card_text
-        elif bonus_text:
+        if bonus_text:
             result_text = bonus_text
-        elif six_card_text:
-            result_text = six_card_text
 
         self.result_label.config(text=result_text, fg='white')
         
@@ -1404,25 +1291,10 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 设置30秒后自动重置
         self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
-        
-    def get_best_six_card_hand_type(self):
-        all_cards = self.game.player_hand + self.game.dealer_hand
-
-        if self.is_six_card_super_royal(all_cards):
-            # 返回中文牌型名称
-            return SIX_CARD_PAYOUT["6_card_super_royal"] * (self.game.six_card_bet / 10), "6张牌超级皇家同花顺"
-
-        best_value, best_name = self.evaluate_best_five_card_hand(all_cards)
-        # 将英文牌型名称转换为中文
-        chinese_name = self.six_card_hand_names.get(best_name, best_name)
-        return best_value, chinese_name
-        
+    
     def show_showdown(self):
         # 翻开庄家牌
         self.reveal_dealer_cards()
-        
-        # 更新庄家牌型
-        self.update_hand_labels()
         
         # 结算
         winnings, details = self.calculate_winnings()
@@ -1434,29 +1306,29 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 更新下注显示金额
         self.ante_var.set(str(int(details["ante"])))
-        self.pair_plus_var.set(str(int(details["pair_plus"])))
         self.play_var.set(str(int(details["play"])))
         
         # 设置背景色：赢为金色，平局为浅蓝色，输为白色
-        for bet_type in ["ante", "pair_plus", "play"]:
+        for bet_type in ["ante", "play"]:
             widget = self.bet_widgets.get(bet_type)
             if not widget:
                 continue
 
-            # 对应的下注金额，如果是 play（Bet），取 self.game.play_bet
-            bet_amount = (
-                self.game.play_bet if bet_type == "play"
-                else getattr(self.game, bet_type)
-            )
+            # 对应的下注金额
+            if bet_type == "ante":
+                bet_amount = self.game.ante
+            else:  # "play"
+                bet_amount = self.game.play_bet
+                
             win_amount = details[bet_type]
 
             # 赢（任何注项赢都染金色）
-            if details[bet_type] > 0 and details[bet_type] != self.game.ante:  # 赢
+            if win_amount > bet_amount:  # 赢
                 widget.config(bg='gold')
-            # 平局且确实有下注（注额>0）
+            # 平局并且确实有下注（注金>0）
             elif win_amount == bet_amount and bet_amount > 0:
                 widget.config(bg='light blue')
-            # 其他情况（输了，或根本没下注）都保持白色
+            # 其他情况（输了，或根本没下注）保持白色
             else:
                 widget.config(bg='white')
         
@@ -1465,47 +1337,33 @@ class ThreeCardPokerGUI(tk.Tk):
         comparison = compare_hands(self.game.player_hand, self.game.dealer_hand)
         
         if not dealer_qualifies:
-            base_text = "本局您赢了"
+            base_text = "庄家不合格，Play退还"
         else:
             if comparison > 0:  # 玩家赢
-                if dealer_qualifies != True:
-                    base_text = "本局Ante退还"
-                else:
-                    base_text = "本局您赢了"
+                base_text = "本局您赢了"
             elif comparison < 0:  # 玩家输
                 base_text = "本局您输了"
             else:  # 平局
                 base_text = "本局Push"
         
-        # 获取Bonus和6 Card的中奖信息
+        # 获取Bonus的中奖信息
         bonus_win = details["bonus"]
-        six_card_win = details["six_card"]
         bonus_text = ""
-        six_card_text = ""
         
         if bonus_win > 0:
-            player_eval = evaluate_three_card_hand(self.game.player_hand)
+            player_eval = evaluate_five_card_hand(self.game.player_hand)
             player_hand_type = HAND_RANK_NAMES.get(player_eval[0], "高牌")
             bonus_text = f"恭喜中了JP大奖${bonus_win:.2f}~ 牌型{player_hand_type}"
         
-        if six_card_win > 0:
-            # 获取6张牌的最佳牌型
-            _, hand_type = self.get_best_six_card_hand_type()
-            six_card_text = f"恭喜中了6 Card大奖${six_card_win:.2f} ~ 牌型{hand_type}"
-        
         # 组合消息
         result_text = base_text
-        if bonus_text and six_card_text:
-            result_text = bonus_text + "\n" + six_card_text
-        elif bonus_text:
-            result_text = bonus_text
-        elif six_card_text:
-            result_text = six_card_text
+        if bonus_text:
+            result_text = base_text + "\n" + bonus_text
 
         self.result_label.config(text=result_text, fg='white')
         self.status_label.config(text="游戏结束")
         
-        # 更新上局获胜金额
+        # 更新上局赢得金额
         self.last_win_label.config(text=f"上局获胜: ${winnings:.2f}")
         
         # 添加重新开始按钮
@@ -1523,27 +1381,16 @@ class ThreeCardPokerGUI(tk.Tk):
         self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
     
     def calculate_winnings(self):
-        """计算赢得的金额 (已修复)"""
+        """计算赢得的金额"""
         winnings = 0
         details = {
             "ante": 0,
-            "pair_plus": 0,
             "play": 0,
-            "bonus": 0,
-            "six_card": 0
+            "bonus": 0
         }
         bonus_win = 0
-        six_card_win = 0
         
-        # 1. 结算Pair Plus (已修复)
-        player_eval = evaluate_three_card_hand(self.game.player_hand)
-        if player_eval[0] in PAIR_PLUS_PAYOUT:
-            payout = PAIR_PLUS_PAYOUT[player_eval[0]]
-            pair_plus_win = self.game.pair_plus * (payout + 1)
-            winnings += pair_plus_win
-            details["pair_plus"] = pair_plus_win
-        
-        # 2. 结算Ante和Bet
+        # 1. 结算Ante和Bet
         dealer_qualifies = self.game.dealer_qualifies()
         comparison = compare_hands(self.game.player_hand, self.game.dealer_hand)
         
@@ -1551,18 +1398,21 @@ class ThreeCardPokerGUI(tk.Tk):
         play_result = 0
         
         if not dealer_qualifies:
-            # 庄家不合格：Ante支付1:1，Play退还
-            ante_result = self.game.ante
+            # 庄家不合格：Play退还
             if comparison > 0:
-                play_result = self.game.play_bet* 2
+                ante_result = self.game.ante * 2
             elif comparison == 0:
-                play_result = self.game.play_bet
+                ante_result = self.game.ante
             else:
-                play_result = 0
+                ante_result = 0
+            play_result = self.game.play_bet
         else:
             if comparison > 0:  # 玩家赢
                 ante_result = self.game.ante * 2
-                play_result = self.game.play_bet * 2
+                # Bet根据玩家牌型支付
+                player_rank, _ = evaluate_five_card_hand(self.game.player_hand)
+                payout = CARIBBEAN_STUD_PAYOUT.get(player_rank, 1)
+                play_result = self.game.play_bet * (payout + 1)
             elif comparison == 0:  # 平局
                 ante_result = self.game.ante
                 play_result = self.game.play_bet
@@ -1574,28 +1424,22 @@ class ThreeCardPokerGUI(tk.Tk):
         details["ante"] = ante_result
         details["play"] = play_result
         
-        # 3. 结算Bonus (如果下注了Jackpot)
+        # 2. 结算Jackpot (如果下注了)
         if self.game.jackpot_bet:
             bonus_win = self.calculate_bonus()
             winnings += bonus_win
             details["bonus"] = bonus_win
         
-        # 4. 结算6 Card (如果下注了)
-        if self.game.six_card_bet:
-            six_card_win = self.calculate_six_card_bonus()
-            winnings += six_card_win
-            details["six_card"] = six_card_win
-        
-        # 5. 更新Jackpot彩池
+        # 3. 更新Jackpot奖池
         self.update_jackpot(winnings, details["ante"], self.game.ante, details["play"], self.game.play_bet)
         
         return winnings, details
     
     def update_jackpot(self, winnings, ante_win, ante_bet, play_win, play_bet):
-        """更新Jackpot彩池金额"""
-        # 计算本局贡献: (获胜金额 * 0.01 + Push金额 * 0.05 + 输的金额 * 0.1)
-        # 获胜金额 = 玩家赢得的净盈利（不包括本金）
-        win_amount = winnings - (ante_bet + self.game.pair_plus + play_bet + self.game.jackpot_bet + self.game.six_card_bet)
+        """更新Jackpot奖池金额"""
+        # 计算本局贡献：(赢得金额 * 0.01 + Push金额 * 0.05 + 输的金额 * 0.1)
+        # 赢得金额 = 玩家赢得的纯利润（不包括本金）
+        win_amount = winnings - (ante_bet + play_bet + self.game.jackpot_bet)
         
         # Push金额 = 平局时退还的本金部分
         push_amount = 0
@@ -1622,13 +1466,12 @@ class ThreeCardPokerGUI(tk.Tk):
         save_jackpot(self.game.jackpot_amount)
     
     def calculate_bonus(self):
-        """计算Bonus奖励"""
+        """计算Jackpot奖金"""
         cards = self.game.player_hand
-        values = sorted([c.value for c in cards], reverse=True)
-        suits = [c.suit for c in cards]
+        hand_rank, _ = evaluate_five_card_hand(cards)
         
-        # 检查是否黑桃同花大顺 (Q-K-A 黑桃)
-        if values == [14, 13, 12] and len(set(suits)) == 1 and suits[0] == '♠':
+        # 同花大顺
+        if hand_rank == 9:
             bonus = self.game.jackpot_amount
             # 重置Jackpot为初始值
             self.game.jackpot_amount = self.game.initial_jackpot
@@ -1636,112 +1479,23 @@ class ThreeCardPokerGUI(tk.Tk):
             save_jackpot(self.game.jackpot_amount)
             return bonus
         
-        # 检查是否同花大顺 (Q-K-A 其他花色)
-        if values == [14, 13, 12] and len(set(suits)) == 1:
+        # 同花顺
+        if hand_rank == 8:
             return self.game.jackpot_amount * 0.1
         
-        # 检查其他牌型
-        hand_rank, _ = evaluate_three_card_hand(cards)
-        
-        if hand_rank == 6:  # 同花顺
+        # 四条
+        if hand_rank == 7:
             return 500
-        elif hand_rank == 5:  # 三条
-            return 400
-        elif hand_rank == 4:  # 顺子
-            return 40
+        
+        # 葫芦
+        if hand_rank == 6:
+            return 100
+        
+        # 同花
+        if hand_rank == 5:
+            return 75
         
         return 0
-    
-    def calculate_six_card_bonus(self):
-        all_cards = self.game.player_hand + self.game.dealer_hand
-
-        # 先检查6-Card Super Royal
-        if self.is_six_card_super_royal(all_cards):
-            return SIX_CARD_PAYOUT["6_card_super_royal"] * (self.game.six_card_bet / 10)
-
-        # 其余牌型：直接解包
-        best_value, _ = self.evaluate_best_five_card_hand(all_cards)
-        return best_value * (self.game.six_card_bet / 10)
-        
-    def is_six_card_super_royal(self, cards):
-        """检查是否是6-Card Super Royal (9-10-J-Q-K-A 同花顺)"""
-        # 首先检查花色是否全部相同
-        suits = set(card.suit for card in cards)
-        if len(suits) != 1:
-            return False
-        
-        # 检查是否包含9-10-J-Q-K-A
-        required_ranks = {9, 10, 11, 12, 13, 14}  # 对应9,10,J,Q,K,A
-        card_ranks = set(card.value for card in cards)
-        
-        return card_ranks == required_ranks
-    
-    def evaluate_best_five_card_hand(self, cards):
-        """评估6张牌中最好的5张牌组合，返回 (最佳支付值, 牌型名称)"""
-        from itertools import combinations
-
-        best_value = 0
-        best_name = "other"
-        # 遍历所有5张组合
-        for combo in combinations(cards, 5):
-            val = self.evaluate_five_card_hand(list(combo))
-            if val > best_value:
-                best_value = val
-                # 根据 payout 表反查牌型名称
-                for name, payout in SIX_CARD_PAYOUT.items():
-                    if payout == val:
-                        best_name = name
-                        break
-
-        return best_value, best_name
-        
-    def evaluate_five_card_hand(self, cards):
-        """评估5张牌的牌型"""
-        # 按点数排序
-        values = sorted([c.value for c in cards], reverse=True)
-        suits = [c.suit for c in cards]
-        
-        # 检查同花
-        is_flush = len(set(suits)) == 1
-        
-        # 检查顺子
-        is_straight = True
-        for i in range(1, 5):
-            if values[i] != values[i-1] - 1:
-                is_straight = False
-                break
-        
-        # 检查皇家同花顺 (10-J-Q-K-A)
-        is_royal = is_straight and values[0] == 14 and values[4] == 10
-        
-        # 检查同花顺
-        if is_flush and is_straight:
-            if is_royal:
-                return SIX_CARD_PAYOUT["royal_flush"]
-            return SIX_CARD_PAYOUT["straight_flush"]
-        
-        # 检查四条
-        if values[0] == values[3] or values[1] == values[4]:
-            return SIX_CARD_PAYOUT["four_of_a_kind"]
-        
-        # 检查葫芦 (三条+对子)
-        if (values[0] == values[2] and values[3] == values[4]) or \
-           (values[0] == values[1] and values[2] == values[4]):
-            return SIX_CARD_PAYOUT["full_house"]
-        
-        # 检查同花
-        if is_flush:
-            return SIX_CARD_PAYOUT["flush"]
-        
-        # 检查顺子
-        if is_straight:
-            return SIX_CARD_PAYOUT["straight"]
-        
-        # 检查三条
-        if values[0] == values[2] or values[1] == values[3] or values[2] == values[4]:
-            return SIX_CARD_PAYOUT["three_of_a_kind"]
-        
-        return SIX_CARD_PAYOUT["other"]
 
     def animate_collect_cards(self, auto_reset):
         """执行收牌动画：先翻转所有牌为背面，然后向右收起"""
@@ -1784,7 +1538,7 @@ class ThreeCardPokerGUI(tk.Tk):
             return
 
         # 模拟翻转效果：先缩小宽度，再放大（但背面）
-        width = 100 - (step * 10) if step < 5 else (step - 5) * 10
+        width = 80 - (step * 8) if step < 5 else (step - 5) * 8
         if width <= 0:
             width = 1
 
@@ -1822,7 +1576,7 @@ class ThreeCardPokerGUI(tk.Tk):
             dx = target_x - current_x
             if abs(dx) < 5:
                 card_label.place(x=target_x, y=target_y)
-                # 移除该卡片
+                # 移除此卡片
                 card_label.destroy()
                 if card_label in self.active_card_labels:
                     self.active_card_labels.remove(card_label)
@@ -1854,9 +1608,8 @@ class ThreeCardPokerGUI(tk.Tk):
         self._do_reset(auto_reset)
     
     def reset_bets(self):
-        """重置Trips和Ante的投注金额为0"""
+        """重置下注金额为0"""
         self.ante_var.set("0")
-        self.pair_plus_var.set("0")
         
         # 更新显示
         self.status_label.config(text="已重置所有下注金额")
@@ -1867,9 +1620,7 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 短暂高亮显示重置效果
         self.ante_display.config(bg='#FFCDD2')  # 浅红色
-        self.pair_plus_display.config(bg='#FFCDD2')
-        self.after(500, lambda: [self.ante_display.config(bg='white'), 
-                                self.pair_plus_display.config(bg='white')])
+        self.after(500, lambda: self.ante_display.config(bg='white'))
     
     def _do_reset(self, auto_reset=False):
         """真正的重置游戏界面"""
@@ -1885,21 +1636,18 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 重置下注金额为0
         self.ante_var.set("0")
-        self.pair_plus_var.set("0")
         self.play_var.set("0")
         self.jackpot_bet_var.set(self.last_jackpot_state)
-        self.six_card_bet_var.set(self.last_six_card_state)  # 重置6 Card下注
         
         # 重置背景色为白色
         for widget in self.bet_widgets.values():
             widget.config(bg='white')
         
-        # 清空活动卡片列表（在收牌动画后已经清空，这里确保一下）
+        # 清空活动卡片列表（在收牌动画后已清空）
         self.active_card_labels = []
         
         # 恢复下注区域
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
-        self.pair_plus_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("pair_plus"))
         for chip in self.chip_buttons:
             # 使用存储的文本重新绑定事件
             text = self.chip_texts[chip]
@@ -1912,9 +1660,9 @@ class ThreeCardPokerGUI(tk.Tk):
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
         start_button_frame.pack(pady=10)
 
-        # 添加"重设金额"按钮
+        # 添加"重置金额"按钮
         self.reset_bets_button = tk.Button(
-            start_button_frame, text="重设金额", 
+            start_button_frame, text="重置金额", 
             command=self.reset_bets, font=('Arial', 14),
             bg='#F44336', fg='white', width=10
         )
@@ -1928,9 +1676,8 @@ class ThreeCardPokerGUI(tk.Tk):
         )
         self.start_button.pack(side=tk.LEFT)
         
-        # 启用Jackpot和6 Card的Checkbutton
+        # 启用Jackpot的Checkbutton
         self.jackpot_check.config(state=tk.NORMAL)
-        self.six_card_check.config(state=tk.NORMAL)
         
         # 重置本局下注显示
         self.current_bet_label.config(text="本局下注: $0.00")
@@ -1941,7 +1688,7 @@ class ThreeCardPokerGUI(tk.Tk):
             self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
 
 def main(initial_balance=1000, username="Guest"):
-    app = ThreeCardPokerGUI(initial_balance, username)
+    app = CaribbeanStudGUI(initial_balance, username)
     app.mainloop()
     return app.balance
 

@@ -968,33 +968,24 @@ class UTHGUI(tk.Tk):
             self.check_button = tk.Button(
                 self.action_frame, text="过牌", 
                 command=lambda: self.play_action(0), 
-                font=('Arial', 14), bg='#2196F3', fg='white', width=9
+                font=('Arial', 14), bg='#2196F3', fg='white', width=9,
+                state=tk.DISABLED
             )
             self.check_button.pack(side=tk.LEFT, padx=9)
-            
-            # 检查余额是否足够支付3倍Ante
-            bet_3x_state = tk.NORMAL
-            if self.balance < self.game.ante * 3:
-                bet_3x_state = tk.DISABLED
                 
             self.bet_3x_button = tk.Button(
                 self.action_frame, text="下注3倍", 
                 command=lambda: self.play_action(3), 
                 font=('Arial', 14), bg='#FF9800', fg='white', width=9,
-                state=bet_3x_state
+                state=tk.DISABLED
             )
             self.bet_3x_button.pack(side=tk.LEFT, padx=9)
-            
-            # 检查余额是否足够支付4倍Ante
-            bet_4x_state = tk.NORMAL
-            if self.balance < self.game.ante * 4:
-                bet_4x_state = tk.DISABLED
                 
             self.bet_4x_button = tk.Button(
                 self.action_frame, text="下注4倍", 
                 command=lambda: self.play_action(4), 
                 font=('Arial', 14), bg='#F44336', fg='white', width=9,
-                state=bet_4x_state
+                state=tk.DISABLED
             )
             self.bet_4x_button.pack(side=tk.LEFT, padx=9)
             
@@ -1108,6 +1099,9 @@ class UTHGUI(tk.Tk):
         
         # 更新玩家牌型
         self.update_hand_labels()
+        
+        # 1.5秒后启用翻牌前按钮
+        self.after(1500, self.enable_preflop_buttons)
     
     def reveal_flop(self):
         """翻开翻牌圈的三张公共牌（带动画）"""
@@ -1122,7 +1116,10 @@ class UTHGUI(tk.Tk):
         
         # 更新玩家牌型
         self.update_hand_labels()
-    
+        
+        # 2秒后启用翻牌圈按钮
+        self.after(2000, self.enable_flop_buttons)
+
     def reveal_turn_river(self):
         """翻开转牌和河牌（带动画）"""
         # 安全地获取社区牌框架中的卡片
@@ -1134,6 +1131,9 @@ class UTHGUI(tk.Tk):
         
         # 更新玩家牌型
         self.update_hand_labels()
+        
+        # 1.5秒后启用河牌圈按钮
+        self.after(1500, self.enable_river_buttons)
     
     def reveal_dealer_cards(self):
         """翻开庄家牌（带动画）"""
@@ -1167,9 +1167,8 @@ class UTHGUI(tk.Tk):
             if hasattr(self, 'flop_revealed') and self.flop_revealed > 0:
                 self.flop_revealed -= 1
                 if self.flop_revealed == 0:
-                    # 所有翻牌动画完成，启用按钮
-                    if self.balance >= self.game.ante * 2:
-                        self.bet_2x_button.config(state=tk.NORMAL)
+                    # 所有翻牌动画完成
+                    pass
             return
         
         if step <= steps // 2:
@@ -1197,6 +1196,48 @@ class UTHGUI(tk.Tk):
         step += 1
         card_label.after(50, lambda: self.animate_flip(card_label, front_img, step))
     
+    def enable_preflop_buttons(self):
+        """启用翻牌前的操作按钮，并根据余额设置状态"""
+        ante = self.game.ante
+        # 检查余额是否足够支付3倍Ante
+        if self.balance >= ante * 3:
+            self.bet_3x_button.config(state=tk.NORMAL)
+        else:
+            self.bet_3x_button.config(state=tk.DISABLED)
+
+        # 检查余额是否足够支付4倍Ante
+        if self.balance >= ante * 4:
+            self.bet_4x_button.config(state=tk.NORMAL)
+        else:
+            self.bet_4x_button.config(state=tk.DISABLED)
+
+        # 过牌按钮总是可用
+        self.check_button.config(state=tk.NORMAL)
+
+    def enable_flop_buttons(self):
+        """启用翻牌圈的操作按钮，并根据余额设置状态"""
+        ante = self.game.ante
+        # 检查余额是否足够支付2倍Ante
+        if self.balance >= ante * 2:
+            self.bet_2x_button.config(state=tk.NORMAL)
+        else:
+            self.bet_2x_button.config(state=tk.DISABLED)
+
+        # 过牌按钮总是可用
+        self.check_button.config(state=tk.NORMAL)
+
+    def enable_river_buttons(self):
+        """启用河牌圈的操作按钮"""
+        ante = self.game.ante
+        # 检查余额是否足够支付1倍Ante
+        if self.balance >= ante:
+            self.bet_1x_button.config(state=tk.NORMAL)
+        else:
+            self.bet_1x_button.config(state=tk.DISABLED)
+
+        # 弃牌按钮总是可用
+        self.fold_button.config(state=tk.NORMAL)
+    
     def play_action(self, bet_multiplier):
         if bet_multiplier > 0:
             bet_amount = bet_multiplier * self.game.ante
@@ -1217,6 +1258,9 @@ class UTHGUI(tk.Tk):
         if self.game.stage == "pre_flop":
             if bet_multiplier > 0:
                 # 直接进入摊牌
+                self.bet_4x_button.config(state=tk.DISABLED)
+                self.bet_3x_button.config(state=tk.DISABLED)
+                self.check_button.config(state=tk.DISABLED)
                 self.game.stage = "showdown"
                 self.after(1000, self.show_showdown)
             else:
@@ -1235,19 +1279,15 @@ class UTHGUI(tk.Tk):
                 self.check_button = tk.Button(
                     self.action_frame, text="过牌", 
                     command=lambda: self.play_action(0), 
+                    state=tk.DISABLED,
                     font=('Arial', 14), bg='#2196F3', fg='white', width=9
                 )
                 self.check_button.pack(side=tk.LEFT, padx=9)
-                
-                # 检查余额是否足够支付2倍Ante
-                bet_2x_state = tk.NORMAL
-                if self.balance < self.game.ante * 2:
-                    bet_2x_state = tk.DISABLED
                     
                 self.bet_2x_button = tk.Button(
                     self.action_frame, text="下注2倍", 
                     command=lambda: self.play_action(2),
-                    state=bet_2x_state,
+                    state=tk.DISABLED,
                     font=('Arial', 14), bg='#FF9800', fg='white', width=9
                 )
                 self.bet_2x_button.pack(side=tk.LEFT, padx=9)
@@ -1255,6 +1295,8 @@ class UTHGUI(tk.Tk):
         elif self.game.stage == "flop":
             if bet_multiplier > 0:
                 # 直接进入摊牌
+                self.bet_2x_button.config(state=tk.DISABLED)
+                self.check_button.config(state=tk.DISABLED)
                 self.game.stage = "showdown"
                 self.after(1000, self.show_showdown)
             else:
@@ -1273,6 +1315,7 @@ class UTHGUI(tk.Tk):
                 self.fold_button = tk.Button(
                     self.action_frame, text="弃牌", 
                     command=self.fold_action, 
+                    state=tk.DISABLED,
                     font=('Arial', 14), bg='#F44336', fg='white', width=9
                 )
                 self.fold_button.pack(side=tk.LEFT, padx=10)
@@ -1280,6 +1323,7 @@ class UTHGUI(tk.Tk):
                 self.bet_1x_button = tk.Button(
                     self.action_frame, text="下注1倍", 
                     command=lambda: self.play_action(1), 
+                    state=tk.DISABLED,
                     font=('Arial', 14), bg='#4CAF50', fg='white', width=9
                 )
                 self.bet_1x_button.pack(side=tk.LEFT, padx=9)
@@ -1287,6 +1331,8 @@ class UTHGUI(tk.Tk):
         # 在河牌圈下注1倍时进入结算
         elif self.game.stage == "river":
             if bet_multiplier == 1:
+                self.bet_1x_button.config(state=tk.DISABLED)
+                self.fold_button.config(state=tk.DISABLED)
                 self.update_balance()
                 self.game.play_bet = bet_amount
                 # 更新Bet显示

@@ -117,20 +117,21 @@ def evaluate_hand(cards):
     counts = Counter(values)
     suits = [c.suit for c in cards]
 
-    unique_vals = sorted(set(values), reverse=True)
-    if 14 in unique_vals:
-        unique_vals.append(1)
+    # 创建所有可能的值序列（包括A作为1）
+    all_vals = sorted(set(values), reverse=True)
+    if 14 in all_vals:  # 如果存在A
+        all_vals.append(1)  # 添加A作为1
+    
+    # 重写顺子检测逻辑
     straight_vals = []
-    seq = []
-    for v in unique_vals:
-        if not seq or seq[-1] - 1 == v:
-            seq.append(v)
-        else:
-            seq = [v]
-        if len(seq) >= 5:
-            straight_vals = seq[:5]
+    for i in range(len(all_vals) - 4):
+        # 检查连续5张牌
+        if all_vals[i] - all_vals[i + 4] == 4 and \
+           len(set(all_vals[i:i + 5])) == 5:
+            straight_vals = all_vals[i:i + 5]
             break
-
+    
+    # 同花检测保持不变
     flush_suit = next((s for s in SUITS if suits.count(s) >= 5), None)
     flush_cards = [c for c in cards if c.suit == flush_suit] if flush_suit else []
 
@@ -209,12 +210,16 @@ class CHEGame:  # 修改类名为CHEGame
     
     def dealer_qualifies(self, dealer_eval):
         """检查庄家是否合格（至少有一对4或更好）"""
-        if dealer_eval[0] >= 1:  # 有对子或更好
+        if dealer_eval[0] > 1:  # 有对子或更好
+            return True
+        elif dealer_eval[0] == 1:
             # 检查对子点数是否>=4
             pair_value = dealer_eval[1][0]
-            return pair_value >= 4
-        return False
-    
+            if pair_value >= 4:
+                return True
+        else:
+            return False
+        
     def deal_initial(self):
         """发初始牌：玩家2张，庄家2张，公共牌5张（前3张翻开，后2张盖着）"""
         self.player_hole = self.deck.deal(2)
@@ -856,8 +861,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                 total_bet += 2.5
                 
             # 检查余额是否足够
-            if total_bet > self.balance:
-                messagebox.showerror("错误", "余额不足")
+            if self.balance < total_bet + self.ante * 2:  # 确保有足够余额下注Bet
+                messagebox.showwarning("警告", "余额不足以支付Bet")
                 return
                 
             self.balance -= total_bet
@@ -935,20 +940,16 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             self.fold_button = tk.Button(
                 action_buttons_frame, text="弃牌", 
                 command=lambda: self.play_action("fold"), 
+                state=tk.DISABLED,
                 font=('Arial', 14), bg='#F44336', fg='white', width=9
             )
             self.fold_button.pack(side=tk.LEFT, padx=9)
-            
-            # 检查余额是否足够支付Call下注 (2倍Ante)
-            call_state = tk.NORMAL
-            if self.balance < self.game.ante * 2:
-                call_state = tk.DISABLED
                 
             self.call_button = tk.Button(
                 action_buttons_frame, text="跟注 (2x)", 
                 command=lambda: self.play_action("call"), 
-                font=('Arial', 14), bg='#4CAF50', fg='white', width=9,
-                state=call_state
+                state=tk.DISABLED,
+                font=('Arial', 14), bg='#4CAF50', fg='white', width=9
             )
             self.call_button.pack(side=tk.LEFT, padx=9)
             
@@ -1077,6 +1078,9 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         
         # 更新玩家牌型
         self.update_hand_labels()
+
+        self.fold_button.config(state=tk.NORMAL)
+        self.call_button.config(state=tk.NORMAL)
     
     def reveal_turn_river(self):
         """翻开转牌和河牌（带动画）"""
@@ -1309,7 +1313,6 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                     widget.config(bg='gold')  # 赢 - 金色背景
         
         # 显示结果
-        result_text = f"赢取金额: ${winnings:.2f}"
         self.status_label.config(text="游戏结束。")
         
         # 更新上局获胜金额

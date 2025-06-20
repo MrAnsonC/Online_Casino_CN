@@ -9,6 +9,7 @@ from Casino_Games import transfer_baccarat
 from Casino_Games import Three_Card_Poker
 from Casino_Games import Sicbo
 from Casino_Games import Casino_Holdem
+from Casino_Games import Caribbean_Stud_Poker
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -39,6 +40,7 @@ def display_menu():
     print("请选择以下的游戏种类(0返回主目录):")
     print("① 21点 ② 终极德州扑克 ③ 百家乐")
     print("④ 三張牌撲克 ⑤ 骰宝 ⑥ 赌场扑克")
+    print("⑦ 加勒⽐梭哈撲克")
 
 def main(balance, user):
     while True:
@@ -60,6 +62,8 @@ def main(balance, user):
                 balance = Sicbo.main(user, balance)
             elif choice == "6":
                 balance = Casino_Holdem.main(balance, user)
+            elif choice == "7":
+                balance = Caribbean_Stud_Poker.main(balance, user)
             else:
                 print("无效选择，请输入1到6。")
                 time.sleep(1.5)
