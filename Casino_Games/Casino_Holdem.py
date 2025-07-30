@@ -7,6 +7,8 @@ import os
 from collections import Counter
 from itertools import combinations
 import math
+import secrets
+import subprocess, sys
 
 # 扑克牌花色和点数
 SUITS = ['♠', '♥', '♦', '♣']
@@ -27,7 +29,8 @@ AA_PAYOUT = {
 }
 
 def get_data_file_path():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../saving_data.json')
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(parent_dir, 'saving_data.json')
 
 def save_user_data(users):
     file_path = get_data_file_path()
@@ -95,23 +98,72 @@ class Card:
         self.suit = suit
         self.rank = rank
         self.value = RANK_VALUES[rank]
-        
     def __repr__(self):
         return f"{self.rank}{self.suit}"
 
 class Deck:
     def __init__(self):
-        self.full_deck = [Card(s, r) for s in SUITS for r in RANKS]
-        random.shuffle(self.full_deck)
-        self.start_pos = random.randint(4, 46)
+        # 获取当前脚本所在目录的上一级目录
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # 新的Card文件夹路径
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        shuffle_script = os.path.join(card_dir, 'shuffle.py')
+        
+        # 保证 Python 输出为 UTF-8
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
+        try:
+            # 调用外部 shuffle.py，超时 30 秒
+            result = subprocess.run(
+                [sys.executable, shuffle_script],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                env=env,
+                check=True,
+                timeout=30
+            )
+            shuffle_data = json.loads(result.stdout)
+            
+            if "deck" not in shuffle_data or "cut_position" not in shuffle_data:
+                raise ValueError("Invalid shuffle data format")
+            
+            # 用本模块的 Card 类实例化
+            self.full_deck = [
+                Card(d["suit"], d["rank"])
+                for d in shuffle_data["deck"]
+            ]
+            self.cut_position = shuffle_data["cut_position"]
+        
+        except (subprocess.CalledProcessError,
+                subprocess.TimeoutExpired,
+                json.JSONDecodeError,
+                ValueError,
+                KeyError) as e:
+            print(f"Error calling shuffle.py: {e}. Using fallback shuffle.")
+            # fallback：标准顺序+安全乱序
+            self.full_deck = [Card(s, r) for s in SUITS for r in RANKS]
+            self._secure_shuffle()
+            self.cut_position = secrets.randbelow(52)
+        
+        # 通用的洗牌后索引 & 发牌序列逻辑
+        self.start_pos = self.cut_position
         self.indexes = [(self.start_pos + i) % 52 for i in range(52)]
         self.pointer = 0
+        self.card_sequence = [self.full_deck[i] for i in self.indexes]
+    
+    def _secure_shuffle(self):
+        """Fisher–Yates 洗牌，用 secrets 保证随机性"""
+        for i in range(len(self.full_deck) - 1, 0, -1):
+            j = secrets.randbelow(i + 1)
+            self.full_deck[i], self.full_deck[j] = self.full_deck[j], self.full_deck[i]
 
     def deal(self, n=1):
         dealt = [self.full_deck[self.indexes[self.pointer + i]] for i in range(n)]
         self.pointer += n
         return dealt
-
+    
 def evaluate_hand(cards):
     values = sorted((c.value for c in cards), reverse=True)
     counts = Counter(values)
@@ -205,6 +257,8 @@ class CHEGame:  # 修改类名为CHEGame
             "dealer": [False, False],
             "community": [False, False, False, False, False]
         }
+        self.cut_position = self.deck.start_pos
+        self.card_sequence = self.deck.card_sequence
         # 加载Jackpot金额
         self.jackpot_initial, self.jackpot_amount = load_jackpot()
     
@@ -222,10 +276,10 @@ class CHEGame:  # 修改类名为CHEGame
         
     def deal_initial(self):
         """发初始牌：玩家2张，庄家2张，公共牌5张（前3张翻开，后2张盖着）"""
+        self.community_cards = self.deck.deal(5)  # 发5张公共牌
         self.player_hole = self.deck.deal(2)
         self.dealer_hole = self.deck.deal(2)
-        self.community_cards = self.deck.deal(5)  # 发5张公共牌
-    
+        
     def evaluate_hands(self):
         """评估玩家和庄家的手牌"""
         player_cards = self.player_hole + self.community_cards
@@ -256,7 +310,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
     def __init__(self, initial_balance, username):
         super().__init__()
         self.title("Casino Hold'em")  # 修改标题
-        self.geometry("1200x730")
+        self.geometry("1200x730+50+10")
+        self.resizable(0,0)
         self.configure(bg='#35654d')
         
         self.username = username
@@ -279,6 +334,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             "jackpot": 0
         }
         self.bet_widgets = {}  # 存储下注显示控件
+        self.original_images = {}
         self.last_jackpot_selection = False  # 记录上局Jackpot选择
         
         self._load_assets()
@@ -291,6 +347,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         win = tk.Toplevel(self)
         win.title("游戏规则")
         win.geometry("800x650")
+        win.resizable(0,0)
+        win.resizable(0,0)
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
         
@@ -456,8 +514,11 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         
     def _load_assets(self):
         card_size = (100, 140)
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        card_dir = os.path.join(base_dir, 'Card')
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        
+        # 初始化原始图像字典
+        self.original_images = {}
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -470,13 +531,17 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         # 加载背面图片
         back_path = os.path.join(card_dir, 'Background.png')
         try:
-            back_img = Image.open(back_path).resize(card_size)
+            # 保存原始背面图像
+            self.original_images["back"] = Image.open(back_path)
+            # 创建缩放后的背面图像
+            back_img = self.original_images["back"].resize(card_size, Image.LANCZOS)
             self.back_image = ImageTk.PhotoImage(back_img)
         except Exception as e:
             print(f"Error loading back image: {e}")
             # 如果没有背景图，创建一个黑色背景
             img = Image.new('RGB', card_size, 'black')
             self.back_image = ImageTk.PhotoImage(img)
+            self.original_images["back"] = img.copy()
         
         # 加载扑克牌图片
         for suit in SUITS:
@@ -494,7 +559,13 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                     path = os.path.join(card_dir, filename)
                     if os.path.exists(path):
                         try:
-                            img = Image.open(path).resize(card_size)
+                            # 加载原始图像
+                            orig_img = Image.open(path)
+                            # 保存原始图像
+                            self.original_images[(suit, rank)] = orig_img.copy()
+                            
+                            # 创建缩放后的图像
+                            img = orig_img.resize(card_size, Image.LANCZOS)
                             self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
                             img_found = True
                             break
@@ -516,6 +587,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                         draw.text((10, 10), f"{suit}{rank}", fill="white")
                     
                     self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
+                    self.original_images[(suit, rank)] = img.copy()
 
     def add_chip_to_bet(self, bet_type):
         """添加筹码到下注区域"""
@@ -1244,6 +1316,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                 font=('Arial', 14), bg='#2196F3', fg='white', width=15
             )
             restart_btn.pack(pady=10)
+            restart_btn.bind("<Button-3>", self.show_card_sequence)
             
             # 设置30秒后自动重置
             self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
@@ -1328,6 +1401,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
         restart_btn.pack(pady=10)
+        restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
         self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
@@ -1631,6 +1705,138 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         if auto_reset:
             self.status_label.config(text="30秒已到，自动开始新游戏")
             self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
+
+    def show_card_sequence(self, event):
+        """显示本局牌序窗口 - 右键点击时取消30秒计时"""
+        # 取消30秒自动重置计时器
+        if self.auto_reset_timer:
+            self.after_cancel(self.auto_reset_timer)
+            self.auto_reset_timer = None
+        
+        # 确保有牌序信息
+        if not hasattr(self.game, 'deck') or not self.game.deck:
+            messagebox.showinfo("提示", "没有牌序信息")
+            return
+            
+        win = tk.Toplevel(self)
+        win.title("本局牌序")
+        win.geometry("650x600")  # 固定窗口大小
+        win.resizable(0,0)
+        win.configure(bg='#f0f0f0')
+        
+        # 显示切牌位置
+        cut_pos = self.game.deck.start_pos
+        cut_label = tk.Label(
+            win, 
+            text=f"本局切牌位置: {cut_pos + 1}", 
+            font=('Arial', 14, 'bold'),
+            bg='#f0f0f0'
+        )
+        cut_label.pack(pady=(10, 5))
+        
+        # 创建主框架
+        main_frame = tk.Frame(win, bg='#f0f0f0')
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 添加滚动条
+        scrollbar = ttk.Scrollbar(main_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 创建画布用于滚动
+        canvas = tk.Canvas(main_frame, bg='#f0f0f0', yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=canvas.yview)
+        
+        # 创建内部框架放置所有内容
+        content_frame = tk.Frame(canvas, bg='#f0f0f0')
+        canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
+        
+        # 创建卡片框架
+        card_frame = tk.Frame(content_frame, bg='#f0f0f0')
+        card_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # 创建缩小版卡片图像
+        small_size = (60, 90)  # 卡片尺寸
+        small_images = {}  # 存储缩小后的卡片图像
+        
+        # 使用切牌前的整副牌顺序
+        for i, card in enumerate(self.game.deck.full_deck):
+            key = (card.suit, card.rank)
+            if key in self.original_images:
+                # 使用原始图像创建缩小版
+                small_img = self.original_images[key].resize(small_size, Image.LANCZOS)
+                small_images[i] = ImageTk.PhotoImage(small_img)
+            else:
+                # 如果没有找到图像，使用背面图像
+                if "back" in self.original_images:
+                    small_img = self.original_images["back"].resize(small_size, Image.LANCZOS)
+                    small_images[i] = ImageTk.PhotoImage(small_img)
+                else:
+                    # 创建黑色背景作为最后的选择
+                    small_img = Image.new('RGB', small_size, 'black')
+                    small_images[i] = ImageTk.PhotoImage(small_img)
+        
+        # 创建表格显示牌序 - 每行8张，共7行
+        for row in range(7):  # 7行
+            row_frame = tk.Frame(card_frame, bg='#f0f0f0')
+            row_frame.pack(fill=tk.X, pady=5)
+            
+            # 计算该行卡片数量 (前6行8张，最后一行4张)
+            cards_in_row = 8 if row < 6 else 4
+            
+            for col in range(cards_in_row):
+                card_index = row * 8 + col
+                if card_index >= 52:  # 确保不超过52张
+                    break
+                    
+                # 创建卡片容器
+                card_container = tk.Frame(row_frame, bg='#f0f0f0')
+                card_container.grid(row=0, column=col, padx=5, pady=5)
+                
+                # 标记切牌位置 - 显示在原始牌序中的位置
+                is_cut_position = card_index == self.game.deck.start_pos
+                bg_color = 'light blue' if is_cut_position else '#f0f0f0'
+                
+                # 显示卡片
+                if card_index in small_images:
+                    card_label = tk.Label(
+                        card_container, 
+                        image=small_images[card_index], 
+                        bg=bg_color,
+                        borderwidth=1,
+                        relief="solid"
+                    )
+                    card_label.image = small_images[card_index]  # 保持引用
+                    card_label.pack()
+                else:
+                    # 如果无法创建图像，显示文字表示
+                    card = self.game.deck.full_deck[card_index]
+                    card_label = tk.Label(
+                        card_container, 
+                        text=f"{card.rank}{card.suit}",
+                        bg=bg_color,
+                        width=6,
+                        height=3,
+                        borderwidth=1,
+                        relief="solid"
+                    )
+                    card_label.pack()
+                
+                # 显示牌位置编号
+                pos_label = tk.Label(
+                    card_container, 
+                    text=str(card_index+1), 
+                    bg=bg_color,
+                    font=('Arial', 9)
+                )
+                pos_label.pack()
+        
+        # 更新滚动区域
+        content_frame.update_idletasks()
+        canvas.config(scrollregion=canvas.bbox("all"))
+        
+        # 绑定鼠标滚轮滚动
+        win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
 def main(initial_balance=1000, username="Guest"):
     app = CHEGUI(initial_balance, username)  # 修改为CHEGUI

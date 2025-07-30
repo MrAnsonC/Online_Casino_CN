@@ -134,6 +134,8 @@ def main(initial_balance, username_init):
     username = username_init
     root = tk.Tk()
     root.title("刮刮卡游戏")
+    root.geometry("350x480+50+10")
+    root.resizable(0,0)
 
     balance_label = tk.Label(root, text=f"余额: {balance:.2f}", font=("Arial", 14))
     balance_label.grid(row=0, column=0, columnspan=4, pady=10)
@@ -176,7 +178,7 @@ def main(initial_balance, username_init):
     exit_button.grid(row=5, column=1, pady=10, padx=(10, 0), sticky="ew")  # Add 10px space to the left
 
     root.mainloop()
-    return exit_balance  # 在 main() 结束后返回 balance
+    return balance  # 在 main() 结束后返回 balance
 
 if __name__ == "__main__":
     main(100, "demo_player")

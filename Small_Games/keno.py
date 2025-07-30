@@ -83,8 +83,9 @@ class CircleButton(tk.Canvas):
         
         # 绘制圆形按钮
         self.create_oval(0, 0, radius*2, radius*2, fill=bg_color, outline="#16213e", width=2)
+        # 修改字体大小为18
         self.create_text(radius, radius, text=text, fill=fg_color, 
-                        font=("Arial", 10, "bold"))
+                        font=("Arial", 18, "bold"))  # 字体大小从10改为18
         
         # 绑定点击事件
         self.bind("<Button-1>", self.on_click)
@@ -97,7 +98,8 @@ class KenoGame:
     def __init__(self, root, initial_balance, username):
         self.root = root
         self.root.title("基诺游戏")
-        self.root.geometry("1000x700")
+        self.root.geometry("1000x700+50+10")
+        self.root.resizable(0,0)
         self.root.configure(bg="#1a1a2e")
         
         # 绑定窗口关闭事件
@@ -110,7 +112,7 @@ class KenoGame:
         self.difficulty = "1"
         self.user_numbers = []
         self.winning_numbers = []
-        self.game_active = False
+        self.game_active = False  # 添加游戏状态标志
         self.last_win = 0.0
         self.chip_buttons = []  # 存储筹码按钮的引用
         self.current_bet = 0.0  # 当前下注金额
@@ -171,9 +173,10 @@ class KenoGame:
         
         self.chip_buttons = []  # 存储所有筹码按钮
         for text, bg_color, fg_color in chips:
+            # 创建时传递完整的文本
             btn = CircleButton(
                 chips_frame, text=text, bg_color=bg_color, fg_color=fg_color,
-                command=lambda t=text: self.add_chip(t[1:])  # 去掉$符号
+                command=lambda t=text: self.add_chip(t)  # 传递完整的文本
             )
             btn.pack(side=tk.LEFT, padx=5, pady=5)
             self.chip_buttons.append(btn)
@@ -335,9 +338,19 @@ class KenoGame:
         
         self.update_status()
     
-    def add_chip(self, amount):
+    def add_chip(self, amount_text):
+        """添加筹码金额（处理$1K的特殊情况）"""
+        if self.game_active:
+            return
+            
         try:
-            amount_val = float(amount)
+            # 处理特殊格式（如$1K）
+            if amount_text == "$1K":
+                amount_val = 1000.0
+            else:
+                # 去掉$符号并转换为浮点数
+                amount_val = float(amount_text[1:])
+            
             new_bet = self.current_bet + amount_val
             if new_bet <= self.balance:
                 self.current_bet = new_bet
@@ -404,6 +417,13 @@ class KenoGame:
         if not self.user_numbers:
             messagebox.showwarning("错误", "请至少选择一个数字")
             return
+        
+        if self.current_bet > self.balance:
+            messagebox.showwarning("余额不足", "您的余额不足以进行此下注")
+            return
+        
+        # 设置游戏状态为进行中
+        self.game_active = True
         
         # 扣除下注金额
         self.balance -= self.current_bet
@@ -475,7 +495,7 @@ class KenoGame:
         
         # 准备下一个数字
         self.draw_index += 1
-        self.root.after(750, self.draw_numbers)  # 0.75秒后显示下一个数字
+        self.root.after(500, self.draw_numbers)  # 0.75秒后显示下一个数字
 
     def auto_clear(self):
         """自动清空选择"""
@@ -517,20 +537,23 @@ class KenoGame:
         # 更新JSON余额
         update_balance_in_json(self.username, self.balance)
 
+        # 重置游戏状态
+        self.game_active = False
+        
+        # 5秒后自动清空选择
         self.root.after(5000, self.auto_clear)
-        time.sleep(5)
         
         # 启用按钮
+        time.sleep(5)
         self.start_button.config(state=tk.NORMAL)
         self.lucky_button.config(state=tk.NORMAL)
         self.clear_button.config(state=tk.NORMAL)
         self.reset_bet_button.config(state=tk.NORMAL)
+
         for btn in self.chip_buttons:
             btn.configure(state=tk.NORMAL)
         for btn in self.difficulty_buttons:
             btn.configure(state=tk.NORMAL)
-        
-        # 启用数字按钮
         for btn in self.number_buttons:
             btn.config(state=tk.NORMAL)
     

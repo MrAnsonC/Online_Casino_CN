@@ -2,6 +2,7 @@ import random
 import json
 import os
 import time
+import subprocess, sys
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径

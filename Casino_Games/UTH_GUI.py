@@ -7,6 +7,10 @@ import os
 from collections import Counter
 from itertools import combinations
 import math
+import hashlib
+import time
+import secrets
+import subprocess, sys
 
 # 扑克牌花色和点数
 SUITS = ['♠', '♥', '♦', '♣']
@@ -38,7 +42,8 @@ TRIPS_PAYOUT = {
 }
 
 def get_data_file_path():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../saving_data.json')
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(parent_dir, 'saving_data.json')
 
 def save_user_data(users):
     file_path = get_data_file_path()
@@ -106,17 +111,66 @@ class Card:
         self.suit = suit
         self.rank = rank
         self.value = RANK_VALUES[rank]
-        
     def __repr__(self):
         return f"{self.rank}{self.suit}"
 
 class Deck:
     def __init__(self):
-        self.full_deck = [Card(s, r) for s in SUITS for r in RANKS]
-        random.shuffle(self.full_deck)
-        self.start_pos = random.randint(4, 46)
+        # 获取当前脚本所在目录的上一级目录
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        # 新的Card文件夹路径
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        shuffle_script = os.path.join(card_dir, 'shuffle.py')
+        
+        # 保证 Python 输出为 UTF-8
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
+        try:
+            # 调用外部 shuffle.py，超时 30 秒
+            result = subprocess.run(
+                [sys.executable, shuffle_script],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                env=env,
+                check=True,
+                timeout=30
+            )
+            shuffle_data = json.loads(result.stdout)
+            
+            if "deck" not in shuffle_data or "cut_position" not in shuffle_data:
+                raise ValueError("Invalid shuffle data format")
+            
+            # 用本模块的 Card 类实例化
+            self.full_deck = [
+                Card(d["suit"], d["rank"])
+                for d in shuffle_data["deck"]
+            ]
+            self.cut_position = shuffle_data["cut_position"]
+        
+        except (subprocess.CalledProcessError,
+                subprocess.TimeoutExpired,
+                json.JSONDecodeError,
+                ValueError,
+                KeyError) as e:
+            print(f"Error calling shuffle.py: {e}. Using fallback shuffle.")
+            # fallback：标准顺序+安全乱序
+            self.full_deck = [Card(s, r) for s in SUITS for r in RANKS]
+            self._secure_shuffle()
+            self.cut_position = secrets.randbelow(52)
+        
+        # 通用的洗牌后索引 & 发牌序列逻辑
+        self.start_pos = self.cut_position
         self.indexes = [(self.start_pos + i) % 52 for i in range(52)]
         self.pointer = 0
+        self.card_sequence = [self.full_deck[i] for i in self.indexes]
+    
+    def _secure_shuffle(self):
+        """Fisher–Yates 洗牌，用 secrets 保证随机性"""
+        for i in range(len(self.full_deck) - 1, 0, -1):
+            j = secrets.randbelow(i + 1)
+            self.full_deck[i], self.full_deck[j] = self.full_deck[j], self.full_deck[i]
 
     def deal(self, n=1):
         dealt = [self.full_deck[self.indexes[self.pointer + i]] for i in range(n)]
@@ -218,12 +272,15 @@ class UTHGame:
         }
         # 加载Jackpot金额
         self.jackpot_initial, self.jackpot_amount = load_jackpot()
+        # 新增：记录牌序信息
+        self.cut_position = self.deck.start_pos
+        self.card_sequence = self.deck.card_sequence
     
     def deal_initial(self):
         """发初始牌：玩家2张，庄家2张，公共牌5张"""
+        self.community_cards = self.deck.deal(5)
         self.player_hole = self.deck.deal(2)
         self.dealer_hole = self.deck.deal(2)
-        self.community_cards = self.deck.deal(5)
     
     def evaluate_hands(self):
         """评估玩家和庄家的手牌"""
@@ -255,7 +312,8 @@ class UTHGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
         self.title("Ultimate Texas Hold'em")
-        self.geometry("1200x730")
+        self.geometry("1150x730+50+10")
+        self.resizable(0,0)
         self.configure(bg='#35654d')
         
         self.username = username
@@ -280,6 +338,7 @@ class UTHGUI(tk.Tk):
         }
         self.bet_widgets = {}  # 存储下注显示控件
         self.last_jackpot_selection = False  # 记录上局Jackpot选择
+        self.auto_showdown = False  # 自动摊牌标志
         
         self._load_assets()
         self._create_widgets()
@@ -316,10 +375,11 @@ class UTHGUI(tk.Tk):
         Ultimate Texas Hold'em 游戏规则
 
         1. 游戏开始前下注:
+           - Play: 可选盲注 - 下注Ante的3X/4X或取消下注
            - Ante: 基础下注
            - Blind: 自动等于Ante
            - Trips: 可选副注
-           - Jackpot: 可选参与($2.50)
+           - Progressive: 可选参与($2.50)
 
         2. 游戏流程:
            a. 翻牌前:
@@ -349,7 +409,7 @@ class UTHGUI(tk.Tk):
              * 庄家高牌: 退还
              * 其他情况: 输掉
 
-           - Play Bet:
+           - Play:
              * 玩家赢: 支付2倍
              * 平局: 退还
              * 其他情况: 输掉
@@ -463,8 +523,8 @@ class UTHGUI(tk.Tk):
         
     def _load_assets(self):
         card_size = (100, 140)
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        card_dir = os.path.join(base_dir, 'Card')
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -473,57 +533,78 @@ class UTHGUI(tk.Tk):
             '♦': 'Diamond',
             '♣': 'Club'
         }
+
+        self.original_images = {}
         
         # 加载背面图片
         back_path = os.path.join(card_dir, 'Background.png')
         try:
-            back_img = Image.open(back_path).resize(card_size)
+            back_img_orig = Image.open(back_path)  # 原始尺寸
+            self.original_images["back"] = back_img_orig  # 保存原始图像
+            back_img = back_img_orig.resize(card_size)  # 缩放
             self.back_image = ImageTk.PhotoImage(back_img)
         except Exception as e:
             print(f"Error loading back image: {e}")
-            # 如果没有背景图，创建一个黑色背景
-            img = Image.new('RGB', card_size, 'black')
-            self.back_image = ImageTk.PhotoImage(img)
+            # 创建黑色背景
+            img_orig = Image.new('RGB', card_size, 'black')
+            self.original_images["back"] = img_orig
+            self.back_image = ImageTk.PhotoImage(img_orig)
         
-        # 加载扑克牌图片
+        # 加载扑克牌图片 - 修复这里
         for suit in SUITS:
             for rank in RANKS:
                 # 获取映射后的文件名
                 suit_name = suit_mapping.get(suit, suit)
+                filename = f"{suit_name}{rank}.png"
+                path = os.path.join(card_dir, filename)
                 
-                # 尝试可能的文件名组合
-                possible_filenames = [
-                    f"{suit_name}{rank}.png",       # 如 "SpadeA.png"
-                ]
-                
-                img_found = False
-                for filename in possible_filenames:
-                    path = os.path.join(card_dir, filename)
+                try:
                     if os.path.exists(path):
+                        img = Image.open(path)
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img
+                        # 创建缩放后的图像用于显示
+                        img_resized = img.resize(card_size)
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_resized)
+                    else:
+                        # 创建占位图片
+                        img_orig = Image.new('RGB', card_size, 'blue')
+                        draw = ImageDraw.Draw(img_orig)
+                        # 绘制卡片文本
+                        text = f"{rank}{suit}"
                         try:
-                            img = Image.open(path).resize(card_size)
-                            self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                            img_found = True
-                            break
-                        except Exception as e:
-                            print(f"Error loading {path}: {e}")
-                
-                # 如果没有找到图片，创建一个占位图片
-                if not img_found:
-                    print(f"Card image not found for {suit}{rank}")
-                    img = Image.new('RGB', card_size, 'blue')
-                    draw = ImageDraw.Draw(img)
-                    # 在图片上绘制花色和点数
+                            font = ImageFont.truetype("arial.ttf", 20)
+                        except:
+                            font = ImageFont.load_default()
+                        text_width, text_height = draw.textsize(text, font=font)
+                        x = (card_size[0] - text_width) / 2
+                        y = (card_size[1] - text_height) / 2
+                        draw.text((x, y), text, fill="white", font=font)
+                        
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img_orig
+                        # 创建缩放后的图像用于显示
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                except Exception as e:
+                    print(f"Error loading card image {path}: {e}")
+                    # 创建占位图片
+                    img_orig = Image.new('RGB', card_size, 'red')
+                    draw = ImageDraw.Draw(img_orig)
+                    text = "Error"
                     try:
-                        font = ImageFont.truetype("arial.ttf", 24)
-                        text = f"{suit}{rank}"
-                        draw.text((10, 10), text, font=font, fill="white")
+                        font = ImageFont.truetype("arial.ttf", 20)
                     except:
-                        # 如果字体加载失败，使用简单文本
-                        draw.text((10, 10), f"{suit}{rank}", fill="white")
+                        font = ImageFont.load_default()
+                    text_width, text_height = draw.textsize(text, font=font)
+                    x = (card_size[0] - text_width) / 2
+                    y = (card_size[1] - text_height) / 2
+                    draw.text((x, y), text, fill="white", font=font)
                     
-                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-
+                    # 保存原始图像
+                    self.original_images[(suit, rank)] = img_orig
+                    # 创建缩放后的图像用于显示
+                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                    
     def add_chip_to_bet(self, bet_type):
         """添加筹码到下注区域"""
         if not self.selected_chip:
@@ -542,6 +623,35 @@ class UTHGUI(tk.Tk):
             current = float(self.trips_var.get())
             self.trips_var.set(str(int(current + chip_value)))
     
+    def cycle_bet_amount(self, event):
+        """循环设置Bet下注金额：0 -> 3倍Ante -> 4倍Ante -> 0"""
+        # 获取当前Ante金额
+        try:
+            ante = int(self.ante_var.get())
+        except ValueError:
+            ante = 0
+        
+        # 如果Ante为0，则无法设置Bet，直接返回
+        if ante == 0:
+            return
+        
+        # 获取当前Bet金额，如果为空或无效则视为0
+        try:
+            current_bet = int(self.bet_var.get())
+        except ValueError:
+            current_bet = 0
+        
+        # 确定下一个Bet金额
+        if current_bet == 0:
+            new_bet = ante * 3
+        elif current_bet == ante * 3:
+            new_bet = ante * 4
+        else:
+            new_bet = 0
+        
+        # 更新Bet显示
+        self.bet_var.set(str(new_bet))
+    
     def _create_widgets(self):
         # 主框架 - 左右布局
         main_frame = tk.Frame(self, bg='#35654d')
@@ -556,7 +666,7 @@ class UTHGUI(tk.Tk):
         
         # 庄家区域 - 固定高度200
         dealer_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        dealer_frame.place(x=200, y=30, width=400, height=210)
+        dealer_frame.place(x=150, y=20, width=400, height=210)
         self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.dealer_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.dealer_cards_frame = tk.Frame(dealer_frame, bg='#2a4a3c')
@@ -564,7 +674,7 @@ class UTHGUI(tk.Tk):
         
         # 公共牌区域 - 固定高度200
         community_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        community_frame.place(x=100, y=240, width=600, height=210)
+        community_frame.place(x=50, y=250, width=600, height=210)
         community_label = tk.Label(community_frame, text="公共牌", font=('Arial', 18), bg='#2a4a3c', fg='white')
         community_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.community_cards_frame = tk.Frame(community_frame, bg='#2a4a3c')
@@ -572,7 +682,7 @@ class UTHGUI(tk.Tk):
         
         # 玩家区域 - 固定高度200
         player_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        player_frame.place(x=200, y=450, width=400, height=210)
+        player_frame.place(x=150, y=480, width=400, height=210)
         self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.player_cards_frame = tk.Frame(player_frame, bg='#2a4a3c')
@@ -612,7 +722,7 @@ class UTHGUI(tk.Tk):
         jackpot_inner_frame = tk.Frame(jackpot_frame, bg='#2a4a3c')
         jackpot_inner_frame.pack(expand=True, pady=5)  # 使用expand和居中
 
-        jackpot_label = tk.Label(jackpot_inner_frame, text="Jackpot:", 
+        jackpot_label = tk.Label(jackpot_inner_frame, text="Progressive:", 
                                 font=('Arial', 18), bg='#2a4a3c', fg='gold')
         jackpot_label.pack(side=tk.LEFT, padx=(0, 5))  # 右侧留5像素间距
 
@@ -672,7 +782,7 @@ class UTHGUI(tk.Tk):
         
         self.jackpot_check_var = tk.IntVar()
         self.jackpot_cb = tk.Checkbutton(
-            jackpot_frame, text="Jackpot ($2.50)", 
+            jackpot_frame, text="Progressive ($2.50)", 
             variable=self.jackpot_check_var, font=('Arial', 14),
             bg='#2a4a3c', fg='white', selectcolor='#35654d'
         )
@@ -725,13 +835,14 @@ class UTHGUI(tk.Tk):
         bet_play_frame = tk.Frame(bet_frame, bg='#2a4a3c')
         bet_play_frame.pack(fill=tk.X, padx=20, pady=5)
         
-        bet_play_label = tk.Label(bet_play_frame, text="   Bet:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        bet_play_label = tk.Label(bet_play_frame, text=" Play:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         bet_play_label.pack(side=tk.LEFT)
         
         self.bet_var = tk.StringVar(value="0")
         self.bet_display = tk.Label(bet_play_frame, textvariable=self.bet_var, font=('Arial', 14), 
                                    bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.bet_display.pack(side=tk.LEFT, padx=5)
+        self.bet_display.bind("<Button-1>", self.cycle_bet_amount)  # 绑定点击事件
         self.bet_widgets["bet"] = self.bet_display
 
         # 新增提示文字 - 在下注模块下方
@@ -861,13 +972,15 @@ class UTHGUI(tk.Tk):
         """禁用所有操作按钮"""
         self.buttons_disabled = True
         for widget in self.action_frame.winfo_children():
-            widget.config(state=tk.DISABLED)
+            if widget.winfo_exists():
+                widget.config(state=tk.DISABLED)
     
     def enable_action_buttons(self):
         """启用所有操作按钮"""
         self.buttons_disabled = False
         for widget in self.action_frame.winfo_children():
-            widget.config(state=tk.NORMAL)
+            if widget.winfo_exists():
+                widget.config(state=tk.NORMAL)
     
     def start_game(self):
         try:
@@ -876,134 +989,160 @@ class UTHGUI(tk.Tk):
             self.trips = int(self.trips_var.get())
             self.participate_jackpot = bool(self.jackpot_check_var.get())
             self.last_jackpot_selection = bool(self.jackpot_check_var.get())  # 记录当前选择
-            
-            # 检查Ante至少5块
-            if self.ante < 5:
-                messagebox.showerror("错误", "Ante至少需要5块")
-                return
-            
-            # 计算总下注
-            total_bet = self.ante + self.blind + self.trips
-            if self.participate_jackpot:
-                total_bet += 2.5
-                
-            # 检查余额是否足够进行后续操作
-            # 计算最小需要的余额：总下注 + 最小的1倍Bet (Ante)
-            min_required_balance = total_bet + self.ante
-            
-            if min_required_balance > self.balance:
-                messagebox.showerror("错误", f"余额不足以支付Bet！")
-                return
-                
-            self.balance -= total_bet
-            self.update_balance()
-            
-            # 更新本局下注显示
-            self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
-            
-            self.game.reset_game()
-            self.game.deal_initial()
-            self.game.ante = self.ante
-            self.game.blind = self.blind
-            self.game.trips = self.trips
-            self.game.participate_jackpot = self.participate_jackpot
-            
-            # 清除所有卡片
-            for widget in self.dealer_cards_frame.winfo_children():
-                widget.destroy()
-            for widget in self.community_cards_frame.winfo_children():
-                widget.destroy()
-            for widget in self.player_cards_frame.winfo_children():
-                widget.destroy()
-            
-            # 重置动画状态
-            self.animation_queue = []
-            self.animation_in_progress = False
-            self.active_card_labels = []
-            
-            # 初始化卡片位置
-            self.card_positions = {}
-            
-            # 添加所有卡片到动画队列
-            self.animation_queue = []
-            
-            # 公共牌 - 放置在中心位置
-            for i in range(5):
-                card_id = f"community_{i}"
-                self.card_positions[card_id] = {
-                    "current": (50, 50), 
-                    "target": (i * 110, 0)  # 水平排列
-                }
-                self.animation_queue.append(card_id)
-            
-            # 玩家牌 - 放置在中心位置
-            for i in range(2):
-                card_id = f"player_{i}"
-                self.card_positions[card_id] = {
-                    "current": (50, 50), 
-                    "target": (i * 150, 0)  # 水平排列
-                }
-                self.animation_queue.append(card_id)
-            
-            # 庄家牌 - 放置在中心位置
-            for i in range(2):
-                card_id = f"dealer_{i}"
-                self.card_positions[card_id] = {
-                    "current": (50, 50), 
-                    "target": (i * 150, 0)  # 水平排列
-                }
-                self.animation_queue.append(card_id)
-            
-            # 开始动画
-            self.animate_deal()
-            
-            # 更新游戏状态
-            self.stage_label.config(text="阶段: 翻牌前")
-            self.status_label.config(text="做出决策: 过牌、下注3倍或下注4倍")
-            
-            # 创建操作按钮 - 替换开始按钮
-            for widget in self.action_frame.winfo_children():
-                widget.destroy()
-                
-            self.check_button = tk.Button(
-                self.action_frame, text="过牌", 
-                command=lambda: self.play_action(0), 
-                font=('Arial', 14), bg='#2196F3', fg='white', width=9,
-                state=tk.DISABLED
-            )
-            self.check_button.pack(side=tk.LEFT, padx=9)
-                
-            self.bet_3x_button = tk.Button(
-                self.action_frame, text="下注3倍", 
-                command=lambda: self.play_action(3), 
-                font=('Arial', 14), bg='#FF9800', fg='white', width=9,
-                state=tk.DISABLED
-            )
-            self.bet_3x_button.pack(side=tk.LEFT, padx=9)
-                
-            self.bet_4x_button = tk.Button(
-                self.action_frame, text="下注4倍", 
-                command=lambda: self.play_action(4), 
-                font=('Arial', 14), bg='#F44336', fg='white', width=9,
-                state=tk.DISABLED
-            )
-            self.bet_4x_button.pack(side=tk.LEFT, padx=9)
-            
-            # 禁用下注区域
-            self.ante_display.unbind("<Button-1>")
-            self.trips_display.unbind("<Button-1>")
-            self.jackpot_cb.config(state=tk.DISABLED)
-            for chip in self.chip_buttons:
-                chip.unbind("<Button-1>")
-            
+            # 读取Bet金额
+            self.bet = int(self.bet_var.get())   # 如果为空字符串，会触发ValueError，所以下面捕获异常
         except ValueError:
-            messagebox.showerror("错误", "请输入有效的下注金额")
+            # 如果转换失败，将Bet设为0
+            self.bet = 0
+            
+        # 检查Ante至少5块
+        if self.ante < 5:
+            messagebox.showerror("错误", "Ante至少需要5块")
+            return
+        
+        # 计算总下注（包括Bet）
+        total_bet = self.ante + self.blind + self.trips + self.bet
+        if self.participate_jackpot:
+            total_bet += 2.5
+            
+        # 检查余额是否足够（包括Bet）
+        if total_bet > self.balance:
+            messagebox.showerror("错误", "余额不足以支付所有下注！")
+            return
+            
+        self.balance -= total_bet
+        self.update_balance()
+        
+        # 更新本局下注显示
+        self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
+        
+        # 如果Play Bet不为0，禁用重设金额和开始游戏按钮
+        if self.bet > 0:
+            self.reset_bets_button.config(state=tk.DISABLED)
+            self.start_button.config(state=tk.DISABLED)
+        
+        self.game.reset_game()
+        self.game.deal_initial()
+        self.game.ante = self.ante
+        self.game.blind = self.blind
+        self.game.trips = self.trips
+        self.game.participate_jackpot = self.participate_jackpot
+        
+        # 设置自动摊牌标志
+        self.auto_showdown = (self.bet > 0)
+        
+        # 清除所有卡片
+        for widget in self.dealer_cards_frame.winfo_children():
+            widget.destroy()
+        for widget in self.community_cards_frame.winfo_children():
+            widget.destroy()
+        for widget in self.player_cards_frame.winfo_children():
+            widget.destroy()
+        
+        # 重置动画状态
+        self.animation_queue = []
+        self.animation_in_progress = False
+        self.active_card_labels = []
+        
+        # 初始化卡片位置
+        self.card_positions = {}
+        
+        # 添加所有卡片到动画队列
+        self.animation_queue = []
+        
+        # 公共牌 - 放置在中心位置
+        for i in range(5):
+            card_id = f"community_{i}"
+            self.card_positions[card_id] = {
+                "current": (50, 50), 
+                "target": (i * 110, 0)  # 水平排列
+            }
+            self.animation_queue.append(card_id)
+        
+        # 玩家牌 - 放置在中心位置
+        for i in range(2):
+            card_id = f"player_{i}"
+            self.card_positions[card_id] = {
+                "current": (50, 50), 
+                "target": (i * 150, 0)  # 水平排列
+            }
+            self.animation_queue.append(card_id)
+        
+        # 庄家牌 - 放置在中心位置
+        for i in range(2):
+            card_id = f"dealer_{i}"
+            self.card_positions[card_id] = {
+                "current": (50, 50), 
+                "target": (i * 150, 0)  # 水平排列
+            }
+            self.animation_queue.append(card_id)
+        
+        # 开始动画
+        self.animate_deal()
+        
+        # 更新游戏状态
+        self.stage_label.config(text="阶段: 翻牌前")
+        
+        # 如果Bet有下注金额，则直接进入摊牌阶段
+        if self.auto_showdown:
+            # 记录Play Bet
+            self.game.play_bet = self.bet
+            # 设置游戏阶段为摊牌
+            self.game.stage = "showdown"
+            # 更新状态标签
+            self.status_label.config(text=f"已下注: ${self.bet}，将在牌到位后自动摊牌。")
+            # 不创建操作按钮
+            return
+        
+        # 创建操作按钮 - 替换开始按钮
+        for widget in self.action_frame.winfo_children():
+            widget.destroy()
+            
+        buttons_container = tk.Frame(self.action_frame, bg='#2a4a3c')
+        buttons_container.pack(expand=True, pady=10)
+
+        self.check_button = tk.Button(
+            buttons_container, text="过牌", 
+            command=lambda: self.play_action(0), 
+            font=('Arial', 14), bg='#2196F3', fg='white', width=9,
+            state=tk.DISABLED
+        )
+        self.check_button.pack(side=tk.LEFT, padx=9)
+            
+        self.bet_3x_button = tk.Button(
+            buttons_container, text="下注3倍", 
+            command=lambda: self.play_action(3), 
+            font=('Arial', 14), bg='#FF9800', fg='white', width=9,
+            state=tk.DISABLED
+        )
+        self.bet_3x_button.pack(side=tk.LEFT, padx=9)
+            
+        self.bet_4x_button = tk.Button(
+            buttons_container, text="下注4倍", 
+            command=lambda: self.play_action(4), 
+            font=('Arial', 14), bg='#F44336', fg='white', width=9,
+            state=tk.DISABLED
+        )
+        self.bet_4x_button.pack(side=tk.LEFT, padx=9)
+        
+        # 禁用下注区域
+        self.ante_display.unbind("<Button-1>")
+        self.trips_display.unbind("<Button-1>")
+        self.bet_display.unbind("<Button-1>")
+        self.jackpot_cb.config(state=tk.DISABLED)
+        for chip in self.chip_buttons:
+            chip.unbind("<Button-1>")
     
     def animate_deal(self):
         if not self.animation_queue:
             self.animation_in_progress = False
-            # 发牌动画完成后翻开玩家牌
-            self.after(500, self.reveal_player_cards)
+            # 发牌动画完成后
+            if self.auto_showdown:
+                # 自动摊牌：翻开所有牌
+                self.after(500, self.show_showdown)
+            else:
+                # 正常流程：翻开玩家牌
+                self.after(500, self.reveal_player_cards)
             return
             
         self.animation_in_progress = True
@@ -1198,6 +1337,10 @@ class UTHGUI(tk.Tk):
     
     def enable_preflop_buttons(self):
         """启用翻牌前的操作按钮，并根据余额设置状态"""
+        # 检查按钮是否还存在
+        if not hasattr(self, 'bet_3x_button') or not self.bet_3x_button.winfo_exists():
+            return
+            
         ante = self.game.ante
         # 检查余额是否足够支付3倍Ante
         if self.balance >= ante * 3:
@@ -1216,6 +1359,10 @@ class UTHGUI(tk.Tk):
 
     def enable_flop_buttons(self):
         """启用翻牌圈的操作按钮，并根据余额设置状态"""
+        # 检查按钮是否还存在
+        if not hasattr(self, 'bet_2x_button') or not self.bet_2x_button.winfo_exists():
+            return
+            
         ante = self.game.ante
         # 检查余额是否足够支付2倍Ante
         if self.balance >= ante * 2:
@@ -1228,6 +1375,10 @@ class UTHGUI(tk.Tk):
 
     def enable_river_buttons(self):
         """启用河牌圈的操作按钮"""
+        # 检查按钮是否还存在
+        if not hasattr(self, 'bet_1x_button') or not self.bet_1x_button.winfo_exists():
+            return
+            
         ante = self.game.ante
         # 检查余额是否足够支付1倍Ante
         if self.balance >= ante:
@@ -1258,9 +1409,12 @@ class UTHGUI(tk.Tk):
         if self.game.stage == "pre_flop":
             if bet_multiplier > 0:
                 # 直接进入摊牌
-                self.bet_4x_button.config(state=tk.DISABLED)
-                self.bet_3x_button.config(state=tk.DISABLED)
-                self.check_button.config(state=tk.DISABLED)
+                if hasattr(self, 'bet_4x_button') and self.bet_4x_button.winfo_exists():
+                    self.bet_4x_button.config(state=tk.DISABLED)
+                if hasattr(self, 'bet_3x_button') and self.bet_3x_button.winfo_exists():
+                    self.bet_3x_button.config(state=tk.DISABLED)
+                if hasattr(self, 'check_button') and self.check_button.winfo_exists():
+                    self.check_button.config(state=tk.DISABLED)
                 self.game.stage = "showdown"
                 self.after(1000, self.show_showdown)
             else:
@@ -1276,8 +1430,11 @@ class UTHGUI(tk.Tk):
                 for widget in self.action_frame.winfo_children():
                     widget.destroy()
                     
+                buttons_container = tk.Frame(self.action_frame, bg='#2a4a3c')
+                buttons_container.pack(expand=True, pady=10)
+
                 self.check_button = tk.Button(
-                    self.action_frame, text="过牌", 
+                    buttons_container, text="过牌", 
                     command=lambda: self.play_action(0), 
                     state=tk.DISABLED,
                     font=('Arial', 14), bg='#2196F3', fg='white', width=9
@@ -1285,7 +1442,7 @@ class UTHGUI(tk.Tk):
                 self.check_button.pack(side=tk.LEFT, padx=9)
                     
                 self.bet_2x_button = tk.Button(
-                    self.action_frame, text="下注2倍", 
+                    buttons_container, text="下注2倍", 
                     command=lambda: self.play_action(2),
                     state=tk.DISABLED,
                     font=('Arial', 14), bg='#FF9800', fg='white', width=9
@@ -1295,8 +1452,10 @@ class UTHGUI(tk.Tk):
         elif self.game.stage == "flop":
             if bet_multiplier > 0:
                 # 直接进入摊牌
-                self.bet_2x_button.config(state=tk.DISABLED)
-                self.check_button.config(state=tk.DISABLED)
+                if hasattr(self, 'bet_2x_button') and self.bet_2x_button.winfo_exists():
+                    self.bet_2x_button.config(state=tk.DISABLED)
+                if hasattr(self, 'check_button') and self.check_button.winfo_exists():
+                    self.check_button.config(state=tk.DISABLED)
                 self.game.stage = "showdown"
                 self.after(1000, self.show_showdown)
             else:
@@ -1312,16 +1471,19 @@ class UTHGUI(tk.Tk):
                 for widget in self.action_frame.winfo_children():
                     widget.destroy()
                     
+                buttons_container = tk.Frame(self.action_frame, bg='#2a4a3c')
+                buttons_container.pack(expand=True, pady=10)
+
                 self.fold_button = tk.Button(
-                    self.action_frame, text="弃牌", 
+                    buttons_container, text="弃牌", 
                     command=self.fold_action, 
                     state=tk.DISABLED,
                     font=('Arial', 14), bg='#F44336', fg='white', width=9
                 )
                 self.fold_button.pack(side=tk.LEFT, padx=10)
-                
+                    
                 self.bet_1x_button = tk.Button(
-                    self.action_frame, text="下注1倍", 
+                    buttons_container, text="下注1倍", 
                     command=lambda: self.play_action(1), 
                     state=tk.DISABLED,
                     font=('Arial', 14), bg='#4CAF50', fg='white', width=9
@@ -1331,8 +1493,10 @@ class UTHGUI(tk.Tk):
         # 在河牌圈下注1倍时进入结算
         elif self.game.stage == "river":
             if bet_multiplier == 1:
-                self.bet_1x_button.config(state=tk.DISABLED)
-                self.fold_button.config(state=tk.DISABLED)
+                if hasattr(self, 'bet_1x_button') and self.bet_1x_button.winfo_exists():
+                    self.bet_1x_button.config(state=tk.DISABLED)
+                if hasattr(self, 'fold_button') and self.fold_button.winfo_exists():
+                    self.fold_button.config(state=tk.DISABLED)
                 self.update_balance()
                 self.game.play_bet = bet_amount
                 # 更新Bet显示
@@ -1396,31 +1560,39 @@ class UTHGUI(tk.Tk):
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
         restart_btn.pack(pady=10)
+        restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
         self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
     
     def show_showdown(self):
-        # 翻开所有未翻开的牌
+        """摊牌阶段：一次性翻开所有牌"""
+        # 翻开所有公共牌
         for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
             if hasattr(card_label, "card") and not card_label.is_face_up:
                 self.flip_card_animation(card_label)
-                # 标记公共牌已翻开
                 self.game.cards_revealed["community"][i] = True
         
-        # 更新玩家牌型
+        # 翻开玩家牌
+        for i, card_label in enumerate(self.player_cards_frame.winfo_children()):
+            if hasattr(card_label, "card") and not card_label.is_face_up:
+                self.flip_card_animation(card_label)
+                self.game.cards_revealed["player"][i] = True
+        
+        # 翻开庄家牌
+        for i, card_label in enumerate(self.dealer_cards_frame.winfo_children()):
+            if hasattr(card_label, "card") and not card_label.is_face_up:
+                self.flip_card_animation(card_label)
+                self.game.cards_revealed["dealer"][i] = True
+        
+        # 更新所有牌型标签
         self.update_hand_labels()
         
-        # 等待2秒后翻开庄家牌
+        # 等待2秒后结算
         self.after(2000, self.final_reveal)
     
     def final_reveal(self):
-        # 翻开庄家牌
-        self.reveal_dealer_cards()
-        
-        # 更新庄家牌型
-        self.update_hand_labels()
-        
+        """摊牌后结算"""
         # 评估手牌
         player_eval, player_best, dealer_eval, dealer_best = self.game.evaluate_hands()
         
@@ -1484,6 +1656,7 @@ class UTHGUI(tk.Tk):
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
         restart_btn.pack(pady=10)
+        restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
         self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
@@ -1650,51 +1823,7 @@ class UTHGUI(tk.Tk):
         # 禁用所有按钮
         self.disable_action_buttons()
         
-        # 第一步：翻转所有牌为背面
-        self.flip_all_to_back()
-        
-        # 第二步：设置动画完成后执行真正的重置
-        self.after(1000, lambda: self.animate_move_cards_out(auto_reset))
-
-    def flip_all_to_back(self):
-        """将所有牌翻转为背面"""
-        self.flipping_cards = []  # 存储正在翻转的卡片
-        
-        # 收集所有需要翻转的卡片
-        for card_label in self.active_card_labels:
-            if card_label.is_face_up:
-                self.flipping_cards.append(card_label)
-        
-        # 如果没有需要翻转的卡片，直接返回
-        if not self.flipping_cards:
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-            
-        # 开始翻转动画
-        self.animate_flip_to_back_step(0)
-
-    def animate_flip_to_back_step(self, step):
-        """执行翻转动画的每一步"""
-        if step >= 10:  # 假设10步完成
-            # 翻转完成，将所有正在翻转的卡片设为背面
-            for card_label in self.flipping_cards:
-                card_label.config(image=self.back_image)
-                card_label.is_face_up = False
-                
-            # 开始移动动画
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-
-        # 模拟翻转效果：先缩小宽度，再放大（但背面）
-        width = 100 - (step * 10) if step < 5 else (step - 5) * 10
-        if width <= 0:
-            width = 1
-
-        for card_label in self.flipping_cards:
-            card_label.place(width=width)
-
-        step += 1
-        self.after(50, lambda: self.animate_flip_to_back_step(step))
+        self.animate_move_cards_out(auto_reset)
 
     def animate_move_cards_out(self, auto_reset):
         """将所有牌向右移出屏幕"""
@@ -1760,6 +1889,7 @@ class UTHGUI(tk.Tk):
         self.ante_var.set("0")
         self.blind_var.set("0")  # Blind会自动等于Ante，所以也要重置
         self.trips_var.set("0")
+        self.bet_var.set("0")  # 同时重置Bet金额
         
         # 更新显示
         self.status_label.config(text="已重置所有下注金额")
@@ -1771,8 +1901,12 @@ class UTHGUI(tk.Tk):
         # 短暂高亮显示重置效果
         self.ante_display.config(bg='#FFCDD2')  # 浅红色
         self.trips_display.config(bg='#FFCDD2')
-        self.after(500, lambda: [self.ante_display.config(bg='white'), 
-                                self.trips_display.config(bg='white')])
+        self.bet_display.config(bg='#FFCDD2')
+        self.after(500, lambda: [
+            self.ante_display.config(bg='white'), 
+            self.trips_display.config(bg='white'),
+            self.bet_display.config(bg='white')
+        ])
     
     def _do_reset(self, auto_reset=False):
         """真正的重置游戏界面"""
@@ -1803,6 +1937,7 @@ class UTHGUI(tk.Tk):
         # 恢复下注区域
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.trips_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("trips"))
+        self.bet_display.bind("<Button-1>", self.cycle_bet_amount)
         self.jackpot_cb.config(state=tk.NORMAL)
         for chip in self.chip_buttons:
             # 使用存储的文本重新绑定事件
@@ -1839,6 +1974,138 @@ class UTHGUI(tk.Tk):
         if auto_reset:
             self.status_label.config(text="30秒已到，自动开始新游戏")
             self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
+
+    def show_card_sequence(self, event):
+        """显示本局牌序窗口 - 右键点击时取消30秒计时"""
+        # 取消30秒自动重置计时器
+        if self.auto_reset_timer:
+            self.after_cancel(self.auto_reset_timer)
+            self.auto_reset_timer = None
+        
+        # 确保有牌序信息
+        if not hasattr(self.game, 'deck') or not self.game.deck:
+            messagebox.showinfo("提示", "没有牌序信息")
+            return
+            
+        win = tk.Toplevel(self)
+        win.title("本局牌序")
+        win.geometry("650x600")  # 固定窗口大小
+        win.resizable(0,0)
+        win.configure(bg='#f0f0f0')
+        
+        # 显示切牌位置
+        cut_pos = self.game.deck.start_pos
+        cut_label = tk.Label(
+            win, 
+            text=f"本局切牌位置: {cut_pos + 1}", 
+            font=('Arial', 14, 'bold'),
+            bg='#f0f0f0'
+        )
+        cut_label.pack(pady=(10, 5))
+        
+        # 创建主框架
+        main_frame = tk.Frame(win, bg='#f0f0f0')
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 添加滚动条
+        scrollbar = ttk.Scrollbar(main_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 创建画布用于滚动
+        canvas = tk.Canvas(main_frame, bg='#f0f0f0', yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=canvas.yview)
+        
+        # 创建内部框架放置所有内容
+        content_frame = tk.Frame(canvas, bg='#f0f0f0')
+        canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
+        
+        # 创建卡片框架
+        card_frame = tk.Frame(content_frame, bg='#f0f0f0')
+        card_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        # 创建缩小版卡片图像
+        small_size = (60, 90)
+        small_images = {}
+
+        # 尝试加载字体
+        from PIL import ImageFont, ImageDraw
+        
+        # 创建卡片图像
+        for i, card in enumerate(self.game.deck.full_deck):
+            # 使用花色和点数作为键获取原始图片
+            key = (card.suit, card.rank)
+            
+            if key in self.original_images:
+                # 获取原始图像
+                orig_img = self.original_images[key]
+                
+                # 创建缩小版图像
+                small_img = orig_img.resize(small_size, Image.LANCZOS)
+                small_images[i] = ImageTk.PhotoImage(small_img)
+            else:
+                # 创建带文字的占位图像
+                img = Image.new('RGB', small_size, 'blue')
+                draw = ImageDraw.Draw(img)
+                text = f"{card.rank}{card.suit}"
+                try:
+                    font = ImageFont.truetype("arial.ttf", 12)
+                except:
+                    font = ImageFont.load_default()
+                text_width, text_height = draw.textsize(text, font=font)
+                x = (small_size[0] - text_width) / 2
+                y = (small_size[1] - text_height) / 2
+                draw.text((x, y), text, fill="white", font=font)
+                small_images[i] = ImageTk.PhotoImage(img)
+        
+        # 创建表格显示牌序 - 每行8张，共7行
+        for row in range(7):  # 7行
+            row_frame = tk.Frame(card_frame, bg='#f0f0f0')
+            row_frame.pack(fill=tk.X, pady=5)
+            
+            # 计算该行卡片数量 (前6行8张，最后一行4张)
+            cards_in_row = 8 if row < 6 else 4
+            
+            for col in range(cards_in_row):
+                card_index = row * 8 + col
+                if card_index >= 52:  # 确保不超过52张
+                    break
+                    
+                # 创建卡片容器
+                card_container = tk.Frame(row_frame, bg='#f0f0f0')
+                card_container.grid(row=0, column=col, padx=5, pady=5)
+                
+                # 标记切牌位置 - 显示在原始牌序中的位置
+                is_cut_position = card_index == self.game.deck.start_pos
+                bg_color = 'light blue' if is_cut_position else '#f0f0f0'
+                
+                # 显示卡片
+                card = self.game.deck.full_deck[card_index]
+                card_label = tk.Label(
+                    card_container, 
+                    image=small_images[card_index], 
+                    bg=bg_color,
+                    borderwidth=1,
+                    relief="solid"
+                )
+                card_label.image = small_images[card_index]  # 保持引用
+                card_label.pack()
+                
+                # 显示牌位置编号
+                pos_label = tk.Label(
+                    card_container, 
+                    text=str(card_index+1), 
+                    bg=bg_color,
+                    font=('Arial', 9)
+                )
+                pos_label.pack()
+        
+        # 更新滚动区域
+        content_frame.update_idletasks()
+        canvas.config(scrollregion=canvas.bbox("all"))
+        
+        # 绑定鼠标滚轮滚动
+        win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
 def main(initial_balance=1000, username="Guest"):
     app = UTHGUI(initial_balance, username)

@@ -38,7 +38,7 @@ class CircleButton(tk.Canvas):
         
         self.create_oval(0, 0, radius*2, radius*2, fill=bg_color, outline="#16213e", width=2)
         self.create_text(radius, radius, text=text, fill=fg_color, 
-                        font=("Arial", 10, "bold"))
+                        font=("Arial", 18, "bold"))
         
         self.bind("<Button-1>", self.on_click)
     
@@ -50,7 +50,8 @@ class GuessNumberGame:
     def __init__(self, root, initial_balance, username):
         self.root = root
         self.root.title("猜数字游戏")
-        self.root.geometry("1050x700")
+        self.root.geometry("1050x700+50+10")
+        self.root.resizable(0,0)
         self.root.configure(bg="#1a1a2e")
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         
@@ -184,7 +185,10 @@ class GuessNumberGame:
     
     def add_chip(self, amount):
         try:
-            amount_val = float(amount)
+            if amount == "1K":
+                amount_val = 1000.0
+            else:
+                amount_val = float(amount)
             new_bet = self.current_bet + amount_val
             if new_bet <= self.balance:
                 self.current_bet = new_bet

@@ -1,10 +1,11 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
 import random
 import json
 import os
 import time
 import math
+
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -44,7 +45,7 @@ class CircleButton(tk.Canvas):
         # 绘制圆形按钮
         self.create_oval(0, 0, radius*2, radius*2, fill=bg_color, outline="#16213e", width=2)  # 外框使用背景色
         self.create_text(radius, radius, text=text, fill=fg_color, 
-                        font=("Arial", 10, "bold"))
+                        font=("Arial", 18, "bold"))
         
         # 绑定点击事件
         self.bind("<Button-1>", self.on_click)
@@ -57,7 +58,8 @@ class TowerGame:
     def __init__(self, root, initial_balance, username):
         self.root = root
         self.root.title("上塔游戏")
-        self.root.geometry("1000x700")
+        self.root.geometry("1000x700+50+10")
+        self.root.resizable(0,0)
         self.root.configure(bg="#1a1a2e")
         
         # 绑定窗口关闭事件
@@ -378,8 +380,11 @@ class TowerGame:
     
     def start_game(self):
         if self.current_bet <= 0:
+            messagebox.showwarning("错误", "请先下注")
             return
+        # 检查余额是否足够
         if self.current_bet > self.balance:
+            messagebox.showwarning("余额不足", "您的余额不足以进行此下注")
             return
         
         self.bet_amount = self.current_bet

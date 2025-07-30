@@ -52,7 +52,7 @@ class CircleButton(tk.Canvas):
         # 绘制圆形按钮
         self.create_oval(0, 0, radius*2, radius*2, fill=bg_color, outline="#16213e", width=2)
         self.create_text(radius, radius, text=text, fill=fg_color, 
-                        font=("Arial", 10, "bold"))
+                        font=("Arial", 18, "bold"))
         
         # 绑定点击事件
         self.bind("<Button-1>", self.on_click)
@@ -96,7 +96,8 @@ class MinesGame:
     def __init__(self, root, initial_balance, username):
         self.root = root
         self.root.title("扫雷游戏")
-        self.root.geometry("1000x700")
+        self.root.geometry("1000x700+50+10")
+        self.root.resizable(0,0)
         self.root.configure(bg="#1a1a2e")
         
         # 绑定窗口关闭事件

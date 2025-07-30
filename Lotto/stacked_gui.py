@@ -82,6 +82,7 @@ def update_display():
 
 root = tk.Tk()
 root.title("刮刮乐游戏")
+root.resizable(0,0)
 
 username = "demo_player"
 balance = 100

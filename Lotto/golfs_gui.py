@@ -59,6 +59,8 @@ class ScratchGame:
     def __init__(self, root, balance, username):
         self.root = root
         self.root.title("刮刮乐游戏")
+        self.root.geometry("415x340+50+10")
+        self.root.resizable(0,0)
         self.username = username
         self.balance = int(balance)
         self.card = None

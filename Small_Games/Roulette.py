@@ -1,828 +1,869 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 import random
-import time
-from PIL import Image, ImageTk, ImageDraw, ImageFont
 import math
+import os
+import json
+from PIL import Image, ImageTk, ImageDraw, ImageFont
+import winsound  # 用于添加音效
 
-class RouletteSpinWindow:
-    def __init__(self, parent, winning_number, callback):
-        self.parent = parent
-        self.winning_number = winning_number
-        self.callback = callback
-        self.window = tk.Toplevel(parent)
-        self.window.title("轮盘旋转中...")
-        self.window.geometry("600x600")
-        self.window.configure(bg='#1e3d59')
-        self.window.resizable(False, False)
-        self.window.grab_set()
+# 轮盘赌游戏逻辑 - 支持标准下注类型
+class RouletteGame:
+    def __init__(self):
+        self.reset_game()
         
-        # 窗口居中
-        parent_x = parent.winfo_x()
-        parent_y = parent.winfo_y()
-        parent_width = parent.winfo_width()
-        parent_height = parent.winfo_height()
-        x = parent_x + (parent_width - 600) // 2
-        y = parent_y + (parent_height - 600) // 2
-        self.window.geometry(f"600x600+{x}+{y}")
+    def reset_game(self):
+        self.bets = {}  # 存储所有下注: {位置: (金额, 下注类型)}
+        self.total_bet = 0
+        self.winning_number = None
+        self.win_amount = 0
+        self.winning_bets = []
         
-        # 创建轮盘画布
-        self.canvas = tk.Canvas(self.window, width=550, height=550, bg='#1e3d59', highlightthickness=0)
-        self.canvas.pack(pady=20)
+    def place_bet(self, bet_type, amount, position=None):
+        """下注到指定位置"""
+        key = position if position else bet_type
         
-        # 初始化轮盘
-        self.roulette_wheel = RouletteWheel(self.canvas, 550, 550)
-        self.roulette_wheel.set_spin_complete_callback(self.on_spin_complete)
+        if key not in self.bets:
+            self.bets[key] = (0, bet_type)
+        current_amount, _ = self.bets[key]
+        self.bets[key] = (current_amount + amount, bet_type)
+        self.total_bet += amount
         
-        # 状态标签
-        self.status_label = tk.Label(self.window, text="轮盘旋转中...", font=("Arial", 16, "bold"), 
-                                    fg='white', bg='#1e3d59')
-        self.status_label.pack()
+    def spin(self):
+        """旋转轮盘并确定获胜号码"""
+        self.winning_number = random.randint(0, 36)
+        self.winning_bets = []
+        self.win_amount = 0
         
-        # 开始旋转
-        self.window.after(100, self.start_spin)
+        # 确定哪些下注获胜
+        for key, (amount, bet_type) in self.bets.items():
+            if self.is_winning_bet(bet_type, key, self.winning_number):
+                odds = self.get_odds(bet_type)
+                self.win_amount += amount * (odds + 1)
+                self.winning_bets.append((key, bet_type, amount, odds))
+        
+        return self.winning_number, self.win_amount, self.winning_bets
     
-    def start_spin(self):
-        """开始旋转轮盘"""
-        self.roulette_wheel.spin(self.winning_number)
-    
-    def on_spin_complete(self, winning_number):
-        """轮盘旋转完成"""
-        # 显示结果
-        num_text = "00" if winning_number == 37 else str(winning_number)
-        self.status_label.config(text=f"结果: {num_text}")
+    def is_winning_bet(self, bet_type, key, number):
+        """检查下注是否获胜"""
+        # 单个数字
+        if bet_type == "straight":
+            return int(key) == number
         
-        # 等待2秒后关闭窗口并回调
-        self.window.after(2000, self.close_window)
+        # First Five (0, 00, 1, 2, 3)
+        elif bet_type == "first_five":
+            return number in [0, 37, 1, 2, 3]  # 37代表00
+        
+        # Split (两个相邻数字)
+        elif bet_type == "split":
+            num1, num2 = map(int, key.split(','))
+            return number in [num1, num2]
+        
+        # Street (一行三个数字)
+        elif bet_type == "street":
+            start_num = int(key)
+            return start_num <= number <= start_num + 2
+        
+        # Corner (四个数字)
+        elif bet_type == "corner":
+            nums = list(map(int, key.split(',')))
+            return number in nums
+        
+        # Six-line (两行六个数字)
+        elif bet_type == "six_line":
+            start_num = int(key)
+            return start_num <= number <= start_num + 5
+        
+        # Even Chance (红/黑, 单/双, 1-18/19-36)
+        elif bet_type == "even_chance":
+            if key == "red":
+                return number in self.red_numbers
+            elif key == "black":
+                return number in self.black_numbers
+            elif key == "odd":
+                return number % 2 == 1 and number != 0 and number != 37
+            elif key == "even":
+                return number % 2 == 0 and number != 0 and number != 37
+            elif key == "1-18":
+                return 1 <= number <= 18
+            elif key == "19-36":
+                return 19 <= number <= 36
+        
+        # Dozen (1-12, 13-24, 25-36)
+        elif bet_type == "dozen":
+            if key == "1st_12":
+                return 1 <= number <= 12
+            elif key == "2nd_12":
+                return 13 <= number <= 24
+            elif key == "3rd_12":
+                return 25 <= number <= 36
+        
+        # Column (列下注)
+        elif bet_type == "column":
+            if key == "1st_col":
+                return number % 3 == 1 and number != 0 and number != 37
+            elif key == "2nd_col":
+                return number % 3 == 2 and number != 0 and number != 37
+            elif key == "3rd_col":
+                return number % 3 == 0 and number != 0 and number != 37
+        
+        return False
     
-    def close_window(self):
-        """关闭窗口并回调"""
-        self.window.destroy()
-        self.callback(self.winning_number)
+    def get_odds(self, bet_type):
+        """获取不同下注类型的赔率"""
+        odds_map = {
+            "straight": 35,     # 35:1
+            "first_five": 6,    # 6:1
+            "split": 17,        # 17:1
+            "street": 11,        # 11:1
+            "corner": 8,         # 8:1
+            "six_line": 5,       # 5:1
+            "even_chance": 1,   # 1:1
+            "dozen": 2,         # 2:1
+            "column": 2          # 2:1
+        }
+        return odds_map.get(bet_type, 1)
+    
+    # 轮盘数字颜色定义 (美式轮盘)
+    red_numbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]
+    black_numbers = [2, 4, 6, 8, 10, 11, 13, 15, 17, 20, 22, 24, 26, 28, 29, 31, 33, 35]
 
-
-class RouletteWheel:
-    def __init__(self, canvas, width, height):
-        self.canvas = canvas
-        self.width = width
-        self.height = height
-        self.center_x = width // 2
-        self.center_y = height // 2
-        self.radius = min(width, height) * 0.4
-        self.ball_radius = 10
-        self.wheel_img = None
-        self.ball_position = None
-        self.ball_angle = 0
-        self.spinning = False
-        self.target_number = None
-        self.on_spin_complete = None
+class RouletteGUI(tk.Tk):
+    def __init__(self, initial_balance, username):
+        super().__init__()
+        self.title("Casino Roulette")
+        self.geometry("1200x800+50+10")
+        self.resizable(0,0)
+        self.configure(bg='#35654d')  # 赌场绿色背景
         
+        self.username = username
+        self.balance = initial_balance
+        self.game = RouletteGame()
+        self.selected_chip = 5  # 默认选择5元筹码
+        self.selected_bet_type = "straight"  # 默认下注类型
+        self.chip_buttons = []  # 筹码按钮列表
+        self.bet_type_buttons = []  # 下注类型按钮列表
+        self.last_win = 0
+        self.bet_labels = {}  # 存储下注标签
+        self.bet_markers = []  # 存储下注标记
+        
+        self._load_assets()
+        self._create_widgets()
+        self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def on_close(self):
+        # 保存余额（如果是登录用户）
+        if self.username != 'Guest':
+            self.update_balance_in_json()
+        self.destroy()
+        
+    def update_balance_in_json(self):
+        # 加载用户数据
+        users = []
         try:
-            self.font_small = ImageFont.truetype("arial.ttf", 16)
-            self.font_large = ImageFont.truetype("arial.ttf", 20)
+            with open('saving_data.json', 'r') as f:
+                users = json.load(f)
         except:
-            # 如果Arial不可用，使用默认字体
-            self.font_small = ImageFont.load_default()
-            self.font_large = ImageFont.load_default()
+            pass
         
-        self.create_wheel()
+        # 更新当前用户余额
+        for user in users:
+            if user['user_name'] == self.username:
+                user['cash'] = f"{self.balance:.2f}"
+                break
+                
+        # 保存用户数据
+        with open('saving_data.json', 'w') as f:
+            json.dump(users, f, indent=4)
+
+    def _load_assets(self):
+        # 创建筹码图像
+        self.chip_images = {}
+        chip_values = [5, 10, 25, 50, 100, 500]
+        chip_colors = ['#FF0000', '#FFA500', '#00FF00', '#FFFFFF', '#0000FF', '#FF00FF']
         
-    def create_wheel(self):
+        for value, color in zip(chip_values, chip_colors):
+            # 创建圆形筹码图像
+            img = Image.new('RGBA', (60, 60), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            
+            # 绘制筹码主体
+            draw.ellipse((5, 5, 55, 55), fill=color)
+            
+            # 绘制白色边框
+            draw.ellipse((0, 0, 59, 59), outline='white', width=3)
+            
+            # 添加筹码值文本
+            try:
+                font = ImageFont.truetype("arial.ttf", 16)
+            except:
+                font = ImageFont.load_default()
+                
+            text = f"${value}"
+            # 使用 textbbox 替代已弃用的 textsize
+            bbox = draw.textbbox((0, 0), text, font=font)
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+            draw.text((30 - w/2, 30 - h/2), text, fill='white' if color in ['#0000FF', '#000000'] else 'black', font=font)
+            
+            self.chip_images[value] = ImageTk.PhotoImage(img)
+        
         # 创建轮盘图像
-        img = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
+        self.wheel_image = self.create_roulette_wheel()
+        
+        # 小球图像
+        self.ball_image = self.create_ball_image()
+        
+        # 创建下注标记图像
+        self.bet_marker_img = self.create_bet_marker()
+
+    def create_roulette_wheel(self):
+        """创建轮盘图像"""
+        size = 300
+        img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         
         # 绘制轮盘外圈
-        draw.ellipse([(self.center_x - self.radius, self.center_y - self.radius),
-                     (self.center_x + self.radius, self.center_y + self.radius)], 
-                     outline='#333', width=5, fill='#2c3e50')
+        draw.ellipse((10, 10, size-10, size-10), fill='#2a4a3c', outline='#FFD700', width=3)
         
-        # 美式轮盘数字顺序
-        numbers = [
-            0, 28, 9, 26, 30, 11, 7, 20, 32, 17, 
-            5, 22, 34, 15, 3, 24, 36, 13, 1, 00, 
-            27, 10, 25, 29, 12, 8, 19, 31, 18, 6, 
-            21, 33, 16, 4, 23, 35, 14, 2
-        ]
-        
-        # 数字颜色定义
-        red_numbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]
+        # 绘制内圈
+        draw.ellipse((40, 40, size-40, size-40), fill='#1e1e1e', outline='#FFD700', width=2)
         
         # 绘制数字槽
-        num_slots = len(numbers)
-        angle_per_slot = 360 / num_slots
-        text_radius = self.radius * 0.7
+        num_slots = 38  # 0, 00, 1-36
+        slot_width = 360 / num_slots
         
-        for i, num in enumerate(numbers):
-            angle = math.radians(i * angle_per_slot - 90)
-            start_angle = math.radians(i * angle_per_slot)
-            end_angle = math.radians((i + 1) * angle_per_slot)
+        for i in range(num_slots):
+            angle = i * slot_width - 90  # 从顶部开始
             
-            # 确定颜色
-            if num == 0 or num == 00:
-                color = '#2ecc71'  # 绿色
-            elif num in red_numbers:
-                color = '#e74c3c'  # 红色
+            # 计算槽位位置
+            start_angle = angle
+            end_angle = angle + slot_width
+            
+            # 槽位颜色 (红、黑、绿)
+            if i == 0:  # 0
+                color = '#008000'  # 绿色
+            elif i == 1:  # 00
+                color = '#008000'  # 绿色
             else:
-                color = '#1a1a1a'  # 黑色
-                
+                num = i - 1  # 实际数字
+                color = '#FF0000' if num in self.game.red_numbers else '#000000'
+            
             # 绘制槽位
-            draw.pieslice([(self.center_x - self.radius*0.95, self.center_y - self.radius*0.95),
-                          (self.center_x + self.radius*0.95, self.center_y + self.radius*0.95)],
-                          i * angle_per_slot, (i + 1) * angle_per_slot, 
-                          fill=color, outline='#333')
+            draw.pieslice((20, 20, size-20, size-20), start_angle, end_angle, fill=color, outline='#FFD700')
             
-            # 绘制数字
-            text_x = self.center_x + text_radius * math.cos(angle)
-            text_y = self.center_y + text_radius * math.sin(angle)
+            # 添加数字
+            num_text = "0" if i == 0 else "00" if i == 1 else str(num)
+            rad = math.radians(angle + slot_width/2)
+            text_x = size/2 + (size/2 - 40) * math.cos(rad)
+            text_y = size/2 + (size/2 - 40) * math.sin(rad)
             
-            text_color = '#ffffff' if color == '#1a1a1a' else '#ffffff'
-            
-            # 处理00显示
-            num_text = "0" if num == 0 else "00" if num == 00 else str(num)
-            
-            # 使用字体对象
-            if num == 0 or num == 00:
-                draw.text((text_x - 10, text_y - 10), num_text, 
-                         fill=text_color, font=self.font_large)
-            else:
-                draw.text((text_x - 10, text_y - 10), num_text, 
-                         fill=text_color, font=self.font_small)
-        
-        # 添加中心标志
-        draw.ellipse([(self.center_x - self.radius*0.1, self.center_y - self.radius*0.1),
-                     (self.center_x + self.radius*0.1, self.center_y + self.radius*0.1)], 
-                     fill='#f39c12', outline='#d35400')
-        
-        self.wheel_img = ImageTk.PhotoImage(img)
-        self.canvas.create_image(self.center_x, self.center_y, image=self.wheel_img)
-        
-    def spin(self, target_number=None):
-        if self.spinning:
-            return
-            
-        self.spinning = True
-        self.target_number = target_number or random.randint(0, 37)  # 0-36 + 00 (37)
-        
-        # 重置球位置
-        self.ball_angle = 0
-        self.draw_ball()
-        
-        # 开始旋转动画
-        self.animate_spin(0)
-        
-    def animate_spin(self, frame):
-        if frame < 100:  # 旋转100帧
-            # 增加旋转速度（开始时加速）
-            speed = min(20, frame // 5 + 1)
-            self.ball_angle = (self.ball_angle + speed) % 360
-            
-            # 更新球位置
-            self.draw_ball()
-            
-            # 继续动画
-            self.canvas.after(30, lambda: self.animate_spin(frame + 1))
-        else:
-            # 减速到目标位置
-            target_angle = self.calculate_target_angle()
-            self.decelerate_to_target(target_angle, 100)
-    
-    def decelerate_to_target(self, target_angle, frames_left):
-        if frames_left > 0:
-            # 计算当前角度和目标角度之间的差距
-            angle_diff = (target_angle - self.ball_angle) % 360
-            if angle_diff > 180:
-                angle_diff -= 360
+            try:
+                font = ImageFont.truetype("arial.ttf", 12)
+            except:
+                font = ImageFont.load_default()
                 
-            # 减速运动
-            speed = max(0.5, min(5, abs(angle_diff) / 20))
-            
-            # 更新球位置
-            self.ball_angle = (self.ball_angle + speed * (1 if angle_diff > 0 else -1)) % 360
-            self.draw_ball()
-            
-            # 继续动画
-            self.canvas.after(40, lambda: self.decelerate_to_target(target_angle, frames_left - 1))
-        else:
-            # 最终定位到目标
-            self.ball_angle = target_angle
-            self.draw_ball()
-            self.spinning = False
-            # 触发结果回调
-            if self.on_spin_complete:
-                self.on_spin_complete(self.target_number)
+            # 使用 textbbox 替代已弃用的 textsize
+            bbox = draw.textbbox((0, 0), num_text, font=font)
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+            draw.text((text_x - w/2, text_y - h/2), num_text, 
+                     fill='white' if color == '#000000' else 'black', 
+                     font=font)
+        
+        return ImageTk.PhotoImage(img)
     
-    def calculate_target_angle(self):
-        """计算目标数字对应的角度"""
-        # 美式轮盘数字顺序
-        numbers = [
-            0, 28, 9, 26, 30, 11, 7, 20, 32, 17, 
-            5, 22, 34, 15, 3, 24, 36, 13, 1, 00, 
-            27, 10, 25, 29, 12, 8, 19, 31, 18, 6, 
-            21, 33, 16, 4, 23, 35, 14, 2
-        ]
+    def create_ball_image(self):
+        """创建小球图像"""
+        img = Image.new('RGBA', (20, 20), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
         
-        # 找到目标数字在列表中的索引
-        try:
-            index = numbers.index(self.target_number if self.target_number != 37 else 00)
-        except ValueError:
-            index = random.randint(0, len(numbers) - 1)
+        # 绘制小球
+        draw.ellipse((0, 0, 19, 19), fill='#FFFFFF')
+        draw.ellipse((5, 5, 14, 14), fill='#FF0000')
         
-        # 每个槽位角度
-        angle_per_slot = 360 / len(numbers)
+        # 添加高光
+        draw.ellipse((3, 3, 8, 8), fill='#FFFFFF')
         
-        # 目标角度（加一点随机偏移使结果更自然）
-        target_angle = (index * angle_per_slot + random.uniform(-3, 3)) % 360
-        
-        return target_angle
+        return ImageTk.PhotoImage(img)
     
-    def draw_ball(self):
-        """在轮盘上绘制小球"""
-        if self.ball_position:
-            self.canvas.delete(self.ball_position)
-            
-        ball_radius = self.radius * 0.9
-        angle_rad = math.radians(self.ball_angle - 90)  # -90使0点在上方
+    def create_bet_marker(self):
+        """创建下注标记图像"""
+        img = Image.new('RGBA', (30, 30), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
         
-        x = self.center_x + ball_radius * math.cos(angle_rad)
-        y = self.center_y + ball_radius * math.sin(angle_rad)
+        # 绘制透明圆形标记
+        draw.ellipse((0, 0, 29, 29), fill=(255, 255, 0, 150))  # 半透明黄色
         
-        self.ball_position = self.canvas.create_oval(
-            x - self.ball_radius, y - self.ball_radius,
-            x + self.ball_radius, y + self.ball_radius,
-            fill='#ffffff', outline='#333'
-        )
-    
-    def set_spin_complete_callback(self, callback):
-        self.on_spin_complete = callback
+        return ImageTk.PhotoImage(img)
 
-
-class RouletteGame:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("美式轮盘游戏")
-        self.root.geometry("1350x780")
-        self.root.configure(bg='#0a5f38')
-        
-        # 游戏状态
-        self.balance = 10000
-        self.current_bet = 0
-        self.bet_amount = 100
-        self.last_win = 0
-        self.bets = {}
-        self.history = []
-        self.accept_bets = True
-        
-        # 创建主界面
-        self.create_widgets()
-        
-        # 设置默认筹码
-        self.set_bet_amount(100)
-        
-        # 绑定回车键
-        self.root.bind('<Return>', lambda event: self.spin_wheel())
-        
-    def create_widgets(self):
-        # 主框架
-        main_frame = tk.Frame(self.root, bg='#0a5f38')
+    def _create_widgets(self):
+        # 主框架 - 上下布局
+        main_frame = tk.Frame(self, bg='#35654d')
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        # 左侧面板 - 下注区域
-        left_frame = tk.Frame(main_frame, bg='#0a5f38')
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # 顶部轮盘区域
+        wheel_frame = tk.Frame(main_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        wheel_frame.pack(fill=tk.X, pady=5)
         
-        # 赌毯框架
-        bet_area_frame = tk.LabelFrame(left_frame, text="下注区域", font=("Arial", 14, "bold"), 
-                                     bg='#1e3d59', fg='white', padx=10, pady=10)
-        bet_area_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        wheel_label = tk.Label(wheel_frame, text="轮盘", font=('Arial', 16), bg='#2a4a3c', fg='#FFD700')
+        wheel_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         
-        # 创建赌毯
-        self.create_bet_area(bet_area_frame)
+        self.wheel_canvas = tk.Canvas(wheel_frame, width=310, height=310, bg='#2a4a3c', highlightthickness=0)
+        self.wheel_canvas.pack(padx=10, pady=10)
+        self.wheel_canvas.create_image(155, 155, image=self.wheel_image)
         
-        # 右侧面板 - 控制面板
-        right_frame = tk.Frame(main_frame, bg='#0a5f38', width=300)
-        right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
+        # 小球位置（初始在顶部）
+        self.ball_id = self.wheel_canvas.create_image(155, 25, image=self.ball_image)
         
-        # 控制面板
-        control_frame = tk.LabelFrame(right_frame, text="控制面板", font=("Arial", 14, "bold"), 
-                                    bg='#1e3d59', fg='white', padx=10, pady=10)
-        control_frame.pack(fill=tk.BOTH, expand=True)
+        # 下注区域
+        betting_frame = tk.Frame(main_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        betting_frame.pack(fill=tk.BOTH, expand=True, pady=5)
         
-        # 余额信息
-        info_frame = tk.Frame(control_frame, bg='#1e3d59')
-        info_frame.pack(fill=tk.X, pady=10)
+        betting_label = tk.Label(betting_frame, text="下注区域", font=('Arial', 16), bg='#2a4a3c', fg='#FFD700')
+        betting_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         
-        self.balance_label = tk.Label(info_frame, text=f"余额: ${self.balance}", 
-                                     font=("Arial", 14, "bold"), fg='white', bg='#1e3d59')
-        self.balance_label.pack(side=tk.LEFT, padx=10)
+        # 创建下注表格
+        self.create_betting_table(betting_frame)
         
-        # 下注信息
-        bet_info_frame = tk.Frame(control_frame, bg='#1e3d59')
-        bet_info_frame.pack(fill=tk.X, pady=5)
+        # 右侧控制面板
+        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=300)
+        control_frame.pack(fill=tk.Y, side=tk.RIGHT, padx=5)
         
-        self.current_bet_label = tk.Label(bet_info_frame, text=f"本局下注: ${self.current_bet}", 
-                                        font=("Arial", 12), fg='white', bg='#1e3d59')
-        self.current_bet_label.pack(side=tk.LEFT, padx=10)
+        # 顶部信息栏
+        info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        info_frame.pack(fill=tk.X, pady=5)
         
-        self.last_win_label = tk.Label(bet_info_frame, text=f"上局获胜: ${self.last_win}", 
-                                     font=("Arial", 12), fg='white', bg='#1e3d59')
-        self.last_win_label.pack(side=tk.LEFT, padx=10)
+        self.balance_label = tk.Label(
+            info_frame, 
+            text=f"余额: ${self.balance:.2f}",
+            font=('Arial', 18),
+            bg='#2a4a3c',
+            fg='white'
+        )
+        self.balance_label.pack(side=tk.LEFT, padx=20, pady=10)
         
-        # 筹码选择
-        chip_frame = tk.Frame(control_frame, bg='#1e3d59')
-        chip_frame.pack(fill=tk.X, pady=10)
+        # 下注类型选择
+        bet_type_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        bet_type_frame.pack(fill=tk.X, pady=5)
         
-        tk.Label(chip_frame, text="筹码选择", font=("Arial", 12, "bold"), 
-                fg='white', bg='#1e3d59').pack(anchor=tk.W, pady=5)
+        bet_type_label = tk.Label(bet_type_frame, text="下注类型:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        bet_type_label.pack(anchor='w', padx=10, pady=5)
         
-        # 筹码值
-        self.chip_values = [10, 25, 50, 100, 500, 1000, 5000]
-        self.chip_buttons = []
-        
-        chips_frame = tk.Frame(chip_frame, bg='#1e3d59')
-        chips_frame.pack(fill=tk.X)
-        
-        for value in self.chip_values:
-            btn = tk.Button(chips_frame, text=f"${value}", font=("Arial", 10, "bold"),
-                          command=lambda v=value: self.set_bet_amount(v),
-                          bg='#f39c12', fg='black', width=6, height=1)
-            btn.pack(side=tk.LEFT, padx=5, pady=5)
-            self.chip_buttons.append(btn)
-        
-        # 旋转按钮
-        spin_btn = tk.Button(control_frame, text="旋转轮盘 (Enter)", font=("Arial", 14, "bold"),
-                           bg='#27ae60', fg='white', command=self.spin_wheel)
-        spin_btn.pack(fill=tk.X, pady=10)
-        
-        # 清除按钮
-        clear_btn = tk.Button(control_frame, text="清除下注", font=("Arial", 14, "bold"),
-                            bg='#e74c3c', fg='white', command=self.clear_bets)
-        clear_btn.pack(fill=tk.X, pady=5)
-        
-        # 历史记录
-        history_frame = tk.LabelFrame(control_frame, text="历史记录", font=("Arial", 12, "bold"),
-                                    bg='#1e3d59', fg='white')
-        history_frame.pack(fill=tk.BOTH, expand=True, pady=10)
-        
-        self.history_canvas = tk.Canvas(history_frame, bg='#1e3d59', highlightthickness=0)
-        self.history_canvas.pack(fill=tk.BOTH, expand=True)
-        
-        self.history_container = tk.Frame(self.history_canvas, bg='#1e3d59')
-        self.history_canvas.create_window((0, 0), window=self.history_container, anchor=tk.NW)
-        
-        # 添加滚动条
-        scrollbar = tk.Scrollbar(history_frame, orient=tk.VERTICAL, command=self.history_canvas.yview)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.history_canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # 绑定事件
-        self.history_container.bind("<Configure>", self.on_frame_configure)
-    
-    def on_frame_configure(self, event):
-        """更新滚动区域"""
-        self.history_canvas.configure(scrollregion=self.history_canvas.bbox("all"))
-    
-    def create_bet_area(self, parent):
-        """创建标准轮盘下注区域布局"""
-        # 创建主要下注区域框架
-        bet_area = tk.Canvas(parent, bg='#2c3e50', highlightthickness=0)
-        bet_area.pack(fill=tk.BOTH, expand=True)
-        
-        # 内场区域 - 数字格
-        inner_field = tk.Frame(bet_area, bg='#2c3e50', padx=10, pady=10)
-        inner_field.place(relx=0.5, rely=0.3, anchor=tk.CENTER, width=800, height=400)
-        
-        # 0和00区域 - 顶部
-        zero_frame = tk.Frame(inner_field, bg='#2c3e50')
-        zero_frame.grid(row=0, column=0, columnspan=3, sticky='ew', pady=(0, 5))
-        
-        # 0按钮
-        zero_btn = tk.Button(zero_frame, text="0", font=("Arial", 14, "bold"),
-                           bg='#2ecc71', fg='white', width=4,
-                           command=lambda: self.place_bet("直注", 35, 0))
-        zero_btn.pack(side=tk.LEFT, padx=(0, 2))
-        
-        # 00按钮
-        dzero_btn = tk.Button(zero_frame, text="00", font=("Arial", 14, "bold"),
-                            bg='#2ecc71', fg='white', width=4,
-                            command=lambda: self.place_bet("直注", 35, 00))
-        dzero_btn.pack(side=tk.LEFT, padx=(2, 0))
-        
-        # 0和00分注 - 在0和00之间
-        split_frame = tk.Frame(zero_frame, bg='#2c3e50', width=10, height=40)
-        split_frame.pack(side=tk.LEFT, fill=tk.Y)
-        split_frame.bind("<Button-1>", lambda e: self.place_bet("分注", 17, "0-00"))
-        split_label = tk.Label(split_frame, text="", bg='#3498db', cursor="hand2")
-        split_label.pack(fill=tk.BOTH, expand=True)
-        split_label.bind("<Button-1>", lambda e: self.place_bet("分注", 17, "0-00"))
-        
-        # 数字网格
-        grid_frame = tk.Frame(inner_field, bg='#2c3e50')
-        grid_frame.grid(row=1, column=0, columnspan=3, sticky='nsew')
-        
-        # 列标题
-        col_frame = tk.Frame(grid_frame, bg='#2c3e50')
-        col_frame.pack(fill=tk.X)
-        
-        # 数字布局 - 三列
-        columns = [
-            [1, 4, 7, 10, 13, 16, 19, 22, 25, 28, 31, 34],  # 第一列
-            [2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35],  # 第二列
-            [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36]   # 第三列
+        # 下注类型按钮
+        bet_types = [
+            ("直注(35:1)", "straight"),
+            ("分注(17:1)", "split"),
+            ("街注(11:1)", "street"),
+            ("角注(8:1)", "corner"),
+            ("线注(5:1)", "six_line"),
+            ("首五注(6:1)", "first_five"),
+            ("均注(1:1)", "even_chance"),
+            ("打注(2:1)", "dozen"),
+            ("列注(2:1)", "column")
         ]
         
-        # 红黑数字定义
-        red_numbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]
+        self.bet_type_buttons = []
+        for text, b_type in bet_types:
+            # 创建按钮时存储下注类型
+            btn = tk.Button(
+                bet_type_frame,
+                text=text,
+                font=('Arial', 10),
+                bg='#4A4A4A',
+                fg='white',
+                relief='flat'
+            )
+            # 添加下注类型作为按钮属性
+            btn.bet_type = b_type
+            btn.config(command=lambda bt=b_type: self.select_bet_type(bt))
+            btn.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.X, expand=True)
+            self.bet_type_buttons.append(btn)
         
-        # 创建数字网格
-        for col_idx, col_nums in enumerate(columns):
-            col_frame = tk.Frame(grid_frame, bg='#2c3e50')
-            col_frame.pack(side=tk.LEFT, fill=tk.Y, padx=1)
+        # 默认选中直注
+        self.select_bet_type("straight")
+        
+        # 筹码区域
+        chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        chips_frame.pack(fill=tk.X, pady=5)
+        
+        chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        chips_label.pack(anchor='w', padx=10, pady=5)
+        
+        # 单行放置6个筹码
+        chip_row = tk.Frame(chips_frame, bg='#2a4a3c')
+        chip_row.pack(fill=tk.X, pady=5, padx=5)
+        
+        chip_values = [5, 10, 25, 50, 100, 500]
+        
+        self.chip_buttons = []
+        for value in chip_values:
+            btn = tk.Button(
+                chip_row, 
+                image=self.chip_images[value],
+                command=lambda v=value: self.select_chip(v),
+                bg='#2a4a3c',
+                relief='flat',
+                borderwidth=0
+            )
+            btn.pack(side=tk.LEFT, padx=5)
+            self.chip_buttons.append(btn)
+        
+        # 默认选中$5筹码
+        self.select_chip(5)
+        
+        # 下注信息区域
+        bet_info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        bet_info_frame.pack(fill=tk.X, pady=5)
+        
+        self.current_bet_label = tk.Label(
+            bet_info_frame, 
+            text="本局下注: $0.00",
+            font=('Arial', 14),
+            bg='#2a4a3c',
+            fg='white'
+        )
+        self.current_bet_label.pack(pady=5, padx=10, anchor='w')
+        
+        self.last_win_label = tk.Label(
+            bet_info_frame, 
+            text="上局获胜: $0.00",
+            font=('Arial', 14),
+            bg='#2a4a3c',
+            fg='#FFD700'
+        )
+        self.last_win_label.pack(pady=5, padx=10, anchor='w')
+        
+        # 游戏操作按钮
+        action_frame = tk.Frame(control_frame, bg='#2a4a3c')
+        action_frame.pack(fill=tk.X, pady=5)
+        
+        spin_btn = tk.Button(
+            action_frame, 
+            text="旋转轮盘",
+            command=self.spin_roulette,
+            font=('Arial', 16, 'bold'),
+            bg='#4CAF50',
+            fg='white',
+            padx=10,
+            pady=10
+        )
+        spin_btn.pack(fill=tk.X, pady=5)
+        
+        clear_btn = tk.Button(
+            action_frame, 
+            text="清除下注",
+            command=self.clear_bets,
+            font=('Arial', 14),
+            bg='#F44336',
+            fg='white'
+        )
+        clear_btn.pack(fill=tk.X, pady=5)
+        
+        # 状态信息
+        self.status_label = tk.Label(
+            control_frame, 
+            text="请选择筹码和下注类型，然后点击下注区域",
+            font=('Arial', 12, 'bold'),
+            bg='#2a4a3c',
+            fg='#FFD700'
+        )
+        self.status_label.pack(pady=10, fill=tk.X)
+        
+        # 获胜信息
+        self.win_info_label = tk.Label(
+            control_frame, 
+            text="",
+            font=('Arial', 12),
+            bg='#2a4a3c',
+            fg='white',
+            wraplength=280
+        )
+        self.win_info_label.pack(pady=5, fill=tk.X)
+
+    def create_betting_table(self, parent):
+        """创建经典轮盘赌桌布局"""
+        # 主框架
+        table_frame = tk.Frame(parent, bg='#2a4a3c')
+        table_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 顶部 - 0和00
+        top_frame = tk.Frame(table_frame, bg='#2a4a3c')
+        top_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # 0
+        self.create_bet_button(top_frame, "0", 0, 0, "green", bet_type="straight")
+        # 00
+        self.create_bet_button(top_frame, "00", 0, 1, "green", bet_type="straight")
+        
+        # 第一行数字 (1, 2, 3) - 添加分注线
+        row1_frame = tk.Frame(table_frame, bg='#2a4a3c')
+        row1_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # 添加分注线 (0-1, 0-2, 00-2, 00-3, 1-2, 2-3)
+        self.create_split_button(row1_frame, "0,1", 0, 0, "split")
+        self.create_split_button(row1_frame, "0,2", 0, 1, "split")
+        self.create_split_button(row1_frame, "00,2", 0, 2, "split")
+        self.create_split_button(row1_frame, "00,3", 0, 3, "split")
+        self.create_split_button(row1_frame, "1,2", 0, 4, "split")
+        self.create_split_button(row1_frame, "2,3", 0, 5, "split")
+        
+        # 数字1,2,3
+        self.create_bet_button(row1_frame, "1", 0, 6, "red", bet_type="straight")
+        self.create_bet_button(row1_frame, "2", 0, 7, "black", bet_type="straight")
+        self.create_bet_button(row1_frame, "3", 0, 8, "red", bet_type="straight")
+        
+        # 添加角注点 (0,1,2,3)
+        self.create_corner_button(row1_frame, "0,1,2,3", 0, 9, "corner")
+        
+        # 数字表格 (3列x12行)
+        num_frame = tk.Frame(table_frame, bg='#2a4a3c')
+        num_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 创建数字按钮和分注线
+        for row in range(12):
+            row_frame = tk.Frame(num_frame, bg='#2a4a3c')
+            row_frame.pack(fill=tk.X, pady=2)
             
-            for row_idx, num in enumerate(col_nums):
-                color = '#e74c3c' if num in red_numbers else '#1a1a1a'  # 红/黑
+            # 分注线 (垂直)
+            for col in range(3):
+                num = 3 * row + col + 1
+                color = "red" if num in self.game.red_numbers else "black"
                 
-                num_frame = tk.Frame(col_frame, bg=color, width=30, height=30)
-                num_frame.grid(row=row_idx, column=0, sticky='nsew', padx=1, pady=1)
+                # 添加分注线 (水平)
+                if row > 0:
+                    num_above = num - 3
+                    self.create_split_button(row_frame, f"{num_above},{num}", 0, col*2, "split")
                 
-                num_btn = tk.Button(num_frame, text=str(num), font=("Arial", 10, "bold"),
-                                  bg=color, fg='white', width=3, height=1, relief='flat',
-                                  command=lambda n=num: self.place_bet("直注", 35, n))
-                num_btn.pack(fill=tk.BOTH, expand=True)
+                # 添加分注线 (垂直)
+                if col < 2:
+                    next_num = num + 1
+                    self.create_split_button(row_frame, f"{num},{next_num}", 0, col*2+1, "split")
                 
-                # 添加分注区域 (数字之间)
-                if row_idx < len(col_nums) - 1:
-                    split_frame = tk.Frame(col_frame, bg='#2c3e50', width=30, height=5)
-                    split_frame.grid(row=row_idx, column=1, sticky='ew', pady=1)
-                    split_frame.bind("<Button-1>", lambda e, n1=num, n2=col_nums[row_idx+1]: 
-                                    self.place_bet("分注", 17, f"{n1}-{n2}"))
+                # 添加角注点
+                if col < 2 and row < 11:
+                    corner_nums = [num, num+1, num+3, num+4]
+                    self.create_corner_button(row_frame, ",".join(map(str, corner_nums)), 0, col*2+1, "corner")
                 
-                # 添加街注区域 (行之间)
-                if col_idx < len(columns) - 1 and row_idx < len(col_nums):
-                    street_frame = tk.Frame(grid_frame, bg='#2c3e50', width=5, height=30)
-                    street_frame.place(x=col_idx*60 + 55, y=row_idx*30 + 40)
-                    street_frame.bind("<Button-1>", lambda e, r=row_idx: 
-                                     self.place_bet("街注", 11, f"行{r+1}"))
+                # 添加数字
+                self.create_bet_button(row_frame, str(num), 0, col*2, color, bet_type="straight")
         
-        # 五数注 (0,00,1,2,3) - 在0/00行和第一行之间
-        five_num_frame = tk.Frame(inner_field, bg='#9b59b6', width=100, height=20)
-        five_num_frame.place(relx=0.5, rely=0.2, anchor=tk.CENTER)
-        five_num_btn = tk.Button(five_num_frame, text="五数注 (0,00,1,2,3)", font=("Arial", 10),
-                               bg='#9b59b6', fg='white', relief='flat',
-                               command=lambda: self.place_bet("五数注", 6, "0-00-1-2-3"))
-        five_num_btn.pack(fill=tk.BOTH, expand=True)
+        # 底部 - 外部下注区域
+        bottom_frame = tk.Frame(table_frame, bg='#2a4a3c')
+        bottom_frame.pack(fill=tk.X, pady=(5, 0))
         
-        # 外场区域 - 底部
-        outer_field = tk.Frame(bet_area, bg='#2c3e50')
-        outer_field.place(relx=0.5, rely=0.75, anchor=tk.CENTER, width=800, height=100)
+        # 第一打 (1-12)
+        self.create_bet_button(bottom_frame, "1st_12", 0, 0, "blue", columnspan=4, bet_type="dozen")
+        # 第二打 (13-24)
+        self.create_bet_button(bottom_frame, "2nd_12", 0, 1, "blue", columnspan=4, bet_type="dozen")
+        # 第三打 (25-36)
+        self.create_bet_button(bottom_frame, "3rd_12", 0, 2, "blue", columnspan=4, bet_type="dozen")
         
-        # 左侧外场区域
-        left_outer = tk.Frame(outer_field, bg='#2c3e50')
-        left_outer.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+        # 空位
+        tk.Frame(bottom_frame, width=10, bg='#2a4a3c').grid(row=0, column=3)
         
-        # 1-18 / 19-36
-        low_high_frame = tk.Frame(left_outer, bg='#2c3e50')
-        low_high_frame.pack(fill=tk.X, pady=5)
+        # 1-18
+        self.create_bet_button(bottom_frame, "1-18", 0, 4, "blue", bet_type="even_chance")
+        # 红
+        self.create_bet_button(bottom_frame, "red", 0, 5, "red", bet_type="even_chance")
+        # 黑
+        self.create_bet_button(bottom_frame, "black", 0, 6, "black", bet_type="even_chance")
+        # 奇
+        self.create_bet_button(bottom_frame, "odd", 0, 7, "blue", bet_type="even_chance")
+        # 偶
+        self.create_bet_button(bottom_frame, "even", 0, 8, "blue", bet_type="even_chance")
+        # 19-36
+        self.create_bet_button(bottom_frame, "19-36", 0, 9, "blue", bet_type="even_chance")
         
-        low_btn = tk.Button(low_high_frame, text="1-18", font=("Arial", 12, "bold"),
-                          bg='#f39c12', fg='white', width=10,
-                          command=lambda: self.place_bet("大小", 1, "小"))
-        low_btn.pack(side=tk.LEFT, padx=5)
+        # 第二行 - 列下注
+        bottom_frame2 = tk.Frame(table_frame, bg='#2a4a3c')
+        bottom_frame2.pack(fill=tk.X, pady=(5, 0))
         
-        high_btn = tk.Button(low_high_frame, text="19-36", font=("Arial", 12, "bold"),
-                           bg='#f39c12', fg='white', width=10,
-                           command=lambda: self.place_bet("大小", 1, "大"))
-        high_btn.pack(side=tk.LEFT, padx=5)
+        # 第一列
+        self.create_bet_button(bottom_frame2, "1st_col", 0, 0, "blue", columnspan=4, bet_type="column")
+        # 第二列
+        self.create_bet_button(bottom_frame2, "2nd_col", 0, 1, "blue", columnspan=4, bet_type="column")
+        # 第三列
+        self.create_bet_button(bottom_frame2, "3rd_col", 0, 2, "blue", columnspan=4, bet_type="column")
         
-        # 单/双
-        odd_even_frame = tk.Frame(left_outer, bg='#2c3e50')
-        odd_even_frame.pack(fill=tk.X, pady=5)
+        # First Five
+        self.create_bet_button(bottom_frame2, "First Five", 0, 3, "green", columnspan=4, bet_type="first_five")
+
+    def create_bet_button(self, parent, text, row, column, color, rowspan=1, columnspan=1, bet_type=None):
+        """创建下注按钮"""
+        if bet_type is None:
+            bet_type = self.selected_bet_type
+            
+        bg_color = {
+            "red": "#FF6B6B",
+            "black": "#4A4A4A",
+            "green": "#4CAF50",
+            "blue": "#2196F3"
+        }.get(color, "#2196F3")
         
-        odd_btn = tk.Button(odd_even_frame, text="单", font=("Arial", 12, "bold"),
-                          bg='#3498db', fg='white', width=10,
-                          command=lambda: self.place_bet("单/双", 1, "单"))
-        odd_btn.pack(side=tk.LEFT, padx=5)
+        btn = tk.Button(
+            parent,
+            text=text,
+            font=('Arial', 10, 'bold'),
+            bg=bg_color,
+            fg='white',
+            relief='flat',
+            command=lambda: self.place_bet(bet_type, text)
+        )
+        btn.grid(
+            row=row, 
+            column=column, 
+            padx=2, 
+            pady=2, 
+            sticky='nsew',
+            rowspan=rowspan,
+            columnspan=columnspan
+        )
         
-        even_btn = tk.Button(odd_even_frame, text="双", font=("Arial", 12, "bold"),
-                           bg='#3498db', fg='white', width=10,
-                           command=lambda: self.place_bet("单/双", 1, "双"))
-        even_btn.pack(side=tk.LEFT, padx=5)
+        # 配置行列权重
+        parent.grid_rowconfigure(row, weight=1)
+        parent.grid_columnconfigure(column, weight=1)
         
-        # 中间外场区域
-        middle_outer = tk.Frame(outer_field, bg='#2c3e50')
-        middle_outer.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
+        return btn
+
+    def create_split_button(self, parent, text, row, column, bet_type):
+        """创建分注线按钮"""
+        btn = tk.Button(
+            parent,
+            text="",
+            font=('Arial', 1),
+            bg='#2a4a3c',
+            fg='white',
+            relief='flat',
+            command=lambda: self.place_bet(bet_type, text)
+        )
+        btn.grid(
+            row=row, 
+            column=column, 
+            padx=0, 
+            pady=0, 
+            sticky='nsew',
+            ipadx=5,
+            ipady=5
+        )
+        # 添加分注线
+        canvas = tk.Canvas(btn, bg='#2a4a3c', highlightthickness=0)
+        canvas.pack(fill=tk.BOTH, expand=True)
+        canvas.create_line(0, 0, 20, 20, fill="yellow", width=2)
+        return btn
+
+    def create_corner_button(self, parent, text, row, column, bet_type):
+        """创建角注点按钮"""
+        btn = tk.Button(
+            parent,
+            text="",
+            font=('Arial', 1),
+            bg='#2a4a3c',
+            fg='white',
+            relief='flat',
+            command=lambda: self.place_bet(bet_type, text)
+        )
+        btn.grid(
+            row=row, 
+            column=column, 
+            padx=0, 
+            pady=0, 
+            sticky='nsew',
+            ipadx=5,
+            ipady=5
+        )
+        # 添加角注点
+        canvas = tk.Canvas(btn, bg='#2a4a3c', highlightthickness=0)
+        canvas.pack(fill=tk.BOTH, expand=True)
+        canvas.create_oval(8, 8, 12, 12, fill="yellow", outline="yellow")
+        return btn
+
+    def select_chip(self, value):
+        """选择筹码"""
+        self.selected_chip = value
         
-        # 打数
-        dozen_frame = tk.Frame(middle_outer, bg='#2c3e50')
-        dozen_frame.pack(fill=tk.BOTH, expand=True)
-        
-        for i, text in enumerate(["1-12", "13-24", "25-36"]):
-            btn = tk.Button(dozen_frame, text=text, font=("Arial", 12, "bold"),
-                          bg='#9b59b6', fg='white', width=10,
-                          command=lambda d=i+1: self.place_bet("打数", 2, f"第{d}打"))
-            btn.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
-        
-        # 列注
-        column_frame = tk.Frame(middle_outer, bg='#2c3e50')
-        column_frame.pack(fill=tk.BOTH, expand=True, pady=5)
-        
-        for i, text in enumerate(["2:1", "2:1", "2:1"]):
-            btn = tk.Button(column_frame, text=text, font=("Arial", 12, "bold"),
-                          bg='#34495e', fg='white', width=10,
-                          command=lambda c=i+1: self.place_bet("列注", 2, f"第{c}列"))
-            btn.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
-        
-        # 右侧外场区域
-        right_outer = tk.Frame(outer_field, bg='#2c3e50')
-        right_outer.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10)
-        
-        # 红/黑
-        red_black_frame = tk.Frame(right_outer, bg='#2c3e50')
-        red_black_frame.pack(fill=tk.BOTH, expand=True)
-        
-        red_btn = tk.Button(red_black_frame, text="红", font=("Arial", 12, "bold"),
-                          bg='#e74c3c', fg='white', height=3,
-                          command=lambda: self.place_bet("红/黑", 1, "红"))
-        red_btn.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
-        
-        black_btn = tk.Button(red_black_frame, text="黑", font=("Arial", 12, "bold"),
-                            bg='#1a1a1a', fg='white', height=3,
-                            command=lambda: self.place_bet("红/黑", 1, "黑"))
-        black_btn.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
-    
-    def set_bet_amount(self, amount):
-        """设置当前下注金额"""
-        self.bet_amount = amount
-        
-        # 更新按钮状态
+        # 高亮选中的筹码
         for btn in self.chip_buttons:
-            if int(btn['text'].replace('$', '')) == amount:
-                btn.config(bg='#f1c40f', relief=tk.SUNKEN)
+            if btn['image'] == self.chip_images[value]:
+                btn.config(relief='sunken', borderwidth=2)
             else:
-                btn.config(bg='#f39c12', relief=tk.RAISED)
+                btn.config(relief='flat', borderwidth=0)
     
-    def place_bet(self, bet_type, odds, param):
-        """放置下注"""
-        if not self.accept_bets:
-            messagebox.showinfo("提示", "本轮下注已结束，请等待轮盘停止")
-            return
-            
-        if self.bet_amount > self.balance:
-            messagebox.showwarning("余额不足", "您的余额不足以进行此次下注")
-            return
-            
-        # 创建下注记录键
-        bet_key = f"{bet_type}-{param}"
+    def select_bet_type(self, bet_type):
+        """选择下注类型"""
+        self.selected_bet_type = bet_type
         
-        # 更新下注金额
-        if bet_key in self.bets:
-            self.bets[bet_key] += self.bet_amount
+        # 高亮选中的下注类型
+        for btn in self.bet_type_buttons:
+            if btn.bet_type == bet_type:
+                btn.config(bg='#FFD700', fg='black')
+            else:
+                btn.config(bg='#4A4A4A', fg='white')
+    
+    def place_bet(self, bet_type, position):
+        """在指定位置下注"""
+        if self.balance < self.selected_chip:
+            messagebox.showerror("错误", "余额不足")
+            return
+            
+        # 下注
+        self.game.place_bet(bet_type, self.selected_chip, position)
+        self.balance -= self.selected_chip
+        self.update_balance()
+        
+        # 更新显示
+        self.current_bet_label.config(text=f"本局下注: ${self.game.total_bet:.2f}")
+        self.status_label.config(text=f"已下注 ${self.selected_chip} ({bet_type}) 到 {position}")
+        
+        # 添加下注标记
+        self.add_bet_marker(position)
+        
+        # 播放下注音效
+        try:
+            winsound.PlaySound("chip.wav", winsound.SND_ASYNC)
+        except:
+            pass
+    
+    def add_bet_marker(self, position):
+        """添加下注标记到赌桌"""
+        # 在实际游戏中，这里需要根据位置添加图形标记
+        # 本实现中我们简单显示一个文本标记
+        marker = tk.Label(
+            self, 
+            text=f"${self.selected_chip}",
+            font=('Arial', 8, 'bold'),
+            bg='yellow',
+            fg='black',
+            bd=1,
+            relief=tk.RAISED
+        )
+        marker.place(x=random.randint(100, 1000), y=random.randint(300, 600))
+        self.bet_markers.append(marker)
+    
+    def spin_roulette(self):
+        """旋转轮盘"""
+        if self.game.total_bet == 0:
+            messagebox.showinfo("提示", "请先下注")
+            return
+            
+        # 旋转轮盘动画
+        self.animate_spin()
+        
+        # 播放旋转音效
+        try:
+            winsound.PlaySound("wheel_spin.wav", winsound.SND_ASYNC)
+        except:
+            pass
+    
+    def animate_spin(self, step=0, total_steps=50, final_angle=None):
+        """轮盘旋转动画"""
+        if step == 0:
+            # 第一次调用，计算最终角度
+            self.winning_number = random.randint(0, 37)  # 37代表00
+            slot_angle = 360 / 38  # 38个槽位
+            self.final_angle = (self.winning_number * slot_angle) % 360
+            # 添加随机旋转圈数（5-10圈）
+            self.final_angle += random.randint(5, 10) * 360
+        
+        if step < total_steps:
+            # 缓动函数 - 先快后慢
+            progress = step / total_steps
+            # 二次缓出
+            eased_progress = 1 - (1 - progress) ** 2
+            current_angle = eased_progress * self.final_angle
+            
+            # 更新轮盘位置
+            self.wheel_canvas.delete("wheel")
+            self.wheel_canvas.create_image(155, 155, image=self.wheel_image, tags="wheel")
+            
+            # 更新小球位置
+            rad = math.radians(current_angle)
+            ball_x = 155 + 130 * math.cos(rad)
+            ball_y = 155 + 130 * math.sin(rad)
+            self.wheel_canvas.coords(self.ball_id, ball_x, ball_y)
+            
+            # 继续动画
+            self.after(30, lambda: self.animate_spin(step+1, total_steps, self.final_angle))
         else:
-            self.bets[bet_key] = self.bet_amount
+            # 动画结束，结算
+            winning_number, win_amount, winning_bets = self.game.spin()
             
-        # 更新余额和下注总额
-        self.balance -= self.bet_amount
-        self.current_bet += self.bet_amount
-        self.update_display()
+            # 更新余额
+            self.balance += win_amount
+            self.update_balance()
+            
+            # 显示结果
+            display_num = "00" if winning_number == 37 else str(winning_number)
+            self.status_label.config(text=f"获胜号码: {display_num}")
+            
+            # 显示获胜详情
+            win_text = f"赢得 ${win_amount:.2f}!\n"
+            if winning_bets:
+                win_text += "获胜下注:\n"
+                for key, bet_type, amount, odds in winning_bets:
+                    win_text += f"- {key} ({bet_type}): ${amount} × {odds+1} = ${amount*(odds+1):.2f}\n"
+            else:
+                win_text += "没有获胜下注"
+                
+            self.win_info_label.config(text=win_text)
+            
+            # 更新上局获胜金额
+            self.last_win = win_amount
+            self.last_win_label.config(text=f"上局获胜: ${win_amount:.2f}")
+            
+            # 播放结果音效
+            try:
+                if win_amount > 0:
+                    winsound.PlaySound("win.wav", winsound.SND_ASYNC)
+                else:
+                    winsound.PlaySound("lose.wav", winsound.SND_ASYNC)
+            except:
+                pass
+            
+            # 重置下注（不清除下注显示，让玩家看到结果）
+            self.after(5000, self.reset_for_new_game)
+    
+    def reset_for_new_game(self):
+        """准备新游戏"""
+        self.game.reset_game()
+        self.current_bet_label.config(text="本局下注: $0.00")
+        self.status_label.config(text="请选择筹码和下注类型，然后点击下注区域")
+        self.win_info_label.config(text="")
         
-        # 显示下注确认
-        bet_name = f"{bet_type} ({param})" if param else bet_type
-        # messagebox.showinfo("下注成功", f"您已下注 ${self.bet_amount} 于 {bet_name}")
+        # 清除下注标记
+        for marker in self.bet_markers:
+            marker.destroy()
+        self.bet_markers = []
+        
+        # 重置小球位置到顶部
+        self.wheel_canvas.coords(self.ball_id, 155, 25)
     
     def clear_bets(self):
         """清除所有下注"""
-        if not self.accept_bets:
-            return
-            
-        # 返还所有下注金额
-        total_bet = sum(self.bets.values())
-        self.balance += total_bet
-        self.current_bet = 0
-        self.bets = {}
-        self.update_display()
+        # 退还下注金额
+        self.balance += self.game.total_bet
+        self.update_balance()
         
-        messagebox.showinfo("清除成功", "所有下注已被清除")
+        # 重置游戏
+        self.game.reset_game()
+        self.current_bet_label.config(text="本局下注: $0.00")
+        self.status_label.config(text="已清除所有下注")
+        
+        # 清除下注标记
+        for marker in self.bet_markers:
+            marker.destroy()
+        self.bet_markers = []
     
-    def spin_wheel(self):
-        """旋转轮盘"""
-        if not self.bets:
-            messagebox.showwarning("无法旋转", "请先下注")
-            return
-            
-        if not self.accept_bets:
-            return
-            
-        self.accept_bets = False
-        
-        # 随机生成中奖数字
-        winning_number = random.randint(0, 37)  # 0-36和00(用37表示)
-        
-        # 创建旋转窗口
-        RouletteSpinWindow(self.root, winning_number, self.on_spin_complete)
-    
-    def on_spin_complete(self, winning_number):
-        """轮盘旋转完成，计算结果"""
-        # 确定赢家
-        winnings = self.calculate_winnings(winning_number)
-        
-        # 更新余额
-        self.balance += winnings
-        self.last_win = winnings - self.current_bet if winnings > 0 else 0
-        
-        # 重置下注
-        self.current_bet = 0
-        self.bets = {}
-        
-        # 更新显示
-        self.update_display()
-        
-        # 添加历史记录
-        self.add_to_history(winning_number)
-        
-        # 显示结果
-        num_text = "00" if winning_number == 37 else str(winning_number)
-        result_text = f"本轮结果: {num_text}\n"
-        
-        if winnings > 0:
-            result_text += f"恭喜您赢得 ${winnings - self.current_bet}!"
-            messagebox.showinfo("游戏结果", result_text)
-        else:
-            result_text += "很遗憾，本轮您没有赢钱。"
-            messagebox.showinfo("游戏结果", result_text)
-        
-        # 允许下一轮下注
-        self.accept_bets = True
-    
-    def calculate_winnings(self, winning_number):
-        """计算赢得的金额"""
-        winnings = 0
-        num_text = "00" if winning_number == 37 else str(winning_number)
-        
-        # 红黑数字定义
-        red_numbers = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]
-        
-        # 检查每个下注
-        for bet_key, amount in self.bets.items():
-            bet_type, param = bet_key.split('-', 1)
-            
-            # 直注
-            if bet_type == "直注":
-                if (winning_number == 0 and param == "0") or (winning_number == 37 and param == "00"):
-                    winnings += amount * 36  # 35:1 + 本金
-                elif str(winning_number) == param:
-                    winnings += amount * 36
-            
-            # 分注 (0/00)
-            elif bet_type == "分注" and param == "0-00":
-                if winning_number == 0 or winning_number == 37:
-                    winnings += amount * 18  # 17:1 + 本金
-                    
-            # 分注 (数字之间)
-            elif bet_type == "分注" and '-' in param:
-                nums = param.split('-')
-                if (winning_number == int(nums[0]) or winning_number == int(nums[1])):
-                    winnings += amount * 18
-                    
-            # 街注 (一行三个数字)
-            elif bet_type == "街注" and param.startswith("行"):
-                row = int(param[1:])
-                start_num = (row-1)*3 + 1
-                if winning_number in [start_num, start_num+1, start_num+2]:
-                    winnings += amount * 12  # 11:1 + 本金
-            
-            # 五数注 (0,00,1,2,3)
-            elif bet_type == "五数注" and param == "0-00-1-2-3":
-                if winning_number in [0, 37, 1, 2, 3]:
-                    winnings += amount * 7  # 6:1 + 本金
-            
-            # 列注
-            elif bet_type == "列注":
-                col = int(param[1])  # 第1列, 第2列, 第3列
-                if winning_number > 0 and winning_number <= 36:
-                    # 确定数字属于哪一列
-                    if col == 1 and winning_number % 3 == 1:  # 1,4,7,...
-                        winnings += amount * 3  # 2:1 + 本金
-                    elif col == 2 and winning_number % 3 == 2:  # 2,5,8,...
-                        winnings += amount * 3
-                    elif col == 3 and winning_number % 3 == 0:  # 3,6,9,...
-                        winnings += amount * 3
-            
-            # 红/黑
-            elif bet_type == "红/黑" and winning_number > 0 and winning_number <= 36:
-                if param == "红" and winning_number in red_numbers:
-                    winnings += amount * 2  # 1:1 + 本金
-                elif param == "黑" and winning_number not in red_numbers:
-                    winnings += amount * 2
-            
-            # 单/双
-            elif bet_type == "单/双" and winning_number > 0 and winning_number <= 36:
-                if param == "单" and winning_number % 2 == 1:
-                    winnings += amount * 2
-                elif param == "双" and winning_number % 2 == 0:
-                    winnings += amount * 2
-            
-            # 大小
-            elif bet_type == "大小" and winning_number > 0 and winning_number <= 36:
-                if param == "小" and 1 <= winning_number <= 18:
-                    winnings += amount * 2
-                elif param == "大" and 19 <= winning_number <= 36:
-                    winnings += amount * 2
-            
-            # 打数
-            elif bet_type == "打数" and winning_number > 0 and winning_number <= 36:
-                dozen = int(param[1])  # 第1打, 第2打, 第3打
-                if dozen == 1 and 1 <= winning_number <= 12:
-                    winnings += amount * 3  # 2:1 + 本金
-                elif dozen == 2 and 13 <= winning_number <= 24:
-                    winnings += amount * 3
-                elif dozen == 3 and 25 <= winning_number <= 36:
-                    winnings += amount * 3
-        
-        return winnings
-    
-    def add_to_history(self, winning_number):
-        """添加历史记录"""
-        # 创建历史记录框架
-        frame = tk.Frame(self.history_container, bg='#2c3e50', padx=5, pady=5, relief=tk.RIDGE, bd=1)
-        frame.pack(fill=tk.X, padx=2, pady=2)
-        
-        # 显示数字
-        num_text = "00" if winning_number == 37 else str(winning_number)
-        num_label = tk.Label(frame, text=num_text, font=("Arial", 14, "bold"), 
-                           bg='#2ecc71' if winning_number in [0, 37] else 
-                              '#e74c3c' if winning_number in [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36] else 
-                              '#1a1a1a',
-                           fg='white', width=4)
-        num_label.pack(side=tk.LEFT, padx=10)
-        
-        # 显示红/黑
-        if winning_number in [0, 37]:
-            color_text = "绿"
-            color_bg = '#2ecc71'
-        elif winning_number in [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]:
-            color_text = "红"
-            color_bg = '#e74c3c'
-        else:
-            color_text = "黑"
-            color_bg = '#1a1a1a'
-            
-        color_label = tk.Label(frame, text=color_text, font=("Arial", 12), 
-                             bg=color_bg, fg='white', width=4)
-        color_label.pack(side=tk.LEFT, padx=10)
-        
-        # 显示单/双
-        if winning_number in [0, 37]:
-            parity_text = "-"
-            parity_bg = '#2c3e50'
-        elif winning_number % 2 == 0:
-            parity_text = "双"
-            parity_bg = '#3498db'
-        else:
-            parity_text = "单"
-            parity_bg = '#3498db'
-            
-        parity_label = tk.Label(frame, text=parity_text, font=("Arial", 12), 
-                              bg=parity_bg, fg='white', width=4)
-        parity_label.pack(side=tk.LEFT, padx=10)
-        
-        # 显示大小
-        if winning_number in [0, 37]:
-            size_text = "-"
-            size_bg = '#2c3e50'
-        elif winning_number <= 18:
-            size_text = "小"
-            size_bg = '#f39c12'
-        else:
-            size_text = "大"
-            size_bg = '#f39c12'
-            
-        size_label = tk.Label(frame, text=size_text, font=("Arial", 12), 
-                            bg=size_bg, fg='white', width=4)
-        size_label.pack(side=tk.LEFT, padx=10)
-        
-        # 更新历史记录容器
-        self.history_container.update_idletasks()
-        self.history_canvas.configure(scrollregion=self.history_canvas.bbox("all"))
-        
-        # 保存记录
-        self.history.append({
-            "number": winning_number,
-            "color": color_text,
-            "parity": parity_text,
-            "size": size_text
-        })
-    
-    def update_display(self):
-        """更新显示信息"""
-        self.balance_label.config(text=f"余额: ${self.balance}")
-        self.current_bet_label.config(text=f"本局下注: ${self.current_bet}")
-        self.last_win_label.config(text=f"上局获胜: ${self.last_win}")
+    def update_balance(self):
+        """更新余额显示"""
+        self.balance_label.config(text=f"余额: ${self.balance:.2f}")
 
-
-def main():
-    root = tk.Tk()
-    game = RouletteGame(root)
-    root.mainloop()
+def main(initial_balance=1000, username="Guest"):
+    app = RouletteGUI(initial_balance, username)
+    app.mainloop()
+    return app.balance
 
 if __name__ == "__main__":
-    main()
+    # 独立运行时的示例调用
+    final_balance = main()
+    print(f"最终余额: {final_balance}")

@@ -4,7 +4,8 @@ import os
 import json
 
 def get_data_file_path():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../saving_data.json')
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(parent_dir, 'saving_data.json')
 
 def save_user_data(users):
     file_path = get_data_file_path()
@@ -99,7 +100,8 @@ def main(balance, username):
 
     root = tk.Tk()
     root.title("验钞刮刮乐")
-    root.geometry("650x400")
+    root.geometry("650x400+50+10")
+    root.resizable(0,0)
 
     title_label = tk.Label(root, text=f"验钞刮刮乐", font=("Arial", 24, "bold"))
     title_label.pack(pady=10)

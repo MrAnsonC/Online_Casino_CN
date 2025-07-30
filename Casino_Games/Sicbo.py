@@ -3,7 +3,30 @@ from tkinter import ttk
 import random
 import time
 from PIL import Image, ImageTk, ImageDraw
-import re, os, json
+import os, json
+import sys
+import os
+
+# 获取当前文件所在目录并定位到A_Tools文件夹
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)  # 上一级目录
+a_tools_dir = os.path.join(parent_dir, 'A_Tools')
+
+# 将A_Tools目录添加到系统路径
+if a_tools_dir not in sys.path:
+    sys.path.append(a_tools_dir)
+
+# 导入真随机骰子生成器
+try:
+    from shuffle_dice import Dice
+except ImportError:
+    print("警告：无法导入真随机骰子生成器，使用备用随机方案")
+    class Dice:
+        def __init__(self, value=None):
+            self.value = value or random.randint(1, 6)
+        def roll(self):
+            self.value = random.randint(1, 6)
+            return self.value
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -33,17 +56,18 @@ def update_balance_in_json(username, new_balance):
     save_user_data(users)  # 保存更新后的数据
 
 class DiceAnimationWindow:
-    def __init__(self, parent, callback, final_dice):
+    def __init__(self, parent, callback):
         self.parent = parent
         self.callback = callback
-        # 保存原始骰子顺序，不排序
-        self.final_dice = final_dice
         self.window = tk.Toplevel(parent)
         self.window.title("骰子摇动中...")
         self.window.geometry("500x400")
+        self.window.resizable(0,0)
         self.window.configure(bg='#1e3d59')
         self.window.resizable(False, False)
         self.window.grab_set()
+
+        self.window.protocol("WM_DELETE_WINDOW", self.do_nothing)
 
         # 窗口居中
         parent_x = parent.winfo_x()
@@ -77,7 +101,12 @@ class DiceAnimationWindow:
         self.progress.pack(pady=10)
 
         self.animation_start_time = time.time()
+        self.final_dice = None  # 最终结果将在动画过程中生成
         self.animate_dice()
+    
+    def do_nothing(self):
+        """忽略关闭窗口的请求"""
+        pass
 
     def draw_dice(self, img, num):
         draw = ImageDraw.Draw(img)
@@ -96,29 +125,42 @@ class DiceAnimationWindow:
 
     def animate_dice(self):
         elapsed = time.time() - self.animation_start_time
-        if elapsed < 8:  # 8秒快速变化
-            self.progress['value'] = min(100, (elapsed / 8) * 100)
-            for lbl in self.dice_labels:
-                v = random.randint(1, 6)
-                lbl.config(image=self.dice_images[v-1])
-            self.window.after(100, self.animate_dice)
-        elif elapsed < 10:  # 2秒静止显示最终结果（不排序）
+        if elapsed < 5:  # 5秒快速变化
+            self.progress['value'] = min(100, (elapsed / 5) * 100)
+            
+            # 生成当前帧的骰子结果（使用真随机骰子）
+            current_dice = [Dice().value for _ in range(3)]
+            
+            # 保存最后一次的结果作为最终结果
+            self.final_dice = current_dice
+            
+            for i, lbl in enumerate(self.dice_labels):
+                lbl.config(image=self.dice_images[current_dice[i]-1])
+                
+            self.window.after(10, self.animate_dice)
+            
+        elif elapsed < 6:  # 2秒静止显示最终结果
+            # 直接显示最后一次保存的结果
             for i, lbl in enumerate(self.dice_labels):
                 lbl.config(image=self.dice_images[self.final_dice[i]-1])
+                
             self.status_label.config(text="骰子停止中...")
             self.window.after(100, self.animate_dice)
-        elif elapsed < 13:  # 3秒显示结果（排序后）
+            
+        elif elapsed < 7:  # 3秒显示结果
             sorted_dice = sorted(self.final_dice)
             total = sum(sorted_dice)
             rtype = "大" if total >= 11 else "小"
             if sorted_dice[0] == sorted_dice[1] == sorted_dice[2]:
                 rtype = "围"
-            txt = f"骰子结果: {' '.join(map(str, sorted_dice))}  {total}({rtype})"
+                
+            txt = f"骰子结果: {' '.join(map(str, sorted_dice))} {total}点{rtype}"
             self.status_label.config(text=txt)
             self.window.after(100, self.animate_dice)
+            
         else:
             self.window.destroy()
-            self.callback()
+            self.callback(self.final_dice)
 
 class SicboGame:
     def __init__(self, root, username=None, initial_balance=10000):
@@ -130,7 +172,8 @@ class SicboGame:
         style.configure('TNotebook.Tab', font=('Arial', 12, 'bold'))
 
         self.root.title("Sicbo 骰寶遊戲")
-        self.root.geometry("1350x780")
+        self.root.geometry("1350x780+50+10")
+        self.root.resizable(0,0)
         self.root.configure(bg='#0a5f38')
         self.enter_binding = None
 
@@ -288,6 +331,11 @@ class SicboGame:
         # 添加历史记录标题行
         title_frame = tk.Frame(self.history_inner, bg='#1e3d59', padx=5, pady=3, relief=tk.RAISED, borderwidth=1)
         title_frame.pack(fill=tk.X, padx=2, pady=(0, 5))
+        
+        # 标题
+        tk.Label(title_frame, text="骰子", font=("Arial", 12, "bold"), fg='white', bg='#1e3d59', width=10).pack(side=tk.LEFT)
+        tk.Label(title_frame, text="点数", font=("Arial", 12, "bold"), fg='white', bg='#1e3d59', width=13).pack(side=tk.LEFT)
+        tk.Label(title_frame, text="大/小/围", font=("Arial", 12, "bold"), fg='white', bg='#1e3d59', width=7).pack(side=tk.LEFT)
        
         # 当前下注信息
         bet_info_frame = tk.Frame(control_frame, bg='#D0E7FF')
@@ -655,12 +703,12 @@ class SicboGame:
             lbl.pack(side=tk.LEFT, padx=2)
         
         # 总点数
-        total_label = tk.Label(frame, text=f"{total}", font=("Arial", 12), bg='#D0E7FF', width=5)
+        total_label = tk.Label(frame, text=f"{total}", font=("Arial", 12), bg='#D0E7FF', width=7)
         total_label.pack(side=tk.LEFT, padx=10)
         
         # 类型
         type_label = tk.Label(frame, text=f"{rtype}", font=("Arial", 12), bg='#D0E7FF', width=10)
-        type_label.pack(side=tk.LEFT, padx=10)
+        type_label.pack(side=tk.LEFT, padx=8)
 
     def update_display(self):
         self.balance_label.config(text=f"餘額: ${self.balance}")
@@ -698,14 +746,11 @@ class SicboGame:
             self.root.unbind('<Return>')
             self.enter_binding = None
 
-        # 生成随机骰子结果（不排序）
-        dice = [random.randint(1, 6) for _ in range(3)]
-        self.dice_results = dice  # 保存原始顺序
-        DiceAnimationWindow(self.root, self.calculate_results, dice)
+        # 创建动画窗口，结果将在动画过程中生成
+        DiceAnimationWindow(self.root, self.calculate_results)
 
-    def calculate_results(self):
+    def calculate_results(self, dice):
         # 计算时使用原始顺序
-        dice = self.dice_results
         total = sum(dice)
         result_type = "大" if total >= 11 else "小"
         if dice[0] == dice[1] == dice[2]:

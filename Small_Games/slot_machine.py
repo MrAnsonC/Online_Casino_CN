@@ -190,6 +190,8 @@ def main(balance, username):
 
         if username != "demo_player":
             update_balance_in_json(username, balance)
+    
+    return balance
 
 # 开始游戏
 if __name__ == "__main__":

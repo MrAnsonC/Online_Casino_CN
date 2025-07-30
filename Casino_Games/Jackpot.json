@@ -1,14 +1,30 @@
 [
     {
         "Games": "UTH",
-        "jackpot": 294388.1399999974
+        "jackpot": 297801.88999999553
     },
     {
         "Games": "3CP",
-        "jackpot": 271418.3799999998
+        "jackpot": 272474.1100000001
     },
     {
         "Games": "CHE",
         "jackpot": 278895.0
+    },
+    {
+        "Games": "CSP",
+        "jackpot": 205078.7299999985
+    },
+    {
+        "Games": "LetItRide",
+        "jackpot": 110180.77000000014
+    },
+    {
+        "Games": "HCF",
+        "jackpot": 197313.46000000002
+    },
+    {
+        "Games": "KD",
+        "jackpot": 4761.481137435002
     }
 ]

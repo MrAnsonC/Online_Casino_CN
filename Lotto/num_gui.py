@@ -194,7 +194,8 @@ def main(balance_init, username_init):
 
     root = tk.Tk()
     root.title("100X 现金大挑战!")
-    root.geometry("850x450")
+    root.geometry("850x450+50+10")
+    root.resizable(0,0)
 
     frame1 = tk.Frame(root)
     frame1.grid(row=0, column=0, padx=10, pady=10)

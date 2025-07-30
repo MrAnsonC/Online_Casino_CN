@@ -4,12 +4,12 @@ from PIL import Image, ImageTk, ImageColor
 from pygame import mixer
 import random
 import json
-import os
+import os, sys
 import time
 
 def get_data_file_path():
-    # 用于获取保存数据的文件路径
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../saving_data.json')
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(parent_dir, 'saving_data.json')
 
 # 保存用户数据
 def save_user_data(users):
@@ -32,9 +32,13 @@ def update_balance_in_json(username, new_balance):
     save_user_data(users)  # 保存更新后的数据
 
 class Baccarat:
-    def __init__(self, decks=8):
-        self.deck = self.create_deck(decks)
-        random.shuffle(self.deck)
+    def __init__(self, decks=8, external_deck=None):
+        if external_deck:
+            self.deck = [(card['suit'], card['rank']) for card in external_deck]
+        else:
+            self.deck = self.create_deck(decks)
+            random.shuffle(self.deck)
+            
         self.player_hand = []
         self.banker_hand = []
         self.player_score = 0
@@ -576,8 +580,8 @@ class BaccaratGUI(tk.Tk):
         suits = ['Club', 'Diamond', 'Heart', 'Spade']
         ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        card_dir = os.path.join(base_dir, 'Card')
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
         
         for suit in suits:
             for rank in ranks:
@@ -627,22 +631,22 @@ class BaccaratGUI(tk.Tk):
             try:
                 value = entry.get()
                 if not value:  # 空输入
-                    result[0] = random.randint(103, 299)
+                    result[0] = None  # 标记为使用外部切牌位置
                 else:
                     value = int(value)
                     if 103 <= value <= 299:
                         result[0] = value
                     else:
-                        result[0] = random.randint(103, 299)
+                        result[0] = None  # 无效输入，使用外部切牌位置
                 dialog.destroy()
             except ValueError:
-                # 非整数输入
-                result[0] = random.randint(103, 299)
+                # 非整数输入，使用外部切牌位置
+                result[0] = None
                 dialog.destroy()
         
         # 取消按钮回调
         def on_cancel():
-            result[0] = random.randint(103, 299)
+            result[0] = None  # 使用外部切牌位置
             dialog.destroy()
         
         # 添加按钮
@@ -658,14 +662,46 @@ class BaccaratGUI(tk.Tk):
         # 等待对话框关闭
         self.wait_window(dialog)
         
-        # 如果用户直接关闭窗口，视为取消
-        if result[0] is None:
-            result[0] = random.randint(103, 299)
+        # 获取切牌位置
+        cut_position = result[0]
+        
+        # 获取工具目录和洗牌脚本路径
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        tools_dir = os.path.join(os.path.dirname(current_dir), 'A_Tools')
+        card_dir = os.path.join(tools_dir, 'Card')
+        shuffle_script = os.path.join(card_dir, 'shuffle_baccarat.py')
+        
+        # 运行洗牌脚本获取牌组和切牌位置
+        external_deck = None
+        external_cut_position = None
+        
+        try:
+            # 使用subprocess运行洗牌脚本
+            import subprocess
+            process = subprocess.Popen(
+                [sys.executable, shuffle_script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            stdout, stderr = process.communicate()
+            
+            if process.returncode == 0:
+                data = json.loads(stdout)
+                external_deck = data['deck']
+                external_cut_position = data['cut_position']
+            else:
+                print(f"洗牌脚本错误: {stderr}")
+        except Exception as e:
+            print(f"运行洗牌脚本时出错: {e}")
+        
+        # 如果用户没有提供切牌位置，使用外部切牌位置
+        if cut_position is None:
+            cut_position = external_cut_position if external_cut_position else random.randint(103, 299)
         
         # 初始化游戏
-        self.game = Baccarat()
-        self.game.create_deck()
-        self.game.advanced_shuffle(result[0])
+        self.game = Baccarat(external_deck=external_deck)
+        self.game.advanced_shuffle(cut_position)
         
         # 重新洗牌时重置
         self.marker_results = []
@@ -673,6 +709,7 @@ class BaccaratGUI(tk.Tk):
             'Player': 0, 'Banker': 0, 'Tie': 0,
             'Small Tiger': 0, 'Tiger Tie': 0, 'Big Tiger': 0,
             'Panda 8': 0, 'Divine 9': 0, 'Dragon 7': 0,
+            'P Fabulous 4': 0, 'B Fabulous 4': 0
         }
         self.reset_marker_road()
         self.reset_bigroad()
@@ -2448,15 +2485,15 @@ class BaccaratGUI(tk.Tk):
 
     def _create_flip_image(self, card, angle):
         # 获取当前脚本所在目录的绝对路径
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         if angle < 90:
             # 修改为使用绝对路径
-            bg_path = os.path.join(base_dir, 'Card', 'Background.png')
+            bg_path = os.path.join(parent_dir, 'A_Tools', 'Card', 'Background.png')
             img = Image.open(bg_path)
         else:
             # 修改为使用绝对路径
-            card_path = os.path.join(base_dir, 'Card', f"{card[0]}{card[1]}.png")
+            card_path = os.path.join(parent_dir, 'A_Tools', 'Card', f"{card[0]}{card[1]}.png")
             img = Image.open(card_path)
         
         img = img.resize((100, 140))
