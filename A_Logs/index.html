@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>骰宝游戏实时数据监控 - 围骰统计详解</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a3a, #0d1520);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #2a3b4d;
+            position: relative;
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            color: #ffcc00;
+            text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: #8da0b3;
+            font-weight: 300;
+            margin-bottom: 15px;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+        
+        .card {
+            background: rgba(25, 35, 50, 0.7);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card-header i {
+            font-size: 1.8rem;
+            margin-right: 15px;
+            color: #ffcc00;
+        }
+        
+        .card-header h2 {
+            font-size: 1.6rem;
+            color: #e0e0e0;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+        
+        .triple-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        
+        .stat-item {
+            background: rgba(40, 55, 75, 0.6);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-item:hover {
+            background: rgba(50, 70, 95, 0.8);
+            transform: scale(1.03);
+        }
+        
+        .triple-item {
+            background: rgba(50, 70, 95, 0.6);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .triple-item.t1 { border: 2px solid #ff6b6b; }
+        .triple-item.t2 { border: 2px solid #4ecdc4; }
+        .triple-item.t3 { border: 2px solid #ffd166; }
+        .triple-item.t4 { border: 2px solid #6a0572; }
+        .triple-item.t5 { border: 2px solid #1a936f; }
+        .triple-item.t6 { border: 2px solid #118ab2; }
+        
+        .triple-item:hover {
+            background: rgba(60, 85, 110, 0.8);
+            transform: scale(1.05);
+        }
+        
+        .dice-icon {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            display: block;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #ffcc00;
+            margin: 10px 0;
+            text-shadow: 0 0 8px rgba(255, 204, 0, 0.4);
+        }
+        
+        .stat-label {
+            font-size: 1.1rem;
+            color: #8da0b3;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .history-section {
+            margin-bottom: 40px;
+        }
+        
+        .history-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .history-title i {
+            font-size: 1.8rem;
+            margin-right: 15px;
+            color: #ffcc00;
+        }
+        
+        .history-title h2 {
+            font-size: 1.8rem;
+            color: #e0e0e0;
+        }
+        
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 15px;
+        }
+        
+        .history-item {
+            background: rgba(40, 55, 75, 0.6);
+            border-radius: 10px;
+            aspect-ratio: 1/1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .history-item:hover {
+            transform: translateY(-5px);
+            background: rgba(50, 70, 95, 0.8);
+        }
+        
+        .history-item.small-point {
+            background: #FFD700;
+            color: #000;
+        }
+        
+        .history-item.big-point {
+            background: #FF4500;
+        }
+        
+        .history-item.triple-point {
+            background: #32CD32;
+        }
+        
+        .history-index {
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            font-size: 0.8rem;
+            color: rgb(0, 0, 0);
+        }
+        
+        .history-item.small-point .history-index,
+        .history-item.small-point .dice-sum {
+            color: rgba(0, 0, 0, 0.8);
+        }
+        
+        .dice-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: rgb(0, 0, 0);
+        }
+        
+        .dice-sum {
+            font-size: 0.9rem;
+            color: rgb(0, 0, 0);
+            margin-top: 5px;
+        }
+        
+        .point-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .point-category {
+            background: rgba(25, 35, 50, 0.7);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+        }
+        
+        .point-category h3 {
+            color: #ffcc00;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgb(0, 0, 0);
+        }
+        
+        .point-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        }
+        
+        .point-item:last-child {
+            border-bottom: none;
+        }
+        
+        .point-label {
+            color: #e0e0e0;
+        }
+        
+        .point-value {
+            font-weight: bold;
+            color: #ffcc00;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px 25px;
+            border-radius: 12px;
+            margin-top: 30px;
+            font-size: 1.1rem;
+        }
+        
+        .last-update {
+            color: #8da0b3;
+        }
+        
+        .update-btn {
+            background: linear-gradient(to right, #ff9d00, #ffcc00);
+            color: #0d1520;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .update-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(255, 204, 0, 0.5);
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .triple-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-dice"></i> 骰宝游戏数据监控面板</h1>
+            <p class="subtitle">围骰统计功能详解与实时数据可视化</p>
+        </header>
+        
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-chart-pie"></i>
+                    <h2>数据概览 ~ 100局</h2>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="small-count">0</div>
+                        <div class="stat-label">小 (4-10)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="big-count">0</div>
+                        <div class="stat-label">大 (11-17)</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="triple-count">0</div>
+                        <div class="stat-label">~ 围骰 ~</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="last-triple">0, 0</div>
+                        <div class="stat-label">最近围骰</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-fire"></i>
+                    <h2>历史记录</h2>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="h-small">1</div>
+                        <div class="stat-label">历史小</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="h-big">0</div>
+                        <div class="stat-label">历史大</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="h-triple">0</div>
+                        <div class="stat-label">历史围骰</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="h-t">1</div>
+                        <div class="stat-label">历史局数</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-crown"></i>
+                    <h2>历史围骰总数</h2>
+                </div>
+                <div class="triple-grid">
+                    <div class="triple-item t1">
+                        <i class="fas fa-dice-one dice-icon"></i>
+                        <div class="stat-value" id="t1">0</div>
+                        <div class="stat-label">围骰 1</div>
+                    </div>
+                    <div class="triple-item t2">
+                        <i class="fas fa-dice-two dice-icon"></i>
+                        <div class="stat-value" id="t2">0</div>
+                        <div class="stat-label">围骰 2</div>
+                    </div>
+                    <div class="triple-item t3">
+                        <i class="fas fa-dice-three dice-icon"></i>
+                        <div class="stat-value" id="t3">0</div>
+                        <div class="stat-label">围骰 3</div>
+                    </div>
+                    <div class="triple-item t4">
+                        <i class="fas fa-dice-four dice-icon"></i>
+                        <div class="stat-value" id="t4">0</div>
+                        <div class="stat-label">围骰 4</div>
+                    </div>
+                    <div class="triple-item t5">
+                        <i class="fas fa-dice-five dice-icon"></i>
+                        <div class="stat-value" id="t5">0</div>
+                        <div class="stat-label">围骰 5</div>
+                    </div>
+                    <div class="triple-item t6">
+                        <i class="fas fa-dice-six dice-icon"></i>
+                        <div class="stat-value" id="t6">0</div>
+                        <div class="stat-label">围骰 6</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="history-section">
+            <div class="history-title">
+                <i class="fas fa-history"></i>
+                <h2>最近98次开奖记录</h2>
+            </div>
+            <div class="history-grid" id="history-container">
+                <!-- History items will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <div class="point-stats">
+            <div class="point-category">
+                <h3>历史点数统计 (4-10)</h3>
+                <div class="point-item">
+                    <span class="point-label">4点</span>
+                    <span class="point-value" id="h-4">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">5点</span>
+                    <span class="point-value" id="h-5">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">6点</span>
+                    <span class="point-value" id="h-6">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">7点</span>
+                    <span class="point-value" id="h-7">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">8点</span>
+                    <span class="point-value" id="h-8-val">1</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">9点</span>
+                    <span class="point-value" id="h-9">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">10点</span>
+                    <span class="point-value" id="h-10">0</span>
+                </div>
+            </div>
+            
+            <div class="point-category">
+                <h3>围骰统计</h3>
+                <div class="point-item">
+                    <span class="point-label">围骰1</span>
+                    <span class="point-value" id="h-t1">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">围骰2</span>
+                    <span class="point-value" id="h-t2">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">围骰3</span>
+                    <span class="point-value" id="h-t3">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">围骰4</span>
+                    <span class="point-value" id="h-t4">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">围骰5</span>
+                    <span class="point-value" id="h-t5">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">围骰6</span>
+                    <span class="point-value" id="h-t6">0</span>
+                </div>
+            </div>            
+            
+            <div class="point-category">
+                <h3>历史点数统计 (11-17)</h3>
+                <div class="point-item">
+                    <span class="point-label">11点</span>
+                    <span class="point-value" id="h-11">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">12点</span>
+                    <span class="point-value" id="h-12">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">13点</span>
+                    <span class="point-value" id="h-13">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">14点</span>
+                    <span class="point-value" id="h-14">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">15点</span>
+                    <span class="point-value" id="h-15">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">16点</span>
+                    <span class="point-value" id="h-16">0</span>
+                </div>
+                <div class="point-item">
+                    <span class="point-label">17点</span>
+                    <span class="point-value" id="h-17">0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="last-update">
+                <i class="fas fa-sync"></i> 最后更新: <span id="update-time">刚刚</span>
+            </div>
+            <button class="update-btn" id="refresh-btn">
+                <i class="fas fa-redo"></i> 刷新数据
+            </button>
+        </div>
+    </div>
+    
+    <script>
+        // 从外部Sicbo.json文件获取数据
+        async function fetchData() {
+            try {
+                const response = await fetch('Sicbo.json');
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                // 返回空数据对象
+                return {
+                    "Small": 0,
+                    "Triple": 0,
+                    "Big": 0,
+                    "Last_Triple": [0, 0],
+                    "100_Record": {},
+                    "H_Small": 0,
+                    "H_Triple": 0,
+                    "H_Big": 0,
+                    "H_4": 0,
+                    "H_5": 0,
+                    "H_6": 0,
+                    "H_7": 0,
+                    "H_8": 0,
+                    "H_9": 0,
+                    "H_10": 0,
+                    "H_11": 0,
+                    "H_12": 0,
+                    "H_13": 0,
+                    "H_14": 0,
+                    "H_15": 0,
+                    "H_16": 0,
+                    "H_17": 0,
+                    "H_T1": 0,
+                    "H_T2": 0,
+                    "H_T3": 0,
+                    "H_T4": 0,
+                    "H_T5": 0,
+                    "H_T6": 0
+                };
+            }
+        }
+        
+        // 计算100局数据中的小/大/围骰数量
+        function calculate100GameStats(records) {
+            let smallCount = 0;
+            let bigCount = 0;
+            let tripleCount = 0;
+            
+            // 初始化点数统计对象
+            const pointCounts = {};
+            for (let i = 4; i <= 17; i++) {
+                pointCounts[i] = 0;
+            }
+            
+            // 初始化围骰点数统计
+            const tripleCounts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0};
+            
+            // 遍历所有记录
+            for (let i = 1; i <= 100; i++) {
+                const key = (i < 10 ? '0' + i : i) + '_Data';
+                const record = records[key];
+                
+                if (record && record.length === 3) {
+                    const [d1, d2, d3] = record;
+                    const total = d1 + d2 + d3;
+                    
+                    // 检查是否是围骰
+                    if (d1 === d2 && d2 === d3) {
+                        tripleCount++;
+                        tripleCounts[d1] = (tripleCounts[d1] || 0) + 1;
+                    } 
+                    // 检查小 (4-10)
+                    else if (total >= 4 && total <= 10) {
+                        smallCount++;
+                    }
+                    // 检查大 (11-17)
+                    else if (total >= 11 && total <= 17) {
+                        bigCount++;
+                    }
+                    
+                    // 统计点数
+                    if (total >= 4 && total <= 17) {
+                        pointCounts[total] = (pointCounts[total] || 0) + 1;
+                    }
+                }
+            }
+            
+            return {
+                smallCount,
+                bigCount,
+                tripleCount,
+                pointCounts,
+                tripleCounts
+            };
+        }
+        
+        // 更新页面数据
+        async function updatePage() {
+            const data = await fetchData();
+            
+            // 计算100局统计数据
+            const stats = calculate100GameStats(data["100_Record"] || {});
+            
+            // 更新概览数据（使用计算出的100局数据）
+            document.getElementById('small-count').textContent = stats.smallCount;
+            document.getElementById('big-count').textContent = stats.bigCount;
+            document.getElementById('triple-count').textContent = stats.tripleCount;
+            document.getElementById('last-triple').textContent = data.Last_Triple.join(', ');
+            
+            // 更新近期趋势（使用历史数据）
+            document.getElementById('h-small').textContent = data.H_Small;
+            document.getElementById('h-big').textContent = data.H_Big;
+            document.getElementById('h-triple').textContent = data.H_Triple;
+            document.getElementById('h-t').textContent = data.H_Triple + data.H_Small + data.H_Big;
+            
+            // 更新围骰统计（使用计算出的100局数据）
+            document.getElementById('t1').textContent = data.H_T1;
+            document.getElementById('t2').textContent = data.H_T2;
+            document.getElementById('t3').textContent = data.H_T3;
+            document.getElementById('t4').textContent = data.H_T4;
+            document.getElementById('t5').textContent = data.H_T5;
+            document.getElementById('t6').textContent = data.H_T6;
+            
+            // 更新点数统计（使用计算出的100局数据）
+            document.getElementById('h-4').textContent = data.H_4;
+            document.getElementById('h-5').textContent = data.H_5;
+            document.getElementById('h-6').textContent = data.H_6;
+            document.getElementById('h-7').textContent = data.H_7;
+            document.getElementById('h-8-val').textContent = data.H_8;
+            document.getElementById('h-9').textContent = data.H_9;
+            document.getElementById('h-10').textContent = data.H_10;
+            document.getElementById('h-11').textContent = data.H_11;
+            document.getElementById('h-12').textContent = data.H_12;
+            document.getElementById('h-13').textContent = data.H_13;
+            document.getElementById('h-14').textContent = data.H_14;
+            document.getElementById('h-15').textContent = data.H_15;
+            document.getElementById('h-16').textContent = data.H_16;
+            document.getElementById('h-17').textContent = data.H_17;
+            
+            // 更新围骰统计（使用计算出的100局数据）
+            document.getElementById('h-t1').textContent = stats.tripleCounts[1];
+            document.getElementById('h-t2').textContent = stats.tripleCounts[2];
+            document.getElementById('h-t3').textContent = stats.tripleCounts[3];
+            document.getElementById('h-t4').textContent = stats.tripleCounts[4];
+            document.getElementById('h-t5').textContent = stats.tripleCounts[5];
+            document.getElementById('h-t6').textContent = stats.tripleCounts[6];
+            
+            // 更新历史记录
+            const historyContainer = document.getElementById('history-container');
+            historyContainer.innerHTML = '';
+            
+            for (let i = 1; i <= 98; i++) {
+                const key = (i < 10 ? '0' + i : i) + '_Data';
+                const record = data['100_Record'][key];
+                
+                if (record) {
+                    const isTriple = record[0] === record[1] && record[1] === record[2];
+                    const sum = record.reduce((a, b) => a + b, 0);
+                    
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    
+                    // 根据点数总和添加颜色类
+                    if (isTriple) {
+                        historyItem.classList.add('triple-point');
+                    } else if (sum >= 4 && sum <= 10) {
+                        historyItem.classList.add('small-point');
+                    } else if (sum >= 11 && sum <= 17) {
+                        historyItem.classList.add('big-point');
+                    }
+                    
+                    historyItem.innerHTML = `
+                        <div class="history-index">#${i}</div>
+                        <div class="dice-value">${record[0]}${record[1]}${record[2]}</div>
+                        <div class="dice-sum">${sum}点</div>
+                    `;
+                    
+                    historyContainer.appendChild(historyItem);
+                }
+            }
+            
+            // 更新最后刷新时间
+            const now = new Date();
+            document.getElementById('update-time').textContent = 
+                `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+        }
+        
+        // 初始化页面
+        function initPage() {
+            updatePage();
+            
+            // 设置定时刷新
+            setInterval(updatePage, 5000);
+        }
+        
+        // 添加刷新按钮事件
+        document.getElementById('refresh-btn').addEventListener('click', updatePage);
+        
+        // 页面加载完成后初始化
+        window.addEventListener('DOMContentLoaded', initPage);
+    </script>
+</body>
+</html>

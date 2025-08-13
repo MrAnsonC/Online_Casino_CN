@@ -2266,7 +2266,7 @@ class CaribbeanStudGUI(tk.Tk):
             self._do_reset(auto_reset)
 
     def reset_game(self, auto_reset=False):
-        # 取消自动重置计时器
+        # 取消30秒自动重置计时器
         if self.auto_reset_timer:
             self.after_cancel(self.auto_reset_timer)
             self.auto_reset_timer = None

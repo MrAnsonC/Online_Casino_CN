@@ -1,7 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image, ImageTk, ImageColor
-from pygame import mixer
 import random
 import json
 import os, sys
@@ -144,9 +143,7 @@ class BaccaratGUI(tk.Tk):
         self.title("Baccarat")
         self.geometry("1350x720")
         self.configure(bg='#35654d')
-        mixer.init()  # 初始化音频模块
-        self.sound_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Baccarant')
-        self.is_muted = False
+        self.is_muted = True  # 始终静音
 
         self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Baccarant')
         self.data_file = os.path.join(self.data_dir, 'Baccarant_data.json')
@@ -481,13 +478,6 @@ class BaccaratGUI(tk.Tk):
                 except json.JSONDecodeError:
                     # 文件格式錯誤時使用默認值
                     pass
-
-    def play_sound(self, filename):
-        if self.is_muted:
-            return
-        path = os.path.join(self.sound_path, filename)
-        if os.path.exists(path):
-            mixer.Sound(path).play()
 
     def _ensure_data_file(self):
         """确保数据目录和文件存在"""
@@ -942,15 +932,6 @@ class BaccaratGUI(tk.Tk):
             font=('Arial', 12)
         )
         self.info_button.pack(side=tk.RIGHT, padx=5)
-        self.mute_button = tk.Button(
-            balance_frame,
-            text="🔇 Mute" if not self.is_muted else "🔊 Unmute",
-            command=self.toggle_mute,
-            bg='#ff6666' if not self.is_muted else '#66ff66',
-            font=('Arial', 12),
-            width=8
-        )
-        self.mute_button.pack(side=tk.RIGHT, padx=5)
         
         # ===== 新增：游戏模式切换 =====
         mode_frame = tk.Frame(control_frame, bg='#D0E7FF')
@@ -2302,14 +2283,6 @@ class BaccaratGUI(tk.Tk):
                 self.current_chip_label.config(text="Chips amount: $1,000")
                 break
 
-    def toggle_mute(self):
-        self.is_muted = not self.is_muted
-        self.mute_button.config(
-            text="🔊 Unmute" if self.is_muted else "🔇 Mute",
-            bg='#66ff66' if self.is_muted else '#ff6666'
-        )
-        mixer.music.stop()
-
     def _setup_bindings(self):
         self.bind('<Return>', lambda e: self.start_game())
 
@@ -2350,8 +2323,7 @@ class BaccaratGUI(tk.Tk):
         self.reset_button.config(state=tk.DISABLED)
         self.unbind('<Return>')
         self.mode_combo.config(state='disabled')
-
-        self.play_sound("Stop_betting.mp3")        
+        
         self.game.play_game()
         self.animate_dealing()
 
@@ -2437,9 +2409,6 @@ class BaccaratGUI(tk.Tk):
     def _process_extra_cards(self):
         if len(self.game.player_hand) > 2:
             self._deal_extra_card("player", 2)
-            # 播放补牌后总分音效
-            total = sum(self.game.card_value(c) for c in self.game.player_hand) % 10
-            self.play_sound(f"Player_{total}.mp3")
             self.after(1500, self._process_banker_extra)
         else:
             self._process_banker_extra()
@@ -2447,8 +2416,6 @@ class BaccaratGUI(tk.Tk):
     def _process_banker_extra(self):
         if len(self.game.banker_hand) > 2:
             self._deal_extra_card("banker", 2)
-            total = sum(self.game.card_value(c) for c in self.game.banker_hand) % 10
-            self.play_sound(f"Banker_{total}.mp3")
             self.after(1500, self.resolve_bets)
         else:
             self.resolve_bets()
@@ -2473,15 +2440,6 @@ class BaccaratGUI(tk.Tk):
             self.table_canvas.itemconfig(self.player_total_id, text=str(total))
         else:
             self.table_canvas.itemconfig(self.banker_total_id, text=str(total))
-
-        # 在翻牌后添加音效逻辑
-        if seq in [0, 1, 2, 3]:  # 只处理前4张初始牌
-            hand_type = 'player' if hand_type == 'player' else 'banker'
-            current_cards = self.revealed_cards[hand_type]
-            if len(current_cards) == 2:
-                score = sum(self.game.card_value(c) for c in current_cards) % 10
-                prefix = 'Player' if hand_type == 'player' else 'Banker'
-                self.play_sound(f"{prefix}_{score}.mp3")
 
     def _create_flip_image(self, card, angle):
         # 获取当前脚本所在目录的绝对路径
@@ -2781,34 +2739,7 @@ class BaccaratGUI(tk.Tk):
         # 强制Canvas更新布局
         self.table_canvas.update_idletasks()
 
-        # 结算音效
-        if self.game.winner == 'Player':
-            self.play_sound("Player_win.mp3")
-        elif self.game.winner == 'Banker':
-            if self.game_mode == "tiger":
-                if self.game.banker_score == 6:
-                    if len(self.game.banker_hand) == 2:
-                        self.play_sound("Banker_s6_win.mp3")
-                    else:
-                        self.play_sound("Banker_b6_win.mp3")
-                else:
-                    self.play_sound("Banker_win.mp3" )
-            elif self.game_mode == "ez":
-                if self.game.banker_score == 7 and len(self.game.banker_hand) == 3:
-                    self.play_sound("Banker_push7.mp3")
-                else:
-                    self.play_sound("Banker_win.mp3" )
-            elif self.game_mode == "classic" or self.game_mode == "2to1" or self.game_mode == "fabulous4":
-                self.play_sound("Banker_win.mp3" )
-        elif self.game.winner == 'Tie':
-            if self.game.player_score == 6 and self.game_mode == "tiger":
-                self.play_sound("Tie_6_win.mp3")
-            else:
-                self.play_sound("Tie_win.mp3")
-
         is_natural = False
-        is_stiger = False
-        is_btiger = False
         if self.game.winner != 'Tie':
             # 检查是否为例牌(2张牌8或9点)
             if self.game.winner == 'Player':
@@ -2985,7 +2916,7 @@ class BaccaratGUI(tk.Tk):
                     )
                 continue  # 本局仅是叠加 Tie，不放新圆点
 
-            # —— B. 处理非 Tie (庄家 or 闲家) —— 
+        # —— B. 处理非 Tie (庄家 or 闲家) —— 
 
             # B.1 判断是否“新的跑道”（胜方切换，或之前尚未出现任何非 Tie）
             if last_winner is None or winner != last_winner:

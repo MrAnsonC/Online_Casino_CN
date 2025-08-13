@@ -1,11 +1,12 @@
 import tkinter as tk
 from tkinter import ttk
-import random
+import secrets  # 使用更安全的随机数生成器
 import time
 from PIL import Image, ImageTk, ImageDraw
 import os, json
 import sys
-import os
+import math
+import re
 
 # 获取当前文件所在目录并定位到A_Tools文件夹
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -15,18 +16,6 @@ a_tools_dir = os.path.join(parent_dir, 'A_Tools')
 # 将A_Tools目录添加到系统路径
 if a_tools_dir not in sys.path:
     sys.path.append(a_tools_dir)
-
-# 导入真随机骰子生成器
-try:
-    from shuffle_dice import Dice
-except ImportError:
-    print("警告：无法导入真随机骰子生成器，使用备用随机方案")
-    class Dice:
-        def __init__(self, value=None):
-            self.value = value or random.randint(1, 6)
-        def roll(self):
-            self.value = random.randint(1, 6)
-            return self.value
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -55,10 +44,33 @@ def update_balance_in_json(username, new_balance):
             break
     save_user_data(users)  # 保存更新后的数据
 
+class Dice:
+    """自定义骰子类，确保连续两次结果不是对面数字"""
+    def __init__(self, value=None):
+        self.last_value = None
+        self.value = value or self.roll()
+    
+    def roll(self):
+        if self.last_value is None:
+            # 第一次掷骰子，使用secrets安全随机选择
+            self.value = secrets.randbelow(6) + 1
+        else:
+            # 获取当前值的对面值（骰子规则：1对6，2对5，3对4）
+            opposite = {1: 6, 2: 5, 3: 4, 4: 3, 5: 2, 6: 1}
+            opposite_value = opposite[self.last_value]
+            
+            # 从1-6中排除对面值和当前值，然后随机选择
+            possible_values = [i for i in range(1, 7) if i != opposite_value and i != self.last_value]
+            self.value = secrets.choice(possible_values)
+        
+        self.last_value = self.value
+        return self.value
+
 class DiceAnimationWindow:
-    def __init__(self, parent, callback):
+    def __init__(self, parent, callback, dice_objects):
         self.parent = parent
         self.callback = callback
+        self.dice_objects = dice_objects  # 使用传入的骰子对象
         self.window = tk.Toplevel(parent)
         self.window.title("骰子摇动中...")
         self.window.geometry("500x400")
@@ -110,26 +122,31 @@ class DiceAnimationWindow:
 
     def draw_dice(self, img, num):
         draw = ImageDraw.Draw(img)
-        draw.rectangle([0, 0, 119, 119], outline='#333', width=3)
-        dot_color = '#333'
+        draw.rectangle([0, 0, img.size[0]-1, img.size[1]-1], outline='#333', width=3)
+        
+        # 1和4的点为红色，其他为黑色
+        dot_color = '#ff0000' if num in [1, 4] else '#333'
+        
+        size = img.size[0]
         dot_positions = {
-            1: [(60, 60)],
-            2: [(30, 30), (90, 90)],
-            3: [(30, 30), (60, 60), (90, 90)],
-            4: [(30, 30), (90, 30), (30, 90), (90, 90)],
-            5: [(30, 30), (90, 30), (60, 60), (30, 90), (90, 90)],
-            6: [(30, 30), (90, 30), (30, 60), (90, 60), (30, 90), (90, 90)]
+            1: [(size//2, size//2)],
+            2: [(size//4, size//4), (3*size//4, 3*size//4)],
+            3: [(size//4, size//4), (size//2, size//2), (3*size//4, 3*size//4)],
+            4: [(size//4, size//4), (3*size//4, size//4), (size//4, 3*size//4), (3*size//4, 3*size//4)],
+            5: [(size//4, size//4), (3*size//4, size//4), (size//2, size//2), (size//4, 3*size//4), (3*size//4, 3*size//4)],
+            6: [(size//4, size//4), (3*size//4, size//4), (size//4, size//2), (3*size//4, size//2), (size//4, 3*size//4), (3*size//4, 3*size//4)]
         }
+        dot_size = size // 10
         for pos in dot_positions[num]:
-            draw.ellipse([pos[0]-15, pos[1]-15, pos[0]+15, pos[1]+15], fill=dot_color)
+            draw.ellipse([pos[0]-dot_size, pos[1]-dot_size, pos[0]+dot_size, pos[1]+dot_size], fill=dot_color)
 
     def animate_dice(self):
         elapsed = time.time() - self.animation_start_time
         if elapsed < 5:  # 5秒快速变化
             self.progress['value'] = min(100, (elapsed / 5) * 100)
             
-            # 生成当前帧的骰子结果（使用真随机骰子）
-            current_dice = [Dice().value for _ in range(3)]
+            # 生成当前帧的骰子结果（使用自定义骰子规则）
+            current_dice = [dice.roll() for dice in self.dice_objects]
             
             # 保存最后一次的结果作为最终结果
             self.final_dice = current_dice
@@ -137,17 +154,17 @@ class DiceAnimationWindow:
             for i, lbl in enumerate(self.dice_labels):
                 lbl.config(image=self.dice_images[current_dice[i]-1])
                 
-            self.window.after(10, self.animate_dice)
+            self.window.after(10, self.animate_dice)  # 修改为10ms
             
-        elif elapsed < 6:  # 2秒静止显示最终结果
+        elif elapsed < 6:  # 1秒静止显示最终结果
             # 直接显示最后一次保存的结果
             for i, lbl in enumerate(self.dice_labels):
                 lbl.config(image=self.dice_images[self.final_dice[i]-1])
                 
             self.status_label.config(text="骰子停止中...")
-            self.window.after(100, self.animate_dice)
+            self.window.after(10, self.animate_dice)
             
-        elif elapsed < 7:  # 3秒显示结果
+        elif elapsed < 7:  # 1秒显示结果
             sorted_dice = sorted(self.final_dice)
             total = sum(sorted_dice)
             rtype = "大" if total >= 11 else "小"
@@ -156,11 +173,19 @@ class DiceAnimationWindow:
                 
             txt = f"骰子结果: {' '.join(map(str, sorted_dice))} {total}点{rtype}"
             self.status_label.config(text=txt)
-            self.window.after(100, self.animate_dice)
+            self.window.after(10, self.animate_dice)
             
         else:
             self.window.destroy()
             self.callback(self.final_dice)
+
+# 颜色常量
+COLOR_SMALL = "#FFD700"   # 小（金）
+COLOR_TIE = "#32CD32"     # 围（绿）
+COLOR_BIG = "#FF4500"     # 大（橙红）
+BG_FRAME = "#D0E7FF"
+
+MAX_RECORDS = 100
 
 class SicboGame:
     def __init__(self, root, username=None, initial_balance=10000):
@@ -173,7 +198,6 @@ class SicboGame:
 
         self.root.title("Sicbo 骰寶遊戲")
         self.root.geometry("1350x780+50+10")
-        self.root.resizable(0,0)
         self.root.configure(bg='#0a5f38')
         self.enter_binding = None
 
@@ -183,6 +207,8 @@ class SicboGame:
         self.current_bet = 0
         self.bet_amount = 100
         self.last_win = 0
+        self.last_dice = []  # 存储上局骰子结果
+        self.last_triple = [0, 0]  # [点数, 局数前]
         self.bets = {
             "small": 0,
             "all_triples": 0,
@@ -225,10 +251,189 @@ class SicboGame:
         self.chips = [25, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]
         self.history = []
         self.chip_widgets = []  # 存储 (canvas, oval_id, value)
+        
+        # 初始化骰子对象（使用上一局的结果作为初始值）
+        self.dice_objects = [Dice(), Dice(), Dice()]
 
+        # 定位历史记录文件
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        logs_dir = os.path.join(parent_dir, 'A_Logs')
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir)
+        self.history_file = os.path.join(logs_dir, 'Sicbo.json')
+        self.history_data = self.load_history_data()
+        
         self.create_widgets()
         self.root.bind('<Return>', lambda event: self.roll_dice())
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
+
+    def ensure_100_Record_structure(self, block):
+        """确保 block 包含 01_Data..50_Data 的键，若已有则保留其值（try to map numeric keys）"""
+        new_block = {f"{i:02d}_Data": [] for i in range(1, MAX_RECORDS+1)}
+        if not block:
+            return new_block
+        # Try to map existing keys: extract number from key (like '01_Data' or '1_Data' or '1')
+        for k, v in block.items():
+            m = re.search(r'(\d+)', k)
+            if m:
+                idx = int(m.group(1))
+                if 1 <= idx <= MAX_RECORDS:
+                    new_block[f"{idx:02d}_Data"] = v
+        # If the block had no numeric keys but was a list-like, try to assign from list values
+        # (some legacy formats may store a list)
+        if all(not re.search(r'(\d+)', k) for k in block.keys()):
+            # if block.values() are lists, try fill from newest->oldest into keys starting at 01
+            vals = list(block.values())
+            for i, val in enumerate(vals[:MAX_RECORDS]):
+                new_block[f"{i+1:02d}_Data"] = val
+        return new_block
+
+    def load_history_data(self):
+        # 创建默认数据结构，包含所有需要的字段
+        default_data = {
+            "100_Record": {f"{i:02d}_Data": [] for i in range(1, MAX_RECORDS+1)},
+            "Last_Triple": [0, 0],  # [点数, 局数前]
+            "H_Small": 0,
+            "H_Triple": 0,
+            "H_Big": 0,
+            # 点数历史
+            "H_4": 0, "H_5": 0, "H_6": 0, "H_7": 0, "H_8": 0, "H_9": 0, 
+            "H_10": 0, "H_11": 0, "H_12": 0, "H_13": 0, "H_14": 0, "H_15": 0, 
+            "H_16": 0, "H_17": 0,
+            # 围骰历史
+            "H_T1": 0, "H_T2": 0, "H_T3": 0, "H_T4": 0, "H_T5": 0, "H_T6": 0
+        }
+        
+        try:
+            if os.path.exists(self.history_file):
+                with open(self.history_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                    # 确保所有字段都存在，如果不存在则使用默认值
+                    for key, default_value in default_data.items():
+                        if key not in data:
+                            data[key] = default_value
+                    
+                    # 确保100_Record存在并具有正确的结构
+                    old_block = data.get("100_Record", {})
+                    data["100_Record"] = self.ensure_100_Record_structure(old_block)
+                    
+                    # 确保Last_Triple存在
+                    if "Last_Triple" not in data:
+                        data["Last_Triple"] = [0, 0]
+                    
+                    return data
+            # 文件不存在时返回默认数据
+            return default_data
+        except Exception as e:
+            print(f"加载历史记录失败: {e}")
+            return default_data
+
+    def save_history_data(self):
+        try:
+            with open(self.history_file, 'w', encoding='utf-8') as f:
+                json.dump(self.history_data, f, ensure_ascii=False, indent=4)
+        except Exception as e:
+            print(f"保存历史记录失败: {e}")
+
+    def shift_and_insert_record(self, sorted_dice):
+        """
+        将 01->02, 02->03, ..., 49->50，然后把 sorted_dice 写入 01_Data
+        """
+        block = self.history_data.setdefault("100_Record", {f"{i:02d}_Data": [] for i in range(1, MAX_RECORDS+1)})
+        # shift
+        for i in range(MAX_RECORDS, 1, -1):
+            dst = f"{i:02d}_Data"
+            src = f"{i-1:02d}_Data"
+            block[dst] = list(block.get(src, []))
+        # insert new at 01
+        block["01_Data"] = list(sorted_dice)
+        self.save_history_data()
+
+    def update_history(self, dice):
+        """更新历史记录（将骰子按升序存储），并执行 01->02 的移动逻辑"""
+        sorted_dice = sorted(dice)
+        self.shift_and_insert_record(sorted_dice)
+        
+        # 更新界面显示
+        self.update_history_display()
+        # 更新上局点数显示
+        self.update_last_game_display()
+        # 更新获胜分布
+        self.update_win_distribution()
+
+    def update_global_stats(self, sorted_dice):
+        """更新全局历史统计数据"""
+        total = sum(sorted_dice)
+        is_triple = (sorted_dice[0] == sorted_dice[1] == sorted_dice[2])
+        
+        # 更新小/围/大历史
+        if is_triple:
+            self.history_data["H_Triple"] += 1
+        else:
+            if total <= 10:
+                self.history_data["H_Small"] += 1
+            else:
+                self.history_data["H_Big"] += 1
+        
+        # 更新点数历史
+        if 4 <= total <= 17:
+            key = f"H_{total}"
+            self.history_data[key] = self.history_data.get(key, 0) + 1
+        
+        # 更新围骰点数历史
+        if is_triple and 1 <= sorted_dice[0] <= 6:
+            key = f"H_T{sorted_dice[0]}"
+            self.history_data[key] = self.history_data.get(key, 0) + 1
+        
+        # 保存更新后的数据
+        self.save_history_data()
+
+    def update_history_display(self):
+        """更新历史记录标签页的显示（读取 self.history_data['100_Record'] 并按 01..50 展示非空）"""
+        # 清空当前记录区域（只清除滚动内容）
+        for widget in self.history_inner.winfo_children():
+            widget.destroy()
+        
+        records = self.history_data.get("100_Record", {})
+        # iterate from 01_Data .. 50_Data (01 newest)
+        row = 0
+        for i in range(1, MAX_RECORDS+1):
+            k = f"{i:02d}_Data"
+            dice = records.get(k, [])
+            if not dice or len(dice) < 3:
+                continue
+            total = sum(dice)
+            is_triple = (dice[0] == dice[1] == dice[2])
+            # determine result type (note dice stored sorted)
+            if is_triple:
+                rtype = "围"
+                bg = COLOR_TIE
+            else:
+                rtype = "小" if total <= 10 else "大"
+                bg = COLOR_SMALL if rtype == "小" else COLOR_BIG
+
+            # 创建记录框架，背景按类型着色
+            frame = tk.Frame(self.history_inner, bg=bg, padx=5, pady=5, relief=tk.RIDGE, borderwidth=1)
+            frame.pack(fill=tk.X, padx=2, pady=2)
+
+            # 骰子显示（使用小图）, 背景同类型颜色
+            dice_frame = tk.Frame(frame, bg=bg)
+            dice_frame.pack(side=tk.LEFT, padx=10)
+            for d in dice:
+                lbl = tk.Label(dice_frame, image=self.dice_images_small[d-1], bg=bg)
+                lbl.pack(side=tk.LEFT, padx=1)
+            
+            # 总点数
+            tk.Label(frame, text=f"{total}", font=("Arial", 12), bg=bg, width=13).pack(side=tk.LEFT, padx=10)
+            
+            # 类型
+            tk.Label(frame, text=f"{rtype}", font=("Arial", 12), bg=bg, width=7).pack(side=tk.LEFT, padx=5)
+
+        # 更新 last triple display
+        self.update_last_triple_display()
+        # 更新获胜分布
+        self.update_win_distribution()
 
     def on_window_close(self):
         """窗口关闭时更新余额到JSON"""
@@ -242,7 +447,10 @@ class SicboGame:
         size = img.size[0]
         dot_size = size // 10
         draw.rectangle([0, 0, size-1, size-1], outline='#333', width=2)
-        dot_color = '#333'
+        
+        # 1和4的点为红色，其他为黑色
+        dot_color = "#bf0101" if num in [1, 4] else '#333'
+        
         dot_positions = {
             1: [(size//2, size//2)],
             2: [(size//4, size//4), (3*size//4, 3*size//4)],
@@ -261,13 +469,23 @@ class SicboGame:
         left_frame = tk.Frame(main_frame, bg='#0a5f38')
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # 右侧面板使用Notebook
-        self.right_notebook = ttk.Notebook(main_frame)
-        self.right_notebook.pack(side=tk.RIGHT, fill=tk.BOTH, padx=10, pady=10)
+        # 右侧面板使用固定宽度的容器（375px）
+        right_container = tk.Frame(main_frame, width=375, bg='#F0F0F0', relief=tk.GROOVE, bd=1)
+        right_container.pack(side=tk.RIGHT, fill=tk.Y, padx=10, pady=10)
+        right_container.pack_propagate(False)  # 锁定宽度 375px
+
+        # Notebook 放入右侧容器
+        self.right_notebook = ttk.Notebook(right_container)
+        self.right_notebook.pack(fill=tk.BOTH, expand=True)
 
         # 控制标签页
         control_tab = ttk.Frame(self.right_notebook)
         self.right_notebook.add(control_tab, text='控制面板')
+
+        # 历史记录标签页
+        history_tab = ttk.Frame(self.right_notebook)
+        self.right_notebook.add(history_tab, text='历史记录')
+        self.create_history_tab(history_tab)
 
         # 控制面板内容 背景颜色修改
         control_frame = tk.Frame(control_tab, bg='#D0E7FF')
@@ -278,10 +496,10 @@ class SicboGame:
         info_frame.pack(fill=tk.X, pady=10)
 
         self.balance_label = tk.Label(info_frame, text=f"餘額: ${self.balance}",
-                                     font=("Arial", 14, "bold"), fg='black', bg='#D0E7FF')
+                                    font=("Arial", 14, "bold"), fg='black', bg='#D0E7FF')
         self.balance_label.pack(side=tk.LEFT, padx=10)
 
-        # 筹码区
+        # 筹码区 - 修改筹码大小为60x60，间距调整为5px
         chip_frame = tk.Frame(control_frame, bg='#D0E7FF')
         chip_frame.pack(fill=tk.X, pady=(10, 5))
 
@@ -292,13 +510,14 @@ class SicboGame:
         row1.pack(fill=tk.X, pady=5)
         for idx, (label, color) in enumerate(self.chip_values[:5]):
             value = self.chips[idx]
-            canvas = tk.Canvas(row1, width=50, height=50, bg='#D0E7FF', highlightthickness=0)
-            canvas.pack(side=tk.LEFT, padx=10)
-            oval_id = canvas.create_oval(5, 5, 45, 45, fill=color, outline='#333', width=2)
+            canvas = tk.Canvas(row1, width=60, height=60, bg='#D0E7FF', highlightthickness=0)
+            canvas.pack(side=tk.LEFT, padx=5)  # 间距调整为5px
+            oval_id = canvas.create_oval(5, 5, 55, 55, fill=color, outline='#333', width=2)
             
             # 设置特定筹码的文字颜色为白色
             text_color = 'white' if label in ['100', '200', '2K', '5K', '10K', '50K'] else 'black'
-            canvas.create_text(25, 25, text=label, font=("Arial", 10, "bold"), fill=text_color)
+            # 字体大小调整为16
+            canvas.create_text(30, 30, text=label, font=("Arial", 16, "bold"), fill=text_color)
             
             canvas.bind("<Button-1>", lambda e, c=value: self.set_bet_amount(c))
             self.chip_widgets.append((canvas, oval_id, value))
@@ -307,46 +526,103 @@ class SicboGame:
         row2.pack(fill=tk.X, pady=5)
         for idx, (label, color) in enumerate(self.chip_values[5:]):
             value = self.chips[idx+5]
-            canvas = tk.Canvas(row2, width=50, height=50, bg='#D0E7FF', highlightthickness=0)
-            canvas.pack(side=tk.LEFT, padx=10)
-            oval_id = canvas.create_oval(5, 5, 45, 45, fill=color, outline='#333', width=2)
+            canvas = tk.Canvas(row2, width=60, height=60, bg='#D0E7FF', highlightthickness=0)
+            canvas.pack(side=tk.LEFT, padx=5)  # 间距调整为5px
+            oval_id = canvas.create_oval(5, 5, 55, 55, fill=color, outline='#333', width=2)
             
-            # 设置特定筹码的文字颜色为白色
             text_color = 'white' if label in ['100', '200', '2K', '5K', '10K', '50K'] else 'black'
-            canvas.create_text(25, 25, text=label, font=("Arial", 10, "bold"), fill=text_color)
+            # 字体大小调整为16
+            canvas.create_text(30, 30, text=label, font=("Arial", 16, "bold"), fill=text_color)
             
             canvas.bind("<Button-1>", lambda e, c=value: self.set_bet_amount(c))
             self.chip_widgets.append((canvas, oval_id, value))
 
-        # 历史记录放在筹码选择下方，使用自定义Frame代替Treeview
-        history_container = tk.Frame(control_frame, bg='#D0E7FF')
-        history_container.pack(fill=tk.BOTH, expand=True, pady=(20, 10))
+        # 上局信息 - 创建表格框架
+        last_games_container = tk.Frame(control_frame, bg='#D0E7FF')
+        last_games_container.pack(fill=tk.X, pady=10)
 
-        tk.Label(history_container, text="歷史記錄", font=("Arial", 16, "bold"),
-                fg='black', bg='#D0E7FF').pack(anchor=tk.W, pady=5)
-        
-        self.history_inner = tk.Frame(history_container, bg='#D0E7FF', height=200)
-        self.history_inner.pack(fill=tk.BOTH, expand=True)
-        
-        # 添加历史记录标题行
-        title_frame = tk.Frame(self.history_inner, bg='#1e3d59', padx=5, pady=3, relief=tk.RAISED, borderwidth=1)
-        title_frame.pack(fill=tk.X, padx=2, pady=(0, 5))
-        
-        # 标题
-        tk.Label(title_frame, text="骰子", font=("Arial", 12, "bold"), fg='white', bg='#1e3d59', width=10).pack(side=tk.LEFT)
-        tk.Label(title_frame, text="点数", font=("Arial", 12, "bold"), fg='white', bg='#1e3d59', width=13).pack(side=tk.LEFT)
-        tk.Label(title_frame, text="大/小/围", font=("Arial", 12, "bold"), fg='white', bg='#1e3d59', width=7).pack(side=tk.LEFT)
-       
+        # 表格框架（使用 grid）
+        table_frame = tk.Frame(last_games_container, bg='#D0E7FF')
+        table_frame.pack(fill=tk.X)
+
+        # 设定四列最小宽度，保证标题与内容对齐
+        table_frame.columnconfigure(0, minsize=90)   # 类型列
+        table_frame.columnconfigure(1, minsize=120)  # 骰子列（放三个小图）
+        table_frame.columnconfigure(2, minsize=60)   # 点数列
+        table_frame.columnconfigure(3, minsize=80)   # 结果列
+
+        # 标题行（背景色与字体）
+        header_bg = '#1e3d59'
+        tk.Label(table_frame, text="类型", font=("Arial", 12, "bold"),
+                fg='white', bg=header_bg).grid(row=0, column=0, sticky='nsew', pady=4)
+        tk.Label(table_frame, text="骰子", font=("Arial", 12, "bold"),
+                fg='white', bg=header_bg).grid(row=0, column=1, sticky='nsew', pady=4)
+        tk.Label(table_frame, text="点数", font=("Arial", 12, "bold"),
+                fg='white', bg=header_bg).grid(row=0, column=2, sticky='nsew', pady=4)
+        tk.Label(table_frame, text="结果", font=("Arial", 12, "bold"),
+                fg='white', bg=header_bg).grid(row=0, column=3, sticky='nsew', pady=4)
+
+        # -------- 上局点数（第一行） --------
+        tk.Label(table_frame, text="上局点数:", font=("Arial", 12),
+                bg='#D0E7FF').grid(row=1, column=0, sticky='w', padx=(6,2), pady=4)
+
+        # 骰子放在一个内部 frame 里，用来放三个 image label
+        self.last_dice_frame = tk.Frame(table_frame, bg='#D0E7FF')
+        self.last_dice_frame.grid(row=1, column=1, sticky='w', padx=2, pady=4)
+
+        self.last_dice_labels = []
+        for i in range(3):
+            lbl = tk.Label(self.last_dice_frame, bg='#D0E7FF', bd=1, relief=tk.FLAT)
+            lbl.pack(side=tk.LEFT, padx=4, pady=2)
+            self.last_dice_labels.append(lbl)
+
+        self.last_points_label = tk.Label(table_frame, text="--点", font=("Arial", 12),
+                                        bg='#D0E7FF')
+        self.last_points_label.grid(row=1, column=2, sticky='n', padx=2, pady=8)
+
+        self.last_result_label = tk.Label(table_frame, text="--", font=("Arial", 12),
+                                        bg='#D0E7FF')
+        self.last_result_label.grid(row=1, column=3, sticky='n', padx=2, pady=8)
+
+        # 分割线（横跨四列）
+        divider = tk.Frame(table_frame, bg='#1e3d59', height=2)
+        divider.grid(row=2, column=0, columnspan=4, sticky='ew', padx=2, pady=(4,6))
+
+        # -------- 上次围骰（第二行） --------
+        tk.Label(table_frame, text="上次围骰:", font=("Arial", 12),
+                bg='#D0E7FF').grid(row=3, column=0, sticky='w', padx=(6,2), pady=4)
+
+        self.last_triple_frame = tk.Frame(table_frame, bg='#D0E7FF')
+        self.last_triple_frame.grid(row=3, column=1, sticky='w', padx=2, pady=4)
+
+        self.last_triple_dice_labels = []
+        for i in range(3):
+            lbl = tk.Label(self.last_triple_frame, bg='#D0E7FF', bd=1, relief=tk.FLAT)
+            lbl.pack(side=tk.LEFT, padx=4, pady=2)
+            self.last_triple_dice_labels.append(lbl)
+
+        self.last_triple_points_label = tk.Label(table_frame, text="--",
+                                                font=("Arial", 12), bg='#D0E7FF')
+        self.last_triple_points_label.grid(row=3, column=2, sticky='n', padx=2, pady=8)
+
+        self.last_triple_info_label = tk.Label(table_frame, text="无记录",
+                                            font=("Arial", 12), bg='#D0E7FF')
+        self.last_triple_info_label.grid(row=3, column=3, sticky='n', padx=2, pady=8)
+
+        # 分割线（横跨四列）
+        divider = tk.Frame(table_frame, bg='#1e3d59', height=2)
+        divider.grid(row=4, column=0, columnspan=4, sticky='ew', padx=2, pady=(4,6))
+
         # 当前下注信息
         bet_info_frame = tk.Frame(control_frame, bg='#D0E7FF')
         bet_info_frame.pack(fill=tk.X, pady=10)
 
         self.current_bet_display = tk.Label(bet_info_frame, text="本局下注: $0",
-                                          font=("Arial", 14), fg='black', bg='#D0E7FF')
+                                        font=("Arial", 14), fg='black', bg='#D0E7FF')
         self.current_bet_display.pack(side=tk.LEFT, padx=10)
 
         self.last_win_display = tk.Label(bet_info_frame, text="上局获胜: $0",
-                                       font=("Arial", 14), fg='black', bg='#D0E7FF')
+                                    font=("Arial", 14), fg='black', bg='#D0E7FF')
         self.last_win_display.pack(side=tk.LEFT, padx=10)
 
         # 控制按钮
@@ -360,7 +636,7 @@ class SicboGame:
 
         # 修改掷骰子按钮样式
         roll_btn = tk.Button(btn_frame, text="擲骰子 (Enter)", font=("Arial", 14, "bold"),
-                           bg='#FFD700', fg='black', width=15, command=self.roll_dice)
+                        bg=COLOR_SMALL, fg='black', width=15, command=self.roll_dice)
         roll_btn.pack(side=tk.LEFT, padx=10, expand=True)
 
         # 左侧顶部：小 / 围骰 / 大
@@ -385,12 +661,12 @@ class SicboGame:
         # 围骰框 (三颗一样)
         self.all_triples_frame = tk.Frame(top_frame, bg='#f0ad4e', padx=20, pady=10)
         self.all_triples_frame.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
-        triple_click = lambda e: self.place_bet("all_triples", 30)
+        triple_click = lambda e: self.place_bet("all_triples", 31)  # 赔率改为31:1
         self.all_triples_frame.bind("<Button-1>", triple_click)
-        triple_label1 = tk.Label(self.all_triples_frame, text="围骰（3颗一样）", font=("Arial", 16, "bold"), bg='#f0ad4e')
+        triple_label1 = tk.Label(self.all_triples_frame, text="~ 任何围骰 ~", font=("Arial", 16, "bold"), bg='#f0ad4e')
         triple_label1.pack()
         triple_label1.bind("<Button-1>", triple_click)
-        triple_label2 = tk.Label(self.all_triples_frame, text="1：30", font=("Arial", 14), bg='#f0ad4e')
+        triple_label2 = tk.Label(self.all_triples_frame, text="1：31", font=("Arial", 14), bg='#f0ad4e')  # 显示赔率31
         triple_label2.pack()
         triple_label2.bind("<Button-1>", triple_click)
         self.all_triples_bet_label = tk.Label(self.all_triples_frame, text="$0", font=("Arial", 14), bg='#f0ad4e')
@@ -425,6 +701,253 @@ class SicboGame:
         
         # 设置100筹码为默认选中
         self.set_bet_amount(100)
+        
+        # 初始化历史记录显示
+        self.update_history_display()
+        # 初始化上局点数显示
+        self.update_last_game_display()
+        # 初始化上次围骰显示
+        self.update_last_triple_display()
+        # 初始化获胜分布
+        self.update_win_distribution()
+
+    def create_history_tab(self, parent):
+        """创建历史记录标签页（最近50局）"""
+        record_frame = tk.Frame(parent, bg='#D0E7FF')
+        record_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        tk.Label(record_frame, text="最近100局记录", font=("Arial", 16, "bold"), 
+                bg='#D0E7FF').pack(anchor=tk.W, pady=5)
+        
+        # 标题行（固定，不随滚动）
+        self.records_title_frame = tk.Frame(record_frame, bg='#1e3d59', padx=5, pady=3, relief=tk.RAISED, borderwidth=1)
+        self.records_title_frame.pack(fill=tk.X, padx=2, pady=(0, 5))
+        
+        # 使用网格布局确保对齐
+        tk.Label(self.records_title_frame, text="骰子", font=("Arial", 12, "bold"), 
+                fg='white', bg='#1e3d59', width=12).grid(row=0, column=0, sticky="w")
+        tk.Label(self.records_title_frame, text="点数", font=("Arial", 12, "bold"), 
+                fg='white', bg='#1e3d59', width=14).grid(row=0, column=1, sticky="w")
+        tk.Label(self.records_title_frame, text="结果", font=("Arial", 12, "bold"), 
+                fg='white', bg='#1e3d59', width=4).grid(row=0, column=2, sticky="w")
+
+        # 创建滚动容器（记录列表区域）
+        container = tk.Frame(record_frame, bg='#D0E7FF')
+        container.pack(fill=tk.BOTH, expand=True)
+        
+        # 添加滚动条
+        scrollbar = ttk.Scrollbar(container, orient=tk.VERTICAL)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # 创建Canvas用于滚动（减少高度为150）
+        self.history_canvas = tk.Canvas(container, bg='#D0E7FF', yscrollcommand=scrollbar.set, height=150)
+        self.history_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=self.history_canvas.yview)
+        
+        # 创建内部框架用于放置可滚动内容
+        self.history_inner = tk.Frame(self.history_canvas, bg='#D0E7FF')
+        self.history_window = self.history_canvas.create_window((0, 0), window=self.history_inner, anchor=tk.NW)
+        
+        # 配置Canvas滚动
+        self.history_inner.bind("<Configure>", lambda e: self.history_canvas.configure(scrollregion=self.history_canvas.bbox("all")))
+        self.history_canvas.bind("<Configure>", lambda e: self.history_canvas.itemconfig(self.history_window, width=e.width))
+        
+        # 获胜分布部分（过去50局）
+        distribution_frame = tk.Frame(parent, bg='#D0E7FF', padx=10, pady=10)
+        distribution_frame.pack(fill=tk.X, pady=5)
+        
+        tk.Label(distribution_frame, text="过去100局的获胜分布", font=("Arial", 12, "bold"), 
+                bg='#D0E7FF').pack(anchor=tk.W, pady=5)
+        
+        # 创建进度条容器（宽度限制在375px内）
+        progress_container = tk.Frame(distribution_frame, bg='#D0E7FF', width=355, height=30)
+        progress_container.pack(fill=tk.X, pady=5)
+        
+        self.small_progress = tk.Label(progress_container, text="小", bg=COLOR_SMALL,
+                                    fg='black', anchor='center', font=("Arial", 10, "bold"))
+        self.triple_progress = tk.Label(progress_container, text="围", bg=COLOR_TIE,
+                                        fg='black', anchor='center', font=("Arial", 10, "bold"))
+        self.big_progress = tk.Label(progress_container, text="大", bg=COLOR_BIG,
+                                    fg='black', anchor='center', font=("Arial", 10, "bold"))
+
+        counts_container = tk.Frame(distribution_frame, bg='#D0E7FF', pady=4, width=355)
+        counts_container.pack(fill=tk.X, padx=10)
+
+        self.small_count_label = tk.Label(counts_container, text="小: 0", font=("Arial", 10, "bold"),
+                                        bg='#D0E7FF', fg='black', anchor='center', width=10)
+        self.small_count_label.pack(side=tk.LEFT, expand=True)
+
+        self.triple_count_label = tk.Label(counts_container, text="围: 0", font=("Arial", 10, "bold"),
+                                        bg='#D0E7FF', fg='black', anchor='center', width=10)
+        self.triple_count_label.pack(side=tk.LEFT, expand=True)
+
+        self.big_count_label = tk.Label(counts_container, text="大: 0", font=("Arial", 10, "bold"),
+                                        bg='#D0E7FF', fg='black', anchor='center', width=10)
+        self.big_count_label.pack(side=tk.LEFT, expand=True)
+        
+        # 点数统计部分（使用骰子图标）
+        points_frame = tk.Frame(parent, bg='#D0E7FF', padx=10, pady=10)
+        points_frame.pack(fill=tk.X, pady=5)
+
+        tk.Label(points_frame, text="过去100局中出现的点数数量：", font=("Arial", 12, "bold"), 
+                bg='#D0E7FF').pack(anchor=tk.W, pady=5)
+
+        # 使用网格布局确保对齐
+        points_container = tk.Frame(points_frame, bg='#D0E7FF')
+        points_container.pack(fill=tk.X, pady=5)
+
+        # 使用网格布局容器
+        grid_container = tk.Frame(points_container, bg='#D0E7FF')
+        grid_container.pack()
+
+        # 创建骰子图标标签和计数标签
+        self.dice_icon_labels = []
+        self.point_count_labels = []
+
+        for col, point in enumerate(range(1, 7)):
+            # 创建列容器
+            col_frame = tk.Frame(grid_container, bg='#D0E7FF')
+            col_frame.grid(row=0, column=col, padx=10, pady=5)
+            
+            # 骰子图标
+            icon_frame = tk.Frame(col_frame, bg='#D0E7FF')
+            icon_frame.pack()
+            lbl_icon = tk.Label(icon_frame, image=self.dice_images_small[point-1], bg='#D0E7FF')
+            lbl_icon.pack()
+            self.dice_icon_labels.append(lbl_icon)
+            
+            # 数字计数
+            count_frame = tk.Frame(col_frame, bg='#D0E7FF')
+            count_frame.pack()
+            lbl_count = tk.Label(count_frame, text="0", font=("Arial", 10, "bold"), bg='#D0E7FF')
+            lbl_count.pack()
+            self.point_count_labels.append(lbl_count)
+        
+        # 更新点数统计显示
+        self.update_points_stats()
+
+    def update_last_game_display(self):
+        """更新上局点数显示（使用JSON的01_Data资料）"""
+        records = self.history_data.get("100_Record", {})
+        latest_record = records.get("01_Data", [])
+        
+        if latest_record and len(latest_record) >= 3:
+            # 显示骰子图片
+            for i, lbl in enumerate(self.last_dice_labels):
+                lbl.config(image=self.dice_images_small[latest_record[i]-1])
+            
+            # 计算总点数和结果类型
+            total = sum(latest_record)
+            is_triple = (latest_record[0] == latest_record[1] == latest_record[2])
+            rtype = "围" if is_triple else ("大" if total >= 11 else "小")
+            
+            # 更新点数标签和结果标签
+            self.last_points_label.config(text=f"{total}点")
+            self.last_result_label.config(text=rtype)
+        else:
+            # 没有历史记录，清空显示
+            for lbl in self.last_dice_labels:
+                lbl.config(image='')
+            self.last_points_label.config(text="--点")
+            self.last_result_label.config(text="--")
+
+    def update_last_triple_display(self):
+        """更新最后一次围骰显示（局数前）"""
+        # 直接从历史数据中获取Last_Triple
+        last_triple = self.history_data.get("Last_Triple", [0, 0])
+        
+        if last_triple[0] > 0:
+            # 显示三个相同的骰子图片
+            for lbl in self.last_triple_dice_labels:
+                lbl.config(image=self.dice_images_small[last_triple[0]-1])
+            # 显示局数信息
+            info_text = f"{last_triple[1]}局前"
+            self.last_triple_info_label.config(text=info_text)
+        else:
+            # 没有围骰记录，清除图片显示
+            for lbl in self.last_triple_dice_labels:
+                lbl.config(image='')
+            # 显示无记录信息
+            self.last_triple_info_label.config(text="无记录")
+
+    def update_win_distribution(self):
+        """基于最近100局计算分布并显示（使用 place 放置 colored labels）"""
+        records = self.history_data.get("100_Record", {})
+        small = triple = big = 0
+        # 遍历 01..50（01 是最新）
+        for i in range(1, MAX_RECORDS+1):
+            rec = records.get(f"{i:02d}_Data", [])
+            if not rec or len(rec) < 3:
+                continue
+            
+            # 首先检查是否为围骰
+            is_triple = (rec[0] == rec[1] == rec[2])
+            if is_triple:
+                triple += 1
+                continue  # 跳过大小判断
+            
+            # 非围骰情况才判断大小
+            total = sum(rec)
+            if total <= 10:
+                small += 1
+            else:
+                big += 1
+                
+        total_games = small + triple + big
+
+        # 计算百分比
+        if total_games > 0:
+            small_percent = small / total_games
+            triple_percent = triple / total_games
+            big_percent = big / total_games
+        else:
+            small_percent = triple_percent = big_percent = 0.0
+
+        # 进度条宽度基于容器宽度（取600为最小视觉长度）
+        total_width = max(200, 350)
+        small_w = int(total_width * small_percent)
+        triple_w = int(total_width * triple_percent)
+        big_w = total_width - small_w - triple_w
+
+        # 强制围非零时至少20像素
+        if triple > 0 and triple_w < 20:
+            diff = 20 - triple_w
+            triple_w = 20
+            if big_w >= diff:
+                big_w -= diff
+            elif small_w >= diff:
+                small_w -= diff
+
+        # 最小宽度保证
+        if small > 0 and small_w < 8:
+            small_w = 8
+        if big > 0 and big_w < 8:
+            big_w = 8
+
+        # place labels
+        self.small_progress.place(x=0, y=0, width=small_w, height=30)
+        self.triple_progress.place(x=small_w, y=0, width=triple_w, height=30)
+        self.big_progress.place(x=small_w+triple_w, y=0, width=big_w, height=30)
+
+        # 更新 counts 文本
+        self.small_count_label.config(text=f"小: {small}")
+        self.triple_count_label.config(text=f"围: {triple}")
+        self.big_count_label.config(text=f"大: {big}")
+
+    def update_points_stats(self):
+        """更新点数统计数据（统计各面 1~6 出现次数，基于过去100局）"""
+        face_count = {i: 0 for i in range(1, 7)}
+        records = self.history_data.get("100_Record", {})
+        
+        for i in range(1, MAX_RECORDS+1):
+            dice = records.get(f"{i:02d}_Data", [])
+            for face in dice:
+                if 1 <= face <= 6:
+                    face_count[face] += 1
+        
+        # 更新点数计数标签
+        for idx, point in enumerate(range(1, 7)):
+            self.point_count_labels[idx].config(text=str(face_count[point]))
 
     def create_tab1(self, parent):
         # 双骰子 1:11
@@ -435,13 +958,11 @@ class SicboGame:
         double_frame.pack(fill=tk.X)
         self.double_bet_labels = {}
         
-        # 修复1: 为整个骰子盒子添加点击事件绑定
         for i in range(1, 7):
             dice_box = tk.Frame(double_frame, bg='#ffd3b6', padx=5, pady=5)
             dice_box.grid(row=0, column=i-1, padx=2, sticky="nsew")
             double_frame.columnconfigure(i-1, weight=1)
             
-            # 绑定整个盒子区域
             dice_box.bind("<Button-1>", lambda e, n=i: self.place_bet("double", 11, n))
             
             dice_pair_frame = tk.Frame(dice_box, bg='#ffd3b6')
@@ -465,15 +986,14 @@ class SicboGame:
         tk.Label(row2_frame, text="点数", font=("Arial", 18, "bold"), fg='white', bg='#0a5f38').pack(anchor=tk.W, padx=10, pady=5)
         points_frame1 = tk.Frame(row2_frame, bg='#0a5f38')
         points_frame1.pack(fill=tk.X)
-        odds = {4: 60, 5: 20, 6: 18, 7: 12, 8: 8, 9: 6, 10: 6, 11: 6, 12: 6, 13: 8, 14: 12, 15: 18, 16: 20, 17: 60}
+        # 更新赔率
+        odds = {4: 62, 5: 31, 6: 18, 7: 12, 8: 8, 9: 7, 10: 6, 11: 6, 12: 7, 13: 8, 14: 12, 15: 18, 16: 31, 17: 62}
         self.total_points_labels = {}
         
-        # 修复2: 为整个点数框添加点击事件绑定
         for point in range(4, 11):
             point_frame = tk.Frame(points_frame1, bg='#d4c1ec', padx=5, pady=5, relief=tk.RIDGE, bd=1)
             point_frame.pack(side=tk.LEFT, padx=2, fill=tk.BOTH, expand=True)
             
-            # 绑定整个点数框
             point_frame.bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
             
             point_label = tk.Label(point_frame, text=f"{point}", font=("Arial", 20, "bold"), bg='#d4c1ec')
@@ -488,7 +1008,6 @@ class SicboGame:
             self.total_points_labels[point].pack()
             self.total_points_labels[point].bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
 
-        # 黑色分割线
         separator = tk.Frame(parent, bg='black', height=2)
         separator.pack(fill=tk.X, padx=10, pady=2)
 
@@ -498,22 +1017,16 @@ class SicboGame:
         points_frame2 = tk.Frame(row3_frame, bg='#0a5f38')
         points_frame2.pack(fill=tk.X)
         
-        # 修复3: 为第二行点数框添加点击事件绑定
         for point in range(11, 18):
             point_frame = tk.Frame(points_frame2, bg='#d4c1ec', padx=5, pady=5, relief=tk.RIDGE, bd=1)
             point_frame.pack(side=tk.LEFT, padx=2, fill=tk.BOTH, expand=True)
-            
-            # 绑定整个点数框
             point_frame.bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
-            
             point_label = tk.Label(point_frame, text=f"{point}", font=("Arial", 20, "bold"), bg='#d4c1ec')
             point_label.pack()
             point_label.bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
-            
             odds_label = tk.Label(point_frame, text=f"1:{odds[point]}", font=("Arial", 12), bg='#d4c1ec')
             odds_label.pack()
             odds_label.bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
-            
             self.total_points_labels[point] = tk.Label(point_frame, text="$0", font=("Arial", 12), bg='#d4c1ec')
             self.total_points_labels[point].pack()
             self.total_points_labels[point].bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
@@ -521,23 +1034,18 @@ class SicboGame:
         # 猜点数
         row4_frame = tk.Frame(parent, bg='#0a5f38')
         row4_frame.pack(fill=tk.X, pady=(10, 5))
-        tk.Label(row4_frame, text="猜点数 - 1颗骰子1:1  2颗骰子1:2  3颗骰子1:3", font=("Arial", 18, "bold"), fg='white', bg='#0a5f38').pack(anchor=tk.W, padx=10, pady=5)
+        tk.Label(row4_frame, text="三军 - 1颗骰子1:1  2颗骰子1:2  3颗骰子1:12", font=("Arial", 18, "bold"), fg='white', bg='#0a5f38').pack(anchor=tk.W, padx=10, pady=5)
         guess_frame = tk.Frame(row4_frame, bg='#0a5f38')
         guess_frame.pack(fill=tk.X)
         self.guess_num_labels = {}
         
-        # 修复4: 为整个猜点数框添加点击事件绑定
         for i in range(1, 7):
             guess_box = tk.Frame(guess_frame, bg='#c8e6c9', padx=5, pady=5)
             guess_box.pack(side=tk.LEFT, padx=2, fill=tk.BOTH, expand=True)
-            
-            # 绑定整个猜点数框
             guess_box.bind("<Button-1>", lambda e, n=i: self.place_bet("guess_num", 1, n))
-            
             img_label = tk.Label(guess_box, image=self.dice_images_small[i-1], bg='#c8e6c9')
             img_label.pack(pady=5)
             img_label.bind("<Button-1>", lambda e, n=i: self.place_bet("guess_num", 1, n))
-
             self.guess_num_labels[i] = tk.Label(guess_box, text="$0", font=("Arial", 12), bg='#c8e6c9')
             self.guess_num_labels[i].pack()
             self.guess_num_labels[i].bind("<Button-1>", lambda e, n=i: self.place_bet("guess_num", 1, n))
@@ -549,8 +1057,8 @@ class SicboGame:
         tk.Label(row1_frame, text="组合骰子 - 1:6", font=("Arial", 18, "bold"), fg='white', bg='#0a5f38').pack(anchor=tk.W, padx=10, pady=5)
         pairs_frame = tk.Frame(row1_frame, bg='#0a5f38')
         pairs_frame.pack(fill=tk.X)
-        pairs = [(1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (2, 3), (2, 4), (2, 5), (2, 6), (3, 4), (3, 5), (3, 6), (4, 5), (4, 6), (5, 6)]
         self.pairs_labels = {}
+        pairs = [(1, 2), (1, 3), (1, 4), (1, 5), (1, 6), (2, 3), (2, 4), (2, 5), (2, 6), (3, 4), (3, 5), (3, 6), (4, 5), (4, 6), (5, 6)]
         for i in range(0, 15, 5):
             row_frame = tk.Frame(pairs_frame, bg='#0a5f38')
             row_frame.pack(fill=tk.X, pady=2)
@@ -560,12 +1068,10 @@ class SicboGame:
                 pair_box.pack(side=tk.LEFT, padx=2, fill=tk.BOTH, expand=True)
                 pair_box.bind("<Button-1>", lambda e, p=pair_key: self.place_bet("pairs", 6, p))
 
-                # 使用骰子图片代替文字
                 dice_frame = tk.Frame(pair_box, bg='#e8e8e8')
                 dice_frame.pack(pady=5)
                 dice_frame.bind("<Button-1>", lambda e, p=pair_key: self.place_bet("pairs", 6, p))
 
-                # 显示两个骰子
                 lbl1 = tk.Label(dice_frame, image=self.dice_images_small[pair[0]-1], bg='#e8e8e8')
                 lbl1.pack(side=tk.LEFT, padx=2)
                 lbl1.bind("<Button-1>", lambda e, p=pair_key: self.place_bet("pairs", 6, p))
@@ -581,36 +1087,34 @@ class SicboGame:
         # 围骰
         row2_frame = tk.Frame(parent, bg='#0a5f38')
         row2_frame.pack(fill=tk.X, pady=(10, 5))
-        tk.Label(row2_frame, text="围骰 - 1:180", font=("Arial", 18, "bold"), fg='white', bg='#0a5f38').pack(anchor=tk.W, padx=10, pady=5)
+        tk.Label(row2_frame, text="围骰 - 1:190", font=("Arial", 18, "bold"), fg='white', bg='#0a5f38').pack(anchor=tk.W, padx=10, pady=5)  # 赔率改为190
         triple_frame = tk.Frame(row2_frame, bg='#0a5f38')
         triple_frame.pack(fill=tk.X)
         self.triple_labels = {}
         for i in range(1, 7):
             triple_box = tk.Frame(triple_frame, bg='#ffaaa5', padx=5, pady=5)
             triple_box.pack(side=tk.LEFT, padx=2, fill=tk.BOTH, expand=True)
-            triple_box.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 180, n))
+            triple_box.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))  # 赔率改为190
 
-            # 使用骰子图片代替文字
             dice_frame = tk.Frame(triple_box, bg='#ffaaa5')
             dice_frame.pack(pady=5)
-            dice_frame.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 180, n))
+            dice_frame.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))  # 赔率改为190
 
-            # 显示三个骰子
             lbl1 = tk.Label(dice_frame, image=self.dice_images_small[i-1], bg='#ffaaa5')
             lbl1.pack(side=tk.LEFT, padx=2)
-            lbl1.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 180, n))
+            lbl1.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))  # 赔率改为190
             
             lbl2 = tk.Label(dice_frame, image=self.dice_images_small[i-1], bg='#ffaaa5')
             lbl2.pack(side=tk.LEFT, padx=2)
-            lbl2.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 180, n))
+            lbl2.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))  # 赔率改为190
             
             lbl3 = tk.Label(dice_frame, image=self.dice_images_small[i-1], bg='#ffaaa5')
             lbl3.pack(side=tk.LEFT, padx=2)
-            lbl3.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 180, n))
+            lbl3.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))  # 赔率改为190
 
             self.triple_labels[i] = tk.Label(triple_box, text="$0", font=("Arial", 12), bg='#ffaaa5')
             self.triple_labels[i].pack()
-            self.triple_labels[i].bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 180, n))
+            self.triple_labels[i].bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))  # 赔率改为190
 
         # 数字组合
         row3_frame = tk.Frame(parent, bg='#0a5f38')
@@ -624,12 +1128,10 @@ class SicboGame:
             group_box.pack(side=tk.LEFT, padx=5, fill=tk.BOTH, expand=True)
             group_box.bind("<Button-1>", lambda e, g=group: self.place_bet("number_group", 7, g))
 
-            # 使用骰子图片显示组合
             dice_frame = tk.Frame(group_box, bg='#5bc0de')
             dice_frame.pack(pady=5)
             dice_frame.bind("<Button-1>", lambda e, g=group: self.place_bet("number_group", 7, g))
 
-            # 显示组合中的四个骰子
             for num in group:
                 lbl = tk.Label(dice_frame, image=self.dice_images_small[int(num)-1], bg='#5bc0de')
                 lbl.pack(side=tk.LEFT, padx=2)
@@ -649,7 +1151,8 @@ class SicboGame:
                 canvas.itemconfig(oval_id, outline='#333', width=2)
 
     def get_odds(self, point):
-        odds = {4: 60, 5: 20, 6: 18, 7: 12, 8: 8, 9: 6, 10: 6, 11: 6, 12: 6, 13: 8, 14: 12, 15: 18, 16: 20, 17: 60}
+        # 更新赔率
+        odds = {4: 62, 5: 31, 6: 18, 7: 12, 8: 8, 9: 7, 10: 6, 11: 6, 12: 7, 13: 8, 14: 12, 15: 18, 16: 31, 17: 62}
         return odds.get(point, 1)
 
     def place_bet(self, bet_type, odds, param=None):
@@ -671,44 +1174,6 @@ class SicboGame:
 
         if self.username:
             update_balance_in_json(self.username, self.balance)
-
-    def add_to_history(self, dice, total, rtype):
-        sorted_dice = sorted(dice)
-        children = self.history_inner.winfo_children()
-        record_count = len(children) - 1  # 减去标题行
-        
-        # 修复：当记录达到6条时，移除最旧的记录（最下面的记录行）
-        if record_count >= 6:
-            # 找到最旧的记录（索引为1的记录行，因为索引0是标题行）
-            oldest_record = children[1]
-            oldest_record.destroy()
-        
-        self._render_history(sorted_dice, total, rtype)
-
-    def _render_history(self, dice, total, rtype):
-        # 创建记录框架
-        frame = tk.Frame(self.history_inner, bg='#D0E7FF', padx=5, pady=5, relief=tk.RIDGE, borderwidth=1)
-        
-        # 将新记录添加到标题行之后（最上面）
-        if len(self.history_inner.winfo_children()) > 1:  # 已经有记录行
-            frame.pack(fill=tk.X, padx=2, pady=2, after=self.history_inner.winfo_children()[0])
-        else:
-            frame.pack(fill=tk.X, padx=2, pady=2)
-        
-        # 骰子显示（已排序）
-        dice_frame = tk.Frame(frame, bg='#D0E7FF')
-        dice_frame.pack(side=tk.LEFT, padx=10)
-        for d in dice:  # 使用排序后的骰子
-            lbl = tk.Label(dice_frame, image=self.dice_images_small[d-1], bg='#D0E7FF')
-            lbl.pack(side=tk.LEFT, padx=2)
-        
-        # 总点数
-        total_label = tk.Label(frame, text=f"{total}", font=("Arial", 12), bg='#D0E7FF', width=7)
-        total_label.pack(side=tk.LEFT, padx=10)
-        
-        # 类型
-        type_label = tk.Label(frame, text=f"{rtype}", font=("Arial", 12), bg='#D0E7FF', width=10)
-        type_label.pack(side=tk.LEFT, padx=8)
 
     def update_display(self):
         self.balance_label.config(text=f"餘額: ${self.balance}")
@@ -736,10 +1201,17 @@ class SicboGame:
         for group in self.bets["number_group"]:
             if group in self.number_group_labels:
                 self.number_group_labels[group].config(text=f"${self.bets['number_group'][group]}")
+                
+        # 更新上局骰子显示
+        self.update_last_game_display()
+        # 更新上次围骰显示
+        self.update_last_triple_display()
 
     def roll_dice(self):
-        if self.current_bet == 0 or not self.accept_bets:
+        # 即使没有下注，也可以开始游戏
+        if not self.accept_bets:
             return
+            
         self.accept_bets = False
 
         if self.enter_binding:
@@ -747,58 +1219,84 @@ class SicboGame:
             self.enter_binding = None
 
         # 创建动画窗口，结果将在动画过程中生成
-        DiceAnimationWindow(self.root, self.calculate_results)
+        # 传递骰子对象，使用上一局的结果作为初始值
+        DiceAnimationWindow(self.root, self.calculate_results, self.dice_objects)
 
     def calculate_results(self, dice):
+        # 保存骰子结果用于显示
+        self.last_dice = dice
+        
         # 计算时使用原始顺序
         total = sum(dice)
         result_type = "大" if total >= 11 else "小"
-        if dice[0] == dice[1] == dice[2]:
+        is_triple = (dice[0] == dice[1] == dice[2])
+        if is_triple:
             result_type = "围"
         
-        self.add_to_history(dice, total, result_type)
+        # 更新全局历史记录（保存为升序并做 shift）
+        self.update_history(dice)
 
-        is_triple = (dice[0] == dice[1] == dice[2])
+        # 更新Last_Triple
+        last_triple = self.history_data.get("Last_Triple", [0, 0])
+        
+        if is_triple:
+            # 如果是围骰，重置局数并更新点数
+            last_triple = [dice[0], 1]  # 点数, 局数前=1
+        elif last_triple[0] > 0:  # 如果之前有围骰记录
+            # 如果不是围骰，增加局数
+            last_triple[1] += 1
+        
+        # 保存更新后的Last_Triple
+        self.history_data["Last_Triple"] = last_triple
+        self.save_history_data()
+
         winnings = 0
-        for bet_type, data in self.bets.items():
-            if bet_type == "small" and not is_triple and total < 11:
-                winnings += data * 2 if data > 0 else 0
-            if bet_type == "big" and not is_triple and total >= 11:
-                winnings += data * 2 if data > 0 else 0
-            if bet_type == "all_triples" and is_triple:
-                winnings += data * 31 if data > 0 else 0
-            if bet_type == "double":
-                for num, amount in data.items():
-                    if amount > 0 and dice.count(num) >= 2:
-                        winnings += amount * 12
-            if bet_type == "total_points" and not is_triple:
-                for point, amount in data.items():
-                    if amount > 0 and total == point:
-                        odds = self.get_odds(point)
-                        winnings += amount * (odds + 1)
-            if bet_type == "pairs":
-                for pair, amount in data.items():
-                    if amount > 0:
-                        a, b = map(int, pair.split('&'))
-                        if (dice.count(a) >= 1 and dice.count(b) >= 1) or (dice.count(a) >= 2 and b == a):
-                            winnings += amount * 7
-            if bet_type == "triple":
-                for num, amount in data.items():
-                    if amount > 0 and dice.count(num) == 3:
-                        winnings += amount * 181
-            if bet_type == "guess_num":
-                for num, amount in data.items():
-                    if amount > 0:
-                        count = dice.count(num)
-                        if count > 0:
-                            winnings += amount * (count + 1)
-            if bet_type == "number_group":
-                for group, amount in data.items():
-                    if amount > 0:
-                        group_set = set(int(x) for x in group)
-                        # 三颗骰子必须是互不相同且皆在该组合内
-                        if len(set(dice)) == 3 and set(dice).issubset(group_set):
-                            winnings += amount * 8
+        
+        # 只有当有下注时才计算输赢
+        if self.current_bet > 0:
+            for bet_type, data in self.bets.items():
+                if bet_type == "small" and not is_triple and total < 11:
+                    winnings += data * 2 if data > 0 else 0
+                if bet_type == "big" and not is_triple and total >= 11:
+                    winnings += data * 2 if data > 0 else 0
+                if bet_type == "all_triples" and is_triple:
+                    winnings += data * 31 if data > 0 else 0  # 赔率改为31
+                if bet_type == "double":
+                    for num, amount in data.items():
+                        if amount > 0 and dice.count(num) >= 2:
+                            winnings += amount * 12
+                if bet_type == "total_points" and not is_triple:
+                    for point, amount in data.items():
+                        if amount > 0 and total == point:
+                            odds = self.get_odds(point)
+                            winnings += amount * (odds + 1)
+                if bet_type == "pairs":
+                    for pair, amount in data.items():
+                        if amount > 0:
+                            a, b = map(int, pair.split('&'))
+                            if (dice.count(a) >= 1 and dice.count(b) >= 1) or (dice.count(a) >= 2 and b == a):
+                                winnings += amount * 7
+                if bet_type == "triple":
+                    for num, amount in data.items():
+                        if amount > 0 and dice.count(num) == 3:
+                            winnings += amount * 191  # 赔率改为190+1
+                if bet_type == "guess_num":
+                    for num, amount in data.items():
+                        if amount > 0:
+                            count = dice.count(num)
+                            if count == 1:
+                                winnings += amount * 2  # 1倍赔率
+                            elif count == 2:
+                                winnings += amount * 3  # 2倍赔率
+                            elif count == 3:
+                                winnings += amount * 13  # 12倍赔率
+                if bet_type == "number_group":
+                    for group, amount in data.items():
+                        if amount > 0:
+                            group_set = set(int(x) for x in group)
+                            # 三颗骰子必须是互不相同且皆在该组合内
+                            if len(set(dice)) == 3 and set(dice).issubset(group_set):
+                                winnings += amount * 8
 
         self.balance += winnings
         self.last_win = winnings
@@ -819,9 +1317,6 @@ class SicboGame:
 
         if self.username:
             update_balance_in_json(self.username, self.balance)
-
-        if self.balance <= 0:
-            self.add_to_history([0,0,0], 0, "結束:餘額用完")
 
         self.enter_binding = self.root.bind('<Return>', lambda event: self.roll_dice())
 

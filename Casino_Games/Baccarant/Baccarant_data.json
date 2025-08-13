@@ -1,8 +1,8 @@
 {
-    "Player": 14616,
-    "Tie": 3110,
-    "Banker": 15125,
-    "L_Player": 11,
-    "L_Tie": 4,
-    "L_Banker": 12
+    "Player": 0,
+    "Tie": 0,
+    "Banker": 1,
+    "L_Player": 0,
+    "L_Tie": 0,
+    "L_Banker": 0
 }
