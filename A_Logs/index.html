@@ -718,7 +718,6 @@
                     }
                     
                     historyItem.innerHTML = `
-                        <div class="history-index">#${i}</div>
                         <div class="dice-value">${record[0]}${record[1]}${record[2]}</div>
                         <div class="dice-sum">${sum}点</div>
                     `;
@@ -738,7 +737,7 @@
             updatePage();
             
             // 设置定时刷新
-            setInterval(updatePage, 5000);
+            setInterval(updatePage, 1000);
         }
         
         // 添加刷新按钮事件
