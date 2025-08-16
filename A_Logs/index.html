@@ -560,7 +560,7 @@
                     "Triple": 0,
                     "Big": 0,
                     "Last_Triple": [0, 0],
-                    "100_Record": {},
+                    "500_Record": {},
                     "H_Small": 0,
                     "H_Triple": 0,
                     "H_Big": 0,
@@ -647,7 +647,7 @@
             const data = await fetchData();
             
             // 计算100局统计数据
-            const stats = calculate100GameStats(data["100_Record"] || {});
+            const stats = calculate100GameStats(data["500_Record"] || {});
             
             // 更新概览数据（使用计算出的100局数据）
             document.getElementById('small-count').textContent = stats.smallCount;
@@ -699,7 +699,7 @@
             
             for (let i = 1; i <= 98; i++) {
                 const key = (i < 10 ? '0' + i : i) + '_Data';
-                const record = data['100_Record'][key];
+                const record = data['500_Record'][key];
                 
                 if (record) {
                     const isTriple = record[0] === record[1] && record[1] === record[2];
