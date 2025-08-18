@@ -317,6 +317,7 @@ class SicboGame:
         self.create_widgets()
         self.root.bind('<Return>', lambda event: self.roll_dice())
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
+        self.update_trend_display()
     
     def toggle_history_display_count(self):
         """切换显示的历史记录数量"""
@@ -338,6 +339,44 @@ class SicboGame:
         self.update_history_display()
         self.update_win_distribution()
         self.update_points_stats()
+
+    def update_trend_display(self):
+        """更新近期趋势显示为具体点数或围骰信息"""
+        records = self.history_data.get("500_Record", {})
+        trends = []
+        
+        # 获取最近5局结果
+        for i in range(1, 6):
+            k = f"{i:02d}_Data"
+            dice = records.get(k, [])
+            if dice:
+                if dice[0] == dice[1] == dice[2]:
+                    # 围骰显示为 T+点数 (如 T2)
+                    trends.append(f"围{dice[0]}")
+                    bg = 'white'
+                    fg = "#448D00"
+                else:
+                    # 非围骰显示为总点数
+                    total = sum(dice)
+                    trends.append(str(total))
+                    if total <= 10:
+                        bg = COLOR_SMALL
+                        fg = 'black'
+                    else:
+                        bg = COLOR_BIG   
+                        fg = 'white'
+            else:
+                trends.append("--")
+                bg = '#e8e8e8'
+                fg = 'black'
+            
+            # 更新标签显示
+            if i-1 < len(self.trend_labels):
+                self.trend_labels[i-1].config(
+                    text=trends[i-1],
+                    bg=bg,
+                    fg=fg
+                )
     
     def format_amount(self, amount):
         """格式化金额显示"""
@@ -424,6 +463,7 @@ class SicboGame:
             self.update_points_stats()
         except Exception:
             pass
+        self.update_trend_display()
 
     def update_global_stats(self, sorted_dice):
         """更新全局统计数据"""
@@ -677,9 +717,39 @@ class SicboGame:
         divider = tk.Frame(table_frame, bg='#1e3d59', height=2)
         divider.grid(row=4, column=0, columnspan=4, sticky='ew', padx=2, pady=(4,6))
 
+        # 近期趋势框架
+        trend_frame = tk.Frame(table_frame, bg='#D0E7FF')
+        trend_frame.grid(row=5, column=0, columnspan=4, sticky='ew', padx=2, pady=5)
+
+        tk.Label(trend_frame, text="近期趋势:", font=("Arial", 12), 
+                bg='#D0E7FF').pack(side=tk.LEFT, padx=(6, 2))
+
+        # 创建趋势标签容器
+        trend_container = tk.Frame(trend_frame, bg='#D0E7FF')
+        trend_container.pack(side=tk.LEFT)
+
+        # 创建箭头标签
+        self.arrow_labels = []
+        for i in range(4):
+            lbl = tk.Label(trend_container, text=">", font=("Arial", 12, "bold"), 
+                        bg='#D0E7FF', fg='#333')
+            lbl.grid(row=0, column=i*2+1)
+            self.arrow_labels.append(lbl)
+
+        # 创建趋势点标签
+        self.trend_labels = []
+        for i in range(5):
+            lbl = tk.Label(trend_container, text="--", font=("Arial", 12, "bold"), 
+                        bg='#e8e8e8', width=3, relief=tk.SUNKEN)
+            lbl.grid(row=0, column=i*2, padx=2)
+            self.trend_labels.append(lbl)
+
+        divider = tk.Frame(table_frame, bg='#1e3d59', height=2)
+        divider.grid(row=6, column=0, columnspan=4, sticky='ew', padx=2, pady=(4,6))
+
         # 当前下注信息
         bet_info_frame = tk.Frame(control_frame, bg='#D0E7FF')
-        bet_info_frame.pack(fill=tk.X, pady=10)
+        bet_info_frame.pack(fill=tk.X, pady=3)
 
         label_style = {"font": ("Arial", 14, "bold"), "fg": "#333", "bg": "#D0E7FF"}
         value_style = {"font": ("Arial", 14), "fg": "black", "bg": "#D0E7FF"}
@@ -714,11 +784,13 @@ class SicboGame:
         def bind_click_widgets(container, handler):
             try:
                 container.bind("<Button-1>", handler)
+                container.bind("<Button-3>", lambda e: self.clear_single_bet_area(container))
             except Exception:
                 pass
             for child in container.winfo_children():
                 try:
                     child.bind("<Button-1>", handler)
+                    child.bind("<Button-3>", lambda e: self.clear_single_bet_area(container))
                 except Exception:
                     pass
                 if isinstance(child, (tk.Frame, tk.Label, tk.Canvas)):
@@ -883,6 +955,7 @@ class SicboGame:
         self.update_last_game_display()
         self.update_last_triple_display()
         self.update_win_distribution()
+        self.update_points_stats()
 
     def switch_tab_mode(self, mode):
         if hasattr(self, 'tab_frames'):
@@ -1027,13 +1100,13 @@ class SicboGame:
         self.double_label.pack(side=tk.RIGHT)
         
         # 点数统计
-        points_frame = tk.Frame(parent, bg='#D0E7FF', padx=10, pady=10)
+        points_frame = tk.Frame(parent, bg='#D0E7FF', padx=10, pady=5)
         points_frame.pack(fill=tk.X, pady=5)
 
         # 动态更新点数统计标题
         self.points_stats_label = tk.Label(points_frame, text=f"最新{self.history_display_count}局中出现的点数数量：", 
                                          font=("Arial", 12, "bold"), 
-                                         bg='#D0E7FF')
+                                         bg="#D0E7FF")
         self.points_stats_label.pack(anchor=tk.W, pady=5)
 
         points_container = tk.Frame(points_frame, bg='#D0E7FF')
@@ -1042,26 +1115,36 @@ class SicboGame:
         grid_container = tk.Frame(points_container, bg='#D0E7FF')
         grid_container.pack()
 
-        self.dice_icon_labels = []
-        self.point_count_labels = []
+        # 创建存储框架、排名标签的列表
+        self.point_frames = []   # 每个点数一个框架（col_frame）
+        self.rank_labels = []    # 每个点数一个排名标签
+        self.dice_icon_labels = []  # 重新创建，因为之前是在循环内，现在我们要按顺序存储
+        self.point_count_labels = []  # 重新创建
 
         for col, point in enumerate(range(1, 7)):
+            # 每个点数的框架
             col_frame = tk.Frame(grid_container, bg='#D0E7FF')
-            col_frame.grid(row=0, column=col, padx=10, pady=5)
-            
+            col_frame.grid(row=0, column=col, padx=10, pady=1)
+            self.point_frames.append(col_frame)
+
+            # 排名标签
+            rank_label = tk.Label(col_frame, text="", font=("Arial", 10, "bold"), bg='#D0E7FF')
+            rank_label.pack(side=tk.TOP)
+            self.rank_labels.append(rank_label)
+
+            # 骰子图标
             icon_frame = tk.Frame(col_frame, bg='#D0E7FF')
-            icon_frame.pack()
+            icon_frame.pack(side=tk.TOP)
             lbl_icon = tk.Label(icon_frame, image=self.dice_images_small[point-1], bg='#D0E7FF')
             lbl_icon.pack()
             self.dice_icon_labels.append(lbl_icon)
-            
+
+            # 计数标签
             count_frame = tk.Frame(col_frame, bg='#D0E7FF')
-            count_frame.pack()
+            count_frame.pack(side=tk.TOP)
             lbl_count = tk.Label(count_frame, text="0", font=("Arial", 10, "bold"), bg='#D0E7FF')
             lbl_count.pack()
             self.point_count_labels.append(lbl_count)
-        
-        self.update_points_stats()
 
     def _on_mousewheel(self, event):
         """处理鼠标滚轮滚动历史记录"""
@@ -1098,11 +1181,15 @@ class SicboGame:
         if last_triple[0] > 0:
             for lbl in self.last_triple_dice_labels:
                 lbl.config(image=self.dice_images_small[last_triple[0]-1])
+            # 修改这里：显示为"围X"格式
+            self.last_triple_points_label.config(text=f"围{last_triple[0]}")
             info_text = f"{last_triple[1]}局前"
             self.last_triple_info_label.config(text=info_text)
         else:
             for lbl in self.last_triple_dice_labels:
                 lbl.config(image='')
+            # 保持无记录时的显示
+            self.last_triple_points_label.config(text="--")
             self.last_triple_info_label.config(text="无记录")
 
     def update_win_distribution(self):
@@ -1341,8 +1428,49 @@ class SicboGame:
                 if 1 <= face <= 6:
                     face_count[face] += 1
         
+        # 更新计数标签
         for idx, point in enumerate(range(1, 7)):
             self.point_count_labels[idx].config(text=str(face_count[point]))
+        
+        # 热冷号码追踪 - 按出现次数排序
+        sorted_counts = sorted(face_count.items(), key=lambda x: x[1], reverse=True)
+        
+        # 创建排名映射
+        rank_map = {}
+        current_rank = 1
+        prev_count = None
+        
+        # 为每个点数分配排名
+        for i, (num, count) in enumerate(sorted_counts):
+            if count != prev_count:
+                current_rank = i + 1  # 实际排名（从1开始）
+            rank_map[num] = current_rank
+            prev_count = count
+        
+        # 排名标签映射
+        rank_labels = {
+            1: "1ST",
+            2: "2ND",
+            3: "3RD",
+            4: "4TH",
+            5: "5TH",
+            6: "6TH"
+        }
+        
+        # 设置背景颜色和排名标签
+        for idx, point in enumerate(range(1, 7)):
+            rank = rank_map.get(point, 7)  # 7表示超出范围
+            
+            # 设置排名标签
+            rank_text = rank_labels.get(rank, "")
+            self.rank_labels[idx].config(text=rank_text)
+            
+            # 设置背景颜色（前三名使用红色背景）
+            bg_color = '#FF7474' if rank <= 3 else '#D0E7FF'
+            self.point_frames[idx].config(bg=bg_color)
+            self.rank_labels[idx].config(bg=bg_color)
+            self.dice_icon_labels[idx].config(bg=bg_color)
+            self.point_count_labels[idx].config(bg=bg_color)
 
     def create_tab1(self, parent):
         """创建基本下注标签页"""
@@ -1360,6 +1488,7 @@ class SicboGame:
             double_frame.columnconfigure(i-1, weight=1)
             
             dice_box.bind("<Button-1>", lambda e, n=i: self.place_bet("double", 11, n))
+            dice_box.bind("<Button-3>", lambda e, n=i: self.clear_single_bet("double", n))
             
             dice_pair_frame = tk.Frame(dice_box, bg='#ffd3b6', cursor="hand2")
             dice_pair_frame.pack(pady=5)
@@ -1367,14 +1496,17 @@ class SicboGame:
             img_label1 = tk.Label(dice_pair_frame, image=self.dice_images_small[i-1], bg='#ffd3b6', cursor="hand2")
             img_label1.pack(side=tk.LEFT, padx=2)
             img_label1.bind("<Button-1>", lambda e, n=i: self.place_bet("double", 11, n))
+            img_label1.bind("<Button-3>", lambda e, n=i: self.clear_single_bet("double", n))
             
             img_label2 = tk.Label(dice_pair_frame, image=self.dice_images_small[i-1], bg='#ffd3b6', cursor="hand2")
             img_label2.pack(side=tk.LEFT, padx=2)
             img_label2.bind("<Button-1>", lambda e, n=i: self.place_bet("double", 11, n))
+            img_label2.bind("<Button-3>", lambda e, n=i: self.clear_single_bet("double", n))
 
             self.double_bet_labels[i] = tk.Label(dice_box, text="$0", font=("Arial", 12), bg='#ffd3b6', cursor="hand2")
             self.double_bet_labels[i].pack()
             self.double_bet_labels[i].bind("<Button-1>", lambda e, n=i: self.place_bet("double", 11, n))
+            self.double_bet_labels[i].bind("<Button-3>", lambda e, n=i: self.clear_single_bet("double", n))
 
         # 点数
         row_points_frame = tk.Frame(parent, bg='#0a5f38')
@@ -1397,18 +1529,22 @@ class SicboGame:
             point_frame.pack(side=tk.LEFT, padx=2, pady=2)
 
             point_frame.bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
+            point_frame.bind("<Button-3>", lambda e, p=point: self.clear_single_bet("total_points", p))
             
             point_label = tk.Label(point_frame, text=f"{point}", font=("Arial", 22, "bold"), bg=bg_color, cursor="hand2")
             point_label.pack()
             point_label.bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
+            point_label.bind("<Button-3>", lambda e, p=point: self.clear_single_bet("total_points", p))
             
             odds_label = tk.Label(point_frame, text=f"1:{odds[point]}", font=("Arial", 12), bg=bg_color, cursor="hand2")
             odds_label.pack()
             odds_label.bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
+            odds_label.bind("<Button-3>", lambda e, p=point: self.clear_single_bet("total_points", p))
             
             self.total_points_labels[point] = tk.Label(point_frame, text="$0", font=("Arial", 12), bg=bg_color, cursor="hand2")
             self.total_points_labels[point].pack()
             self.total_points_labels[point].bind("<Button-1>", lambda e, p=point: self.place_bet("total_points", self.get_odds(p), p))
+            self.total_points_labels[point].bind("<Button-3>", lambda e, p=point: self.clear_single_bet("total_points", p))
 
         # 猜点数
         row4_frame = tk.Frame(parent, bg='#0a5f38')
@@ -1429,22 +1565,27 @@ class SicboGame:
             guess_box.pack_propagate(False)
 
             handler = lambda e, n=i: self.place_bet("guess_num", 1, n)
+            clear_handler = lambda e, n=i: self.clear_single_bet("guess_num", n)
 
             guess_box.bind("<Button-1>", handler)
+            guess_box.bind("<Button-3>", clear_handler)
 
             img_label = tk.Label(guess_box, image=self.dice_images_small[i-1], bg='#c8e6c9', cursor='hand2')
             img_label.pack(side=tk.TOP, pady=(12, 5))
             img_label.bind("<Button-1>", handler)
+            img_label.bind("<Button-3>", clear_handler)
 
             amt_label = tk.Label(guess_box, text="$0", font=("Arial", 12), bg='#c8e6c9', cursor='hand2')
             amt_label.pack(side=tk.TOP)
             amt_label.bind("<Button-1>", handler)
+            amt_label.bind("<Button-3>", clear_handler)
 
             self.guess_num_labels[i] = amt_label
 
             for child in guess_box.winfo_children():
                 try:
                     child.bind("<Button-1>", handler)
+                    child.bind("<Button-3>", clear_handler)
                 except Exception:
                     pass
 
@@ -1474,22 +1615,27 @@ class SicboGame:
             pair_box.pack_propagate(False)
             pair_box.pack(side=tk.LEFT, padx=2, pady=2)
             pair_box.bind("<Button-1>", lambda e, p=pair_key: self.place_bet("pairs", 6, p))
+            pair_box.bind("<Button-3>", lambda e, p=pair_key: self.clear_single_bet("pairs", p))
 
             dice_frame = tk.Frame(pair_box, bg='#e8e8e8', cursor="hand2")
             dice_frame.pack(pady=3)
             dice_frame.bind("<Button-1>", lambda e, p=pair_key: self.place_bet("pairs", 6, p))
+            dice_frame.bind("<Button-3>", lambda e, p=pair_key: self.clear_single_bet("pairs", p))
 
             lbl1 = tk.Label(dice_frame, image=self.dice_images_small[pair[0]-1], bg='#e8e8e8', cursor="hand2")
             lbl1.pack(side=tk.TOP, pady=1)
             lbl1.bind("<Button-1>", lambda e, p=pair_key: self.place_bet("pairs", 6, p))
+            lbl1.bind("<Button-3>", lambda e, p=pair_key: self.clear_single_bet("pairs", p))
 
             lbl2 = tk.Label(dice_frame, image=self.dice_images_small[pair[1]-1], bg='#e8e8e8', cursor="hand2")
             lbl2.pack(side=tk.TOP, pady=1)
             lbl2.bind("<Button-1>", lambda e, p=pair_key: self.place_bet("pairs", 6, p))
+            lbl2.bind("<Button-3>", lambda e, p=pair_key: self.clear_single_bet("pairs", p))
 
             self.pairs_labels[pair_key] = tk.Label(pair_box, text="$0", font=("Arial", 10), bg='#e8e8e8', cursor="hand2")
             self.pairs_labels[pair_key].pack()
             self.pairs_labels[pair_key].bind("<Button-1>", lambda e, p=pair_key: self.place_bet("pairs", 6, p))
+            self.pairs_labels[pair_key].bind("<Button-3>", lambda e, p=pair_key: self.clear_single_bet("pairs", p))
 
         # 围骰
         row2_frame = tk.Frame(parent, bg='#0a5f38')
@@ -1504,26 +1650,32 @@ class SicboGame:
             triple_box.pack_propagate(False)
             triple_box.pack(side=tk.LEFT, padx=2, fill=tk.BOTH, expand=True)
             triple_box.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))
+            triple_box.bind("<Button-3>", lambda e, n=i: self.clear_single_bet("triple", n))
 
             dice_frame = tk.Frame(triple_box, bg='#ffaaa5', cursor="hand2")
             dice_frame.pack(pady=5)
             dice_frame.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))
+            dice_frame.bind("<Button-3>", lambda e, n=i: self.clear_single_bet("triple", n))
 
             lbl1 = tk.Label(dice_frame, image=self.dice_images_small[i-1], bg='#ffaaa5', cursor="hand2")
             lbl1.pack(side=tk.LEFT, padx=2)
             lbl1.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))
+            lbl1.bind("<Button-3>", lambda e, n=i: self.clear_single_bet("triple", n))
             
             lbl2 = tk.Label(dice_frame, image=self.dice_images_small[i-1], bg='#ffaaa5', cursor="hand2")
             lbl2.pack(side=tk.LEFT, padx=2)
             lbl2.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))
+            lbl2.bind("<Button-3>", lambda e, n=i: self.clear_single_bet("triple", n))
             
             lbl3 = tk.Label(dice_frame, image=self.dice_images_small[i-1], bg='#ffaaa5', cursor="hand2")
             lbl3.pack(side=tk.LEFT, padx=2)
             lbl3.bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))
+            lbl3.bind("<Button-3>", lambda e, n=i: self.clear_single_bet("triple", n))
 
             self.triple_labels[i] = tk.Label(triple_box, text="$0", font=("Arial", 12), bg='#ffaaa5', cursor="hand2")
             self.triple_labels[i].pack()
             self.triple_labels[i].bind("<Button-1>", lambda e, n=i: self.place_bet("triple", 190, n))
+            self.triple_labels[i].bind("<Button-3>", lambda e, n=i: self.clear_single_bet("triple", n))
 
         # 数字组合
         row3_frame = tk.Frame(parent, bg='#0a5f38')
@@ -1538,19 +1690,23 @@ class SicboGame:
             group_box.pack(side=tk.LEFT, padx=5)
             group_box.pack_propagate(False)  # 禁止自动调整大小
             group_box.bind("<Button-1>", lambda e, g=group: self.place_bet("number_group", 7, g))
+            group_box.bind("<Button-3>", lambda e, g=group: self.clear_single_bet("number_group", g))
 
             dice_frame = tk.Frame(group_box, bg='#5bc0de', cursor="hand2")
             dice_frame.pack(pady=5)
             dice_frame.bind("<Button-1>", lambda e, g=group: self.place_bet("number_group", 7, g))
+            dice_frame.bind("<Button-3>", lambda e, g=group: self.clear_single_bet("number_group", g))
 
             for num in group:
                 lbl = tk.Label(dice_frame, image=self.dice_images_small[int(num)-1], bg='#5bc0de', cursor="hand2")
                 lbl.pack(side=tk.LEFT, padx=2)
                 lbl.bind("<Button-1>", lambda e, g=group: self.place_bet("number_group", 7, g))
+                lbl.bind("<Button-3>", lambda e, g=group: self.clear_single_bet("number_group", g))
 
             self.number_group_labels[group] = tk.Label(group_box, text="$0", font=("Arial", 12), bg='#5bc0de', cursor="hand2")
             self.number_group_labels[group].pack(pady=5)
             self.number_group_labels[group].bind("<Button-1>", lambda e, g=group: self.place_bet("number_group", 7, g))
+            self.number_group_labels[group].bind("<Button-3>", lambda e, g=group: self.clear_single_bet("number_group", g))
 
     def set_bet_amount(self, amount):
         """设置下注金额并高亮筹码"""
@@ -1578,6 +1734,8 @@ class SicboGame:
         else:
             if isinstance(self.bets[bet_type], dict):
                 current_bet_amount = self.bets[bet_type][param]
+            else:
+                return
 
         # 获取本局总下注额
         total_bet_amount = self.current_bet
@@ -1793,6 +1951,63 @@ class SicboGame:
 
         if self.username:
             update_balance_in_json(self.username, self.balance)
+            
+    def clear_single_bet(self, bet_type, param=None):
+        """清除单个下注区域"""
+        if not self.accept_bets:
+            return
+            
+        # 获取当前区域的下注金额
+        if param is None:
+            amount = self.bets[bet_type]
+            if amount == 0:
+                return
+            # 清零
+            self.bets[bet_type] = 0
+        else:
+            # 对于字典类型的下注
+            if isinstance(self.bets[bet_type], dict):
+                amount = self.bets[bet_type][param]
+                if amount == 0:
+                    return
+                self.bets[bet_type][param] = 0
+            else:
+                return
+
+        # 将金额加回余额
+        self.balance += amount
+        self.current_bet -= amount
+        self.update_display()
+
+        if self.username:
+            update_balance_in_json(self.username, self.balance)
+            
+        # 播放清除音效
+        # 可选: 添加音效提示
+        
+    def clear_single_bet_area(self, area):
+        """根据区域清除下注"""
+        # 根据区域背景色判断下注类型
+        bg_color = area.cget('bg')
+        
+        if bg_color == '#FFD700':  # 小
+            self.clear_single_bet("small")
+        elif bg_color == '#FF4500':  # 大
+            self.clear_single_bet("big")
+        elif bg_color == '#87CEEB':  # 单
+            self.clear_single_bet("odd")
+        elif bg_color == '#FF6B93':  # 双
+            self.clear_single_bet("even")
+        elif bg_color == '#32CD32':  # 任何围骰
+            self.clear_single_bet("all_triples")
+        else:
+            # 尝试根据子元素判断
+            for widget in area.winfo_children():
+                if isinstance(widget, tk.Label) and hasattr(widget, 'image'):
+                    # 可能是骰子区域
+                    return
+            # 默认清除整个区域
+            self.clear_single_bet_area(area)
 
 def main(username=None, balance=None):
     root = tk.Tk()
