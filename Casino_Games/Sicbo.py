@@ -59,10 +59,11 @@ class Dice:
         return self.value
 
 class DiceAnimationWindow:
-    def __init__(self, game, callback, dice_objects):
+    def __init__(self, game, callback, dice_objects, fixed_dice=None):
         self.game = game
         self.callback = callback
         self.dice_objects = dice_objects
+        self.fixed_dice = fixed_dice  # 开发者模式下的固定骰子
 
         self.window = tk.Toplevel(game.root)
         self.window.title("骰子摇动中...")
@@ -146,9 +147,14 @@ class DiceAnimationWindow:
             progress_percent = min(100, (elapsed / self.total_duration) * 100)
             self.progress['value'] = progress_percent
             
-            # 每次动画都重新掷骰子
-            current_dice = [dice.roll() for dice in self.dice_objects]
-            self.final_dice = current_dice
+            # 如果开发者模式有固定骰子，使用固定骰子
+            if self.fixed_dice:
+                current_dice = self.fixed_dice
+                self.final_dice = current_dice
+            else:
+                # 每次动画都重新掷骰子
+                current_dice = [dice.roll() for dice in self.dice_objects]
+                self.final_dice = current_dice
             
             # 更新骰子图像显示
             for i, lbl in enumerate(self.dice_labels):
@@ -240,6 +246,11 @@ class SicboGame:
         self.username = username
         self.accept_bets = True
         
+        # 开发者模式相关变量
+        self.developer_mode = False
+        self.developer_dice = None
+        self.clear_right_clicked = False
+        
         style = ttk.Style()
         style.configure('TNotebook.Tab', font=('Arial', 12, 'bold'))
 
@@ -314,11 +325,111 @@ class SicboGame:
         self.history_file = os.path.join(logs_dir, 'Sicbo.json')
         self.history_data = self.load_history_data()
         
+        # 围骰模式开关 (默认为关)
+        self.triple_mode = False
+        
         self.create_widgets()
         self.root.bind('<Return>', lambda event: self.roll_dice())
         self.root.protocol("WM_DELETE_WINDOW", self.on_window_close)
         self.update_trend_display()
     
+    def on_clear_right_click(self, event):
+        """清除投注按钮右键点击事件 - 开发者模式第一步"""
+        self.clear_right_clicked = True
+
+    def on_roll_right_click(self, event):
+        """掷骰子按钮右键点击事件 - 开发者模式第二步
+        替代原来在 shell 中使用 input() 的实现，改为弹出 Tk 窗口让玩家输入 3 个数字（可空）。
+        """
+        if self.clear_right_clicked:
+            self.developer_mode = True
+            # 重置清除按钮的右键标记（避免下次不用重复清除再进入）
+            self.clear_right_clicked = False
+
+            # 如果窗口已存在就抬到最前
+            if getattr(self, 'dev_input_window', None) and tk.Toplevel.winfo_exists(self.dev_input_window):
+                try:
+                    self.dev_input_window.lift()
+                except Exception:
+                    pass
+                return
+
+            # 打开输入对话框
+            self.show_developer_input_dialog()
+    
+    def show_developer_input_dialog(self):
+        """弹出一个小窗口，包含单一输入框（玩家可输入3个数字或留空）。
+        输入规则：
+         - 空串：使用随机骰子（self.developer_dice = None）
+         - 三个数字：每个必须为 1..6（会设置 self.developer_dice = [a,b,c]）
+         - 其他或格式错误：弹窗提示并不关闭窗口，让玩家修正
+        """
+        win = tk.Toplevel(self.root)
+        self.dev_input_window = win
+        win.title("开发者模式")
+        win.resizable(False, False)
+        # 小窗口尺寸与父窗口居中
+        try:
+            win.geometry("100x70")
+            win.transient(self.root)
+            win.grab_set()
+        except Exception:
+            pass
+
+        entry = tk.Entry(win, font=("Arial", 14))
+        entry.pack(fill="x", padx=10, pady=(6, 4))
+        entry.insert(0, "")  # 默认为空
+
+        # 确认与取消按钮
+        btn_frame = tk.Frame(win)
+        btn_frame.pack(pady=(0, 8))
+
+        def on_confirm():
+            txt = entry.get().strip()
+            if txt == "":
+                # 留空 => 随机
+                self.developer_dice = None
+                try:
+                    win.destroy()
+                except Exception:
+                    pass
+                return
+
+            parts = re.split(r'[\s,;]+', txt)
+            try:
+                vals = list(map(int, parts))
+            except Exception:
+                messagebox.showwarning("输入错误", "请输入 3 个 1 到 6 之间的整数（用空格/逗号分隔），或留空。")
+                return
+
+            if len(vals) != 3 or not all(1 <= v <= 6 for v in vals):
+                messagebox.showwarning("输入错误", "请输入恰好 3 个数字，且每个数字在 1 到 6 之间。")
+                return
+
+            # 通过验证 —— 设置 developer_dice（不排序，按玩家输入顺序）
+            self.developer_dice = vals
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+        def on_cancel():
+            # 取消 => 清除开发者骰子（使用随机）
+            self.developer_dice = None
+            try:
+                win.destroy()
+            except Exception:
+                pass
+
+        tk.Button(btn_frame, text="确定", width=10, command=on_confirm).pack(side=tk.LEFT, padx=6)
+        tk.Button(btn_frame, text="取消", width=10, command=on_cancel).pack(side=tk.LEFT, padx=6)
+
+        # 快捷键：回车确认，Esc 取消
+        win.bind("<Return>", lambda e: on_confirm())
+        win.bind("<Escape>", lambda e: on_cancel())
+
+        entry.focus_set()
+
     def toggle_history_display_count(self):
         """切换显示的历史记录数量"""
         options = [50, 100, 250, 500]
@@ -591,9 +702,36 @@ class SicboGame:
         # 筹码区
         chip_frame = tk.Frame(control_frame, bg='#D0E7FF')
         chip_frame.pack(fill=tk.X, pady=(0, 5))
-
-        tk.Label(chip_frame, text="筹码选择", font=("Arial", 18, "bold"),
-                fg='black', bg='#D0E7FF').pack(anchor=tk.W, pady=2)
+        
+        # 筹码选择和围骰模式开关
+        chip_title_frame = tk.Frame(chip_frame, bg='#D0E7FF')
+        chip_title_frame.pack(fill=tk.X, pady=2)
+        
+        tk.Label(chip_title_frame, text="筹码选择", font=("Arial", 18, "bold"),
+                fg='black', bg='#D0E7FF').pack(side=tk.LEFT, padx=5)
+        
+        # 围骰模式开关
+        switch_frame = tk.Frame(chip_title_frame, bg='#D0E7FF')
+        switch_frame.pack(side=tk.RIGHT, padx=10)
+        
+        tk.Label(switch_frame, text="保险模式:", font=("Arial", 18, "bold"), bg='#D0E7FF').pack(side=tk.LEFT)
+        
+        # 开关按钮
+        self.mode_switch = ttk.Checkbutton(
+            switch_frame, 
+            text="关", 
+            style="Switch.TCheckbutton",
+            command=self.toggle_triple_mode
+        )
+        self.mode_switch.pack(side=tk.LEFT, padx=5)
+        self.mode_switch.state(['!alternate'])  # 初始状态为关
+        
+        # 自定义开关样式
+        style = ttk.Style()
+        style.configure("Switch.TCheckbutton", font=("Arial", 12, "bold"), width=4, relief=tk.RAISED)
+        style.map("Switch.TCheckbutton", 
+                 background=[('selected', '#4CAF50'), ('!selected', '#F44336')],
+                 foreground=[('selected', 'white'), ('!selected', 'white')])
 
         row1 = tk.Frame(chip_frame, bg='#D0E7FF')
         row1.pack(fill=tk.X, pady=2)
@@ -776,10 +914,14 @@ class SicboGame:
         clear_btn = tk.Button(btn_frame, text="清除投注", font=("Arial", 14, "bold"),
                             bg='#ff4444', fg='white', width=10, command=self.clear_bets, cursor="hand2")
         clear_btn.pack(side=tk.LEFT, padx=10, expand=True)
+        # 绑定右键点击事件
+        clear_btn.bind("<Button-3>", self.on_clear_right_click)
 
         roll_btn = tk.Button(btn_frame, text="擲骰子 (Enter)", font=("Arial", 14, "bold"),
                         bg=COLOR_SMALL, fg='black', width=15, command=self.roll_dice, cursor="hand2")
         roll_btn.pack(side=tk.LEFT, padx=10, expand=True)
+        # 绑定右键点击事件
+        roll_btn.bind("<Button-3>", self.on_roll_right_click)
 
         def bind_click_widgets(container, handler):
             try:
@@ -817,11 +959,12 @@ class SicboGame:
         bind_click_widgets(self.small_frame, small_click)
 
         # 围骰通杀（左）
-        small_triple_bar = tk.Frame(left_col, bg="#CFA3FF", relief=tk.SUNKEN, bd=1, height=30, width=300)
-        small_triple_bar.pack(padx=5, pady=0)
-        small_triple_bar.pack_propagate(False)
-        tk.Label(small_triple_bar, text="↑↓↑↓ 赔率1:1  围骰通杀 ↑↓↑↓", font=("Arial", 14, "bold"),
-                bg="#CFA3FF").pack(fill=tk.BOTH, expand=True)
+        self.small_triple_bar = tk.Frame(left_col, bg="#CFA3FF", relief=tk.SUNKEN, bd=1, height=30, width=300)
+        self.small_triple_bar.pack(padx=5, pady=0)
+        self.small_triple_bar.pack_propagate(False)
+        self.small_triple_label = tk.Label(self.small_triple_bar, text="↓↑↓↑↓ 赔率1:1  围骰通杀 ↑↓↑↓↑", font=("Arial", 14, "bold"),
+                bg="#CFA3FF")
+        self.small_triple_label.pack(fill=tk.BOTH, expand=True)
 
         # 单
         self.odd_frame = tk.Frame(left_col, bg='#87CEEB', padx=20, pady=10, cursor="hand2", height=100, width=300)
@@ -898,11 +1041,12 @@ class SicboGame:
         bind_click_widgets(self.big_frame, big_click)
 
         # 围骰通杀（右）
-        big_triple_bar = tk.Frame(right_col, bg="#FF7B00", relief=tk.SUNKEN, bd=1, height=30, width=300)
-        big_triple_bar.pack(padx=5, pady=0)
-        big_triple_bar.pack_propagate(False)
-        tk.Label(big_triple_bar, text="↑↓↑↓ 赔率1:1  围骰通杀 ↑↓↑↓", font=("Arial", 14, "bold"),
-                bg='#FF7B00').pack(fill=tk.BOTH, expand=True)
+        self.big_triple_bar = tk.Frame(right_col, bg="#FF7B00", relief=tk.SUNKEN, bd=1, height=30, width=300)
+        self.big_triple_bar.pack(padx=5, pady=0)
+        self.big_triple_bar.pack_propagate(False)
+        self.big_triple_label = tk.Label(self.big_triple_bar, text="↓↑↓↑↓ 赔率1:1  围骰通杀 ↑↓↑↓↑", font=("Arial", 14, "bold"),
+                bg='#FF7B00')
+        self.big_triple_label.pack(fill=tk.BOTH, expand=True)
 
         # 双
         self.even_frame = tk.Frame(right_col, bg="#FF6B93", padx=20, pady=10, cursor="hand2", height=100, width=300)
@@ -956,6 +1100,28 @@ class SicboGame:
         self.update_last_triple_display()
         self.update_win_distribution()
         self.update_points_stats()
+
+    def toggle_triple_mode(self):
+        """切换围骰模式"""
+        self.triple_mode = not self.triple_mode
+        
+        # 更新开关文本
+        if self.triple_mode:
+            self.mode_switch.config(text="开")
+            # 更新大小范围显示
+            self.small_frame.children['!label'].config(text="小（3-10）")
+            self.big_frame.children['!label'].config(text="大（11-18）")
+            # 更新围骰通杀条显示
+            self.small_triple_label.config(text="↑↓↑↓ 赔率1:0.97 围骰照赔 ↑↓↑↓")
+            self.big_triple_label.config(text="↑↓↑↓ 赔率1:0.97 围骰照赔 ↑↓↑↓")
+        else:
+            self.mode_switch.config(text="关")
+            # 恢复大小范围显示
+            self.small_frame.children['!label'].config(text="小（4-10）")
+            self.big_frame.children['!label'].config(text="大（11-17）")
+            # 恢复围骰通杀条显示
+            self.small_triple_label.config(text="↓↑↓↑↓ 赔率1:1  围骰通杀 ↑↓↑↓↑")
+            self.big_triple_label.config(text="↓↑↓↑↓ 赔率1:1  围骰通杀 ↑↓↑↓↑")
 
     def switch_tab_mode(self, mode):
         if hasattr(self, 'tab_frames'):
@@ -1207,12 +1373,12 @@ class SicboGame:
             total = sum(rec)
 
             if is_triple:
-                triple += 1
+                triple += 1   # ← 修复
             else:
                 if total <= 10:
-                    small += 1
+                    small += 1   # ← 修复
                 else:
-                    big += 1
+                    big += 1     # ← 修复
 
             if not is_triple:
                 if total % 2 == 1:
@@ -1496,7 +1662,7 @@ class SicboGame:
             img_label1 = tk.Label(dice_pair_frame, image=self.dice_images_small[i-1], bg='#ffd3b6', cursor="hand2")
             img_label1.pack(side=tk.LEFT, padx=2)
             img_label1.bind("<Button-1>", lambda e, n=i: self.place_bet("double", 11, n))
-            img_label1.bind("<Button-3>", lambda e, n=i: self.clear_single_bet("double", n))
+            img_label1.bind("<Button-3>", lambda e, n=i: self.clear_s_single_bet("double", n))
             
             img_label2 = tk.Label(dice_pair_frame, image=self.dice_images_small[i-1], bg='#ffd3b6', cursor="hand2")
             img_label2.pack(side=tk.LEFT, padx=2)
@@ -1832,16 +1998,32 @@ class SicboGame:
             self.root.unbind('<Return>')
             self.enter_binding = None
 
-        DiceAnimationWindow(self, self.calculate_results, self.dice_objects)
+        # 检查开发者模式
+        fixed_dice = None
+        if self.developer_dice:
+            fixed_dice = self.developer_dice
+            self.developer_dice = None
+
+        DiceAnimationWindow(self, self.calculate_results, self.dice_objects, fixed_dice)
 
     def calculate_results(self, dice):
         """计算游戏结果"""
         self.last_dice = dice
         total = sum(dice)
-        result_type = "大" if total >= 11 else "小"
         is_triple = (dice[0] == dice[1] == dice[2])
-        if is_triple:
-            result_type = "围"
+        
+        # 根据围骰模式调整结果判断
+        if self.triple_mode:  # 开模式
+            # 小: 3-10点 (包括围骰)
+            # 大: 11-18点 (包括围骰)
+            result_type = "大" if total >= 11 else "小"
+        else:  # 关模式
+            # 小: 4-10点 (不包括围骰)
+            # 大: 11-17点 (不包括围骰)
+            if is_triple:
+                result_type = "围"
+            else:
+                result_type = "大" if total >= 11 else "小"
         
         self.update_history(dice)
 
@@ -1857,17 +2039,44 @@ class SicboGame:
         winnings = 0
         
         if self.current_bet > 0:
+            # 根据围骰模式确定赔率
+            size_odds = 0.97 if self.triple_mode else 1.0
+            
             for bet_type, data in self.bets.items():
-                if bet_type == "small" and not is_triple and total < 11:
-                    winnings += data * 2 if data > 0 else 0
-                if bet_type == "big" and not is_triple and total >= 11:
-                    winnings += data * 2 if data > 0 else 0
-                if bet_type == "odd" and not is_triple and total % 2 == 1:
-                    winnings += data * 2 if data > 0 else 0
-                if bet_type == "even" and not is_triple and total % 2 == 0:
-                    winnings += data * 2 if data > 0 else 0
+                if bet_type == "small":
+                    if self.triple_mode:  # 开模式: 3-10点都赢 (包括围骰)
+                        if 3 <= total <= 10:
+                            winnings += data * (size_odds + 1)
+                    else:  # 关模式: 4-10点且不是围骰
+                        if not is_triple and 4 <= total <= 10:
+                            winnings += data * (size_odds + 1)
+                
+                if bet_type == "big":
+                    if self.triple_mode:  # 开模式: 11-18点都赢 (包括围骰)
+                        if 11 <= total <= 18:
+                            winnings += data * (size_odds + 1)
+                    else:  # 关模式: 11-17点且不是围骰
+                        if not is_triple and 11 <= total <= 17:
+                            winnings += data * (size_odds + 1)
+                
+                if bet_type == "odd":
+                    if self.triple_mode:  # 开模式: 奇数点都赢 (包括围骰)
+                        if total % 2 == 1:
+                            winnings += data * (size_odds + 1)
+                    else:  # 关模式: 奇数点且不是围骰
+                        if not is_triple and total % 2 == 1:
+                            winnings += data * (size_odds + 1)
+                
+                if bet_type == "even":
+                    if self.triple_mode:  # 开模式: 偶数点都赢 (包括围骰)
+                        if total % 2 == 0:
+                            winnings += data * (size_odds + 1)
+                    else:  # 关模式: 偶数点且不是围骰
+                        if not is_triple and total % 2 == 0:
+                            winnings += data * (size_odds + 1)
+                
                 if bet_type == "all_triples" and is_triple:
-                    winnings += data * 32 if data > 0 else 0
+                    winnings += data * 32
                 if bet_type == "double":
                     for num, amount in data.items():
                         if amount > 0 and dice.count(num) >= 2:
@@ -2009,7 +2218,7 @@ class SicboGame:
             # 默认清除整个区域
             self.clear_single_bet_area(area)
 
-def main(username=None, balance=None):
+def main(balance=None, username=None):
     root = tk.Tk()
     
     if username and balance is None:

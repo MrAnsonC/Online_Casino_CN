@@ -1763,7 +1763,7 @@ class CrapsGame:
         if self.username:
             update_balance_in_json(self.username, self.balance)
 
-def main(username=None, balance=None):
+def main(balance=None, username=None):
     root = tk.Tk()
     
     # 如果没有提供余额，尝试从JSON加载

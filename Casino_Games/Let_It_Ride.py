@@ -282,7 +282,7 @@ class LetItRideGame:
         self.keep_bet_b = False
         self.cards_revealed = {
             "player": [False, False, False],
-            "community": [False, False, False, False, False]
+            "community": [False, False]  # 修改为只有2张公共牌
         }
         # 加载Jackpot金额
         self.jackpot_initial, self.jackpot_amount = load_jackpot()
@@ -291,9 +291,13 @@ class LetItRideGame:
         self.card_sequence = self.deck.card_sequence
     
     def deal_initial(self):
-        """发初始牌：玩家3张，公共牌5张"""
-        self.player_hole = self.deck.deal(3)
-        self.community_cards = self.deck.deal(5)
+        """发初始牌：玩家3张，公共牌2张"""
+        # 按照新的发牌顺序：玩家第0张，公共牌第0张，玩家第1张，公共牌第1张，玩家第2张
+        self.player_hole = [self.deck.deal(1)[0]]  # 玩家第0张
+        self.community_cards = [self.deck.deal(1)[0]]  # 公共牌第0张
+        self.player_hole.append(self.deck.deal(1)[0])  # 玩家第1张
+        self.community_cards.append(self.deck.deal(1)[0])  # 公共牌第1张
+        self.player_hole.append(self.deck.deal(1)[0])  # 玩家第2张
     
     def evaluate_hands(self):
         """评估玩家的手牌"""
@@ -321,7 +325,7 @@ class LetItRideGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
         self.title("Let It Ride")
-        self.geometry("1200x700")
+        self.geometry("1200x700+50+10")
         self.resizable(0,0)
         self.configure(bg='#35654d')
         
@@ -392,7 +396,7 @@ class LetItRideGUI(tk.Tk):
         2. 游戏流程:
            a. 初始发牌:
                - 玩家获得3张底牌(面朝下)
-               - 公共牌5张(面朝下)
+               - 公共牌2张(面朝下)
                
            b. 第一阶段决策:
                - 查看底牌后选择:
@@ -400,18 +404,18 @@ class LetItRideGUI(tk.Tk):
                  * 收回A注: 收回A注筹码(退还)
                  
            c. 翻牌圈:
-               - 翻开前三张公共牌
+               - 翻开第一张公共牌
                
            d. 第二阶段决策:
-               - 查看底牌+前三张公共牌后选择:
+               - 查看底牌+第一张公共牌后选择:
                  * 保留B注: 保留B注筹码
                  * 收回B注: 收回B注筹码(退还)
                  
            e. 河牌圈:
-               - 翻开最后两张公共牌
+               - 翻开第二张公共牌
                
            f. 摊牌:
-               - 玩家用3张底牌+5张公共牌组成最佳5张牌
+               - 玩家用3张底牌+2张公共牌组成最佳5张牌
                - 结算所有保留的下注
 
         3. 结算规则:
@@ -660,7 +664,7 @@ class LetItRideGUI(tk.Tk):
         
         # 公共牌区域 - 固定高度200
         community_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        community_frame.place(x=75, y=100, width=600, height=210)
+        community_frame.place(x=245, y=100, width=270, height=210)  # 调整位置和宽度以适应2张牌
         community_label = tk.Label(community_frame, text="公共牌", font=('Arial', 18), bg='#2a4a3c', fg='white')
         community_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.community_cards_frame = tk.Frame(community_frame, bg='#2a4a3c')
@@ -694,7 +698,7 @@ class LetItRideGUI(tk.Tk):
         
         self.stage_label = tk.Label(
             info_frame, 
-            text="阶段: 准备下注",
+            text="准备下注",
             font=('Arial', 18, 'bold'),
             bg='#2a4a3c',
             fg='#FFD700'
@@ -1057,7 +1061,7 @@ class LetItRideGUI(tk.Tk):
             self.animation_queue = []
             
             # 公共牌 - 放置在中心位置
-            for i in range(5):
+            for i in range(2):  # 只有2张公共牌
                 card_id = f"community_{i}"
                 self.card_positions[card_id] = {
                     "current": (50, 50), 
@@ -1078,7 +1082,7 @@ class LetItRideGUI(tk.Tk):
             self.animate_deal()
             
             # 更新游戏状态
-            self.stage_label.config(text="阶段: 初始决策")
+            self.stage_label.config(text="初始决策")
             self.status_label.config(text="手牌已打开，做出您的决策。")
             
             # 创建操作按钮 - 替换开始按钮
@@ -1216,15 +1220,13 @@ class LetItRideGUI(tk.Tk):
         # 1.5秒后启用决策按钮
         self.after(1500, self.enable_decision_buttons)
     
-    def reveal_flop(self):
-        """翻开翻牌圈的三张公共牌（带动画）"""
-        self.flop_revealed = 0
+    def reveal_first_community_card(self):
+        """翻开第一张公共牌（带动画）"""
         for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up and i < 3:
+            if hasattr(card_label, "card") and not card_label.is_face_up and i < 1:  # 只翻开第一张
                 self.flip_card_animation(card_label)
                 # 标记公共牌已翻开
                 self.game.cards_revealed["community"][i] = True
-                self.flop_revealed += 1
         
         # 更新玩家牌型
         self.update_hand_labels()
@@ -1232,11 +1234,11 @@ class LetItRideGUI(tk.Tk):
         # 2秒后启用翻牌圈按钮
         self.after(2000, self.enable_flop_buttons)
 
-    def reveal_turn_river(self):
-        """翻开转牌和河牌（带动画）"""
+    def reveal_second_community_card(self):
+        """翻开第二张公共牌（带动画）"""
         # 安全地获取社区牌框架中的卡片
         for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up and i >= 3:
+            if hasattr(card_label, "card") and not card_label.is_face_up and i >= 1:  # 只翻开第二张
                 self.flip_card_animation(card_label)
                 # 标记公共牌已翻开
                 self.game.cards_revealed["community"][i] = True
@@ -1263,13 +1265,6 @@ class LetItRideGUI(tk.Tk):
         if step > steps:
             # 动画结束
             card_label.is_face_up = True
-            
-            # 检查是否所有翻牌动画都已完成
-            if hasattr(self, 'flop_revealed') and self.flop_revealed > 0:
-                self.flop_revealed -= 1
-                if self.flop_revealed == 0:
-                    # 所有翻牌动画完成
-                    pass
             return
         
         if step <= steps // 2:
@@ -1329,11 +1324,11 @@ class LetItRideGUI(tk.Tk):
             
             # 进入翻牌圈
             self.game.stage = "flop"
-            self.stage_label.config(text="阶段: 翻牌圈")
-            self.status_label.config(text="翻牌已发出，做出您的决策。")
+            self.stage_label.config(text="翻牌圈")
+            self.status_label.config(text="翻开第一张公共牌，做出您的决策。")
             
-            # 翻开翻牌圈的三张牌
-            self.reveal_flop()
+            # 翻开第一张公共牌
+            self.reveal_first_community_card()
             
             # 更新操作按钮
             for widget in self.action_frame.winfo_children():
@@ -1379,11 +1374,11 @@ class LetItRideGUI(tk.Tk):
             
             # 进入河牌圈
             self.game.stage = "turn"
-            self.stage_label.config(text="阶段: 河牌圈")
-            self.status_label.config(text="河牌已发出，结算中...")
+            self.stage_label.config(text="河牌圈")
+            self.status_label.config(text="翻开第二张公共牌，结算中...")
             
-            # 翻开转牌和河牌
-            self.reveal_turn_river()
+            # 翻开第二张公共牌
+            self.reveal_second_community_card()
 
     def show_showdown(self):
         # 翻开所有未翻开的牌
@@ -1750,7 +1745,7 @@ class LetItRideGUI(tk.Tk):
         """真正的重置游戏界面"""
         # 重置游戏状态
         self.game.reset_game()
-        self.stage_label.config(text="阶段: 准备下注")
+        self.stage_label.config(text="准备下注")
         
         # 重置标签显示
         self.player_label.config(text="玩家")

@@ -22,6 +22,9 @@ from Casino_Games import Video_Poker
 from Casino_Games import Faro_match
 from Casino_Games import craps
 from Casino_Games import flush
+from Casino_Games import EZ_21
+from Casino_Games import Let_It_Ride
+from Casino_Games import Klondike_Dice
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -47,63 +50,33 @@ def update_balance_in_json(username, new_balance):
             break
     save_user_data(users)  # 保存更新后的数据
 
-def get_display_width(text):
-    """计算文本的显示宽度（考虑中文字符）"""
-    width = 0
-    for char in text:
-        # 中文字符占2个宽度，其他占1个
-        if '\u4e00' <= char <= '\u9fff':
-            width += 2
-        else:
-            width += 1
-    return width
-
-def display_menu(selected_index):
-    # 定义游戏菜单项
-    menu_items = [
-        "德州扑克双人对决", "百家乐",
-        "加勒比梭哈扑克", "花旗骰",
-        "终极德州扑克", "视频扑克",
-        "法罗（变种）", "赌场扑克",
-        "三张牌扑克", "高牌同花",
-        "21点", "骰宝",
-        "返回主目录"
+def display_menu(selected_row, selected_col):
+    # 定义游戏菜单布局（每行3个，选项间2个空格分隔）
+    menu_layout = [
+        ["法罗(变种)", "高牌同花", "德州扑克双人对决"],
+        ["三张牌扑克", "视频扑克", "加勒比梭哈扑克"],
+        ["任逍遥扑克", "赌场扑克", "终极德州扑克"],
+        ["简单21点  ", "21点    ", "百家乐"],
+        ["花旗骰    ", "克朗代克", "骰宝"],
+        ["返回主目录", "", ""]  # 新增返回选项
     ]
     
     os.system('cls' if os.name == 'nt' else 'clear')
-    print("欢迎来到赌场!")
+    print(" 欢迎来到街机小游戏中心!\n")
     print("请使用方向键选择游戏，回车确认(ESC返回主目录):\n")
     
-    # 计算最大宽度（包括选中状态）
-    max_item_width = 0
-    for item in menu_items:
-        # 计算选中状态时的最大宽度
-        selected_width = get_display_width(f">> {item} <<")
-        if selected_width > max_item_width:
-            max_item_width = selected_width
-    
-    # 每行显示2个项目
-    for i in range(0, len(menu_items), 2):
+    # 打印菜单，高亮显示选中的游戏
+    for row_idx, row in enumerate(menu_layout):
         line = ""
-        for j in range(2):
-            idx = i + j
-            if idx < len(menu_items):
-                item = menu_items[idx]
-                
-                # 创建显示文本（选中或未选中）
-                if idx == selected_index:
-                    display_text = f">> {item} <<"
+        for col_idx, game in enumerate(row):
+            if game:  # 跳过空项
+                if row_idx == selected_row and col_idx == selected_col:
+                    # 高亮显示选中的游戏
+                    line += f">> {game} <<  "  # 选项间2个空格
                 else:
-                    display_text = f"   {item}   "
-                
-                # 计算当前文本宽度
-                current_width = get_display_width(display_text)
-                
-                # 添加填充空格使所有项目等宽
-                padding = max_item_width - current_width
-                display_text += ' ' * padding
-                
-                line += display_text
+                    line += f"   {game}     "  # 选项间2个空格
+            else:
+                line += " " * 12  # 空项占位
         print(line)
     print("\n")
 
@@ -125,6 +98,8 @@ def get_key():
                     return 'enter'
                 elif key == b'\x1b':  # ESC键
                     return 'esc'
+                elif key == b'0':
+                    return '0'
                 else:
                     return key
             time.sleep(0.05)  # 减少CPU占用
@@ -153,6 +128,8 @@ def get_key():
                         return 'esc'  # ESC键
                 elif key == '\r':  # 回车键
                     return 'enter'
+                elif key == '0':
+                    return '0'
                 else:
                     return key
         finally:
@@ -160,62 +137,99 @@ def get_key():
         return None
 
 def main(balance, user):
-    # 定义游戏菜单项和对应的函数
-    menu_items = [
-        ("德州扑克双人对决", lambda: auto_th.main(balance, user)),
-        ("百家乐", lambda: transfer_baccarat.play_game(balance, user)),
-        ("加勒比梭哈扑克", lambda: Caribbean_Stud_Poker.main(balance, user)),
-        ("花旗骰", lambda: craps.main(user, balance)),
-        ("终极德州扑克", lambda: UTH_GUI.main(balance, user)),
-        ("视频扑克", lambda: Video_Poker.main(balance, user)),
-        ("法罗（变种）", lambda: Faro_match.main(balance, user)),
-        ("赌场扑克", lambda: Casino_Holdem.main(balance, user)),
-        ("三张牌扑克", lambda: Three_Card_Poker.main(balance, user)),
-        ("高牌同花", lambda: flush.main(balance, user)),
-        ("21点", lambda: Blackjack.main(balance, user)),
-        ("骰宝", lambda: Sicbo.main(user, balance)),
-        ("返回主目录", None)
-    ]
+    # 初始选择位置 (第0行，第0列)
+    selected_row = 0
+    selected_col = 0
     
-    selected_index = 0
-    total_items = len(menu_items)
+    # 定义游戏映射
+    game_map = {
+        (0, 0): ('1', Faro_match.main),
+        (0, 1): ('2', flush.main),
+        (0, 2): ('3', auto_th.main),
+        (1, 0): ('4', Three_Card_Poker.main),
+        (1, 1): ('5', Video_Poker.main),
+        (1, 2): ('6', Caribbean_Stud_Poker.main),
+        (2, 0): ('7', Let_It_Ride.main),
+        (2, 1): ('8', Casino_Holdem.main),
+        (2, 2): ('9', UTH_GUI.main),
+        (3, 0): ('10', EZ_21.main),
+        (3, 1): ('11', Blackjack.main),
+        (3, 2): ('12', transfer_baccarat.play_game),
+        (4, 0): ('13', craps.main),
+        (4, 1): ('14', Klondike_Dice.main),
+        (4, 2): ('15', Sicbo.main),
+        (5, 0): ('return', None)  # 返回主目录选项
+    }
+    
+    # 定义每行的列数
+    row_cols = [3, 3, 3, 3, 3, 1]  # 每行的列数
     
     while True:
-        display_menu(selected_index)
+        display_menu(selected_row, selected_col)
         
+        # 获取当前选择对应的游戏
+        current_game = game_map.get((selected_row, selected_col))
+        
+        # 获取按键
         key = get_key()
         
+        # 处理方向键
         if key == 'up':
-            # 向上移动一行（2个位置）
-            selected_index = max(0, selected_index - 2)
+            if selected_row == 0:  # 在第一行按上键
+                selected_row = 5  # 跳到最后一行
+            else:
+                selected_row -= 1
+            # 确保列在有效范围内
+            selected_col = min(selected_col, row_cols[selected_row] - 1)
+            
         elif key == 'down':
-            # 向下移动一行（2个位置）
-            selected_index = min(total_items - 1, selected_index + 2)
-            # 如果到达最后一行且是奇数位置，调整到最后一个有效位置
-            if selected_index == total_items - 2 and total_items % 2 == 1:
-                selected_index = total_items - 1
+            if selected_row == 5:  # 在最后一行按下键
+                selected_row = 0  # 跳到第一行
+            else:
+                selected_row += 1
+            # 确保列在有效范围内
+            selected_col = min(selected_col, row_cols[selected_row] - 1)
+            
         elif key == 'left':
-            # 向左移动一个位置（如果可能）
-            if selected_index % 2 == 1:  # 当前在右侧
-                selected_index -= 1
+            if selected_col > 0:  # 同一行内向左移动
+                selected_col -= 1
+            else:
+                # 移动到上一行的最后一个选项
+                if selected_row > 0:
+                    selected_row -= 1
+                    selected_col = row_cols[selected_row] - 1
+                else:  # 在第一行按左键
+                    selected_row = 5  # 跳到最后一行
+                    selected_col = 0  # 最后一行的第一个选项
+                    
         elif key == 'right':
-            # 向右移动一个位置（如果可能）
-            if selected_index % 2 == 0 and selected_index + 1 < total_items:  # 当前在左侧且有右侧项
-                selected_index += 1
+            if selected_col < row_cols[selected_row] - 1:  # 同一行内向右移动
+                selected_col += 1
+            else:
+                # 移动到下一行的第一个选项
+                if selected_row < 5:
+                    selected_row += 1
+                    selected_col = 0
+                else:  # 在最后一行按右键
+                    selected_row = 0  # 跳到第一行
+                    selected_col = 0  # 第一行的第一个选项
+                    
+        # 处理回车键
         elif key == 'enter':
-            item_name, action = menu_items[selected_index]
-            if action:
+            if current_game and current_game[0] == '14':
+                print("维护中 请稍后再试")
+                time.sleep(2)
+                continue
+            if current_game and current_game[1]:
                 try:
-                    if item_name == "返回主目录":
-                        return balance
-                    new_balance = action()
-                    if new_balance is not None:
-                        balance = new_balance
-                        update_balance_in_json(user, balance)
+                    balance = current_game[1](balance, user)
+                    update_balance_in_json(user, balance)
                 except Exception as e:
                     print(f"游戏运行出错: {e}")
                     time.sleep(2)
-            else:
+            elif current_game and current_game[0] == 'return':
                 return balance  # 返回主目录
-        elif key == 'esc':
+                
+        # 处理退出键
+        elif key == '0' or key == 'esc':  # 0 或 ESC 键
             return balance
