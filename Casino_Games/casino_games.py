@@ -25,6 +25,7 @@ from Casino_Games import flush
 from Casino_Games import EZ_21
 from Casino_Games import Let_It_Ride
 from Casino_Games import Klondike_Dice
+from Casino_Games import Wild_Five_Card_poker
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -57,6 +58,7 @@ def display_menu(selected_row, selected_col):
         ["三张牌扑克", "视频扑克", "加勒比梭哈扑克"],
         ["任逍遥扑克", "赌场扑克", "终极德州扑克"],
         ["简单21点  ", "21点    ", "百家乐"],
+        ["⺩五張撲克"],
         ["花旗骰    ", "克朗代克", "骰宝"],
         ["返回主目录", "", ""]  # 新增返回选项
     ]
@@ -155,14 +157,15 @@ def main(balance, user):
         (3, 0): ('10', EZ_21.main),
         (3, 1): ('11', Blackjack.main),
         (3, 2): ('12', transfer_baccarat.play_game),
-        (4, 0): ('13', craps.main),
-        (4, 1): ('14', Klondike_Dice.main),
-        (4, 2): ('15', Sicbo.main),
-        (5, 0): ('return', None)  # 返回主目录选项
+        (4, 0): ('13', Wild_Five_Card_poker.main),
+        (5, 0): ('14', craps.main),
+        (5, 1): ('15', Klondike_Dice.main),
+        (5, 2): ('16', Sicbo.main),
+        (6, 0): ('return', None)  # 返回主目录选项
     }
     
     # 定义每行的列数
-    row_cols = [3, 3, 3, 3, 3, 1]  # 每行的列数
+    row_cols = [3, 3, 3, 3, 1, 3, 1]  # 每行的列数
     
     while True:
         display_menu(selected_row, selected_col)
@@ -176,14 +179,14 @@ def main(balance, user):
         # 处理方向键
         if key == 'up':
             if selected_row == 0:  # 在第一行按上键
-                selected_row = 5  # 跳到最后一行
+                selected_row = 6  # 跳到最后一行
             else:
                 selected_row -= 1
             # 确保列在有效范围内
             selected_col = min(selected_col, row_cols[selected_row] - 1)
             
         elif key == 'down':
-            if selected_row == 5:  # 在最后一行按下键
+            if selected_row == 6:  # 在最后一行按下键
                 selected_row = 0  # 跳到第一行
             else:
                 selected_row += 1
@@ -199,7 +202,7 @@ def main(balance, user):
                     selected_row -= 1
                     selected_col = row_cols[selected_row] - 1
                 else:  # 在第一行按左键
-                    selected_row = 5  # 跳到最后一行
+                    selected_row = 6  # 跳到最后一行
                     selected_col = 0  # 最后一行的第一个选项
                     
         elif key == 'right':
@@ -207,7 +210,7 @@ def main(balance, user):
                 selected_col += 1
             else:
                 # 移动到下一行的第一个选项
-                if selected_row < 5:
+                if selected_row < 6:
                     selected_row += 1
                     selected_col = 0
                 else:  # 在最后一行按右键
@@ -216,7 +219,7 @@ def main(balance, user):
                     
         # 处理回车键
         elif key == 'enter':
-            if current_game and current_game[0] == '14':
+            if current_game and current_game[0] == '14' or current_game and current_game[0] == '15':
                 print("维护中 请稍后再试")
                 time.sleep(2)
                 continue
