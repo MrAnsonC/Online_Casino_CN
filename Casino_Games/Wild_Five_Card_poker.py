@@ -437,7 +437,6 @@ def evaluate_progressive(cards):
 def _get_progressive_rank(result):
     """获取Progressive牌型的排名"""
     progressive_ranks = {
-        "five_aces": 7,
         "five_of_a_kind": 6,
         "royal_flush": 5,
         "straight_flush": 4,
@@ -452,16 +451,11 @@ def _evaluate_progressive_normal(cards):
     if len(cards) != 5:
         return None
     
-    # 检查五张A牌
-    aces = [c for c in cards if c.value == 14]
-    if len(aces) >= 5:
-        return "five_aces"
-    
-    # 检查五条 (2-K)
+    # 检查五条
     values = [c.value for c in cards]
     counts = Counter(values)
     for value, count in counts.items():
-        if count >= 5 and value != 14:  # 排除A
+        if count >= 5:
             return "five_of_a_kind"
     
     # 检查皇家同花顺
@@ -521,13 +515,12 @@ def _evaluate_progressive_normal(cards):
 def calculate_progressive_payout(progressive_result, jackpot_amount):
     """计算Progressive奖金，确保奖池不低于197301.26"""
     payout_table = {
-        "five_aces": max(jackpot_amount, 50000),  # 100% Progressive或50000，取更高
-        "five_of_a_kind": max(jackpot_amount * 0.5, 20000),  # 50% Progressive或20000，取更高
-        "royal_flush": max(jackpot_amount * 0.2, 5000),  # 20% Progressive或5000，取更高
-        "straight_flush": 3000,
-        "four_of_a_kind": 2000,
-        "full_house": 1000,
-        "flush": 500
+        "five_of_a_kind": max(jackpot_amount, 50000),  # 100% Progressive或50000，取更高
+        "royal_flush": max(jackpot_amount * 0.5, 20000),  # 50% Progressive或20000，取更高
+        "straight_flush": max(jackpot_amount * 0.5, 20000),  # 20% Progressive或5000，取更高
+        "four_of_a_kind": 3000,
+        "full_house": 2000,
+        "flush": 1000
     }
     
     if progressive_result in payout_table:
@@ -752,6 +745,7 @@ class WildFiveGame:
         self.bonus = 0
         self.wild5 = 0
         self.progressive = 0
+        self.ppair = 0
         self.play_bet = 0
         self.stage = "pre_flop"  # pre_flop, decision, dealer_draw, showdown
         self.folded = False
@@ -887,81 +881,91 @@ class WildFiveGame:
         return self._get_lowest_singleton_card()
         
     def _find_discard_for_four_flush(self):
-        """若存在正好四张同花（不是五张同花），返回应该弃掉的那张卡（即不是那四张的那张）。
+        """若存在正好四张同花（考虑鬼牌作为万能牌），返回应该弃掉的那张卡（即不是那四张的那张）。
         如果不存在则返回 None。
         """
-        # 忽略 Joker（若有），只用普通花色判断
+        # 分离鬼牌和普通牌
+        jokers = [c for c in self.dealer_hand if getattr(c, 'is_joker', False)]
         non_joker_cards = [c for c in self.dealer_hand if not getattr(c, 'is_joker', False)]
-        suits = [c.suit for c in non_joker_cards]
-
-        # 找到正好出现 4 次的花色
-        for suit in set(suits):
-            if suits.count(suit) == 4:
-                # 找到不是该花色的那张卡（包括可能的 Joker）
-                for c in self.dealer_hand:
-                    if getattr(c, 'is_joker', False):
-                        # 如果存在 Joker，通常应视为可作任意花色的一部分；
-                        # 但这里我们优先按“正好四张同花”的定义 —— Joker 不计入 non_joker_cards 的 4 张中。
-                        # 如果 Joker 存在且不是四张同花的一员（即四张同花已经由普通牌构成），
-                        # 我们会把 Joker 视作“不是那四张”的候选并丢弃它（除非你希望其它行为）。
-                        continue
-                # 返回那张非该花色的卡（含 joker 的话会在最后 fallback 选择非该花色的第一张）
-                for c in self.dealer_hand:
-                    if c.suit != suit:
-                        return c
+        
+        # 统计各花色的数量（包括鬼牌可以补充到任何花色）
+        suit_counts = {}
+        for card in non_joker_cards:
+            suit = card.suit
+            suit_counts[suit] = suit_counts.get(suit, 0) + 1
+        
+        joker_count = len(jokers)
+        
+        # 检查每个花色，看是否可以通过鬼牌补充形成四张同花
+        for suit, count in suit_counts.items():
+            total_count = count + joker_count
+            if total_count >= 4:
+                # 找到不是该花色的那张卡（优先弃非鬼牌）
+                for card in self.dealer_hand:
+                    if not getattr(card, 'is_joker', False) and card.suit != suit:
+                        return card
+                # 如果没有找到非鬼牌的非该花色卡，则弃一张鬼牌
+                if jokers:
+                    return jokers[0]
+        
         return None
 
     def _find_discard_for_four_outside_straight(self):
-        """检测是否存在 four-to-an-outside-straight（4 张连续的牌），
+        """检测是否存在 four-to-an-outside-straight（4 张连续的牌，考虑鬼牌作为万能牌），
         若存在返回应该弃掉的那张 Card（即不属于这 4 张的那张），否则返回 None。
-
-        说明：
-        - 这里把 Ace 只当作高（14）来判断，不把 A 当作 1（因此 A-2-3-4 不被当作四连）。
-        - 严格排除 J-Q-K-A（11,12,13,14）这种组合（题目要求不算 outside）。
         """
-        # 只使用非 Joker 的普通牌来检测顺子组合
-        normal_cards = [c for c in self.dealer_hand if not getattr(c, 'is_joker', False)]
-        if len(normal_cards) < 4:
+        # 分离鬼牌和普通牌
+        jokers = [c for c in self.dealer_hand if getattr(c, 'is_joker', False)]
+        non_joker_cards = [c for c in self.dealer_hand if not getattr(c, 'is_joker', False)]
+        
+        if len(non_joker_cards) + len(jokers) < 4:
             return None
-
-        # 去重并排序值
-        unique_vals = sorted({c.value for c in normal_cards})
-        if len(unique_vals) < 4:
-            return None
-
-        # 寻找长度为 4 的连续子序列（例如 [3,4,5,6]）
-        for i in range(len(unique_vals) - 3):
-            seq = unique_vals[i:i+4]
-            if seq[3] - seq[0] == 3:
-                # 排除 J-Q-K-A (11,12,13,14)
-                if seq == [11, 12, 13, 14]:
-                    continue
-
-                # 现在我们确认有一个 4 连；要判断这 4 连是否能从手牌中对应到 4 张不同的牌
-                seq_set = set(seq)
-                seq_cards = []
-                other_cards = []
-
-                # 为每个 value 选一张对应的牌（若手中有该 value 的多张牌，只取一张）
-                used_values = set()
-                for c in self.dealer_hand:
-                    if getattr(c, 'is_joker', False):
-                        continue
-                    if c.value in seq_set and c.value not in used_values:
-                        seq_cards.append(c)
-                        used_values.add(c.value)
-                    else:
-                        other_cards.append(c)
-
-                # 要求 seq_cards 恰好为 4 张，且 other_cards 恰好为 1 张（那就是要弃掉的）
-                if len(seq_cards) == 4 and len(self.dealer_hand) - len(seq_cards) == 1:
-                    # 找到那张不在 seq_cards 的卡并返回
-                    for c in self.dealer_hand:
-                        if c not in seq_cards:
-                            return c
-                # 若 seq_cards==4 但还有 joker 等复杂情况，继续尝试其它 seq
+        
+        # 获取所有牌的值（包括鬼牌可以代表任何值）
+        values = sorted([c.value for c in non_joker_cards])
+        joker_count = len(jokers)
+        
+        # 尝试找到4张连续的值
+        for i in range(len(values) - 2):  # 减少循环次数
+            # 尝试用鬼牌填补空缺
+            sequence = [values[i]]
+            jokers_used = 0
+            
+            # 构建可能的连续序列
+            for j in range(i + 1, len(values)):
+                gap = values[j] - sequence[-1]
+                
+                # 如果差距大于1，需要用鬼牌填补
+                while gap > 1 and jokers_used < joker_count:
+                    sequence.append(sequence[-1] + 1)
+                    jokers_used += 1
+                    gap = values[j] - sequence[-1]
+                
+                if gap == 1:
+                    sequence.append(values[j])
+                elif gap > 1:
+                    break  # 无法形成连续序列
+            
+            # 如果序列长度不足，用鬼牌补充到最后
+            while len(sequence) < 4 and jokers_used < joker_count:
+                sequence.append(sequence[-1] + 1 if sequence else 14)  # 从最高值开始
+                jokers_used += 1
+            
+            # 检查是否形成了4张连续且不是J-Q-K-A
+            if len(sequence) >= 4:
+                # 检查是否包含J-Q-K-A (11,12,13,14)
+                has_royal = any(v >= 11 for v in sequence[-4:])
+                if not has_royal or sequence[-4] != 11:  # 不是J-Q-K-A
+                    # 找出不在序列中的牌
+                    sequence_set = set(sequence[-4:])
+                    for card in self.dealer_hand:
+                        if not getattr(card, 'is_joker', False) and card.value not in sequence_set:
+                            return card
+                    # 如果没有找到非鬼牌的非序列卡，则弃一张鬼牌
+                    if jokers:
+                        return jokers[0]
+        
         return None
-
     
     def _get_lowest_singleton_card(self):
         """返回应该弃掉的最低的 singleton（单张）。
@@ -1029,7 +1033,7 @@ class WildFiveGUI(tk.Tk):
         # 创建自定义弹窗
         win = tk.Toplevel(self)
         win.title("游戏规则")
-        win.geometry("900x700")
+        win.geometry("650x600+80+20")  # 增加窗口高度以容纳更多内容
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
         
@@ -1058,6 +1062,7 @@ class WildFiveGUI(tk.Tk):
         - Ante: 基础下注 (最少$5)
         - Bonus: 红利押注 (最终牌型)
         - Wild 5: 边注 (原始的5张牌)
+        - PPair: 边注 (公共牌对子)
         - Progressive: 边注 ($1)
 
         2. 游戏流程:
@@ -1076,14 +1081,42 @@ class WildFiveGUI(tk.Tk):
 
         d. 摊牌:
             - 比较玩家和庄家的最佳五张牌
+                (先比较手牌 再比较踢脚)
             - 需要注意的是 公共牌只能二选一
             - 结算所有下注
 
-        3. Progressive奖池规则:
-        - 每局总下注的2.5%会自动加入Progressive奖池
-        - 中奖奖金从Progressive奖池中扣除
-        - Progressive奖池有最低保证金额
-        - 中奖时会弹出提示窗口通知玩家
+        3. 赔付规则:
+            - Ante 
+                - 庄家手牌是对子或以上
+                    - 并且玩家手牌比庄家强 以1:1结算
+                    - 但玩家手牌比庄家差 输
+                    - 但玩家手牌和庄家持平 平局
+                - 庄家手牌是高牌
+                    - 无论结果如何 都以平局结算
+            - Play
+                - 玩家手牌比庄家强 以1:1结算
+                - 玩家手牌比庄家差 输
+                - 玩家手牌和庄家持平 平局
+            - Bonus
+                - 玩家牌型比庄家强 根据下方赔率结算
+                - 玩家牌型比庄家差 输
+                - 玩家牌型和庄家持平 平局
+            - Wild 5
+                - 只看原始的5张手牌
+                - 不和庄家做任何比较
+                - 根据下方赔率结算
+                - 在玩家第一次开牌后就做赔付
+            - PPair
+                - 只看2张公共牌是否为对子
+                - 不和庄家做任何比较
+                - 根据下方赔率结算
+                - 无论玩家是否弃牌，只要下注即有效
+            - Progressive
+                - 只看最后的5张手牌
+                - 每局总下注的10%会自动加入Progressive奖池
+                - Progressive奖金会从奖池中扣除
+                - Progressive奖池有最低保证金额
+                - 中奖时会弹出提示窗口通知玩家
 
         4. 万能牌规则:
         - 鬼牌(JOKER)可作为任何牌使用
@@ -1117,11 +1150,11 @@ class WildFiveGUI(tk.Tk):
         odds_data = [
             ("五条", "100:1", "1000:1", "100% Progressive奖池"),
             ("同花大顺", "50:1", "500:1", "50% Progressive奖池"),
-            ("同花顺", "10:1", "250:1", "$5,000"),
+            ("同花顺", "10:1", "250:1", "20% Progressive奖池"),
             ("四条", "5:1", "100:1", "$3,000"),
             ("葫芦", "3:1", "50:1", "$2,000"),
             ("同花", "2:1", "25:1", "$1,000"),
-            ("顺子", "1:1", "10:1", "$500"),
+            ("顺子", "1:1", "10:1", "-"),
             ("三条", "平局", "5:1", "-"),
             ("两对", "平局", "5:1", "-"),
             ("对子", "平局", "-", "-"),
@@ -1159,26 +1192,59 @@ class WildFiveGUI(tk.Tk):
         for c in range(len(headers)):
             odds_frame.columnconfigure(c, weight=1)
         
-        # Progressive奖池说明
-        progressive_text = """
-        Progressive奖池说明:
-        - 每局游戏总下注的2.5%会自动加入Progressive奖池
-        - 中奖奖金从Progressive奖池中扣除
-        - Progressive奖池有最低保证金额
-        - 中奖时会弹出提示窗口通知玩家
-        - 奖池金额实时显示在游戏界面右上角
-        """
-        
-        progressive_label = tk.Label(
+        # 添加PPair赔率表
+        tk.Label(
             content_frame, 
-            text=progressive_text,
-            font=('微软雅黑', 11),
-            bg='#F0F0F0',
-            justify=tk.LEFT,
-            padx=10,
-            pady=10
-        )
-        progressive_label.pack(fill=tk.X, padx=10, pady=10)
+            text="PPair赔率表",
+            font=('微软雅黑', 12, 'bold'),
+            bg='#F0F0F0'
+        ).pack(fill=tk.X, padx=10, pady=(20, 5), anchor='w')
+        
+        ppair_frame = tk.Frame(content_frame, bg='#F0F0F0')
+        ppair_frame.pack(fill=tk.X, padx=20, pady=5)
+
+        ppair_headers = ["公共牌对子类型", "赔率"]
+        ppair_data = [
+            ("A-A", "30:1"),
+            ("A-K (同花)", "25:1"),
+            ("A-Q (同花) 或 A-J (同花)", "20:1"),
+            ("A-K", "15:1"),
+            ("K-K, Q-Q, 或 J-J", "10:1"),
+            ("其中一张为Joker", "8:1"),
+            ("A-Q 或 A-J", "5:1"),
+            ("其他对子 (10-10 到 2-2)", "3:1")
+        ]
+
+        # PPair表头
+        for col, h in enumerate(ppair_headers):
+            tk.Label(
+                ppair_frame,
+                text=h,
+                font=('微软雅黑', 10, 'bold'),
+                bg='#4B8BBE',
+                fg='white',
+                padx=10, pady=5,
+                anchor='center',
+                justify='center'
+            ).grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
+
+        # PPair表格内容
+        for r, row_data in enumerate(ppair_data, start=1):
+            bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
+            for c, txt in enumerate(row_data):
+                tk.Label(
+                    ppair_frame,
+                    text=txt,
+                    font=('微软雅黑', 10),
+                    bg=bg,
+                    padx=10, pady=5,
+                    anchor='center',
+                    justify='center'
+                ).grid(row=r, column=c, sticky='nsew', padx=1, pady=1)
+
+        # 平均分配PPair表每列宽度
+        for c in range(len(ppair_headers)):
+            ppair_frame.columnconfigure(c, weight=1)
         
         # 更新滚动区域
         content_frame.update_idletasks()
@@ -1304,14 +1370,17 @@ class WildFiveGUI(tk.Tk):
         # 更新对应的下注变量
         if bet_type == "ante":
             current = float(self.ante_var.get())
-            self.ante_var.set(str(int(current + chip_value)))
-        elif bet_type == "bonus":
-            current = float(self.bonus_var.get())
-            self.bonus_var.set(str(int(current + chip_value)))
+            new_ante = int(current + chip_value)
+            self.ante_var.set(str(new_ante))
+            # Bonus与Ante同步
+            self.bonus_var.set(str(new_ante))
         elif bet_type == "wild5":
             current = float(self.wild5_var.get())
             self.wild5_var.set(str(int(current + chip_value)))
-    
+        elif bet_type == "ppair":  # 添加PPair处理
+            current = float(self.ppair_var.get())
+            self.ppair_var.set(str(int(current + chip_value)))
+        
     def select_chip(self, chip_text):
         """选择筹码，并更新筹码的高亮状态"""
         self.selected_chip = chip_text
@@ -1435,7 +1504,8 @@ class WildFiveGUI(tk.Tk):
             self.ante = int(self.ante_var.get())
             self.bonus = int(self.bonus_var.get())
             self.wild5 = int(self.wild5_var.get())
-            self.progressive = 1 if self.progressive_var.get() else 0
+            self.ppair = int(self.ppair_var.get())
+            self.progressive = 10 if self.progressive_var.get() else 0
         except ValueError:
             messagebox.showerror("错误", "下注金额必须为整数")
             return
@@ -1447,18 +1517,18 @@ class WildFiveGUI(tk.Tk):
 
         # 计算总下注（暂时以最小 Play=Ante 作为保留）
         play_bet_min = self.ante
-        total_bet = self.ante + self.bonus + self.wild5 + self.progressive + play_bet_min
+        total_bet = self.ante + self.bonus + self.wild5 + self.progressive + self.ppair + play_bet_min
 
         if total_bet > self.balance:
             messagebox.showerror("错误", f"余额不足以支付所有下注！需要${total_bet}，当前余额${self.balance}")
             return
 
         # 扣除 ante/bonus/wild5/progressive（Play 在玩家决策时再扣）
-        self.balance -= (self.ante + self.bonus + self.wild5 + self.progressive)
+        self.balance -= (self.ante + self.bonus + self.wild5 + self.progressive + self.ppair)
         self.update_balance()
 
         # 更新本局下注显示
-        self.current_bet_label.config(text=f"本局下注: ${self.ante + self.bonus + self.wild5 + self.progressive:.2f}")
+        self.current_bet_label.config(text=f"本局下注: ${self.ante + self.bonus + self.wild5 + self.ppair + self.progressive:.2f}")
 
         # 禁用开始/重设按钮
         try:
@@ -1476,6 +1546,7 @@ class WildFiveGUI(tk.Tk):
         self.game.ante = self.ante
         self.game.bonus = self.bonus
         self.game.wild5 = self.wild5
+        self.game.ppair = self.ppair
         self.game.progressive = self.progressive
 
         # 清除 各牌区 的“牌”widget —— 注意：**保留弃牌区里的标题 label**（通过检查 widget 是否有 .card 属性）
@@ -2456,12 +2527,16 @@ class WildFiveGUI(tk.Tk):
         else:
             dealer_wins = True
 
-        if player_wins:
-            self.status_label.config(text="你赢了!")
-        elif dealer_wins:
-            self.status_label.config(text="送你好运！")
+        progressive_win = self.win_details['progressive']
+        if progressive_win > 0:
+            self.status_label.config(text=f"您赢了Progressive大奖${progressive_win:.2f}!")
         else:
-            self.status_label.config(text="平局")
+            if player_wins:
+                self.status_label.config(text="您赢了!")
+            elif dealer_wins:
+                self.status_label.config(text="送你好运！")
+            else:
+                self.status_label.config(text="平局")
 
         # 更新所有下注格子的显示 - 使用StringVar设置文本
         def update_bet_display(bet_type, amount, original_bet, var_object):
@@ -2581,7 +2656,6 @@ class WildFiveGUI(tk.Tk):
                 
                 # 显示中奖消息
                 hand_name_map = {
-                    "five_aces": "五张A",
                     "five_of_a_kind": "五条",
                     "royal_flush": "皇家同花顺",
                     "straight_flush": "同花顺",
@@ -2595,15 +2669,28 @@ class WildFiveGUI(tk.Tk):
             self.win_details['progressive'] = progressive_win
             total_winnings += progressive_win
         
-        # 5) 将本局总下注的2.5%加入Progressive奖池
-        total_bet = self.game.ante + self.game.bonus + self.game.wild5 + self.game.progressive
-        progressive_contribution = total_bet * 0.025
+        # 5) 将本局总下注的10%加入Progressive奖池
+        total_bet = self.game.ante + self.game.bonus + self.game.wild5 + self.game.progressive + self.game.ppair
+        progressive_contribution = total_bet * 0.1
         self.game.jackpot_amount += progressive_contribution
         save_jackpot(self.game.jackpot_amount)
         self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
 
-        return total_winnings
+        # 结算PPair
+        ppair_win = self.calculate_ppair_payout()
+        self.win_details['ppair'] = ppair_win
+        total_winnings += ppair_win
         
+        # 更新PPair显示
+        if ppair_win > 0:
+            self.ppair_display.config(bg='gold')
+            self.ppair_var.set(str(ppair_win))
+        else:
+            self.ppair_display.config(bg='white')
+            self.ppair_var.set("0")
+
+        return total_winnings
+            
     def calculate_winnings(self, player_eval, dealer_eval):
         """最终结算（玩家与庄家比较）"""
         # 重置获胜详情
@@ -2655,13 +2742,14 @@ class WildFiveGUI(tk.Tk):
         total_winnings += self.win_details['ante']
 
         # 2) Bonus 结算 - 与庄家比较
-        if player_rank > dealer_rank:
+        if player_wins:
+            # 玩家赢，根据玩家牌型支付Bonus
             if player_rank in BONUS_PAYOUT:
                 odds = BONUS_PAYOUT[player_rank]
                 self.win_details['bonus'] = self.game.bonus * (odds + 1)  # 包含本金
             else:
                 self.win_details['bonus'] = self.game.bonus  # 退还
-        elif player_rank < dealer_rank:
+        elif dealer_wins:
             self.win_details['bonus'] = 0  # 输
         else:
             # 平局 -> 退还Bonus
@@ -2707,7 +2795,6 @@ class WildFiveGUI(tk.Tk):
                 
                 # 显示中奖消息
                 hand_name_map = {
-                    "five_aces": "五张A",
                     "five_of_a_kind": "五条",
                     "royal_flush": "皇家同花顺",
                     "straight_flush": "同花顺",
@@ -2731,15 +2818,93 @@ class WildFiveGUI(tk.Tk):
             self.win_details['play'] = self.game.play_bet
 
         total_winnings += self.win_details['play']
+
+        # 结算PPair
+        ppair_win = self.calculate_ppair_payout()
+        self.win_details['ppair'] = ppair_win
+        total_winnings += ppair_win
         
-        # 6) 将本局总下注的2.5%加入Progressive奖池
-        total_bet = self.game.ante + self.game.bonus + self.game.wild5 + self.game.progressive + self.game.play_bet
-        progressive_contribution = total_bet * 0.025
+        # 更新PPair显示
+        if ppair_win > 0:
+            self.ppair_display.config(bg='gold')
+            self.ppair_var.set(str(ppair_win))
+        else:
+            self.ppair_display.config(bg='white')
+            self.ppair_var.set("0")
+        
+        # 6) 将本局总下注的10%加入Progressive奖池
+        total_bet = self.game.ante + self.game.bonus + self.game.wild5 + self.game.progressive + self.game.ppair
+        progressive_contribution = total_bet * 0.1
         self.game.jackpot_amount += progressive_contribution
         save_jackpot(self.game.jackpot_amount)
         self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
 
+        # 结算PPair
+        ppair_win = self.calculate_ppair_payout()
+        self.win_details['ppair'] = ppair_win
+        total_winnings += ppair_win
+
         return total_winnings
+    
+    def calculate_ppair_payout(self):
+        """计算PPair边注赔付"""
+        if self.game.ppair <= 0:
+            return 0
+            
+        community_cards = self.game.community_cards
+        
+        # 检查是否有Joker
+        has_joker = any(card.is_joker for card in community_cards)
+        if has_joker:
+            return self.game.ppair * 9  # 8:1赔率 + 本金 = 9倍
+            
+        # 检查是否是对子
+        if len(community_cards) == 2:
+            card1, card2 = community_cards
+            
+            # 获取牌值和花色
+            value1 = card1.value if not card1.is_joker else 0
+            value2 = card2.value if not card2.is_joker else 0
+            suit1 = card1.suit if not card1.is_joker else None
+            suit2 = card2.suit if not card2.is_joker else None
+            
+            # 检查同花
+            is_suited = suit1 == suit2 and suit1 is not None and suit2 is not None
+            
+            # A-A
+            if value1 == 14 and value2 == 14:
+                return self.game.ppair * 31  # 30:1赔率 + 本金 = 31倍
+                
+            # 同花A-K
+            if is_suited and ((value1 == 14 and value2 == 13) or (value1 == 13 and value2 == 14)):
+                return self.game.ppair * 26  # 25:1赔率 + 本金 = 26倍
+                
+            # 同花A-Q或A-J
+            if is_suited and (
+                (value1 == 14 and value2 == 12) or (value1 == 12 and value2 == 14) or
+                (value1 == 14 and value2 == 11) or (value1 == 11 and value2 == 14)
+            ):
+                return self.game.ppair * 21  # 20:1赔率 + 本金 = 21倍
+                
+            # A-K
+            if (value1 == 14 and value2 == 13) or (value1 == 13 and value2 == 14):
+                return self.game.ppair * 16  # 15:1赔率 + 本金 = 16倍
+                
+            # K-K, Q-Q, J-J
+            if (value1 == 13 and value2 == 13) or (value1 == 12 and value2 == 12) or (value1 == 11 and value2 == 11):
+                return self.game.ppair * 11  # 10:1赔率 + 本金 = 11倍
+                
+            # A-Q或A-J
+            if (value1 == 14 and value2 == 12) or (value1 == 12 and value2 == 14) or \
+            (value1 == 14 and value2 == 11) or (value1 == 11 and value2 == 14):
+                return self.game.ppair * 6  # 5:1赔率 + 本金 = 6倍
+                
+            # 其他对子 (10-10 through 2-2)
+            if value1 == value2 and value1 >= 2 and value1 <= 10:
+                return self.game.ppair * 4  # 3:1赔率 + 本金 = 4倍
+        
+        # 不符合任何赔付条件
+        return 0
 
     def reset_game(self, auto_reset=False):
         # 取消自动重置计时器
@@ -2759,8 +2924,9 @@ class WildFiveGUI(tk.Tk):
     def reset_bets(self):
         """重置所有投注金额为0（不重置Progressive的打勾）"""
         self.ante_var.set("0")
-        self.bonus_var.set("0")
+        self.bonus_var.set("0")  # 同时重置Bonus
         self.wild5_var.set("0")
+        self.ppair_var.set("0")
         # 注意：不重置progressive_var，保留打勾状态
         
         # 更新显示
@@ -2936,7 +3102,7 @@ class WildFiveGUI(tk.Tk):
             
         win = tk.Toplevel(self)
         win.title("本局牌序")
-        win.geometry("650x600")  # 固定窗口大小
+        win.geometry("650x600+80+20")  # 固定窗口大小
         win.resizable(0,0)
         win.configure(bg='#f0f0f0')
         
@@ -3198,6 +3364,29 @@ class WildFiveGUI(tk.Tk):
             # 所有动画完成，重置游戏
             self._do_reset(auto_reset)
 
+    def reset_single_bet(self, bet_type):
+        """重置单个下注类型的金额为0"""
+        if bet_type == "ante":
+            self.ante_var.set("0")
+            self.bonus_var.set("0")  # 同时重置Bonus
+            self.ante_display.config(bg='white')
+            self.bonus_display.config(bg='white')
+        elif bet_type == "bonus":
+            # Bonus不再单独重置，与Ante同步
+            pass
+        elif bet_type == "wild5":
+            self.wild5_var.set("0")
+            self.wild5_display.config(bg='white')
+        elif bet_type == "ppair":  # 添加PPair处理
+            self.ppair_var.set("0")
+            self.ppair_display.config(bg='white')
+        
+        # 短暂高亮显示重置效果
+        widget = getattr(self, f"{bet_type}_display", None)
+        if widget:
+            widget.config(bg='#FFCDD2')  # 浅红色
+            self.after(500, lambda: widget.config(bg='white'))
+
     def _create_widgets(self):
         # 主框架 - 左右布局
         main_frame = tk.Frame(self, bg='#35654d')
@@ -3235,7 +3424,7 @@ class WildFiveGUI(tk.Tk):
 
         self.ante_info_label = tk.Label(
             table_canvas, 
-            text="庄家最少对子或更好牌型才及格\n不及格的 Ante以平局结算\n\n🃏🃏鬼牌为万能牌🃏🃏\n系统自动寻找对牌型最有利的牌", 
+            text="庄家最少对子或更好牌型才及格\n不及格的 Ante以平局结算\n\n>>🃏🃏公共牌二选一🃏🃏<<\n>>🃏🃏鬼牌为万能牌🃏🃏<<\n系统自动寻找对牌型最有利的牌", 
             font=('Arial', 24), 
             bg='#35654d', 
             fg='#FFD700',
@@ -3288,7 +3477,7 @@ class WildFiveGUI(tk.Tk):
         
         # Jackpot显示区域
         jackpot_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        jackpot_frame.pack(fill=tk.X, pady=10)
+        jackpot_frame.pack(fill=tk.X, pady=5)
 
         # 创建一个内部框架用于居中
         jackpot_inner_frame = tk.Frame(jackpot_frame, bg='#2a4a3c')
@@ -3306,7 +3495,7 @@ class WildFiveGUI(tk.Tk):
         
         # 筹码区域
         chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        chips_frame.pack(fill=tk.X, pady=10)
+        chips_frame.pack(fill=tk.X, pady=5)
         
         chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         chips_label.pack(anchor='w', padx=10, pady=5)
@@ -3346,67 +3535,85 @@ class WildFiveGUI(tk.Tk):
         
         # 下注区域
         bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_frame.pack(fill=tk.X, pady=10)
-        
+        bet_frame.pack(fill=tk.X, pady=5)
+
         # 第一行：Progressive选项
         progressive_frame = tk.Frame(bet_frame, bg='#2a4a3c')
         progressive_frame.pack(fill=tk.X, padx=20, pady=5)
-        
+
         self.progressive_var = tk.IntVar()
         self.progressive_cb = tk.Checkbutton(
-            progressive_frame, text="Progressive ($1.00)", 
+            progressive_frame, text="Progressive ($10.00)", 
             variable=self.progressive_var, font=('Arial', 14),
             bg='#2a4a3c', fg='white', selectcolor='#35654d'
         )
         self.progressive_cb.pack(side=tk.LEFT)
-        
-        # 第二行：Bonus和Wild5区域
-        bonus_wild5_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        bonus_wild5_frame.pack(fill=tk.X, padx=20, pady=5)
 
-        # Bonus区域
-        bonus_label = tk.Label(bonus_wild5_frame, text="Bonus:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        bonus_label.pack(side=tk.LEFT)
+        # 第二行：使用 grid 把 Wild5 和 PPair 放在同一行的不同列
+        row_frame = tk.Frame(bet_frame, bg='#2a4a3c')
+        row_frame.pack(fill=tk.X, padx=20, pady=5)
 
-        self.bonus_var = tk.StringVar(value="0")
-        self.bonus_display = tk.Label(bonus_wild5_frame, textvariable=self.bonus_var, font=('Arial', 14), 
-                                    bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
-        self.bonus_display.pack(side=tk.LEFT, padx=5)
-        self.bonus_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("bonus"))
-        self.bet_widgets["bonus"] = self.bonus_display
-
-        # Wild5区域
-        wild5_label = tk.Label(bonus_wild5_frame, text="Wild 5:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        wild5_label.pack(side=tk.LEFT, padx=(20, 0))
-
+        # Wild5 (column 0)
+        wild5_label = tk.Label(row_frame, text="Wild 5:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        wild5_label.grid(row=0, column=0, sticky='w')
         self.wild5_var = tk.StringVar(value="0")
-        self.wild5_display = tk.Label(bonus_wild5_frame, textvariable=self.wild5_var, font=('Arial', 14), 
+        self.wild5_display = tk.Label(row_frame, textvariable=self.wild5_var, font=('Arial', 14),
                                     bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
-        self.wild5_display.pack(side=tk.LEFT, padx=5)
+        self.wild5_display.grid(row=0, column=1, padx=(5,30), sticky='w')
         self.wild5_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("wild5"))
+        self.wild5_display.bind("<Button-3>", lambda e: self.reset_single_bet("wild5"))
         self.bet_widgets["wild5"] = self.wild5_display
-        
-        # 第三行：Ante区域
-        ante_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        ante_frame.pack(fill=tk.X, padx=20, pady=5)
 
-        ante_label = tk.Label(ante_frame, text="   Ante:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        # PPair (column 2)
+        ppair_label = tk.Label(row_frame, text=" PPair:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        ppair_label.grid(row=0, column=2, sticky='w')
+        self.ppair_var = tk.StringVar(value="0")
+        self.ppair_display = tk.Label(row_frame, textvariable=self.ppair_var, font=('Arial', 14),
+                                    bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
+        self.ppair_display.grid(row=0, column=3, padx=5, sticky='w')
+        self.ppair_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ppair"))
+        self.ppair_display.bind("<Button-3>", lambda e: self.reset_single_bet("ppair"))
+        self.bet_widgets["ppair"] = self.ppair_display
+
+        # 第三行：Ante和Bonus区域
+        ante_bonus_frame = tk.Frame(bet_frame, bg='#2a4a3c')
+        ante_bonus_frame.pack(fill=tk.X, padx=20, pady=5)
+
+        # Ante区域
+        ante_label = tk.Label(ante_bonus_frame, text="   Ante:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         ante_label.pack(side=tk.LEFT)
 
         self.ante_var = tk.StringVar(value="0")
-        self.ante_display = tk.Label(ante_frame, textvariable=self.ante_var, font=('Arial', 14), 
+        self.ante_display = tk.Label(ante_bonus_frame, textvariable=self.ante_var, font=('Arial', 14), 
                                     bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.ante_display.pack(side=tk.LEFT, padx=5)
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
+        self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante"))
         self.bet_widgets["ante"] = self.ante_display
 
-        # Play标签（只显示，不可点击）
-        play_label = tk.Label(ante_frame, text="   Play:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        play_label.pack(side=tk.LEFT, padx=(20, 0))
+        # 等号
+        tk.Label(ante_bonus_frame, text="=", font=('Arial', 14), bg='#2a4a3c', fg='white').pack(side=tk.LEFT, padx=5)
+
+        # Bonus区域（与Ante同步）
+        self.bonus_var = tk.StringVar(value="0")
+        self.bonus_display = tk.Label(ante_bonus_frame, textvariable=self.bonus_var, font=('Arial', 14), 
+                                    fg='black', width=5, relief=tk.SUNKEN, padx=5)
+        self.bonus_display.pack(side=tk.LEFT, padx=5)
+        self.bet_widgets["bonus"] = self.bonus_display
+
+        bonus_label = tk.Label(ante_bonus_frame, text=": Bonus", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        bonus_label.pack(side=tk.LEFT)
+
+        # 第四行：Play区域
+        play_frame = tk.Frame(bet_frame, bg='#2a4a3c')
+        play_frame.pack(fill=tk.X, padx=18, pady=5)
+
+        play_label = tk.Label(play_frame, text="    Play:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        play_label.pack(side=tk.LEFT)
 
         self.play_var = tk.StringVar(value="0")
-        self.play_display = tk.Label(ante_frame, textvariable=self.play_var, font=('Arial', 14), 
-                                   bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
+        self.play_display = tk.Label(play_frame, textvariable=self.play_var, font=('Arial', 14), 
+                                bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.play_display.pack(side=tk.LEFT, padx=5)
         self.bet_widgets["play"] = self.play_display
 
