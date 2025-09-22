@@ -66,22 +66,22 @@ def update_balance_in_json(username, new_balance):
 # Jackpot 文件加载与保存
 def load_jackpot():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
-    default_jackpot = 197301.26
+    default_progressive = 327301.26
     # 文件不存在时使用默认奖池
     if not os.path.exists(path):
-        return True, default_jackpot
+        return True, default_progressive
     try:
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             for item in data:
                 if item.get('Games') == 'UTH':
-                    return False, float(item.get('jackpot', default_jackpot))
+                    return False, float(item.get('jackpot', default_progressive))
     except Exception:
-        return True, default_jackpot
+        return True, default_progressive
     # 未找到 UTH 条目时也使用默认
-    return True, default_jackpot
+    return True, default_progressive
 
-def save_jackpot(jackpot):
+def save_progressive(jackpot):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
     data = []
     # 如果文件存在，读取原有数据
@@ -129,7 +129,7 @@ class Deck:
         try:
             # 调用外部 shuffle.py，超时 30 秒
             result = subprocess.run(
-                [sys.executable, shuffle_script],
+                [sys.executable, shuffle_script, "false", "1"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -271,7 +271,7 @@ class UTHGame:
             "community": [False, False, False, False, False]
         }
         # 加载Jackpot金额
-        self.jackpot_initial, self.jackpot_amount = load_jackpot()
+        self.jackpot_initial, self.progressive_amount = load_jackpot()
         # 新增：记录牌序信息
         self.cut_position = self.deck.start_pos
         self.card_sequence = self.deck.card_sequence
@@ -312,7 +312,7 @@ class UTHGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
         self.title("Ultimate Texas Hold'em")
-        self.geometry("1150x730+50+10")
+        self.geometry("1150x735+50+10")
         self.resizable(0,0)
         self.configure(bg='#35654d')
         
@@ -372,44 +372,44 @@ class UTHGUI(tk.Tk):
         
         # 游戏规则文本
         rules_text = """
-        Ultimate Texas Hold'em 游戏规则
+        终极德州扑克 游戏规则
 
         1. 游戏开始前下注:
-           - Play: 可选盲注 - 下注Ante的3X/4X或取消下注
-           - Ante: 基础下注
-           - Blind: 自动等于Ante
-           - Trips: 可选副注
-           - Progressive: 可选参与($2.50)
+           - 加注: 可选下注 - 下注底注的3倍/4倍或取消下注
+           - 底注: 基础下注
+           - 盲注: 自动等于底注
+           - 三条注: 可选副注
+           - 累进大奖: 可选参与($20)
 
         2. 游戏流程:
            a. 翻牌前:
                - 查看手牌后选择:
                  * 过牌: 进入翻牌圈
-                 * 下注3倍: 下注Ante的3倍
-                 * 下注4倍: 下注Ante的4倍
+                 * 下注3倍: 下注底注的3倍到加注
+                 * 下注4倍: 下注底注的4倍到加注
 
            b. 翻牌圈:
                - 查看前三张公共牌后选择:
                  * 过牌: 进入河牌圈
-                 * 下注2倍: 下注Ante的2倍
+                 * 下注2倍: 下注底注的2倍到加注
 
            c. 河牌圈:
                - 查看所有公共牌后选择:
-                 * 弃牌: 放弃所有下注
-                 * 下注1倍: 下注Ante的1倍
+                 * 弃牌: 放弃所有的下注(除三条注和累进大奖)
+                 * 下注1倍: 下注底注的1倍到加注
 
         3. 摊牌:
            - 比较玩家和庄家的最佳五张牌
            - 结算所有下注
 
         4. 支付表:
-           - Ante:
+           - 底注:
              * 玩家赢: 支付2倍
              * 平局: 退还
              * 庄家高牌: 退还
              * 其他情况: 输掉
 
-           - Play:
+           - 加注:
              * 玩家赢: 支付2倍
              * 平局: 退还
              * 其他情况: 输掉
@@ -437,13 +437,13 @@ class UTHGUI(tk.Tk):
         odds_frame = tk.Frame(content_frame, bg='#F0F0F0')
         odds_frame.pack(fill=tk.X, padx=20, pady=5)
 
-        headers = ["牌型", "Blind赔率", "Trips赔率", "jackpot赔率*"]
+        headers = ["牌型", "盲注", "三条注", "累进大奖#"]
         odds_data = [
-            ("皇家顺", "500:1", "50:1", "Jackpot大奖"),
-            ("同花顺", "50:1", "40:1", "Jackpot大奖10%"),
-            ("四条", "10:1", "30:1", "$1275"),
-            ("葫芦", "3:1", "8:1", "$375"),
-            ("同花", "1.5:1", "6:1", "$250"),
+            ("皇家顺", "500:1", "50:1", "100%累进大奖/$350,000"),
+            ("同花顺", "50:1", "40:1", "10%累进大奖/$35,000"),
+            ("四条", "10:1", "30:1", "$25,000"),
+            ("葫芦", "3:1", "8:1", "$4000"),
+            ("同花", "1.5:1", "6:1", "$3000"),
             ("顺子", "1:1", "5:1", "-"),
             ("三条", "-", "3:1", "-")
         ]
@@ -485,7 +485,7 @@ class UTHGUI(tk.Tk):
         # 注释
         notes = """
         注: 
-        * 玩家的牌和头3张公共牌组成牌型才获胜
+        # 玩家的牌和头3张公共牌组成牌型才获胜
         """
         
         notes_label = tk.Label(
@@ -610,17 +610,69 @@ class UTHGUI(tk.Tk):
         if not self.selected_chip:
             return
             
-        # 获取筹码金额
-        chip_value = float(self.selected_chip.replace('$', '').replace('K', '000'))
+        # 获取筹码金额 - 处理K表示1000的情况
+        chip_text = self.selected_chip.replace('$', '')
+        if 'K' in chip_text:
+            # 处理带K的筹码，如1K或2.5K
+            chip_value = float(chip_text.replace('K', '')) * 1000
+        else:
+            chip_value = float(chip_text)
         
         # 更新对应的下注变量
         if bet_type == "ante":
             current = float(self.ante_var.get())
+            max_bet = 10000  # Ante最大下注限制
+            
+            # 检查是否已超过上限
+            if current >= max_bet:
+                messagebox.showwarning("下注限制", "底注已满，不能再下注！")
+                return
+            
+            # 检查下注后是否会超过上限
+            if current + chip_value > max_bet:
+                allowed_amount = max_bet - current
+                if allowed_amount > 0:
+                    # 自动调整到下注上限
+                    chip_value = allowed_amount
+                    messagebox.showwarning("下注限制", f"底注已达上限，自动调整为 {int(allowed_amount)}")
+                else:
+                    messagebox.showwarning("下注限制", "底注已满，不能再下注！")
+                    return
+            
             self.ante_var.set(str(int(current + chip_value)))
             # Blind 自动等于 Ante
             self.blind_var.set(self.ante_var.get())
+            
+            # 检查Blind是否超过上限
+            blind_current = float(self.blind_var.get())
+            blind_max_bet = 10000  # Blind最大下注限制
+            
+            if blind_current > blind_max_bet:
+                # 如果Blind超过上限，调整Ante和Blind
+                self.ante_var.set(str(blind_max_bet))
+                self.blind_var.set(str(blind_max_bet))
+                messagebox.showwarning("下注限制", f"盲注上限为{blind_max_bet}，已自动调整底注和盲注")
+                
         elif bet_type == "trips":
             current = float(self.trips_var.get())
+            max_bet = 2500  # Trips最大下注限制
+            
+            # 检查是否已超过上限
+            if current >= max_bet:
+                messagebox.showwarning("下注限制", "三条注已满，不能再下注！")
+                return
+            
+            # 检查下注后是否会超过上限
+            if current + chip_value > max_bet:
+                allowed_amount = max_bet - current
+                if allowed_amount > 0:
+                    # 自动调整到下注上限
+                    chip_value = allowed_amount
+                    messagebox.showwarning("下注限制", f"三条注已达上限，自动调整为 {int(allowed_amount)}")
+                else:
+                    messagebox.showwarning("下注限制", "三条注已满，不能再下注！")
+                    return
+            
             self.trips_var.set(str(int(current + chip_value)))
     
     def cycle_bet_amount(self, event):
@@ -689,7 +741,7 @@ class UTHGUI(tk.Tk):
         self.player_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # 右侧控制面板
-        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=300, padx=10, pady=10)
+        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=300, padx=10, pady=2)
         control_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
         # 顶部信息栏
@@ -707,34 +759,37 @@ class UTHGUI(tk.Tk):
         
         self.stage_label = tk.Label(
             info_frame, 
-            text="阶段: 翻牌前",
+            text="翻牌前",
             font=('Arial', 18, 'bold'),
             bg='#2a4a3c',
             fg='#FFD700'
         )
-        self.stage_label.pack(side=tk.LEFT, padx=20, pady=10)
+        self.stage_label.pack(side=tk.RIGHT, padx=20, pady=10)
         
-        # Jackpot显示区域
-        jackpot_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        jackpot_frame.pack(fill=tk.X, pady=10)
+        # Progressive显示区域 - 修改后的代码
+        progressive_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        progressive_frame.pack(fill=tk.X, pady=5)
 
-        # 创建一个内部框架用于居中
-        jackpot_inner_frame = tk.Frame(jackpot_frame, bg='#2a4a3c')
-        jackpot_inner_frame.pack(expand=True, pady=5)  # 使用expand和居中
+        # 使用网格布局确保标签在左边，金额在中间
+        progressive_frame.columnconfigure(0, weight=1)  # 标签列
+        progressive_frame.columnconfigure(1, weight=2)  # 金额列（更宽）
+        progressive_frame.columnconfigure(2, weight=1)  # 空白列（平衡布局）
 
-        jackpot_label = tk.Label(jackpot_inner_frame, text="Progressive:", 
+        # 标签放在左边
+        progressive_label = tk.Label(progressive_frame, text="累进大奖:", 
                                 font=('Arial', 18), bg='#2a4a3c', fg='gold')
-        jackpot_label.pack(side=tk.LEFT, padx=(0, 5))  # 右侧留5像素间距
+        progressive_label.grid(row=0, column=0, sticky='w', padx=(10, 0), pady=5)
 
-        self.jackpot_var = tk.StringVar()
-        self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
-        self.jackpot_display = tk.Label(jackpot_inner_frame, textvariable=self.jackpot_var, 
-                                    font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='gold')
-        self.jackpot_display.pack(side=tk.LEFT)
+        # 金额放在中间 - 使用StringVar
+        self.progressive_amount_var = tk.StringVar()
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
+        self.progressive_display = tk.Label(progressive_frame, textvariable=self.progressive_amount_var, 
+                                    font=('Arial', 22, 'bold'), bg='#2a4a3c', fg='gold')
+        self.progressive_display.grid(row=0, column=1, sticky='w', pady=3)
         
         # 筹码区域
         chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        chips_frame.pack(fill=tk.X, pady=10)
+        chips_frame.pack(fill=tk.X, pady=5)
         
         chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         chips_label.pack(anchor='w', padx=10, pady=5)
@@ -744,12 +799,12 @@ class UTHGUI(tk.Tk):
         chip_row.pack(fill=tk.X, pady=5, padx=5)
         
         chip_configs = [
-            ("$5", '#ff0000', 'white'),     # 红色背景，白色文字
             ('$10', '#ffa500', 'black'),   # 橙色背景，黑色文字
             ("$25", '#00ff00', 'black'),    # 绿色背景，黑色文字
-            ("$50", '#ffffff', 'black'),    # 白色背景，黑色文字
             ("$100", '#000000', 'white'),   # 黑色背景，白色文字
             ("$500", "#FF7DDA", 'black'),   # 粉色背景，黑色文字
+            ("$1K", '#ffffff', 'black'),    # 白色背景，黑色文字
+            ("$2.5K", '#ff0000', 'white'),     # 红色背景，白色文字
         ]
         
         self.chip_buttons = []
@@ -759,40 +814,66 @@ class UTHGUI(tk.Tk):
             chip_canvas = tk.Canvas(chip_row, width=55, height=55, bg='#2a4a3c', highlightthickness=0)
             
             # 创建圆形（尺寸调整为51x51，在55x55画布中居中）
-            chip_canvas.create_oval(2, 2, 53, 53, fill=bg_color, outline='black')
+            chip_canvas.create_oval(2, 2, 54, 54, fill=bg_color, outline='black')
             
             # 创建文本（位置调整为画布中心）
-            text_id = chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 15, 'bold'))
+            text_id = chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 14, 'bold'))
             
             chip_canvas.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
             chip_canvas.pack(side=tk.LEFT, padx=5)
             self.chip_buttons.append(chip_canvas)
             self.chip_texts[chip_canvas] = text  # 存储文本
         
-        # 默认选中$5筹码
-        self.select_chip("$5")
+        # 默认选中$10筹码
+        self.select_chip("$10")
+
+        # 每注限制
+        minmax_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        minmax_frame.pack(fill=tk.X, pady=5)
+        
+        # 标题行
+        header_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        header_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
+        
+        tk.Label(header_frame, text="底注最低", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="底注最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="边注最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        
+        # 数值行
+        value_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        value_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+        
+        tk.Label(value_frame, text="$10", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$10,000", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$2,500", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
         
         # 下注区域
         bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_frame.pack(fill=tk.X, pady=10)
-        
-        # 第一行：Jackpot选项
-        jackpot_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        jackpot_frame.pack(fill=tk.X, padx=20, pady=5)
-        
-        self.jackpot_check_var = tk.IntVar()
-        self.jackpot_cb = tk.Checkbutton(
-            jackpot_frame, text="Progressive ($2.50)", 
-            variable=self.jackpot_check_var, font=('Arial', 14),
+        bet_frame.pack(fill=tk.X, pady=5)
+
+        # 第一行：Progressive选项
+        progressive_frame = tk.Frame(bet_frame, bg='#2a4a3c')
+        progressive_frame.pack(fill=tk.X, padx=20, pady=5)
+
+        self.progressive_var = tk.IntVar()
+        self.progressive_cb = tk.Checkbutton(
+            progressive_frame, text="累进大奖 ($20.00)", 
+            variable=self.progressive_var, font=('Arial', 14),
             bg='#2a4a3c', fg='white', selectcolor='#35654d'
         )
-        self.jackpot_cb.pack(side=tk.LEFT)
+        self.progressive_cb.pack(side=tk.LEFT)
         
         # 第二行：Trips区域
         trips_frame = tk.Frame(bet_frame, bg='#2a4a3c')
         trips_frame.pack(fill=tk.X, padx=20, pady=5)
 
-        trips_label = tk.Label(trips_frame, text="Trips:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        trips_label = tk.Label(trips_frame, text="三条注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         trips_label.pack(side=tk.LEFT)
 
         self.trips_var = tk.StringVar(value="0")
@@ -807,7 +888,7 @@ class UTHGUI(tk.Tk):
         ante_blind_frame.pack(fill=tk.X, padx=20, pady=5)
 
         # Ante 显示区域
-        ante_label = tk.Label(ante_blind_frame, text=" Ante:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        ante_label = tk.Label(ante_blind_frame, text="    底注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         ante_label.pack(side=tk.LEFT)
 
         self.ante_var = tk.StringVar(value="0")
@@ -828,14 +909,14 @@ class UTHGUI(tk.Tk):
         self.bet_widgets["blind"] = self.blind_display  # 存储用于背景色更改
         
         # Blind 文本标签
-        blind_label = tk.Label(ante_blind_frame, text=": Blind", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        blind_label = tk.Label(ante_blind_frame, text=": 盲注", font=('Arial', 14), bg='#2a4a3c', fg='white')
         blind_label.pack(side=tk.LEFT, padx=5)
         
         # 新增Bet行
         bet_play_frame = tk.Frame(bet_frame, bg='#2a4a3c')
         bet_play_frame.pack(fill=tk.X, padx=20, pady=5)
         
-        bet_play_label = tk.Label(bet_play_frame, text=" Play:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        bet_play_label = tk.Label(bet_play_frame, text="    加注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         bet_play_label.pack(side=tk.LEFT)
         
         self.bet_var = tk.StringVar(value="0")
@@ -845,18 +926,13 @@ class UTHGUI(tk.Tk):
         self.bet_display.bind("<Button-1>", self.cycle_bet_amount)  # 绑定点击事件
         self.bet_widgets["bet"] = self.bet_display
 
-        # 新增提示文字 - 在下注模块下方
-        self.hint_label = tk.Label(bet_play_frame, text="庄家是高牌 Ante退还", 
-                                font=('Arial', 18), bg='#2a4a3c', fg='#FFD700')
-        self.hint_label.pack(pady=(0, 10))
-
         # 游戏操作按钮框架 - 用于放置所有操作按钮
         self.action_frame = tk.Frame(control_frame, bg='#2a4a3c')
-        self.action_frame.pack(fill=tk.X, pady=10)
+        self.action_frame.pack(fill=tk.X, pady=5)
 
         # 创建一个框架来容纳重置按钮和开始游戏按钮
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重设金额"按钮
         self.reset_bets_button = tk.Button(
@@ -864,26 +940,26 @@ class UTHGUI(tk.Tk):
             command=self.reset_bets, font=('Arial', 14),
             bg='#F44336', fg='white', width=10
         )
-        self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
-        
+        self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))  # 右侧留出10像素间距
+
         # 开始游戏按钮
         self.start_button = tk.Button(
             start_button_frame, text="开始游戏", 
             command=self.start_game, font=('Arial', 14),
             bg='#4CAF50', fg='white', width=10
         )
-        self.start_button.pack(side=tk.LEFT)
+        self.start_button.pack(side=tk.LEFT, padx=(0, 10))
         
-        # 状态信息
+        # 状态信息 - 调整高度属性以匹配开始游戏后的状态
         self.status_label = tk.Label(
             control_frame, text="设置下注金额并开始游戏", 
-            font=('Arial', 14), bg='#2a4a3c', fg='white'
+            font=('Arial', 14, 'bold'), bg='#2a4a3c', fg='white', height=1  # 这里将height从1改为2
         )
-        self.status_label.pack(pady=5, fill=tk.X)
+        self.status_label.pack(pady=5, fill=tk.X, anchor='n')
 
         # 本局下注和上局获胜金额显示
         bet_info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_info_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10)
+        bet_info_frame.pack(fill=tk.X, pady=20)
         
         # 本局下注金额
         self.current_bet_label = tk.Label(
@@ -909,7 +985,7 @@ class UTHGUI(tk.Tk):
             bg='#4B8BBE',
             fg='white',
             font=('Arial', 12),
-            width=3,
+            width=2,
             relief=tk.FLAT
         )
         self.info_button.pack(side=tk.RIGHT)
@@ -987,8 +1063,8 @@ class UTHGUI(tk.Tk):
             self.ante = int(self.ante_var.get())
             self.blind = int(self.blind_var.get())
             self.trips = int(self.trips_var.get())
-            self.participate_jackpot = bool(self.jackpot_check_var.get())
-            self.last_jackpot_selection = bool(self.jackpot_check_var.get())  # 记录当前选择
+            self.participate_jackpot = bool(self.progressive_var.get())
+            self.last_jackpot_selection = bool(self.progressive_var.get())  # 记录当前选择
             # 读取Bet金额
             self.bet = int(self.bet_var.get())   # 如果为空字符串，会触发ValueError，所以下面捕获异常
         except ValueError:
@@ -997,13 +1073,13 @@ class UTHGUI(tk.Tk):
             
         # 检查Ante至少5块
         if self.ante < 5:
-            messagebox.showerror("错误", "Ante至少需要5块")
+            messagebox.showerror("错误", "底注至少需要10块")
             return
         
         # 计算总下注（包括Bet）
         total_bet = self.ante + self.blind + self.trips + self.bet
         if self.participate_jackpot:
-            total_bet += 2.5
+            total_bet += 20
             
         # 检查余额是否足够（包括Bet）
         if total_bet > self.balance:
@@ -1081,7 +1157,7 @@ class UTHGUI(tk.Tk):
         self.animate_deal()
         
         # 更新游戏状态
-        self.stage_label.config(text="阶段: 翻牌前")
+        self.stage_label.config(text="翻牌前")
         
         # 如果Bet有下注金额，则直接进入摊牌阶段
         if self.auto_showdown:
@@ -1099,7 +1175,7 @@ class UTHGUI(tk.Tk):
             widget.destroy()
             
         buttons_container = tk.Frame(self.action_frame, bg='#2a4a3c')
-        buttons_container.pack(expand=True, pady=10)
+        buttons_container.pack(pady=5)
 
         self.check_button = tk.Button(
             buttons_container, text="过牌", 
@@ -1129,7 +1205,7 @@ class UTHGUI(tk.Tk):
         self.ante_display.unbind("<Button-1>")
         self.trips_display.unbind("<Button-1>")
         self.bet_display.unbind("<Button-1>")
-        self.jackpot_cb.config(state=tk.DISABLED)
+        self.progressive_cb.config(state=tk.DISABLED)
         for chip in self.chip_buttons:
             chip.unbind("<Button-1>")
     
@@ -1402,7 +1478,7 @@ class UTHGUI(tk.Tk):
             # 更新本局下注显示
             total_bet = self.ante + self.blind + self.trips + bet_amount
             if self.participate_jackpot:
-                total_bet += 2.5
+                total_bet += 20
             self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
         
         # 根据当前阶段决定下一步
@@ -1420,7 +1496,7 @@ class UTHGUI(tk.Tk):
             else:
                 # 进入翻牌圈
                 self.game.stage = "flop"
-                self.stage_label.config(text="阶段: 翻牌圈")
+                self.stage_label.config(text="翻牌圈")
                 self.status_label.config(text="翻牌已发出。做出决策: 过牌或下注2倍")
                 
                 # 翻开翻牌圈的三张牌
@@ -1431,7 +1507,7 @@ class UTHGUI(tk.Tk):
                     widget.destroy()
                     
                 buttons_container = tk.Frame(self.action_frame, bg='#2a4a3c')
-                buttons_container.pack(expand=True, pady=10)
+                buttons_container.pack(pady=5)
 
                 self.check_button = tk.Button(
                     buttons_container, text="过牌", 
@@ -1461,7 +1537,7 @@ class UTHGUI(tk.Tk):
             else:
                 # 进入河牌圈
                 self.game.stage = "river"
-                self.stage_label.config(text="阶段: 河牌圈")
+                self.stage_label.config(text="河牌圈")
                 self.status_label.config(text="河牌已发出。做出最终决策: 弃牌或下注1倍")
                 
                 # 翻开转牌和河牌
@@ -1472,7 +1548,7 @@ class UTHGUI(tk.Tk):
                     widget.destroy()
                     
                 buttons_container = tk.Frame(self.action_frame, bg='#2a4a3c')
-                buttons_container.pack(expand=True, pady=10)
+                buttons_container.pack(pady=5)
 
                 self.fold_button = tk.Button(
                     buttons_container, text="弃牌", 
@@ -1506,7 +1582,7 @@ class UTHGUI(tk.Tk):
                 # 更新本局下注显示
                 total_bet = self.ante + self.blind + self.trips + bet_amount
                 if self.participate_jackpot:
-                    total_bet += 2.5
+                    total_bet += 20
                 self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
                 
                 # 进入摊牌
@@ -1515,40 +1591,144 @@ class UTHGUI(tk.Tk):
             else:
                 # 弃牌
                 self.fold_action()
-    
+        
     def fold_action(self):
         self.game.folded = True
         self.status_label.config(text="您已弃牌。游戏结束。")
-        
-        # 检查status_label是否存在，如果不存在则创建
-        if not hasattr(self, 'status_label'):
-            # 创建status_label
-            self.status_label = tk.Label(
-                self.control_frame, text="", 
-                font=('Arial', 12, 'bold'), bg='#2a4a3c', fg='#FFD700'
-            )
-            self.status_label.pack(pady=5, fill=tk.X)
-        
-        self.status_label.config(text="您输掉了所有下注。")
 
-        self.last_win = 0
-        self.last_win_label.config(text="上局获胜: $0.00")
-        
         # 翻开庄家牌
         self.reveal_dealer_cards()
         
         # 更新庄家牌型
         self.update_hand_labels()
         
-        # 更新下注显示为0（输）
+        # 翻开所有公共牌和玩家牌，以便评估Trips和Progressive
+        for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
+            if hasattr(card_label, "card") and not card_label.is_face_up:
+                self.flip_card_animation(card_label)
+                self.game.cards_revealed["community"][i] = True
+        
+        for i, card_label in enumerate(self.player_cards_frame.winfo_children()):
+            if hasattr(card_label, "card") and not card_label.is_face_up:
+                self.flip_card_animation(card_label)
+                self.game.cards_revealed["player"][i] = True
+        
+        # 更新所有牌型标签
+        self.update_hand_labels()
+        
+        # 等待1秒后结算Trips和Progressive
+        self.after(1000, self.settle_trips_and_progressive_after_fold)
+
+    def settle_trips_and_progressive_after_fold(self):
+        """弃牌后结算Trips和Progressive"""
+        # 评估玩家手牌
+        player_cards = self.game.player_hole + self.game.community_cards
+        player_eval, player_best = find_best_5(player_cards)
+        
+        # 结算Trips
+        trips_winnings = 0
+        if self.game.trips > 0:
+            player_hand_rank = player_eval[0]
+            if player_hand_rank >= 3:  # 三条及以上
+                if player_hand_rank in TRIPS_PAYOUT:
+                    odds = TRIPS_PAYOUT[player_hand_rank]
+                    trips_winnings = self.game.trips * (1 + odds)
+                else:
+                    # 如果没有匹配的赔率，退还本金
+                    trips_winnings = self.game.trips
+        
+        # 结算Progressive
+        progressive_winnings = 0
+        if self.game.participate_jackpot:
+            progressive_cards = self.game.player_hole + self.game.community_cards[:3]
+            pg_eval, _ = evaluate_hand(progressive_cards)
+            
+            # 定义奖金规则
+            jackpot_rules = {
+                9: {"amount": lambda: max(self.game.progressive_amount, 350000), "message": "皇家顺! 赢得累进大奖 ${amount:.2f}!"},
+                8: {"amount": lambda: max(self.game.progressive_amount * 0.1, 35000), "message": "同花顺! 赢得累进大奖 ${amount:.2f}!"},
+                7: {"amount": 25000, "message": "四条! 赢得累进大奖 $25,000!"},
+                6: {"amount": 4000, "message": "葫芦! 赢得累进大奖 $4,000!"},
+                5: {"amount": 3000, "message": "同花! 赢得累进大奖 $3,000!"}
+            }
+            
+            if pg_eval in jackpot_rules:
+                rule = jackpot_rules[pg_eval]
+                
+                # 计算奖金金额
+                if callable(rule["amount"]):
+                    amount = rule["amount"]()
+                else:
+                    amount = rule["amount"]
+                
+                progressive_winnings = amount
+                
+                # 从奖池扣除
+                self.game.progressive_amount -= amount
+                
+                # 显示消息
+                messagebox.showinfo("恭喜您获得累进大奖！", rule["message"].format(amount=amount))
+        
+        # 计算总赢取金额
+        total_winnings = trips_winnings + progressive_winnings
+        self.last_win = total_winnings
+        
+        # 更新余额
+        self.balance += total_winnings
+        self.update_balance()
+        
+        # 更新Trips显示
+        self.trips_var.set(str(int(trips_winnings)))
+        
+        # 设置背景色
+        if trips_winnings > 0:
+            self.trips_display.config(bg='gold')  # 赢 - 金色背景
+        elif trips_winnings == self.game.trips:
+            self.trips_display.config(bg='light blue')  # 退还 - 浅蓝色背景
+        else:
+            self.trips_display.config(bg='white')  # 输 - 白色背景
+        
+        # 显示结果
+        if total_winnings > 0:
+            result_text = f"弃牌但赢得三条注: ${total_winnings:.2f}"
+            self.status_label.config(text=result_text)
+        else:
+            self.status_label.config(text="您已弃牌。游戏结束。")
+        
+        # 更新上局获胜金额
+        self.last_win_label.config(text=f"上局获胜: ${total_winnings:.2f}")
+        
+        # 计算Progressive增量
+        total_bet = self.game.ante + self.game.blind + self.game.trips + self.game.play_bet
+        progressive_increase = total_bet * 0.08
+        
+        # 如果玩家购买了Progressive，将20元中的95%加入奖池
+        if self.game.participate_jackpot:
+            progressive_increase += 19
+        
+        self.game.progressive_amount += progressive_increase
+        
+        # 确保奖池最低金额为327301.26
+        if self.game.progressive_amount < 327301.26:
+            self.game.progressive_amount = 327301.26
+        
+        # 更新Progressive金额
+        save_progressive(self.game.progressive_amount)
+        
+        # 确保界面上的奖池金额实时更新
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
+        if hasattr(self, 'progressive_display'):
+            self.progressive_display.config(text=f"${self.game.progressive_amount:.2f}")
+        
+        # 更新下注显示
         self.ante_var.set("0")
         self.blind_var.set("0")
         self.bet_var.set("0")
-        self.trips_var.set("0")
         
         # 设置背景色为白色（输）
-        for widget in self.bet_widgets.values():
-            widget.config(bg='white')
+        for widget_type, widget in self.bet_widgets.items():
+            if widget_type != "trips":  # Trips已经单独处理
+                widget.config(bg='white')
         
         # 添加重新开始按钮
         for widget in self.action_frame.winfo_children():
@@ -1559,7 +1739,7 @@ class UTHGUI(tk.Tk):
             command=self.reset_game, 
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
-        restart_btn.pack(pady=10)
+        restart_btn.pack(pady=5)
         restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
@@ -1655,7 +1835,7 @@ class UTHGUI(tk.Tk):
             command=self.reset_game, 
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
-        restart_btn.pack(pady=10)
+        restart_btn.pack(pady=5)
         restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
@@ -1748,73 +1928,65 @@ class UTHGUI(tk.Tk):
                 # 两对及以下，Trips输
                 self.win_details['trips'] = 0
         
-        # 5. Jackpot 结算
+        # 5. Jackpot 结算 - 简化版
         if self.game.participate_jackpot:
-            jp_cards = self.game.player_hole + self.game.community_cards[:3]
-            jp_eval, _ = evaluate_hand(jp_cards)
+            progressive_cards = self.game.player_hole + self.game.community_cards[:3]
+            pg_eval, _ = evaluate_hand(progressive_cards)
             
-            if jp_eval == 9:  # 皇家顺
-                amount = max(self.game.jackpot_amount, 10000)
+            # 定义奖金规则
+            jackpot_rules = {
+                9: {"amount": lambda: max(self.game.progressive_amount, 350000), "message": "皇家顺! 赢得累进大奖 ${amount:.2f}!"},
+                8: {"amount": lambda: max(self.game.progressive_amount * 0.1, 35000), "message": "同花顺! 赢得累进大奖 ${amount:.2f}!"},
+                7: {"amount": 25000, "message": "四条! 赢得累进大奖 $25,000!"},
+                6: {"amount": 4000, "message": "葫芦! 赢得累进大奖 $4,000!"},
+                5: {"amount": 3000, "message": "同花! 赢得累进大奖 $3,000!"}
+            }
+            
+            if pg_eval in jackpot_rules:
+                rule = jackpot_rules[pg_eval]
+                
+                # 计算奖金金额
+                if callable(rule["amount"]):
+                    amount = rule["amount"]()
+                else:
+                    amount = rule["amount"]
+                
                 self.win_details['jackpot'] = amount
                 total_winnings += amount
-                # 重置Jackpot为初始值
-                self.game.jackpot_amount = 197301.26
-                messagebox.showinfo("恭喜您获得Jackpot大奖！", 
-                                f"皇家顺! 赢得Jackpot大奖 ${amount:.2f}!")
+                
+                # 从奖池扣除
+                self.game.progressive_amount -= amount
+                
+                # 显示消息
+                messagebox.showinfo("恭喜您获得累进大奖！", rule["message"].format(amount=amount))
             
-            elif jp_eval == 8:  # 同花顺
-                amount = max(self.game.jackpot_amount * 0.1, 1000)
-                self.win_details['jackpot'] = amount
-                total_winnings += amount
-                # 重置Jackpot为初始值
-                self.game.jackpot_amount = 197301.26
-                messagebox.showinfo("恭喜您获得Jackpot大奖！", 
-                                f"同花顺! 赢得Jackpot大奖 ${amount:.2f}!")
-            
-            elif jp_eval == 7:  # 四条
-                amount = 1250
-                self.win_details['jackpot'] = amount
-                total_winnings += amount
-                self.game.jackpot_amount -= amount
-                messagebox.showinfo("恭喜您获得Jackpot奖励！", 
-                                f"四条! 赢得Jackpot奖励 ${amount:.2f}!")
-            
-            elif jp_eval == 6:  # 葫芦
-                amount = 375
-                self.win_details['jackpot'] = amount
-                total_winnings += amount
-                self.game.jackpot_amount -= amount
-                messagebox.showinfo("恭喜您获得Jackpot奖励！", 
-                                f"葫芦! 赢得Jackpot奖励 ${amount:.2f}!")
-            
-            elif jp_eval == 5:  # 同花
-                amount = 250
-                self.win_details['jackpot'] = amount
-                total_winnings += amount
-                self.game.jackpot_amount -= amount
-                messagebox.showinfo("恭喜您获得Jackpot奖励！", 
-                                f"同花! 赢得Jackpot奖励 ${amount:.2f}!")
-            
-            # 保存Jackpot金额
-            save_jackpot(self.game.jackpot_amount)
-            self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
-            
-        # 计算Jackpot增量
-        # 本金 = Ante + Blind + Trips + Play bet
-        principal = self.game.ante + self.game.blind + self.game.trips + self.game.play_bet
-        # Push金额 = 平局部分的金额
-        push_amount = 0
-        if player_eval == dealer_eval:
-            push_amount = principal
+            # 保存Progressive金额
+            save_progressive(self.game.progressive_amount)
+            self.progressive_var.set(f"${self.game.progressive_amount:.2f}")
+
+        # 计算Progressive增量
+        total_bet = self.game.ante + self.game.blind + self.game.trips + self.game.play_bet
+        progressive_increase = total_bet * 0.08
         
-        # 未赢金额 = 本金 - winnings (如果玩家输了)
-        lost_amount = principal - total_winnings if total_winnings < principal else 0
+        # 如果玩家购买了Progressive，将20元中的95%加入奖池
+        if self.game.participate_jackpot:
+            progressive_increase += 19
         
-        # 更新Jackpot金额
-        jackpot_increment = (principal * 0.01) + (push_amount * 0.05) + (lost_amount * 0.1)
-        self.game.jackpot_amount += jackpot_increment
-        save_jackpot(self.game.jackpot_amount)
-        self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
+        self.game.progressive_amount += progressive_increase
+        
+        # 确保奖池最低金额为327301.26
+        if self.game.progressive_amount < 327301.26:
+            self.game.progressive_amount = 327301.26
+        
+        # 更新Progressive金额
+        save_progressive(self.game.progressive_amount)
+
+        # 确保界面上的奖池金额实时更新
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
+
+        # 更新Progressive显示（如果存在）
+        if hasattr(self, 'progressive_display'):
+            self.progressive_display.config(text=f"${self.game.progressive_amount:.2f}")
         
         return total_winnings
 
@@ -1912,7 +2084,7 @@ class UTHGUI(tk.Tk):
         """真正的重置游戏界面"""
         # 重置游戏状态
         self.game.reset_game()
-        self.stage_label.config(text="阶段: 翻牌前")
+        self.stage_label.config(text="翻牌前")
         
         # 重置标签显示
         self.player_label.config(text="玩家")
@@ -1924,7 +2096,7 @@ class UTHGUI(tk.Tk):
         self.trips_var.set("0")
         self.bet_var.set("0")
         # 设置Jackpot复选框为上一局的选择
-        self.jackpot_check_var.set(1 if self.last_jackpot_selection else 0)
+        self.progressive_var.set(1 if self.last_jackpot_selection else 0)
         
         # 重置背景色为白色
         for widget in self.bet_widgets.values():
@@ -1938,7 +2110,7 @@ class UTHGUI(tk.Tk):
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.trips_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("trips"))
         self.bet_display.bind("<Button-1>", self.cycle_bet_amount)
-        self.jackpot_cb.config(state=tk.NORMAL)
+        self.progressive_cb.config(state=tk.NORMAL)
         for chip in self.chip_buttons:
             # 使用存储的文本重新绑定事件
             text = self.chip_texts[chip]
@@ -1949,7 +2121,7 @@ class UTHGUI(tk.Tk):
             widget.destroy()
         
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重设金额"按钮
         self.reset_bets_button = tk.Button(
@@ -1965,7 +2137,7 @@ class UTHGUI(tk.Tk):
             command=self.start_game, font=('Arial', 14),
             bg='#4CAF50', fg='white', width=10
         )
-        self.start_button.pack(side=tk.LEFT)
+        self.start_button.pack(side=tk.LEFT, padx=(0, 10))
         
         # 重置本局下注显示
         self.current_bet_label.config(text="本局下注: $0.00")
@@ -1974,6 +2146,8 @@ class UTHGUI(tk.Tk):
         if auto_reset:
             self.status_label.config(text="30秒已到，自动开始新游戏")
             self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
+        else:
+            self.status_label.config(text="设置下注金额并开始游戏")
 
     def show_card_sequence(self, event):
         """显示本局牌序窗口 - 右键点击时取消30秒计时"""
@@ -2107,7 +2281,7 @@ class UTHGUI(tk.Tk):
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-def main(initial_balance=1000, username="Guest"):
+def main(initial_balance=10000, username="Guest"):
     app = UTHGUI(initial_balance, username)
     app.mainloop()
     return app.balance

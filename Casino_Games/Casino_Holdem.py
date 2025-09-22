@@ -19,13 +19,27 @@ HAND_RANK_NAMES = {
     4: '顺子', 3: '三条', 2: '两对', 1: '对子', 0: '高牌'
 }
 
-# AA下注支付表
-AA_PAYOUT = {
+# Ante下注支付表 (修改后的赔率)
+ANTE_PAYOUT = {
     9: 100,   # 皇家顺 100:1
-    8: 20,    # 同花顺 20:1
-    7: 10,    # 四条 10:1
+    8: 49,    # 同花顺 49:1
+    7: 17,    # 四条 17:1
     6: 3,     # 葫芦 3:1
     5: 2,     # 同花 2:1
+    # 其他牌型都是1:1
+}
+
+# AA下注支付表 (修改后的赔率)
+AA_PAYOUT = {
+    9: 100,   # 皇家顺 100:1
+    8: 50,    # 同花顺 50:1
+    7: 40,    # 四条 40:1
+    6: 30,    # 葫芦 30:1
+    5: 20,    # 同花 20:1
+    4: 10,    # 顺子 10:1
+    3: 8,     # 三条 8:1
+    2: 7,     # 两对 7:1
+    # 对子Aces需要特殊处理
 }
 
 def get_data_file_path():
@@ -68,7 +82,7 @@ def load_jackpot():
     # 未找到 CHE 条目时也使用默认
     return True, default_jackpot
 
-def save_jackpot(jackpot):
+def save_progressive(jackpot):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
     data = []
     # 如果文件存在，读取原有数据
@@ -116,7 +130,7 @@ class Deck:
         try:
             # 调用外部 shuffle.py，超时 30 秒
             result = subprocess.run(
-                [sys.executable, shuffle_script],
+                [sys.executable, shuffle_script, "false", "1"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -152,6 +166,17 @@ class Deck:
         self.indexes = [(self.start_pos + i) % 52 for i in range(52)]
         self.pointer = 0
         self.card_sequence = [self.full_deck[i] for i in self.indexes]
+    
+    def _secure_shuffle(self):
+        """Fisher–Yates 洗牌，用 secrets 保证随机性"""
+        for i in range(len(self.full_deck) - 1, 0, -1):
+            j = secrets.randbelow(i + 1)
+            self.full_deck[i], self.full_deck[j] = self.full_deck[j], self.full_deck[i]
+
+    def deal(self, n=1):
+        dealt = [self.full_deck[self.indexes[self.pointer + i]] for i in range(n)]
+        self.pointer += n
+        return dealt
     
     def _secure_shuffle(self):
         """Fisher–Yates 洗牌，用 secrets 保证随机性"""
@@ -260,7 +285,7 @@ class CHEGame:  # 修改类名为CHEGame
         self.cut_position = self.deck.start_pos
         self.card_sequence = self.deck.card_sequence
         # 加载Jackpot金额
-        self.jackpot_initial, self.jackpot_amount = load_jackpot()
+        self.jackpot_initial, self.progressive_amount = load_jackpot()
     
     def dealer_qualifies(self, dealer_eval):
         """检查庄家是否合格（至少有一对4或更好）"""
@@ -309,8 +334,8 @@ class CHEGame:  # 修改类名为CHEGame
 class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
     def __init__(self, initial_balance, username):
         super().__init__()
-        self.title("Casino Hold'em")  # 修改标题
-        self.geometry("1200x730+50+10")
+        self.title("赌场扑克")
+        self.geometry("1100x700+50+10")
         self.resizable(0,0)
         self.configure(bg='#35654d')
         
@@ -346,7 +371,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         # 创建自定义弹窗
         win = tk.Toplevel(self)
         win.title("游戏规则")
-        win.geometry("800x650")
+        win.geometry("800x750")
         win.resizable(0,0)
         win.resizable(0,0)
         win.resizable(False, False)
@@ -371,40 +396,42 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         
         # 游戏规则文本
         rules_text = """
-        Casino Hold'em 游戏规则
+        赌场扑克 游戏规则
 
         1. 游戏开始前下注:
-           - Ante: 基础下注
-           - AA: 可选副注
-           - Jackpot: 可选参与($2.50)
+           - 底注: 基础下注
+           - AA+: 可选副注
+           - 累进大奖: 可选参与($2.50)
 
         2. 游戏流程:
            a. 翻牌前:
                - 发玩家2张牌，庄家2张牌，公共牌3张（翻牌）
                - 查看手牌后选择:
-                 * 弃牌: 输掉Ante和AA下注
-                 * 跟注: 下注Ante的2倍
+                 * 弃牌: 输掉底注
+                 * 加注: 下注底注的2倍
 
            b. 翻牌圈:
-               - 如果跟注，发出最后2张公共牌（转牌和河牌）
+               - 如果加注，发出最后2张公共牌（转牌和河牌）
                - 摊牌比较手牌
 
         3. 庄家资格:
            - 庄家必须至少有一对4或更好的牌才能参与比较
-           - 如果庄家不合格，玩家赢得Ante，Call下注退还
+           - 如果庄家不合格，玩家赢得底注，加注退还
 
         4. 结算规则:
-           - Ante:
+           - 底注:
+             * 庄家不合格: 无条件获胜，按玩家牌型赔率支付
+             * 玩家赢: 按玩家牌型赔率支付
+             * 平局: 退还
+             * 玩家输: 输掉
+
+           - 加注:
              * 玩家赢: 支付1:1
              * 庄家不合格: 退还
+             * 平局: 退还
              * 其他情况: 输掉
 
-           - Call Bet:
-             * 玩家赢: 支付1:1
-             * 庄家不合格: 退还
-             * 其他情况: 输掉
-
-           - AA副注:
+           - AA+边注:
              * 根据玩家最终手牌支付
         """
         
@@ -430,13 +457,18 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         odds_frame = tk.Frame(content_frame, bg='#F0F0F0')
         odds_frame.pack(fill=tk.X, padx=20, pady=5)
 
-        headers = ["牌型", "AA赔率", "jackpot赔率*"]
+        headers = ["牌型", "底注赔率", "AA+赔率", "累进大奖"]
         odds_data = [
-            ("皇家顺", "100:1", "Jackpot大奖"),
-            ("同花顺", "20:1", "Jackpot大奖10%"),
-            ("四条", "10:1", "$1275"),
-            ("葫芦", "3:1", "$375"),
-            ("同花", "2:1", "$250"),
+            ("皇家顺", "100:1", "100:1", "100%累进大奖"),
+            ("同花顺", "49:1", "50:1", "10%累进大奖"),
+            ("四条", "17:1", "40:1", "$1275"),
+            ("葫芦", "3:1", "30:1", "$375"),
+            ("同花", "2:1", "20:1", "$250"),
+            ("顺子", "1:1", "10:1", "-"),
+            ("三条", "1:1", "8:1", "-"),
+            ("两对", "1:1", "7:1", "-"),
+            ("对子A", "1:1", "7:1", "-"),
+            ("其他牌型", "1:1", "-", "-"),
         ]
 
         # 表头
@@ -477,6 +509,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         notes = """
         注: 
         * 玩家的牌和头3张公共牌组成牌型才获胜
+        * 对子A指一对A
         """
         
         notes_label = tk.Label(
@@ -594,8 +627,13 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         if not self.selected_chip:
             return
             
-        # 获取筹码金额
-        chip_value = float(self.selected_chip.replace('$', '').replace('K', '000'))
+        # 获取筹码金额 - 处理K表示1000的情况
+        chip_text = self.selected_chip.replace('$', '')
+        if 'K' in chip_text:
+            # 处理带K的筹码，如1K或2.5K
+            chip_value = float(chip_text.replace('K', '')) * 1000
+        else:
+            chip_value = float(chip_text)
         
         # 更新对应的下注变量
         if bet_type == "ante":
@@ -619,15 +657,26 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         
         # 庄家区域 - 固定高度200
         dealer_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        dealer_frame.place(x=200, y=30, width=400, height=210)
+        dealer_frame.place(x=20, y=10, width=300, height=210)
         self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.dealer_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.dealer_cards_frame = tk.Frame(dealer_frame, bg='#2a4a3c')
         self.dealer_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        self.ante_info_label = tk.Label(
+            table_canvas, 
+            text="庄家最少对子4才合格\n不合格时 加注退还\n底注按玩家牌型赔付", 
+            font=('Arial', 24), 
+            bg='#35654d', 
+            fg='#FFD700',
+            anchor='w',
+            justify='center'
+        )
+        self.ante_info_label.place(x=490, y=120, anchor='center')
         
         # 公共牌区域 - 固定高度200
         community_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        community_frame.place(x=100, y=240, width=600, height=210)
+        community_frame.place(x=20, y=230, width=600, height=210)
         community_label = tk.Label(community_frame, text="公共牌", font=('Arial', 18), bg='#2a4a3c', fg='white')
         community_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.community_cards_frame = tk.Frame(community_frame, bg='#2a4a3c')
@@ -635,14 +684,25 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         
         # 玩家区域 - 固定高度200
         player_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        player_frame.place(x=200, y=450, width=400, height=210)
+        player_frame.place(x=20, y=450, width=300, height=210)
         self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.player_cards_frame = tk.Frame(player_frame, bg='#2a4a3c')
         self.player_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+        self.player_info_label = tk.Label(
+            table_canvas, 
+            text="AA+和累进大奖只使用\n玩家的2张手牌\n和头3张公共牌", 
+            font=('Arial', 24), 
+            bg='#35654d', 
+            fg='#FFD700',
+            anchor='w',
+            justify='center'
+        )
+        self.player_info_label.place(x=490, y=550, anchor='center')
         
         # 右侧控制面板
-        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=300, padx=10, pady=10)
+        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=300, padx=10, pady=2)
         control_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
         # 顶部信息栏
@@ -660,34 +720,37 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         
         self.stage_label = tk.Label(
             info_frame, 
-            text="阶段: 翻牌前",
+            text="翻牌前",
             font=('Arial', 18, 'bold'),
             bg='#2a4a3c',
             fg='#FFD700'
         )
-        self.stage_label.pack(side=tk.LEFT, padx=20, pady=10)
+        self.stage_label.pack(side=tk.RIGHT, padx=20, pady=10)
         
-        # Jackpot显示区域
-        jackpot_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        jackpot_frame.pack(fill=tk.X, pady=10)
+        # Progressive显示区域 - 修改后的代码
+        progressive_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        progressive_frame.pack(fill=tk.X, pady=5)
 
-        # 创建一个内部框架用于居中
-        jackpot_inner_frame = tk.Frame(jackpot_frame, bg='#2a4a3c')
-        jackpot_inner_frame.pack(expand=True, pady=5)  # 使用expand和居中
+        # 使用网格布局确保标签在左边，金额在中间
+        progressive_frame.columnconfigure(0, weight=1)  # 标签列
+        progressive_frame.columnconfigure(1, weight=2)  # 金额列（更宽）
+        progressive_frame.columnconfigure(2, weight=1)  # 空白列（平衡布局）
 
-        jackpot_label = tk.Label(jackpot_inner_frame, text="Jackpot:", 
+        # 标签放在左边
+        progressive_label = tk.Label(progressive_frame, text="累进大奖:", 
                                 font=('Arial', 18), bg='#2a4a3c', fg='gold')
-        jackpot_label.pack(side=tk.LEFT, padx=(0, 5))  # 右侧留5像素间距
+        progressive_label.grid(row=0, column=0, sticky='w', padx=(10, 0), pady=5)
 
-        self.jackpot_var = tk.StringVar()
-        self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
-        self.jackpot_display = tk.Label(jackpot_inner_frame, textvariable=self.jackpot_var, 
-                                    font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='gold')
-        self.jackpot_display.pack(side=tk.LEFT)
+        # 金额放在中间 - 使用StringVar
+        self.progressive_amount_var = tk.StringVar()
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
+        self.progressive_display = tk.Label(progressive_frame, textvariable=self.progressive_amount_var, 
+                                    font=('Arial', 22, 'bold'), bg='#2a4a3c', fg='gold')
+        self.progressive_display.grid(row=0, column=1, sticky='w', pady=3)
         
         # 筹码区域
         chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        chips_frame.pack(fill=tk.X, pady=10)
+        chips_frame.pack(fill=tk.X, pady=5)
         
         chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         chips_label.pack(anchor='w', padx=10, pady=5)
@@ -697,12 +760,12 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         chip_row.pack(fill=tk.X, pady=5, padx=5)
         
         chip_configs = [
-            ("$5", '#ff0000', 'white'),     # 红色背景，白色文字
             ('$10', '#ffa500', 'black'),   # 橙色背景，黑色文字
             ("$25", '#00ff00', 'black'),    # 绿色背景，黑色文字
-            ("$50", '#ffffff', 'black'),    # 白色背景，黑色文字
             ("$100", '#000000', 'white'),   # 黑色背景，白色文字
             ("$500", "#FF7DDA", 'black'),   # 粉色背景，黑色文字
+            ("$1K", '#ffffff', 'black'),    # 白色背景，黑色文字
+            ("$2.5K", '#ff0000', 'white'),     # 红色背景，白色文字
         ]
         
         self.chip_buttons = []
@@ -712,41 +775,67 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             chip_canvas = tk.Canvas(chip_row, width=55, height=55, bg='#2a4a3c', highlightthickness=0)
             
             # 创建圆形（尺寸调整为51x51，在55x55画布中居中）
-            chip_canvas.create_oval(2, 2, 53, 53, fill=bg_color, outline='black')
+            chip_canvas.create_oval(2, 2, 54, 54, fill=bg_color, outline='black')
             
             # 创建文本（位置调整为画布中心）
-            text_id = chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 15, 'bold'))
+            text_id = chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 14, 'bold'))
             
             chip_canvas.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
             chip_canvas.pack(side=tk.LEFT, padx=5)
             self.chip_buttons.append(chip_canvas)
             self.chip_texts[chip_canvas] = text  # 存储文本
         
-        # 默认选中$5筹码
-        self.select_chip("$5")
+        # 默认选中$10筹码
+        self.select_chip("$10")
+
+        # 每注限制
+        minmax_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        minmax_frame.pack(fill=tk.X, pady=5)
+        
+        # 标题行
+        header_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        header_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
+        
+        tk.Label(header_frame, text="底注最低", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="底注最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="边注最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        
+        # 数值行
+        value_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        value_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+        
+        tk.Label(value_frame, text="$10", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$10,000", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$2,500", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
         
         # 下注区域
         bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_frame.pack(fill=tk.X, pady=10)
-        
-        # 第一行：Jackpot选项
-        jackpot_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        jackpot_frame.pack(fill=tk.X, padx=20, pady=5)
-        
-        self.jackpot_check_var = tk.IntVar()
-        self.jackpot_cb = tk.Checkbutton(
-            jackpot_frame, text="Jackpot ($2.50)", 
-            variable=self.jackpot_check_var, font=('Arial', 14),
+        bet_frame.pack(fill=tk.X, pady=5)
+
+        # 第一行：Progressive选项
+        progressive_frame = tk.Frame(bet_frame, bg='#2a4a3c')
+        progressive_frame.pack(fill=tk.X, padx=20, pady=5)
+
+        self.progressive_var = tk.IntVar()
+        self.progressive_cb = tk.Checkbutton(
+            progressive_frame, text="累进大奖 ($2.50)", 
+            variable=self.progressive_var, font=('Arial', 14),
             bg='#2a4a3c', fg='white', selectcolor='#35654d'
         )
-        self.jackpot_cb.pack(side=tk.LEFT)
+        self.progressive_cb.pack(side=tk.LEFT)
         
         # 第二行：Ante和AA下注区域（合并到一行）
         ante_aa_frame = tk.Frame(bet_frame, bg='#2a4a3c')
         ante_aa_frame.pack(fill=tk.X, padx=20, pady=5)
         
         # Ante部分
-        ante_label = tk.Label(ante_aa_frame, text="Ante:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        ante_label = tk.Label(ante_aa_frame, text="底注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         ante_label.pack(side=tk.LEFT)
         
         self.ante_var = tk.StringVar(value="0")
@@ -760,7 +849,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         tk.Label(ante_aa_frame, text="   ", bg='#2a4a3c').pack(side=tk.LEFT)
         
         # AA部分
-        aa_label = tk.Label(ante_aa_frame, text="AA:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        aa_label = tk.Label(ante_aa_frame, text="AA+:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         aa_label.pack(side=tk.LEFT)
         
         self.aa_var = tk.StringVar(value="0")
@@ -774,7 +863,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         call_frame = tk.Frame(bet_frame, bg='#2a4a3c')
         call_frame.pack(fill=tk.X, padx=20, pady=5)
         
-        call_label = tk.Label(call_frame, text=" Call:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        call_label = tk.Label(call_frame, text="加注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         call_label.pack(side=tk.LEFT)
         
         self.call_var = tk.StringVar(value="0")
@@ -783,18 +872,13 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         self.call_display.pack(side=tk.LEFT, padx=5)
         self.bet_widgets["call"] = self.call_display
 
-        # 新增提示文字 - 在下注模块下方
-        self.hint_label = tk.Label(call_frame, text="庄家玩对子4或以上", 
-                                font=('Arial', 18), bg='#2a4a3c', fg='#FFD700')
-        self.hint_label.pack(pady=(0, 10))
-
         # 游戏操作按钮框架 - 用于放置所有操作按钮
         self.action_frame = tk.Frame(control_frame, bg='#2a4a3c')
         self.action_frame.pack(fill=tk.X, pady=10)
 
         # 创建一个框架来容纳重置按钮和开始游戏按钮
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重设金额"按钮
         self.reset_bets_button = tk.Button(
@@ -919,8 +1003,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         try:
             self.ante = int(self.ante_var.get())
             self.aa = int(self.aa_var.get())
-            self.participate_jackpot = bool(self.jackpot_check_var.get())
-            self.last_jackpot_selection = bool(self.jackpot_check_var.get())  # 记录当前选择
+            self.participate_jackpot = bool(self.progressive_var.get())
+            self.last_jackpot_selection = bool(self.progressive_var.get())  # 记录当前选择
             
             # 检查Ante至少5块
             if self.ante < 5:
@@ -939,6 +1023,20 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                 
             self.balance -= total_bet
             self.update_balance()
+            
+            # 更新Progressive奖池
+            # 玩家下注的0.08（不包括Progressive下注）进入奖池
+            ante_aa_bet = self.ante + self.aa
+            rake = ante_aa_bet * 0.08
+            self.game.progressive_amount += rake
+            
+            # 如果有下注Progressive，额外将2.21加入奖池
+            if self.participate_jackpot:
+                self.game.progressive_amount += 2.21
+            
+            # 保存更新后的奖池金额
+            save_progressive(self.game.progressive_amount)
+            self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
             
             # 更新本局下注显示
             self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
@@ -1000,14 +1098,14 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             
             # 更新游戏状态
             self.stage_label.config(text="阶段: 翻牌前")
-            self.status_label.config(text="做出决策: 弃牌或跟注")
+            self.status_label.config(text="做出决策: 弃牌或下注")
             
             # 创建操作按钮 - 替换开始按钮
             for widget in self.action_frame.winfo_children():
                 widget.destroy()
                 
             action_buttons_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-            action_buttons_frame.pack(pady=10)
+            action_buttons_frame.pack(pady=5)
                 
             self.fold_button = tk.Button(
                 action_buttons_frame, text="弃牌", 
@@ -1018,7 +1116,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             self.fold_button.pack(side=tk.LEFT, padx=9)
                 
             self.call_button = tk.Button(
-                action_buttons_frame, text="跟注 (2x)", 
+                action_buttons_frame, text="下注2倍", 
                 command=lambda: self.play_action("call"), 
                 state=tk.DISABLED,
                 font=('Arial', 14), bg='#4CAF50', fg='white', width=9
@@ -1028,7 +1126,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             # 禁用下注区域
             self.ante_display.unbind("<Button-1>")
             self.aa_display.unbind("<Button-1>")
-            self.jackpot_cb.config(state=tk.DISABLED)
+            self.progressive_cb.config(state=tk.DISABLED)
             for chip in self.chip_buttons:
                 chip.unbind("<Button-1>")
             
@@ -1236,7 +1334,15 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             self.game.call_bet = call_amount
             # 更新Call显示
             self.call_var.set(str(int(call_amount)))
-            self.status_label.config(text=f"跟注: ${call_amount}")
+            self.status_label.config(text=f"加注: ${call_amount}")
+
+            # 更新Progressive奖池 - 添加Call Bet的0.08
+            call_rake = call_amount * 0.08
+            self.game.progressive_amount += call_rake
+            
+            # 保存更新后的奖池金额
+            save_progressive(self.game.progressive_amount)
+            self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
 
             self.fold_button.config(state=tk.DISABLED)
             self.call_button.config(state=tk.DISABLED)
@@ -1315,7 +1421,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                 command=self.reset_game, 
                 font=('Arial', 14), bg='#2196F3', fg='white', width=15
             )
-            restart_btn.pack(pady=10)
+            restart_btn.pack(pady=5)
             restart_btn.bind("<Button-3>", self.show_card_sequence)
             
             # 设置30秒后自动重置
@@ -1400,7 +1506,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             command=self.reset_game, 
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
-        restart_btn.pack(pady=10)
+        restart_btn.pack(pady=5)
         restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
@@ -1420,13 +1526,25 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         # 检查庄家是否合格
         dealer_qualified = self.game.dealer_qualifies(dealer_eval)
         
-        # 1. Ante 结算
+        # 1. Ante 结算 (修改后的规则)
         if not dealer_qualified:
-            # 庄家不合格 - 退还Ante
-            self.win_details['ante'] = self.game.ante
+            # 庄家不合格 - Ante按玩家牌型赔率支付
+            player_hand_rank = player_eval[0]
+            if player_hand_rank in ANTE_PAYOUT:
+                odds = ANTE_PAYOUT[player_hand_rank]
+                self.win_details['ante'] = self.game.ante * (1 + odds)
+            else:
+                # 其他牌型 1:1
+                self.win_details['ante'] = self.game.ante * 2
         elif player_eval > dealer_eval:
-            # 玩家赢 - 支付1:1
-            self.win_details['ante'] = self.game.ante * 2
+            # 玩家赢 - Ante按玩家牌型赔率支付
+            player_hand_rank = player_eval[0]
+            if player_hand_rank in ANTE_PAYOUT:
+                odds = ANTE_PAYOUT[player_hand_rank]
+                self.win_details['ante'] = self.game.ante * (1 + odds)
+            else:
+                # 其他牌型 1:1
+                self.win_details['ante'] = self.game.ante * 2
         elif player_eval == dealer_eval:
             # 平局 - 退还Ante
             self.win_details['ante'] = self.game.ante
@@ -1437,7 +1555,10 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         total_winnings += self.win_details['ante']
         
         # 2. Call Bet 结算
-        if player_eval > dealer_eval:
+        if not dealer_qualified:
+            # 庄家不合格 - 退还Call
+            self.win_details['call'] = self.game.call_bet
+        elif player_eval > dealer_eval:
             # 玩家赢 - 支付1:1
             self.win_details['call'] = self.game.call_bet * 2
         elif player_eval == dealer_eval:
@@ -1449,120 +1570,75 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             
         total_winnings += self.win_details['call']
         
-        # 3. AA 副注结算
+        # 3. AA 副注结算 (修改后的赔率)
         if self.game.aa > 0:
-            player_hand_rank = player_eval[0]
-            if player_hand_rank in AA_PAYOUT:
-                odds = AA_PAYOUT[player_hand_rank]
+            # 获取前3张公共牌
+            flop_cards = self.game.community_cards[:3]
+            # 组合玩家手牌和前3张公共牌
+            aa_cards = self.game.player_hole + flop_cards
+            
+            # 评估AA手牌
+            aa_eval, _ = find_best_5(aa_cards)
+            aa_hand_rank = aa_eval[0]
+            aa_hand_cards = aa_eval[1]
+            
+            # 检查是否是对子Aces
+            is_pair_aces = (aa_hand_rank == 1 and 
+                        len(aa_hand_cards) > 0 and 
+                        aa_hand_cards[0] == 14)
+            
+            if is_pair_aces:
+                # 对子Aces特殊赔付 7:1
+                self.win_details['aa'] = self.game.aa * (1 + 7)
+                total_winnings += self.win_details['aa']
+            elif aa_hand_rank in AA_PAYOUT:
+                odds = AA_PAYOUT[aa_hand_rank]
                 self.win_details['aa'] = self.game.aa * (1 + odds)
                 total_winnings += self.win_details['aa']
             else:
                 # 未达到支付牌型，输掉AA下注
                 self.win_details['aa'] = 0
-        
-        # 4. Jackpot 结算
+
         if self.game.participate_jackpot:
-            jp_cards = self.game.player_hole + self.game.community_cards[:3]
-            jp_eval, _ = evaluate_hand(jp_cards)
+            progressive_cards = self.game.player_hole + self.game.community_cards[:3]
+            pg_eval, _ = evaluate_hand(progressive_cards)
             
-            if jp_eval == 9:  # 皇家顺
-                amount = max(self.game.jackpot_amount, 10000)
+            # 定义奖金规则
+            jackpot_rules = {
+                9: {"amount": lambda: max(self.game.progressive_amount, 10000), "message": "皇家顺! 赢得累进大奖 ${amount:.2f}!"},
+                8: {"amount": lambda: max(self.game.progressive_amount * 0.1, 1000), "message": "同花顺! 赢得累进大奖 ${amount:.2f}!"},
+                7: {"amount": 1250, "message": "四条! 赢得累进大奖 $1,250!"},
+                6: {"amount": 375, "message": "葫芦! 赢得累进大奖 $375!"},
+                5: {"amount": 250, "message": "同花! 赢得累进大奖 $250!"}
+            }
+            
+            if pg_eval in jackpot_rules:
+                rule = jackpot_rules[pg_eval]
+                
+                # 计算奖金金额
+                if callable(rule["amount"]):
+                    amount = rule["amount"]()
+                else:
+                    amount = rule["amount"]
+                
                 self.win_details['jackpot'] = amount
                 total_winnings += amount
-                # 重置Jackpot为初始值
-                self.game.jackpot_amount = 197301.26
-                messagebox.showinfo("恭喜您获得Jackpot大奖！", 
-                                f"皇家顺! 赢得Jackpot大奖 ${amount:.2f}!")
-            
-            elif jp_eval == 8:  # 同花顺
-                amount = max(self.game.jackpot_amount * 0.1, 1000)
-                self.win_details['jackpot'] = amount
-                total_winnings += amount
-                # 重置Jackpot为初始值
-                self.game.jackpot_amount = 197301.26
-                messagebox.showinfo("恭喜您获得Jackpot大奖！", 
-                                f"同花顺! 赢得Jackpot大奖 ${amount:.2f}!")
-            
-            elif jp_eval == 7:  # 四条
-                amount = 1250
-                self.win_details['jackpot'] = amount
-                total_winnings += amount
-                self.game.jackpot_amount -= amount
-                messagebox.showinfo("恭喜您获得Jackpot奖励！", 
-                                f"四条! 赢得Jackpot奖励 ${amount:.2f}!")
-            
-            elif jp_eval == 6:  # 葫芦
-                amount = 375
-                self.win_details['jackpot'] = amount
-                total_winnings += amount
-                self.game.jackpot_amount -= amount
-                messagebox.showinfo("恭喜您获得Jackpot奖励！", 
-                                f"葫芦! 赢得Jackpot奖励 ${amount:.2f}!")
-            
-            elif jp_eval == 5:  # 同花
-                amount = 250
-                self.win_details['jackpot'] = amount
-                total_winnings += amount
-                self.game.jackpot_amount -= amount
-                messagebox.showinfo("恭喜您获得Jackpot奖励！", 
-                                f"同花! 赢得Jackpot奖励 ${amount:.2f}!")
-            
-            # 保存Jackpot金额
-            save_jackpot(self.game.jackpot_amount)
-            self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
+                
+                # 从奖池扣除
+                self.game.progressive_amount -= amount
+                
+                # 显示消息
+                messagebox.showinfo("恭喜您获得累进大奖！", rule["message"].format(amount=amount))
             
         return total_winnings
 
     def animate_collect_cards(self, auto_reset):
-        """执行收牌动画：先翻转所有牌为背面，然后向右收起"""
+        """执行收牌动画：向右收起"""
         # 禁用所有按钮
         self.disable_action_buttons()
         
-        # 第一步：翻转所有牌为背面
-        self.flip_all_to_back()
-        
-        # 第二步：设置动画完成后执行真正的重置
-        self.after(1000, lambda: self.animate_move_cards_out(auto_reset))
-
-    def flip_all_to_back(self):
-        """将所有牌翻转为背面"""
-        self.flipping_cards = []  # 存储正在翻转的卡片
-        
-        # 收集所有需要翻转的卡片
-        for card_label in self.active_card_labels:
-            if card_label.is_face_up:
-                self.flipping_cards.append(card_label)
-        
-        # 如果没有需要翻转的卡片，直接返回
-        if not self.flipping_cards:
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-            
-        # 开始翻转动画
-        self.animate_flip_to_back_step(0)
-
-    def animate_flip_to_back_step(self, step):
-        """执行翻转动画的每一步"""
-        if step >= 10:  # 假设10步完成
-            # 翻转完成，将所有正在翻转的卡片设为背面
-            for card_label in self.flipping_cards:
-                card_label.config(image=self.back_image)
-                card_label.is_face_up = False
-                
-            # 开始移动动画
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-
-        # 模拟翻转效果：先缩小宽度，再放大（但背面）
-        width = 100 - (step * 10) if step < 5 else (step - 5) * 10
-        if width <= 0:
-            width = 1
-
-        for card_label in self.flipping_cards:
-            card_label.place(width=width)
-
-        step += 1
-        self.after(50, lambda: self.animate_flip_to_back_step(step))
+        # 设置动画完成后执行真正的重置
+        self.animate_move_cards_out(auto_reset)
 
     def animate_move_cards_out(self, auto_reset):
         """将所有牌向右移出屏幕"""
@@ -1657,7 +1733,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         self.aa_var.set("0")
         self.call_var.set("0")
         # 设置Jackpot复选框为上一局的选择
-        self.jackpot_check_var.set(1 if self.last_jackpot_selection else 0)
+        self.progressive_var.set(1 if self.last_jackpot_selection else 0)
         
         # 重置背景色为白色
         for widget in self.bet_widgets.values():
@@ -1669,7 +1745,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         # 恢复下注区域
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.aa_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("aa"))
-        self.jackpot_cb.config(state=tk.NORMAL)
+        self.progressive_cb.config(state=tk.NORMAL)
         for chip in self.chip_buttons:
             # 使用存储的文本重新绑定事件
             text = self.chip_texts[chip]
@@ -1680,7 +1756,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             widget.destroy()
         
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重设金额"按钮
         self.reset_bets_button = tk.Button(
@@ -1705,6 +1781,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         if auto_reset:
             self.status_label.config(text="30秒已到，自动开始新游戏")
             self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
+        else:
+            self.status_label.config(text="设置下注金额并开始游戏")
 
     def show_card_sequence(self, event):
         """显示本局牌序窗口 - 右键点击时取消30秒计时"""
@@ -1838,7 +1916,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-def main(initial_balance=1000, username="Guest"):
+def main(initial_balance=10000, username="Guest"):
     app = CHEGUI(initial_balance, username)  # 修改为CHEGUI
     app.mainloop()
     return app.balance

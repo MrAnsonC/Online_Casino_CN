@@ -89,7 +89,7 @@ class Deck:
         try:
             # 调用外部 shuffle.py，超时 30 秒
             result = subprocess.run(
-                [sys.executable, shuffle_script],
+                [sys.executable, shuffle_script, "false", "1"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -556,7 +556,7 @@ class VideoPokerGUI(tk.Tk):
         
         # 游戏规则文本
         rules_text = """
-        视频扑克 (Video Poker) 游戏规则
+        视频扑克 游戏规则
 
         1. 游戏开始前下注:
            - 选择下注金额（至少$5）

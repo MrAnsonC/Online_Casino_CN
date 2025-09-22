@@ -42,13 +42,14 @@ TRIPS_PAYOUT = {
     4: 30     # 三条 30:1
 }
 
+# 修改后的Jackpot赔率表
 JACKPOT_PAYOUT = {
-    10: 1.0,   # 皇家顺 100% Jackpot
-    9: 0.1,    # 同花顺 10% Jackpot
-    8: 500,    # 四条 $500
-    7: 100,    # 葫芦 $100
-    6: 50,     # 同花 $50
-    5: 25      # 顺子 $25
+    10: {"type": "percentage", "value": 1.0, "min": 175000},   # 皇家顺: 100% Jackpot 或 $175,000 (取较高者)
+    9: {"type": "percentage", "value": 0.1, "min": 17500},     # 同花顺: 10% Jackpot 或 $17,500 (取较高者)
+    8: {"type": "fixed", "value": 7000},    # 四条 $7,000
+    7: {"type": "fixed", "value": 5000},    # 葫芦 $5,000
+    6: {"type": "fixed", "value": 2500},    # 同花 $2,500
+    5: {"type": "fixed", "value": 1000}     # 顺子 $1,000
 }
 
 def get_data_file_path():
@@ -76,7 +77,7 @@ def update_balance_in_json(username, new_balance):
 # Jackpot 文件加载与保存
 def load_jackpot():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
-    default_jackpot = 110121.07
+    default_jackpot = 157301.26
     # 文件不存在时使用默认奖池
     if not os.path.exists(path):
         return True, default_jackpot
@@ -91,7 +92,7 @@ def load_jackpot():
     # 未找到 UTH 条目时也使用默认
     return True, default_jackpot
 
-def save_jackpot(jackpot):
+def save_progressive(jackpot):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
     data = []
     # 如果文件存在，读取原有数据
@@ -139,7 +140,7 @@ class Deck:
         try:
             # 调用外部 shuffle.py，超时 30 秒
             result = subprocess.run(
-                [sys.executable, shuffle_script],
+                [sys.executable, shuffle_script, "false", "1"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -285,7 +286,7 @@ class LetItRideGame:
             "community": [False, False]  # 修改为只有2张公共牌
         }
         # 加载Jackpot金额
-        self.jackpot_initial, self.jackpot_amount = load_jackpot()
+        self.jackpot_initial, self.progressive_amount = load_jackpot()
         # 记录牌序信息
         self.cut_position = self.deck.start_pos
         self.card_sequence = self.deck.card_sequence
@@ -324,8 +325,8 @@ class LetItRideGame:
 class LetItRideGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
-        self.title("Let It Ride")
-        self.geometry("1200x700+50+10")
+        self.title("任逍遥扑克")
+        self.geometry("1020x700+50+10")
         self.resizable(0,0)
         self.configure(bg='#35654d')
         
@@ -363,7 +364,7 @@ class LetItRideGUI(tk.Tk):
         # 创建自定义弹窗
         win = tk.Toplevel(self)
         win.title("游戏规则")
-        win.geometry("800x650")
+        win.geometry("900x700")
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
         
@@ -384,44 +385,31 @@ class LetItRideGUI(tk.Tk):
         content_frame = tk.Frame(canvas, bg='#F0F0F0')
         canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
         
+        # 游戏标题
+        title_label = tk.Label(
+            content_frame, 
+            text="任逍遥扑克 游戏规则",
+            font=('微软雅黑', 16, 'bold'),
+            bg='#F0F0F0',
+            fg='#2a4a3c'
+        )
+        title_label.pack(pady=(0, 15))
+        
         # 游戏规则文本
         rules_text = """
-        Let It Ride 游戏规则
+        任逍遥扑克是一种使用标准扑克牌的赌场游戏。玩家下三个等额的注（A注、B注和C注），
+        并可以选择下额外的三张手牌加注和累进大奖。
 
-        1. 游戏开始前下注:
-           - A注, B注, C注: 基础下注 (金额相同)
-           - Trips: 可选副注
-           - Jackpot: 可选参与($2.50)
+        游戏流程:
+          1. 玩家下三个等额的注（A注、B注和C注）
+          2. 玩家可以选择下三张手牌加注和参与累进大奖
+          3. 发牌：玩家获得3张底牌，桌上有2张公共牌（面朝下）
+          4. 查看底牌后，玩家决定是否收回A注或保留A注
+          5. 翻开第一张公共牌后，玩家决定是否收回B注或保留B注
+          6. 翻开第二张公共牌，结算所有保留的下注
 
-        2. 游戏流程:
-           a. 初始发牌:
-               - 玩家获得3张底牌(面朝下)
-               - 公共牌2张(面朝下)
-               
-           b. 第一阶段决策:
-               - 查看底牌后选择:
-                 * 保留A注: 保留A注筹码
-                 * 收回A注: 收回A注筹码(退还)
-                 
-           c. 翻牌圈:
-               - 翻开第一张公共牌
-               
-           d. 第二阶段决策:
-               - 查看底牌+第一张公共牌后选择:
-                 * 保留B注: 保留B注筹码
-                 * 收回B注: 收回B注筹码(退还)
-                 
-           e. 河牌圈:
-               - 翻开第二张公共牌
-               
-           f. 摊牌:
-               - 玩家用3张底牌+2张公共牌组成最佳5张牌
-               - 结算所有保留的下注
-
-        3. 结算规则:
-           - 如果玩家选择保留下注，则根据牌型获得赔付
-           - 如果玩家收回下注，则退还该下注金额
-           - C注始终保留，不提供收回选项
+        牌型排名（从高到低）:
+          皇家顺 > 同花顺 > 四条 > 葫芦 > 同花 > 顺子 > 三条 > 两对 > 对子10+ > 对子 > 高牌
         """
         
         rules_label = tk.Label(
@@ -435,80 +423,90 @@ class LetItRideGUI(tk.Tk):
         )
         rules_label.pack(fill=tk.X, padx=10, pady=5)
         
-        # 赔率表
+        # 赔率表标题
         tk.Label(
             content_frame, 
             text="赔率表",
-            font=('微软雅黑', 12, 'bold'),
-            bg='#F0F0F0'
-        ).pack(fill=tk.X, padx=10, pady=(20, 5), anchor='w')
+            font=('微软雅黑', 14, 'bold'),
+            bg='#F0F0F0',
+            fg='#2a4a3c'
+        ).pack(fill=tk.X, padx=10, pady=(20, 10), anchor='center')
         
-        odds_frame = tk.Frame(content_frame, bg='#F0F0F0')
+        # 创建赔率表格框架
+        odds_frame = tk.Frame(content_frame, bg='#F0F0F0', relief=tk.RAISED, bd=1)
         odds_frame.pack(fill=tk.X, padx=20, pady=5)
-
-        headers = ["牌型", "主注赔率", "Trips赔率", "jackpot赔率*"]
+        
+        # 表头
+        headers = ["牌型", "主注", "三张手牌加注", "累进大奖"]
+        header_bg = '#4B8BBE'
+        header_fg = 'white'
+        
+        for col, header in enumerate(headers):
+            header_label = tk.Label(
+                odds_frame,
+                text=header,
+                font=('微软雅黑', 11, 'bold'),
+                bg=header_bg,
+                fg=header_fg,
+                padx=10,
+                pady=8,
+                width=15
+            )
+            header_label.grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
+        
+        # 表格数据
         odds_data = [
-            ("皇家顺", "500:1", "100:1", "Jackpot大奖"),
-            ("同花顺", "200:1", "40:1", "Jackpot大奖10%"),
-            ("四条", "50:1", "30:1", "$500"),
-            ("葫芦", "11:1", "6:1", "$100"),
-            ("同花", "8:1", "3:1", "$50"),
-            ("顺子", "5:1", "6:1", "$25"),
+            ("皇家顺", "500:1", "100:1", "100%累进大奖 或 $175,000\n(取较高者)"),
+            ("同花顺", "200:1", "40:1", "10%累进大奖 或 $17,500\n(取较高者)"),
+            ("四条", "50:1", "30:1", "$7,000"),
+            ("葫芦", "11:1", "6:1", "$5,000"),
+            ("同花", "8:1", "3:1", "$2,500"),
+            ("顺子", "5:1", "6:1", "$1,000"),
             ("三条", "3:1", "30:1", "-"),
             ("两对", "2:1", "-", "-"),
             ("对子10+", "1:1", "-", "-")
         ]
-
-        # 表头
-        for col, h in enumerate(headers):
-            tk.Label(
-                odds_frame,
-                text=h,
-                font=('微软雅黑', 10, 'bold'),
-                bg='#4B8BBE',
-                fg='white',
-                padx=10, pady=5,
-                anchor='center',
-                justify='center'
-            ).grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
-
-        # 表格内容
-        for r, row_data in enumerate(odds_data, start=1):
-            bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
-            for c, txt in enumerate(row_data):
-                tk.Label(
-                    odds_frame,
-                    text=txt,
-                    font=('微软雅黑', 10),
-                    bg=bg,
-                    padx=10, pady=5,
-                    anchor='center',
-                    justify='center'
-                ).grid(row=r, column=c, sticky='nsew', padx=1, pady=1)
-
-        # 平均分配每列宽度，让 sticky='nsew' 生效
-        for c in range(len(headers)):
-            odds_frame.columnconfigure(c, weight=1)
-        # 可选：也给行设置权重，支持垂直拉伸
-        for r in range(len(odds_data) + 1):
-            odds_frame.rowconfigure(r, weight=1)
         
-        # 注释
-        notes = """
-        注: 
-        * 玩家的牌和头3张公共牌组成牌型才获胜
+        for row, row_data in enumerate(odds_data, start=1):
+            row_bg = '#E8F4F8' if row % 2 == 0 else '#FFFFFF'
+            for col, cell_text in enumerate(row_data):
+                cell_label = tk.Label(
+                    odds_frame,
+                    text=cell_text,
+                    font=('微软雅黑', 10),
+                    bg=row_bg,
+                    padx=10,
+                    pady=8,
+                    justify=tk.CENTER,
+                    wraplength=150
+                )
+                cell_label.grid(row=row, column=col, sticky='nsew', padx=1, pady=1)
+        
+        # 配置网格权重
+        for col in range(len(headers)):
+            odds_frame.columnconfigure(col, weight=1)
+        for row in range(len(odds_data) + 1):
+            odds_frame.rowconfigure(row, weight=1)
+        
+        # 注意事项
+        notes_text = """
+        注意事项:
+        - Jackpot奖金需要玩家参与Jackpot下注($20)才有资格获得
+        - Jackpot奖金基于玩家的3张底牌和头2张公共牌组成的牌型
+        - 对子10+指的是对子为10、J、Q、K或A
+        - Trips注基于玩家的3张底牌评估
         """
         
         notes_label = tk.Label(
             content_frame, 
-            text=notes,
+            text=notes_text,
             font=('微软雅黑', 10),
             bg='#F0F0F0',
             justify=tk.LEFT,
             padx=10,
-            pady=10
+            pady=15
         )
-        notes_label.pack(fill=tk.X, padx=10, pady=5)
+        notes_label.pack(fill=tk.X, padx=10, pady=10)
         
         # 更新滚动区域
         content_frame.update_idletasks()
@@ -518,12 +516,17 @@ class LetItRideGUI(tk.Tk):
         close_btn = ttk.Button(
             win,
             text="关闭",
-            command=win.destroy
+            command=win.destroy,
+            style='TButton'
         )
         close_btn.pack(pady=10)
         
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        
+        # 配置按钮样式
+        style = ttk.Style()
+        style.configure('TButton', font=('微软雅黑', 10))
         
     def on_close(self):
         # 取消自动重置计时器
@@ -664,7 +667,7 @@ class LetItRideGUI(tk.Tk):
         
         # 公共牌区域 - 固定高度200
         community_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        community_frame.place(x=245, y=100, width=270, height=210)  # 调整位置和宽度以适应2张牌
+        community_frame.place(x=150, y=100, width=270, height=210)  # 调整位置和宽度以适应2张牌
         community_label = tk.Label(community_frame, text="公共牌", font=('Arial', 18), bg='#2a4a3c', fg='white')
         community_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.community_cards_frame = tk.Frame(community_frame, bg='#2a4a3c')
@@ -672,16 +675,15 @@ class LetItRideGUI(tk.Tk):
         
         # 玩家区域 - 固定高度200
         player_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        player_frame.place(x=200, y=350, width=350, height=210)
+        player_frame.place(x=110, y=350, width=350, height=210)
         self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.player_cards_frame = tk.Frame(player_frame, bg='#2a4a3c')
         self.player_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        # 右侧控制面板 - 固定宽度300像素
-        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=450, padx=10, pady=10)
+        # 右侧控制面板
+        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=300, padx=10, pady=2)
         control_frame.pack(side=tk.RIGHT, fill=tk.Y)
-        control_frame.pack_propagate(False)  # 禁止框架根据内容调整大小
         
         # 顶部信息栏
         info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
@@ -698,34 +700,37 @@ class LetItRideGUI(tk.Tk):
         
         self.stage_label = tk.Label(
             info_frame, 
-            text="准备下注",
+            text="翻牌前",
             font=('Arial', 18, 'bold'),
             bg='#2a4a3c',
             fg='#FFD700'
         )
-        self.stage_label.pack(side=tk.LEFT, padx=20, pady=10)
+        self.stage_label.pack(side=tk.RIGHT, padx=20, pady=10)
         
-        # Jackpot显示区域
-        jackpot_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        jackpot_frame.pack(fill=tk.X, pady=10)
+        # Progressive显示区域 - 修改后的代码
+        progressive_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        progressive_frame.pack(fill=tk.X, pady=5)
 
-        # 创建一个内部框架用于居中
-        jackpot_inner_frame = tk.Frame(jackpot_frame, bg='#2a4a3c')
-        jackpot_inner_frame.pack(expand=True, pady=5)  # 使用expand和居中
+        # 使用网格布局确保标签在左边，金额在中间
+        progressive_frame.columnconfigure(0, weight=1)  # 标签列
+        progressive_frame.columnconfigure(1, weight=2)  # 金额列（更宽）
+        progressive_frame.columnconfigure(2, weight=1)  # 空白列（平衡布局）
 
-        jackpot_label = tk.Label(jackpot_inner_frame, text="Jackpot:", 
+        # 标签放在左边
+        progressive_label = tk.Label(progressive_frame, text="累进大奖:", 
                                 font=('Arial', 18), bg='#2a4a3c', fg='gold')
-        jackpot_label.pack(side=tk.LEFT, padx=(0, 5))  # 右侧留5像素间距
+        progressive_label.grid(row=0, column=0, sticky='w', padx=(10, 0), pady=5)
 
-        self.jackpot_var = tk.StringVar()
-        self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
-        self.jackpot_display = tk.Label(jackpot_inner_frame, textvariable=self.jackpot_var, 
-                                    font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='gold')
-        self.jackpot_display.pack(side=tk.LEFT)
+        # 金额放在中间 - 使用StringVar
+        self.progressive_amount_var = tk.StringVar()
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
+        self.progressive_display = tk.Label(progressive_frame, textvariable=self.progressive_amount_var, 
+                                    font=('Arial', 22, 'bold'), bg='#2a4a3c', fg='gold')
+        self.progressive_display.grid(row=0, column=1, sticky='w', pady=3)
         
         # 筹码区域
         chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        chips_frame.pack(fill=tk.X, pady=10)
+        chips_frame.pack(fill=tk.X, pady=5)
         
         chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         chips_label.pack(anchor='w', padx=10, pady=5)
@@ -735,12 +740,12 @@ class LetItRideGUI(tk.Tk):
         chip_row.pack(fill=tk.X, pady=5, padx=5)
         
         chip_configs = [
-            ("$5", '#ff0000', 'white'),     # 红色背景，白色文字
             ('$10', '#ffa500', 'black'),   # 橙色背景，黑色文字
             ("$25", '#00ff00', 'black'),    # 绿色背景，黑色文字
-            ("$50", '#ffffff', 'black'),    # 白色背景，黑色文字
             ("$100", '#000000', 'white'),   # 黑色背景，白色文字
             ("$500", "#FF7DDA", 'black'),   # 粉色背景，黑色文字
+            ("$1K", '#ffffff', 'black'),    # 白色背景，黑色文字
+            ("$2.5K", '#ff0000', 'white'),     # 红色背景，白色文字
         ]
         
         self.chip_buttons = []
@@ -750,42 +755,67 @@ class LetItRideGUI(tk.Tk):
             chip_canvas = tk.Canvas(chip_row, width=55, height=55, bg='#2a4a3c', highlightthickness=0)
             
             # 创建圆形（尺寸调整为51x51，在55x55画布中居中）
-            chip_canvas.create_oval(2, 2, 53, 53, fill=bg_color, outline='black')
+            chip_canvas.create_oval(2, 2, 54, 54, fill=bg_color, outline='black')
             
             # 创建文本（位置调整为画布中心）
-            text_id = chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 15, 'bold'))
+            text_id = chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 14, 'bold'))
             
             chip_canvas.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
             chip_canvas.pack(side=tk.LEFT, padx=5)
             self.chip_buttons.append(chip_canvas)
             self.chip_texts[chip_canvas] = text  # 存储文本
         
-        # 默认选中$5筹码
-        self.select_chip("$5")
-        
-        # 下注区域 - 修改为两行布局
-        bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_frame.pack(fill=tk.X, pady=10)
-        
-        # 第一行：Jackpot和Trips
-        top_bet_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        top_bet_frame.pack(fill=tk.X, padx=20, pady=5)
+        # 默认选中$10筹码
+        self.select_chip("$10")
 
-        # Jackpot 复选框
-        self.jackpot_check_var = tk.IntVar()
-        self.jackpot_cb = tk.Checkbutton(
-            top_bet_frame, text="Jackpot ($2.50)", 
-            variable=self.jackpot_check_var, font=('Arial', 14),
+        # 每注限制
+        minmax_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        minmax_frame.pack(fill=tk.X, pady=5)
+        
+        # 标题行
+        header_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        header_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
+        
+        tk.Label(header_frame, text="底注最低", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="底注最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="边注最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        
+        # 数值行
+        value_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        value_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+        
+        tk.Label(value_frame, text="$10", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$10,000", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$2,500", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        
+        # 下注区域
+        bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        bet_frame.pack(fill=tk.X, pady=5)
+
+        # 第一行：Progressive选项
+        progressive_frame = tk.Frame(bet_frame, bg='#2a4a3c')
+        progressive_frame.pack(fill=tk.X, padx=20, pady=5)
+
+        self.progressive_var = tk.IntVar()
+        self.progressive_cb = tk.Checkbutton(
+            progressive_frame, text="累进大奖 ($20.00)", 
+            variable=self.progressive_var, font=('Arial', 14),
             bg='#2a4a3c', fg='white', selectcolor='#35654d'
         )
-        self.jackpot_cb.pack(side=tk.LEFT)
+        self.progressive_cb.pack(side=tk.LEFT)
 
-        # Trips 标签和显示 
-        trips_label = tk.Label(top_bet_frame, text="3 Card Bonus:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        # 三张扑克标签和显示 
+        trips_label = tk.Label(progressive_frame, text="三张手牌加注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         trips_label.pack(side=tk.LEFT, padx=(20, 0))
 
         self.trips_var = tk.StringVar(value="0")
-        self.trips_display = tk.Label(top_bet_frame, textvariable=self.trips_var, font=('Arial', 14), 
+        self.trips_display = tk.Label(progressive_frame, textvariable=self.trips_var, font=('Arial', 14), 
                                     bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.trips_display.pack(side=tk.LEFT, padx=5)
         self.trips_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("trips"))
@@ -847,7 +877,7 @@ class LetItRideGUI(tk.Tk):
 
         # 创建一个框架来容纳重置按钮和开始游戏按钮
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重设金额"按钮
         self.reset_bets_button = tk.Button(
@@ -1012,8 +1042,8 @@ class LetItRideGUI(tk.Tk):
             self.bet_b = int(self.bet_b_var.get())
             self.bet_c = int(self.bet_c_var.get())
             self.trips = int(self.trips_var.get())
-            self.participate_jackpot = bool(self.jackpot_check_var.get())
-            self.last_jackpot_selection = bool(self.jackpot_check_var.get())  # 记录当前选择
+            self.participate_jackpot = bool(self.progressive_var.get())
+            self.last_jackpot_selection = bool(self.progressive_var.get())  # 记录当前选择
             
             # 检查下注至少5块
             if self.bet_a < 5 or self.bet_b < 5 or self.bet_c < 5:
@@ -1023,7 +1053,7 @@ class LetItRideGUI(tk.Tk):
             # 计算总下注
             total_bet = self.bet_a + self.bet_b + self.bet_c + self.trips
             if self.participate_jackpot:
-                total_bet += 2.5
+                total_bet += 20
                 
             if total_bet > self.balance:
                 messagebox.showerror("错误", "余额不足！")
@@ -1090,7 +1120,7 @@ class LetItRideGUI(tk.Tk):
                 widget.destroy()
                 
             buttons_container = tk.Frame(self.action_frame, bg='#2a4a3c')
-            buttons_container.pack(expand=True, pady=10)
+            buttons_container.pack(expand=True, pady=5)
 
             self.keep_a_button = tk.Button(
                 buttons_container, text="保留A注", 
@@ -1113,7 +1143,7 @@ class LetItRideGUI(tk.Tk):
             self.bet_b_display.unbind("<Button-1>")
             self.bet_c_display.unbind("<Button-1>")
             self.trips_display.unbind("<Button-1>")
-            self.jackpot_cb.config(state=tk.DISABLED)
+            self.progressive_cb.config(state=tk.DISABLED)
             for chip in self.chip_buttons:
                 chip.unbind("<Button-1>")
             
@@ -1335,7 +1365,7 @@ class LetItRideGUI(tk.Tk):
                 widget.destroy()
                 
             buttons_container = tk.Frame(self.action_frame, bg='#2a4a3c')
-            buttons_container.pack(expand=True, pady=10)
+            buttons_container.pack(expand=True, pady=5)
 
             self.keep_b_button = tk.Button(
                 buttons_container, text="保留B注", 
@@ -1445,7 +1475,7 @@ class LetItRideGUI(tk.Tk):
             command=self.reset_game, 
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
-        restart_btn.pack(pady=10)
+        restart_btn.pack(pady=5)
         restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
@@ -1527,43 +1557,63 @@ class LetItRideGUI(tk.Tk):
                 self.win_details['trips'] = 0
         total_winnings += self.win_details['trips']
         
-        # 5. Jackpot 结算
+        # 5. Jackpot 结算 - 使用提供的简化版代码
         if self.game.participate_jackpot:
-            jp_cards = self.game.player_hole + self.game.community_cards[:3]
-            jp_eval = evaluate_hand(jp_cards)
+            progressive_cards = self.game.player_hole + self.game.community_cards[:3]
+            pg_eval, _ = evaluate_hand(progressive_cards)
             
-            if jp_eval[0] in JACKPOT_PAYOUT:
-                payout = JACKPOT_PAYOUT[jp_eval[0]]
-                if isinstance(payout, float):  # 百分比
-                    amount = self.game.jackpot_amount * payout
-                    self.win_details['jackpot'] = amount
-                    # 重置Jackpot为初始值
-                    self.game.jackpot_amount = 110121.07
-                else:  # 固定金额
-                    self.win_details['jackpot'] = payout
-                    self.game.jackpot_amount -= payout
-            else:
-                self.win_details['jackpot'] = 0
+            # 定义奖金规则 - 根据您的要求修改
+            jackpot_rules = {
+                10: {"amount": lambda: max(self.game.progressive_amount, 175000), "message": "皇家顺! 赢得累进大奖 ${amount:.2f}!"},
+                9: {"amount": lambda: max(self.game.progressive_amount * 0.1, 17500), "message": "同花顺! 赢得累进大奖 ${amount:.2f}!"},
+                8: {"amount": 7000, "message": "四条! 赢得累进大奖 $7,000!"},
+                7: {"amount": 5000, "message": "葫芦! 赢得累进大奖 $5,000!"},
+                6: {"amount": 2500, "message": "同花! 赢得累进大奖 $2,500!"},
+                5: {"amount": 1000, "message": "顺子! 赢得累进大奖 $1,000!"}
+            }
             
-            # 保存Jackpot金额
-            save_jackpot(self.game.jackpot_amount)
-            self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
-            total_winnings += self.win_details['jackpot']
+            if pg_eval in jackpot_rules:
+                rule = jackpot_rules[pg_eval]
+                
+                # 计算奖金金额
+                if callable(rule["amount"]):
+                    amount = rule["amount"]()
+                else:
+                    amount = rule["amount"]
+                
+                self.win_details['jackpot'] = amount
+                total_winnings += amount
+                
+                # 从奖池扣除
+                self.game.progressive_amount -= amount
+                
+                # 显示消息
+                messagebox.showinfo("恭喜您获得累进大奖！", rule["message"].format(amount=amount))
+            
+            # 保存Progressive金额
+            save_progressive(self.game.progressive_amount)
+            self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
         
-        # 计算Jackpot增量
-        # 本金 = A注 + B注 + C注 + Trips
-        principal = self.game.bet_a + self.game.bet_b + self.game.bet_c + self.game.trips
+        # 计算Jackpot增量 - 按照您的要求修改
+        # (玩家的全部下注(不包括Progressive的20块)-A/B退还的金额)*0.08+Progressive的20块(有购买的话)*0.95
+        total_bet_without_progressive = self.game.bet_a + self.game.bet_b + self.game.bet_c + self.game.trips
         
-        # Push金额 = 平局部分的金额
-        push_amount = 0
-        # 在Let It Ride中没有明确的平局概念，这里简化为未赢金额
-        lost_amount = principal - total_winnings if total_winnings < principal else 0
+        # 计算退还金额
+        refund_amount = 0
+        if not self.game.keep_bet_a:
+            refund_amount += self.game.bet_a
+        if not self.game.keep_bet_b:
+            refund_amount += self.game.bet_b
+        
+        # 计算增量
+        jackpot_increment = (total_bet_without_progressive - refund_amount) * 0.08
+        if self.game.participate_jackpot:
+            jackpot_increment += 20 * 0.95  # Progressive的20块 * 0.95
         
         # 更新Jackpot金额
-        jackpot_increment = (principal * 0.01) + (push_amount * 0.05) + (lost_amount * 0.1)
-        self.game.jackpot_amount += jackpot_increment
-        save_jackpot(self.game.jackpot_amount)
-        self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
+        self.game.progressive_amount += jackpot_increment
+        save_progressive(self.game.progressive_amount)
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
         
         return total_winnings
 
@@ -1612,51 +1662,8 @@ class LetItRideGUI(tk.Tk):
         # 禁用所有按钮
         self.disable_action_buttons()
         
-        # 第一步：翻转所有牌为背面
-        self.flip_all_to_back()
-        
-        # 第二步：设置动画完成后执行真正的重置
-        self.after(1000, lambda: self.animate_move_cards_out(auto_reset))
-
-    def flip_all_to_back(self):
-        """将所有牌翻转为背面"""
-        self.flipping_cards = []  # 存储正在翻转的卡片
-        
-        # 收集所有需要翻转的卡片
-        for card_label in self.active_card_labels:
-            if card_label.is_face_up:
-                self.flipping_cards.append(card_label)
-        
-        # 如果没有需要翻转的卡片，直接返回
-        if not self.flipping_cards:
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-            
-        # 开始翻转动画
-        self.animate_flip_to_back_step(0)
-
-    def animate_flip_to_back_step(self, step):
-        """执行翻转动画的每一步"""
-        if step >= 10:  # 假设10步完成
-            # 翻转完成，将所有正在翻转的卡片设为背面
-            for card_label in self.flipping_cards:
-                card_label.config(image=self.back_image)
-                card_label.is_face_up = False
-                
-            # 开始移动动画
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-        
-        # 模拟翻转效果：先缩小宽度，再放大（但背面）
-        width = 100 - (step * 10) if step < 5 else (step - 5) * 10
-        if width <= 0:
-            width = 1
-
-        for card_label in self.flipping_cards:
-            card_label.place(width=width)
-
-        step += 1
-        self.after(50, lambda: self.animate_flip_to_back_step(step))
+        # 设置动画完成后执行真正的重置
+        self.animate_move_cards_out(auto_reset)
 
     def animate_move_cards_out(self, auto_reset):
         """将所有牌向右移出屏幕"""
@@ -1756,7 +1763,7 @@ class LetItRideGUI(tk.Tk):
         self.bet_c_var.set("0")
         self.trips_var.set("0")
         # 设置Jackpot复选框为上一局的选择
-        self.jackpot_check_var.set(1 if self.last_jackpot_selection else 0)
+        self.progressive_var.set(1 if self.last_jackpot_selection else 0)
         
         # 重置背景色为白色
         for widget in self.bet_widgets.values():
@@ -1779,7 +1786,7 @@ class LetItRideGUI(tk.Tk):
         self.bet_b_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("bet_b"))
         self.bet_c_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("bet_c"))
         self.trips_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("trips"))
-        self.jackpot_cb.config(state=tk.NORMAL)
+        self.progressive_cb.config(state=tk.NORMAL)
         for chip in self.chip_buttons:
             # 使用存储的文本重新绑定事件
             text = self.chip_texts[chip]
@@ -1790,7 +1797,7 @@ class LetItRideGUI(tk.Tk):
             widget.destroy()
         
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重设金额"按钮
         self.reset_bets_button = tk.Button(
@@ -1948,7 +1955,7 @@ class LetItRideGUI(tk.Tk):
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-def main(initial_balance=1000, username="Guest"):
+def main(initial_balance=10000, username="Guest"):
     app = LetItRideGUI(initial_balance, username)
     app.mainloop()
     return app.balance

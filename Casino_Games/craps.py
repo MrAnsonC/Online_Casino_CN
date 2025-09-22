@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-import random
+import secrets
 import time
 from PIL import Image, ImageTk, ImageDraw
 import os, json, sys
@@ -13,9 +13,6 @@ a_tools_dir = os.path.join(parent_dir, 'A_Tools')
 # 将A_Tools目录添加到系统路径
 if a_tools_dir not in sys.path:
     sys.path.append(a_tools_dir)
-
-# 导入真随机骰子模块
-from shuffle_dice import Dice
 
 def get_data_file_path():
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -43,34 +40,31 @@ def update_balance_in_json(username, new_balance):
     save_user_data(users)
 
 class DiceAnimationWindow:
-    def __init__(self, parent, callback, dice1, dice2):
-        self.parent = parent
+    def __init__(self, game, callback, dice_objects, fixed_dice=None):
+        self.game = game
         self.callback = callback
+        self.dice_objects = dice_objects
+        self.fixed_dice = fixed_dice  # 开发者模式下的固定骰子
 
-        self.dice1 = dice1
-        self.dice2 = dice2
-        # 初始化最终结果
-        self.final_dice = None
-        
-        self.window = tk.Toplevel(parent)
+        self.window = tk.Toplevel(game.root)
         self.window.title("骰子摇动中...")
-        self.window.geometry("400x350")
+        self.window.geometry("500x400")
+        self.window.resizable(0, 0)
         self.window.configure(bg='#1e3d59')
-        self.window.resizable(False, False)
         self.window.grab_set()
 
         self.window.protocol("WM_DELETE_WINDOW", self.do_nothing)
 
         # 窗口居中
-        parent_x = parent.winfo_x()
-        parent_y = parent.winfo_y()
-        parent_width = parent.winfo_width()
-        parent_height = parent.winfo_height()
-        x = parent_x + (parent_width - 400) // 2
-        y = parent_y + (parent_height - 350) // 2
-        self.window.geometry(f"400x350+{x}+{y}")
+        parent_x = game.root.winfo_x()
+        parent_y = game.root.winfo_y()
+        parent_width = game.root.winfo_width()
+        parent_height = game.root.winfo_height()
+        x = parent_x + (parent_width - 500) // 2
+        y = parent_y + (parent_height - 400) // 2
+        self.window.geometry(f"500x400+{x}+{y}")
 
-        # 生成骰子图片
+        # 生成大号骰子图片
         self.dice_images = []
         for i in range(1, 7):
             img = Image.new('RGB', (120, 120), '#e8d6b3')
@@ -81,18 +75,25 @@ class DiceAnimationWindow:
         self.dice_container.pack(pady=50)
 
         self.dice_labels = []
-        for _ in range(2):  # 两个骰子
+        for _ in range(3):
             lbl = tk.Label(self.dice_container, image=self.dice_images[0], bg='#1e3d59', borderwidth=0)
-            lbl.pack(side=tk.LEFT, padx=30)
+            lbl.pack(side=tk.LEFT, padx=20)
             self.dice_labels.append(lbl)
 
         self.status_label = tk.Label(self.window, text="骰子摇动中...", font=("Arial", 18), fg='white', bg='#1e3d59')
         self.status_label.pack(pady=20)
 
-        self.progress = ttk.Progressbar(self.window, orient=tk.HORIZONTAL, length=350, mode='determinate')
+        self.progress = ttk.Progressbar(self.window, orient=tk.HORIZONTAL, length=400, mode='determinate')
         self.progress.pack(pady=10)
 
         self.animation_start_time = time.time()
+        self.final_dice = None
+        
+        # 计算骰子转动时间：3100到4000
+        total_milliseconds = secrets.randbelow(901) + 3100
+        self.total_duration = total_milliseconds / 1000.0
+        # print(f"骰子动画时长: {total_milliseconds}毫秒 ({self.total_duration:.3f}秒)")
+        
         self.animate_dice()
         
     def do_nothing(self):

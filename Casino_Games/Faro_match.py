@@ -63,7 +63,7 @@ class Deck:
         try:
             # 调用外部 shuffle.py，超时 30 秒
             result = subprocess.run(
-                [sys.executable, shuffle_script],
+                [sys.executable, shuffle_script, "false", "1"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -167,8 +167,8 @@ class FaroGame:
 class FaroGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
-        self.title("Faro 游戏")
-        self.geometry("1050x680+50+10")
+        self.title("法罗游戏(变种)")
+        self.geometry("1100x680+50+10")
         self.resizable(0,0)
         self.configure(bg='#35654d')
         
@@ -276,25 +276,59 @@ class FaroGUI(tk.Tk):
         # 获取筹码金额
         chip_value = float(self.selected_chip.replace('$', '').replace('K', '000'))
         
+        # 获取当前下注金额
+        current_bet_var = getattr(self, f"{bet_type.lower()}_bet_var")
+        current = float(current_bet_var.get())
+        
+        # 每个格子的最大下注限制
+        max_bet_per_cell = 5000
+        # 全部格子的最大下注限制
+        max_total_bet = 10000
+        
+        # 计算当前总下注额
+        total_bet = sum([
+            float(self.in_bet_var.get()),
+            float(self.out_bet_var.get()),
+            float(self.red_bet_var.get()),
+            float(self.black_bet_var.get()),
+            float(self.high_bet_var.get()),
+            float(self.low_bet_var.get())
+        ])
+        
+        # 检查单个格子是否超过上限
+        if current >= max_bet_per_cell:
+            messagebox.showwarning("下注限制", "当前区域已满，不能再下注！")
+            return
+        
+        # 检查下注后单个格子是否会超过上限
+        if current + chip_value > max_bet_per_cell:
+            allowed_amount = max_bet_per_cell - current
+            if allowed_amount > 0:
+                # 自动调整到下注上限
+                chip_value = allowed_amount
+                messagebox.showwarning("下注限制", f"下注已达上限，自动调整为 {int(allowed_amount)}")
+            else:
+                messagebox.showwarning("下注限制", "当前区域已满，不能再下注！")
+                return
+        
+        # 检查总下注是否超过上限
+        if total_bet >= max_total_bet:
+            messagebox.showwarning("下注限制", "总下注已达上限，不能再下注！")
+            return
+        
+        # 检查下注后总下注是否会超过上限
+        if total_bet + chip_value > max_total_bet:
+            allowed_amount = max_total_bet - total_bet
+            if allowed_amount > 0:
+                # 自动调整到下注上限
+                chip_value = allowed_amount
+                messagebox.showwarning("下注限制", f"总下注已达上限，自动调整为 {int(allowed_amount)}")
+            else:
+                messagebox.showwarning("下注限制", "总下注已达上限，不能再下注！")
+                return
+        
         # 更新对应的下注变量
-        if bet_type == "IN":
-            current = float(self.in_bet_var.get())
-            self.in_bet_var.set(str(int(current + chip_value)))
-        elif bet_type == "OUT":
-            current = float(self.out_bet_var.get())
-            self.out_bet_var.set(str(int(current + chip_value)))
-        elif bet_type == "RED":
-            current = float(self.red_bet_var.get())
-            self.red_bet_var.set(str(int(current + chip_value)))
-        elif bet_type == "BLACK":
-            current = float(self.black_bet_var.get())
-            self.black_bet_var.set(str(int(current + chip_value)))
-        elif bet_type == "HIGH":
-            current = float(self.high_bet_var.get())
-            self.high_bet_var.set(str(int(current + chip_value)))
-        elif bet_type == "LOW":
-            current = float(self.low_bet_var.get())
-            self.low_bet_var.set(str(int(current + chip_value)))
+        current_bet_var.set(str(int(current + chip_value)))
     
     def _create_widgets(self):
         # 先初始化变量
@@ -331,7 +365,7 @@ class FaroGUI(tk.Tk):
         # IN牌堆标题
         in_title_frame = tk.Frame(piles_frame, bg='#2a4a3c')
         in_title_frame.pack(fill=tk.X, padx=10, pady=5)
-        tk.Label(in_title_frame, text="IN", font=('Arial', 16, 'bold'), 
+        tk.Label(in_title_frame, text="上", font=('Arial', 16, 'bold'), 
                 bg='#2a4a3c', fg='#FF5555').pack(side=tk.LEFT)
         
         # IN牌堆容器 - 固定高度
@@ -347,7 +381,7 @@ class FaroGUI(tk.Tk):
         # OUT牌堆标题
         out_title_frame = tk.Frame(piles_frame, bg='#2a4a3c')
         out_title_frame.pack(fill=tk.X, padx=10, pady=5)
-        tk.Label(out_title_frame, text="OUT", font=('Arial', 16, 'bold'), 
+        tk.Label(out_title_frame, text="下", font=('Arial', 16, 'bold'), 
                 bg='#2a4a3c', fg='#5555FF').pack(side=tk.LEFT)
         
         # OUT牌堆容器 - 固定高度
@@ -361,7 +395,7 @@ class FaroGUI(tk.Tk):
         self.out_cards_frame.place(x=0, y=0, relwidth=1, height=260)
         
         # 右侧控制面板
-        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=300, padx=10, pady=10)
+        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=300, padx=10, pady=2)
         control_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
         # 顶部信息栏
@@ -371,7 +405,7 @@ class FaroGUI(tk.Tk):
         self.balance_label = tk.Label(
             info_frame, 
             text=f"余额: ${self.balance:.2f}",
-            font=('Arial', 14),
+            font=('Arial', 18),
             bg='#2a4a3c',
             fg='white'
         )
@@ -379,18 +413,18 @@ class FaroGUI(tk.Tk):
         
         self.stage_label = tk.Label(
             info_frame, 
-            text="阶段: 下注",
-            font=('Arial', 14, 'bold'),
+            text="翻牌前",
+            font=('Arial', 18, 'bold'),
             bg='#2a4a3c',
             fg='#FFD700'
         )
-        self.stage_label.pack(side=tk.LEFT, padx=20, pady=10)
+        self.stage_label.pack(side=tk.RIGHT, padx=20, pady=10)
         
         # 筹码区域
         chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        chips_frame.pack(fill=tk.X, pady=10)
+        chips_frame.pack(fill=tk.X, pady=5)
         
-        chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 12), bg='#2a4a3c', fg='white')
+        chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         chips_label.pack(anchor='w', padx=10, pady=5)
         
         # 单行放置5个筹码 - 增加50%大小
@@ -398,38 +432,75 @@ class FaroGUI(tk.Tk):
         chip_row.pack(fill=tk.X, pady=5, padx=5)
         
         chip_configs = [
-            ("$5", '#ff0000', 'white'),     # 红色背景，白色文字
-            ('$10', '#ffa500', 'black'),   # 橙色背景，黑色文字
-            ("$25", '#00ff00', 'black'),    # 绿色背景，黑色文字
-            ("$50", '#ffffff', 'black'),    # 白色背景，黑色文字
+            ('$10', '#ffa500', 'black'),    # 橙色背景，黑色文字
+            ("$20", '#ff0000', 'white'),    # 红色背景，白色文字
+            ("$50", '#00ff00', 'black'),    # 绿色背景，黑色文字
             ("$100", '#000000', 'white'),   # 黑色背景，白色文字
+            ("$500", "#FF7DDA", 'black'),   # 粉色背景，黑色文字
+            ("$1K", '#ffffff', 'black'),    # 白色背景，黑色文字
         ]
         
         self.chip_buttons = []
         self.chip_texts = {}  # 存储每个筹码按钮的文本
         for text, bg_color, fg_color in chip_configs:
-            # 使用Canvas创建圆形筹码 - 增加50%大小 (60x60)
-            chip_canvas = tk.Canvas(chip_row, width=60, height=60, bg='#2a4a3c', highlightthickness=0)
-            chip_canvas.create_oval(2, 2, 58, 58, fill=bg_color, outline='black')
-            text_id = chip_canvas.create_text(30, 30, text=text, fill=fg_color, font=('Arial', 16, 'bold'))
+            # 使用Canvas创建圆形筹码 - 尺寸改为55x55
+            chip_canvas = tk.Canvas(chip_row, width=55, height=55, bg='#2a4a3c', highlightthickness=0)
+            
+            # 创建圆形（尺寸调整为51x51，在55x55画布中居中）
+            chip_canvas.create_oval(2, 2, 54, 54, fill=bg_color, outline='black')
+            
+            # 创建文本（位置调整为画布中心）
+            text_id = chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 14, 'bold'))
+            
             chip_canvas.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
             chip_canvas.pack(side=tk.LEFT, padx=5)
             self.chip_buttons.append(chip_canvas)
             self.chip_texts[chip_canvas] = text  # 存储文本
         
-        # 默认选中$5筹码
-        self.select_chip("$5")
+        # 默认选中$10筹码
+        self.select_chip("$10")
+
+        # 每注限制
+        minmax_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        minmax_frame.pack(fill=tk.X, pady=5)
+        
+        # 标题行
+        header_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        header_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
+        
+        tk.Label(header_frame, text="每注最低", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="每注最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="每局最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
+        
+        # 数值行
+        value_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        value_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+        
+        tk.Label(value_frame, text="$10", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$1,000", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$2,000", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
         
         # 下注区域 - 现在有多个下注区域：IN, OUT, 黑/红, 大/小
         bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
         bet_frame.pack(fill=tk.X, pady=10)
+
+        bet_line0 = tk.Frame(bet_frame, bg='#2a4a3c')
+        bet_line0.pack(fill=tk.X, padx=20, pady=5)
+        tk.Label(bet_line0, text="以下赔率一律0.95:1", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700').pack(side=tk.TOP, anchor='center')
         
         # 第一行：IN 和 OUT
         bet_line1 = tk.Frame(bet_frame, bg='#2a4a3c')
         bet_line1.pack(fill=tk.X, padx=20, pady=5)
 
         # IN 下注
-        tk.Label(bet_line1, text="IN:", font=('Arial',12), bg='#2a4a3c', fg='white').pack(side=tk.LEFT)
+        tk.Label(bet_line1, text="上:", font=('Arial',12), bg='#2a4a3c', fg='white').pack(side=tk.LEFT)
         self.in_bet_display = tk.Label(bet_line1, textvariable=self.in_bet_var, font=('Arial',12),
                                     bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.in_bet_display.pack(side=tk.LEFT, padx=(5,20))
@@ -437,12 +508,14 @@ class FaroGUI(tk.Tk):
         self.bet_widgets["IN"] = self.in_bet_display
 
         # OUT 下注
-        tk.Label(bet_line1, text="OUT:", font=('Arial',12), bg='#2a4a3c', fg='white').pack(side=tk.LEFT)
+        tk.Label(bet_line1, text="   下:", font=('Arial',12), bg='#2a4a3c', fg='white').pack(side=tk.LEFT)
         self.out_bet_display = tk.Label(bet_line1, textvariable=self.out_bet_var, font=('Arial',12),
                                         bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.out_bet_display.pack(side=tk.LEFT, padx=5)
         self.out_bet_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("OUT"))
         self.bet_widgets["OUT"] = self.out_bet_display
+
+        tk.Label(bet_line1, text="先上后下", font=('Arial',14), bg='#2a4a3c', fg='yellow').pack(side=tk.LEFT, padx=5)
         
         # 第二行：黑/红下注
         bet_line2 = tk.Frame(bet_frame, bg='#2a4a3c')
@@ -463,6 +536,8 @@ class FaroGUI(tk.Tk):
         self.black_bet_display.pack(side=tk.LEFT, padx=5)
         self.black_bet_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("BLACK"))
         self.bet_widgets["BLACK"] = self.black_bet_display
+
+        tk.Label(bet_line2, text="♠♣黑色, ♥♦红色", font=('Arial',14), bg='#2a4a3c', fg='yellow').pack(side=tk.LEFT, padx=5)
         
         # 第三行：大/小下注
         bet_line3 = tk.Frame(bet_frame, bg='#2a4a3c')
@@ -483,6 +558,8 @@ class FaroGUI(tk.Tk):
         self.low_bet_display.pack(side=tk.LEFT, padx=5)
         self.low_bet_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("LOW"))
         self.bet_widgets["LOW"] = self.low_bet_display
+
+        tk.Label(bet_line3, text="≤17为小 ≥18为大", font=('Arial',14), bg='#2a4a3c', fg='yellow').pack(side=tk.LEFT, padx=5)
         
         # 游戏操作按钮框架 - 用于放置所有操作按钮
         self.action_frame = tk.Frame(control_frame, bg='#2a4a3c')
@@ -490,7 +567,7 @@ class FaroGUI(tk.Tk):
 
         # 创建一个框架来容纳重置按钮和开始游戏按钮
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重设金额"按钮
         self.reset_bets_button = tk.Button(
@@ -511,7 +588,7 @@ class FaroGUI(tk.Tk):
         # 状态信息
         self.status_label = tk.Label(
             control_frame, text="设置下注金额并开始游戏", 
-            font=('Arial', 12), bg="#2a4a3c", fg='white'
+            font=('Arial', 18), bg="#2a4a3c", fg='white'
         )
         self.status_label.pack(pady=5, fill=tk.X)
         
@@ -545,7 +622,7 @@ class FaroGUI(tk.Tk):
         """显示游戏规则说明"""
         # 创建自定义弹窗
         win = tk.Toplevel(self)
-        win.title("Faro 游戏规则")
+        win.title("法罗游戏(变种)规则")
         win.geometry("800x500")
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
@@ -569,7 +646,7 @@ class FaroGUI(tk.Tk):
         
         # 游戏规则文本
         rules_text = """
-        Faro(变种) 游戏规则
+        法罗游戏(变种)规则
 
         核心创新：
         - 先抽取目标牌
@@ -578,7 +655,7 @@ class FaroGUI(tk.Tk):
 
         1. 游戏开始前下注:
            - 选择下注区域: 
-                * IN 或 OUT: 匹配牌落在IN或OUT牌堆
+                * 上或下: 匹配牌落在上或下牌堆
                 * 红或黑: 匹配牌的颜色
                 * 大或小: 匹配牌出现的位置
            - 设置下注金额
@@ -587,21 +664,19 @@ class FaroGUI(tk.Tk):
         2. 游戏流程:
            a. 抽第一张牌
            b. 庄家轮流翻牌:
-              - 第一张牌放入 IN 牌堆
-              - 第二张牌放入 OUT 牌堆
-              - 第三张牌放入 IN 牌堆
-              - 第四张牌放入 OUT 牌堆
+              - 第一张牌放入 上 牌堆
+              - 第二张牌放入 下 牌堆
+              - 第三张牌放入 上 牌堆
+              - 第四张牌放入 下 牌堆
               - 以此类推...
            c. 当翻到与玩家牌点数相同的牌时停止
-           d. 如果匹配牌落在您下注的区域 (IN, OUT, 红, 黑, 大, 小), 您赢
+           d. 如果匹配牌落在您下注的区域 (上, 下, 红, 黑, 大, 小), 您赢
 
         3. 结算规则:
-           - IN/OUT: 1:1 赔率
-           - 红/黑: 1:1 赔率
+           - 全部的赔率均为0.95:1
            - 大/小: 
                * 小: 匹配牌在翻牌位置1-17之间
                * 大: 匹配牌在翻牌位置18-49之间
-               * 赔率: 1:1
         """
         
         rules_label = tk.Label(
@@ -691,7 +766,7 @@ class FaroGUI(tk.Tk):
             
             # 检查下注金额
             if total_bet < 5:
-                messagebox.showerror("错误", "下注金额至少需要5块")
+                messagebox.showerror("错误", "你还没下注！")
                 return
                 
             if self.balance < total_bet:
@@ -729,7 +804,7 @@ class FaroGUI(tk.Tk):
             self.show_player_card()
             
             # 更新游戏状态
-            self.stage_label.config(text="阶段: 翻牌中")
+            self.stage_label.config(text="翻牌中")
             self.status_label.config(text="庄家正在翻牌...")
             
             # 禁用下注区域
@@ -821,7 +896,8 @@ class FaroGUI(tk.Tk):
             
         # 显示翻开的牌
         self.show_flipped_card(card, pile)
-        self.status_label.config(text=f"庄家翻牌: {card.rank}{card.suit} -> {pile} (第{self.game.flip_count}张)")
+        pile_display = "上" if pile == "IN" else "下"
+        self.status_label.config(text=f"{card.rank}{card.suit} -> 第{self.game.flip_count}张 {pile_display}")
         
         # 检查是否匹配
         if self.game.matched_card:
@@ -860,79 +936,80 @@ class FaroGUI(tk.Tk):
         
         # IN/OUT下注结算
         if in_win:
-            in_total = self.game.in_bet_amount * 2
+            in_total = self.game.in_bet_amount * 1.95
             winnings += in_total
             round_winnings += in_total
             # 更新IN下注显示
-            self.in_bet_var.set(str(in_total))
+            if in_total != 0:
+                self.in_bet_var.set(str(in_total))
             self.in_bet_display.config(bg='gold')
         else:
-            winnings -= self.game.in_bet_amount
             self.in_bet_var.set('0')
         
         if out_win:
-            out_total = self.game.out_bet_amount * 2
+            out_total = self.game.out_bet_amount * 1.95
             winnings += out_total
             round_winnings += out_total
             # 更新OUT下注显示
-            self.out_bet_var.set(str(out_total))
+            if out_total != 0:
+                self.out_bet_var.set(str(out_total))
             self.out_bet_display.config(bg='gold')
         else:
-            winnings -= self.game.out_bet_amount
             self.out_bet_var.set('0')
         
         # 红黑下注结算
         if red_win:
-            red_total = self.game.red_bet_amount * 2
+            red_total = self.game.red_bet_amount * 1.95
             winnings += red_total
             round_winnings += red_total
             # 更新红下注显示
-            self.red_bet_var.set(str(red_total))
+            if red_total != 0:
+                self.red_bet_var.set(str(red_total))
             self.red_bet_display.config(bg='gold')
         else:
-            winnings -= self.game.red_bet_amount
             self.red_bet_var.set('0')
         
         if black_win:
-            black_total = self.game.black_bet_amount * 2
+            black_total = self.game.black_bet_amount * 1.95
             winnings += black_total
             round_winnings += black_total
             # 更新黑下注显示
-            self.black_bet_var.set(str(black_total))
+            if black_total != 0:
+                self.black_bet_var.set(str(black_total))
             self.black_bet_display.config(bg='gold')
         else:
-            winnings -= self.game.black_bet_amount
             self.black_bet_var.set('0')
         
         # 大小下注结算
         if low_win:
-            low_total = self.game.low_bet_amount * 2
+            low_total = self.game.low_bet_amount * 1.95
             winnings += low_total
             round_winnings += low_total
             # 更新小下注显示
-            self.low_bet_var.set(str(low_total))
+            if low_total != 0:
+                self.low_bet_var.set(str(low_total))
             self.low_bet_display.config(bg='gold')
         else:
-            winnings -= self.game.low_bet_amount
             self.low_bet_var.set('0')
         
         if high_win:
-            high_total = self.game.high_bet_amount * 2
+            high_total = self.game.high_bet_amount * 1.95
             winnings += high_total
             round_winnings += high_total
             # 更新大下注显示
-            self.high_bet_var.set(str(high_total))
+            if high_total != 0:
+                self.high_bet_var.set(str(high_total))
             self.high_bet_display.config(bg='gold')
         else:
-            winnings -= self.game.high_bet_amount
             self.high_bet_var.set('0')
         
         # 构建结果文本
+        pile_display = "上" if self.game.matched_pile == "IN" else "下"
         result_text = (
             f"本局点数是{self.game.player_card.rank}, "
             f"第{self.game.flip_count}张抽到, "
-            f"{self.game.matched_pile}, "
-            f"{'红' if self.game.matched_card.is_red() else '黑'}"
+            f"{pile_display}, "
+            f"{'红色' if self.game.matched_card.is_red() else '黑色'}"
         )
         
         # 更新余额
@@ -954,61 +1031,18 @@ class FaroGUI(tk.Tk):
             command=self.reset_game, 
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
-        restart_btn.pack(pady=10)
+        restart_btn.pack(pady=5)
         
         # 设置30秒后自动重置
         self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
     
     def animate_collect_cards(self, auto_reset):
-        """执行收牌动画：先翻转所有牌为背面，然后向右收起"""
+        """执行收牌动画：向右收起"""
         # 禁用所有按钮
         self.disable_action_buttons()
         
-        # 第一步：翻转所有牌为背面
-        self.flip_all_to_back()
-        
-        # 第二步：设置动画完成后执行真正的重置
-        self.after(1000, lambda: self.animate_move_cards_out(auto_reset))
-
-    def flip_all_to_back(self):
-        """将所有牌翻转为背面"""
-        self.flipping_cards = []  # 存储正在翻转的卡片
-        
-        # 收集所有需要翻转的卡片（包括玩家牌）
-        for card_label in self.active_card_labels:
-            if card_label.is_face_up:
-                self.flipping_cards.append(card_label)
-        
-        # 如果没有需要翻转的卡片，直接返回
-        if not self.flipping_cards:
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-            
-        # 开始翻转动画
-        self.animate_flip_to_back_step(0)
-
-    def animate_flip_to_back_step(self, step):
-        """执行翻转动画的每一步"""
-        if step >= 10:  # 假设10步完成
-            # 翻转完成，将所有正在翻转的卡片设为背面
-            for card_label in self.flipping_cards:
-                card_label.config(image=self.back_image)
-                card_label.is_face_up = False
-                
-            # 开始移动动画
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-
-        # 模拟翻转效果：先缩小宽度，再放大（但背面）
-        width = 100 - (step * 10) if step < 5 else (step - 5) * 10
-        if width <= 0:
-            width = 1
-
-        for card_label in self.flipping_cards:
-            card_label.place(width=width)
-
-        step += 1
-        self.after(50, lambda: self.animate_flip_to_back_step(step))
+        # 设置动画完成后执行真正的重置
+        self.animate_move_cards_out(auto_reset)
 
     def animate_move_cards_out(self, auto_reset):
         """将所有牌向右移出屏幕"""
@@ -1098,7 +1132,7 @@ class FaroGUI(tk.Tk):
         """真正的重置游戏界面"""
         # 重置游戏状态
         self.game.reset_game()
-        self.stage_label.config(text="阶段: 下注")
+        self.stage_label.config(text="下注")
         self.status_label.config(text="设置下注金额并开始游戏")
         
         # 重置下注金额为0
@@ -1133,7 +1167,7 @@ class FaroGUI(tk.Tk):
             widget.destroy()
         
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重设金额"按钮
         self.reset_bets_button = tk.Button(
@@ -1158,8 +1192,10 @@ class FaroGUI(tk.Tk):
         if auto_reset:
             self.status_label.config(text="30秒已到，自动开始新游戏")
             self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
+        else:
+            self.status_label.config(text="设置下注金额并开始游戏")
 
-def main(initial_balance=1000, username="Guest"):
+def main(initial_balance=10000, username="Guest"):
     app = FaroGUI(initial_balance, username)
     app.mainloop()
     return app.balance

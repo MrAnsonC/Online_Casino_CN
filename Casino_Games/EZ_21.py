@@ -312,12 +312,12 @@ class Simple21Game:
         """评估下注结果"""
         dealer_value = self.calculate_hand_value(self.dealer_hand)
         self.dealer_twenty_two = (dealer_value == 22)
-        
+
         dealer_bust = dealer_value > 21
-        
+
         winnings = 0
         self.bet_results = {}  # 重置结果
-        
+
         # 如果庄家22点（爆牌）
         if self.dealer_twenty_two:
             # 点数下注(16-20)平局退还
@@ -328,7 +328,7 @@ class Simple21Game:
                     bet_amount,
                     f"{BET_ODDS[bet_type]}:1"
                 )
-            
+
             # 22点下注
             hand_type = self.get_hand_type(self.dealer_hand)
             odds = BET_ODDS['twenty_two'][hand_type]
@@ -338,7 +338,7 @@ class Simple21Game:
                 odds_type = "同色20:1"
             else:
                 odds_type = "杂色8:1"
-            
+
             win_amount = self.bets['twenty_two'] * (1 + odds)
             winnings += win_amount
             self.bet_results['twenty_two'] = (
@@ -346,7 +346,7 @@ class Simple21Game:
                 win_amount,
                 odds_type
             )
-            
+
             # 对子下注
             if self.dealer_pair and len(self.dealer_hand) >= 2:
                 card1, card2 = self.dealer_hand[0], self.dealer_hand[1]
@@ -360,7 +360,7 @@ class Simple21Game:
                     odds_type = "同色15:1"
                 else:
                     odds_type = "杂色7:1"
-                
+
                 win_amount = self.bets['pair'] * (1 + odds)
                 winnings += win_amount
                 self.bet_results['pair'] = (
@@ -370,38 +370,33 @@ class Simple21Game:
                 )
             else:
                 self.bet_results['pair'] = ("lose", 0, "最高60:1")
-            
-            # 小下注
-            small_win = (
-                self.bets['small'] * (1 + BET_ODDS['small'])
-                if len(self.dealer_hand) == 2 and not dealer_bust and self.bets['small'] > 0
-                else 0
-            )
+
+            # 小下注 - **判定依据为庄家最终牌张数，而不是玩家是否下注**
+            small_condition = (len(self.dealer_hand) == 2 and not dealer_bust)
+            small_win = self.bets['small'] * (1 + BET_ODDS['small']) if (small_condition and self.bets['small'] > 0) else 0
             if small_win > 0:
                 winnings += small_win
+            # 重要：result 使用 small_condition（True/False），win_amount 使用 small_win（可能为0）
             self.bet_results['small'] = (
-                "win" if small_win > 0 else "lose",
+                "win" if small_condition else "lose",
                 small_win,
                 "1.75:1"
             )
-            
+
             # 大下注
-            big_win = (
-                self.bets['big'] * (1 + BET_ODDS['big'])
-                if len(self.dealer_hand) >= 4 and not dealer_bust and self.bets['big'] > 0
-                else 0
-            )
+            big_condition = (len(self.dealer_hand) >= 4 and not dealer_bust)
+            big_win = self.bets['big'] * (1 + BET_ODDS['big']) if (big_condition and self.bets['big'] > 0) else 0
             if big_win > 0:
                 winnings += big_win
             self.bet_results['big'] = (
-                "win" if big_win > 0 else "lose",
+                "win" if big_condition else "lose",
                 big_win,
                 "3.5:1"
             )
-            
+
             # BJ、22点以外的其他注项
             self.bet_results['bj'] = ("lose", 0, "最高50:1")
-        
+
         # 如果庄家Blackjack（头两张牌21点）
         elif self.dealer_blackjack:
             # 点数下注(16-20)输
@@ -411,7 +406,7 @@ class Simple21Game:
                     0,
                     f"{BET_ODDS[bet_type]}:1"
                 )
-            
+
             # BJ下注
             card1, card2 = self.dealer_hand[0], self.dealer_hand[1]
             if card1.suit == card2.suit:
@@ -427,16 +422,18 @@ class Simple21Game:
                 odds_type = "同色25:1"
             else:
                 odds_type = "杂色11:1"
-            
+
             bj_win = self.bets['bj'] * (1 + odds)
             winnings += bj_win
             self.bet_results['bj'] = ("win", bj_win, odds_type)
-            
-            # 小下注（庄家2张停牌）
-            small_win = self.bets['small'] * (1 + BET_ODDS['small'])
-            winnings += small_win
-            self.bet_results['small'] = ("win", small_win, "1.75:1")
-            
+
+            # 小下注（庄家2张停牌） -> 这里庄家BJ视为 small_condition=True
+            small_condition = True  # BJ 情况下显然是“2张停牌”
+            small_win = self.bets['small'] * (1 + BET_ODDS['small']) if (self.bets['small'] > 0) else 0
+            if small_win > 0:
+                winnings += small_win
+            self.bet_results['small'] = ("win" if small_condition else "lose", small_win, "1.75:1")
+
             # 对子下注
             if self.dealer_pair and len(self.dealer_hand) >= 2:
                 card1, card2 = self.dealer_hand[0], self.dealer_hand[1]
@@ -450,37 +447,30 @@ class Simple21Game:
                     odds_type = "同色15:1"
                 else:
                     odds_type = "杂色7:1"
-                
+
                 pair_win = self.bets['pair'] * (1 + odds)
                 winnings += pair_win
                 self.bet_results['pair'] = ("win", pair_win, odds_type)
             else:
                 self.bet_results['pair'] = ("lose", 0, "最高60:1")
-            
-            # 大下注
-            big_win = (
-                self.bets['big'] * (1 + BET_ODDS['big'])
-                if len(self.dealer_hand) >= 4 and not dealer_bust and self.bets['big'] > 0
-                else 0
-            )
+
+            # 大下注（BJ 不可能是大）
+            big_condition = (len(self.dealer_hand) >= 4 and not dealer_bust)
+            big_win = self.bets['big'] * (1 + BET_ODDS['big']) if (big_condition and self.bets['big'] > 0) else 0
             if big_win > 0:
                 winnings += big_win
-            self.bet_results['big'] = (
-                "win" if big_win > 0 else "lose",
-                big_win,
-                "3.5:1"
-            )
-            
+            self.bet_results['big'] = ("win" if big_condition else "lose", big_win, "3.5:1")
+
             # 22点下注
             self.bet_results['twenty_two'] = ("lose", 0, "最高50:1")
-        
+
         # 正常情况（非22点，非Blackjack）
         else:
             # 点数下注
             for bet_type in ['16', '17', '18', '19', '20']:
                 bet_value = int(bet_type)
                 bet_amount = self.bets[bet_type]
-                
+
                 if dealer_bust or bet_value > dealer_value:
                     win_amt = bet_amount * (1 + BET_ODDS[bet_type]) if bet_amount > 0 else 0
                     winnings += win_amt
@@ -491,7 +481,7 @@ class Simple21Game:
                     self.bet_results[bet_type] = ("tie", tie_amt, f"{BET_ODDS[bet_type]}:1")
                 else:
                     self.bet_results[bet_type] = ("lose", 0, f"{BET_ODDS[bet_type]}:1")
-            
+
             # 对子下注
             if self.dealer_pair and len(self.dealer_hand) >= 2:
                 card1, card2 = self.dealer_hand[0], self.dealer_hand[1]
@@ -505,45 +495,39 @@ class Simple21Game:
                     odds_type = "同色15:1"
                 else:
                     odds_type = "杂色7:1"
-                
+
                 pair_win = self.bets['pair'] * (1 + odds)
                 winnings += pair_win
                 self.bet_results['pair'] = ("win", pair_win, odds_type)
             else:
                 self.bet_results['pair'] = ("lose", 0, "最高60:1")
-            
+
             # 小下注
-            small_win = (
-                self.bets['small'] * (1 + BET_ODDS['small'])
-                if len(self.dealer_hand) == 2 and not dealer_bust and self.bets['small'] > 0
-                else 0
-            )
+            small_condition = (len(self.dealer_hand) == 2 and not dealer_bust)
+            small_win = self.bets['small'] * (1 + BET_ODDS['small']) if (small_condition and self.bets['small'] > 0) else 0
             if small_win > 0:
                 winnings += small_win
             self.bet_results['small'] = (
-                "win" if small_win > 0 else "lose",
+                "win" if small_condition else "lose",
                 small_win,
                 "1.75:1"
             )
-            
+
             # 大下注
-            big_win = (
-                self.bets['big'] * (1 + BET_ODDS['big'])
-                if len(self.dealer_hand) >= 4 and not dealer_bust and self.bets['big'] > 0
-                else 0
-            )
+            big_condition = (len(self.dealer_hand) >= 4 and not dealer_bust)
+            big_win = self.bets['big'] * (1 + BET_ODDS['big']) if (big_condition and self.bets['big'] > 0) else 0
             if big_win > 0:
                 winnings += big_win
             self.bet_results['big'] = (
-                "win" if big_win > 0 else "lose",
+                "win" if big_condition else "lose",
                 big_win,
                 "3.5:1"
             )
-            
+
             # BJ、22点下注
             self.bet_results['bj'] = ("lose", 0, "最高50:1")
             self.bet_results['twenty_two'] = ("lose", 0, "最高50:1")
-        
+
         # 最终返回并存储本局总赢额
         self.winnings = winnings
         return winnings

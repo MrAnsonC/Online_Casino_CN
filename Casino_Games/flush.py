@@ -82,7 +82,7 @@ class Deck:
         try:
             # 调用外部 shuffle.py，超时 30 秒
             result = subprocess.run(
-                [sys.executable, shuffle_script],
+                [sys.executable, shuffle_script, "false", "1"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -251,7 +251,8 @@ class HighCardFlushGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
         self.title("高牌同花")
-        self.geometry("1350x750+50+10")
+        self.geometry("1350x730+50+10")
+        self.resizable(0,0)
         self.configure(bg='#35654d')
         
         self.username = username
@@ -489,7 +490,7 @@ class HighCardFlushGUI(tk.Tk):
         bet_frame.pack(fill=tk.X, pady=10)
         
         # Bonus部分框架
-        bonus_frame = tk.LabelFrame(bet_frame, text="Bonus", font=('Arial', 18, 'bold'), 
+        bonus_frame = tk.LabelFrame(bet_frame, text="边注", font=('Arial', 18, 'bold'), 
                                   bg='#2a4a3c', fg='#FFD700', padx=10, pady=5)
         bonus_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -526,7 +527,7 @@ class HighCardFlushGUI(tk.Tk):
         self.bet_widgets["straight_flush_bonus"] = self.straight_flush_bonus_display
         
         # Basic部分框架
-        basic_frame = tk.LabelFrame(bet_frame, text="Basic", font=('Arial', 18, 'bold'), 
+        basic_frame = tk.LabelFrame(bet_frame, text="基本", font=('Arial', 18, 'bold'), 
                                   bg='#2a4a3c', fg='#FFD700', padx=10, pady=5)
         basic_frame.pack(fill=tk.X, padx=5, pady=5)
         
@@ -538,7 +539,7 @@ class HighCardFlushGUI(tk.Tk):
         ante_frame = tk.Frame(basic_row, bg='#2a4a3c')
         ante_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        ante_label = tk.Label(ante_frame, text="Ante:", font=('Arial', 18), bg='#2a4a3c', fg='white')
+        ante_label = tk.Label(ante_frame, text="底注:", font=('Arial', 18), bg='#2a4a3c', fg='white')
         ante_label.pack(side=tk.LEFT)
         
         self.ante_var = tk.StringVar(value="0")
@@ -552,7 +553,7 @@ class HighCardFlushGUI(tk.Tk):
         play_frame = tk.Frame(basic_row, bg='#2a4a3c')
         play_frame.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         
-        self.play_label = tk.Label(play_frame, text="  Play:", font=('Arial', 18), bg='#2a4a3c', fg='white')
+        self.play_label = tk.Label(play_frame, text="  加注:", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.play_label.pack(side=tk.LEFT)
         
         self.play_var = tk.StringVar(value="0")
@@ -569,7 +570,7 @@ class HighCardFlushGUI(tk.Tk):
         
         tip_label = tk.Label(
             tip_frame, 
-            text="庄家不及格 Ante赢 Play退还", 
+            text="庄家不及格 底注赢 加注退还", 
             font=('Arial', 18, 'bold'), 
             bg='#2a4a3c', 
             fg='#FFD700'
@@ -582,7 +583,7 @@ class HighCardFlushGUI(tk.Tk):
 
         # 创建一个框架来容纳重置按钮和开始游戏按钮
         self.start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        self.start_button_frame.pack(pady=10)
+        self.start_button_frame.pack(pady=5)
 
         # 添加"重置金额"按钮
         self.reset_bets_button = tk.Button(
@@ -665,16 +666,16 @@ class HighCardFlushGUI(tk.Tk):
         
         # 游戏规则文本
         rules_text = """
-        高牌同花 (High Card Flush) 游戏规则
+        高牌同花 游戏规则
 
         1. 游戏开始前下注:
-           - Ante: 基础下注（必须）
+           - 底注: 基础下注（必须）
            - 同花边注: 可选下注（根据同花张数赔付）
            - 同花顺边注: 可选下注（根据同花顺张数赔付）
 
         2. 游戏流程:
            a. 下注阶段:
-               - 玩家下注Ante
+               - 玩家下注底注
                - 可选择下注同花边注和同花顺边注
                - 点击"开始游戏"按钮开始
 
@@ -684,10 +685,10 @@ class HighCardFlushGUI(tk.Tk):
 
            c. 决策阶段:
                - 玩家查看自己的七张牌后选择:
-                 * 弃牌: 输掉Ante下注
-                 * 下注1X: 下注金额等于Ante
-                 * 下注2X: 下注金额等于Ante的2倍（仅当有5张以上同花）
-                 * 下注3X: 下注金额等于Ante的3倍（仅当有6张以上同花）
+                 * 弃牌: 输掉底注下注
+                 * 下注1倍: 下注金额等于底注
+                 * 下注2倍: 下注金额等于底注的2倍（仅当有5张或以上同花）
+                 * 下注3倍: 下注金额等于底注的3倍（仅当有6张或以上同花）
 
            d. 摊牌:
                - 庄家开牌
@@ -695,15 +696,15 @@ class HighCardFlushGUI(tk.Tk):
                - 结算所有下注
 
         3. 结算规则:
-           - Ante和Play:
+           - 底注和加注:
              * 如果庄家不合格:
-                 - Ante支付1:1
-                 - Play: 退还
+                 - 底注支付1:1
+                 - 加注: 退还
              * 如果庄家合格:
                  - 比较玩家和庄家的牌:
-                   - 玩家赢: Ante支付1:1，Play支付1:1
-                   - 平局: Ante和Play都退还
-                   - 玩家输: 输掉Ante和Play
+                   - 玩家赢: 底注和加注支付1:1
+                   - 平局: 底注和加注都退还
+                   - 玩家输: 输掉底注和加注
                    
            - 边注:
              * 同花边注: 根据玩家最大同花张数赔付
@@ -826,7 +827,7 @@ class HighCardFlushGUI(tk.Tk):
         notes = """
         注: 
         * 庄家必须至少3张同花且高牌≥9才合格
-        * Play 金额等于Ante下注金额的倍数（1X/2X/3X）
+        * 加注金额等于底注下注金额的倍数
         * 边注奖励根据玩家手牌支付（无论庄家是否合格）
         """
         
@@ -930,7 +931,7 @@ class HighCardFlushGUI(tk.Tk):
             
             # 检查Ante至少5块
             if self.ante < 5:
-                messagebox.showerror("错误", "Ante至少需要5块")
+                messagebox.showerror("错误", "底注至少需要5块")
                 return
                 
             # 计算总下注
@@ -993,11 +994,11 @@ class HighCardFlushGUI(tk.Tk):
             
             # 创建决策按钮框架
             self.decision_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-            self.decision_frame.pack(pady=10)
+            self.decision_frame.pack(pady=2)
             
             # 创建决策按钮 (初始禁用) —— 四个按钮同一行
             row_frame = tk.Frame(self.decision_frame, bg='#2a4a3c')
-            row_frame.pack(pady=5)
+            row_frame.pack(pady=3)
 
             self.fold_button = tk.Button(
                 row_frame, text="弃牌",
@@ -1008,7 +1009,7 @@ class HighCardFlushGUI(tk.Tk):
             self.fold_button.pack(side=tk.LEFT, padx=5)
 
             self.bet1x_button = tk.Button(
-                row_frame, text="下注1X",
+                row_frame, text="下注1倍",
                 command=lambda: self.play_action(1),
                 state=tk.DISABLED,
                 font=('Arial', 14), bg='#4CAF50', fg='white', width=7
@@ -1016,7 +1017,7 @@ class HighCardFlushGUI(tk.Tk):
             self.bet1x_button.pack(side=tk.LEFT, padx=5)
 
             self.bet2x_button = tk.Button(
-                row_frame, text="下注2X",
+                row_frame, text="下注2倍",
                 command=lambda: self.play_action(2),
                 state=tk.DISABLED,
                 font=('Arial', 14), bg='#2196F3', fg='white', width=7
@@ -1024,7 +1025,7 @@ class HighCardFlushGUI(tk.Tk):
             self.bet2x_button.pack(side=tk.LEFT, padx=5)
 
             self.bet3x_button = tk.Button(
-                row_frame, text="下注3X",
+                row_frame, text="下注3倍",
                 command=lambda: self.play_action(3),
                 state=tk.DISABLED,
                 font=('Arial', 14), bg='#FF9800', fg='white', width=7
@@ -1147,7 +1148,7 @@ class HighCardFlushGUI(tk.Tk):
         # 根据同花长度启用相应的下注按钮
         suit_name, flush_len, _, _, _ = evaluate_seven_card_hand(self.game.player_hand)
         
-        # 总是启用弃牌和下注1X按钮
+        # 总是启用弃牌和下注1倍按钮
         self.fold_button.config(state=tk.NORMAL)
         self.bet1x_button.config(state=tk.NORMAL)
         
@@ -1292,7 +1293,7 @@ class HighCardFlushGUI(tk.Tk):
             command=self.reset_game, 
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
-        restart_btn.pack(pady=10)
+        restart_btn.pack(pady=5)
         restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
@@ -1448,7 +1449,7 @@ class HighCardFlushGUI(tk.Tk):
             command=self.reset_game, 
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
-        restart_btn.pack(pady=10)
+        restart_btn.pack(pady=5)
         restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
@@ -1725,7 +1726,7 @@ class HighCardFlushGUI(tk.Tk):
         
         # 重新显示开始按钮框架
         self.start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        self.start_button_frame.pack(pady=10)
+        self.start_button_frame.pack(pady=5)
 
         # 添加"重置金额"按钮
         self.reset_bets_button = tk.Button(

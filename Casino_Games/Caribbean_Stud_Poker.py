@@ -15,7 +15,7 @@ SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 RANK_VALUES = {r: i for i, r in enumerate(RANKS, start=2)}
 HAND_RANK_NAMES = {
-    9: '同花大顺', 
+    9: '皇家同花顺', 
     8: '同花顺', 
     7: '四条', 
     6: '葫芦', 
@@ -29,7 +29,7 @@ HAND_RANK_NAMES = {
 
 # 加勒比扑克赔付表
 CARIBBEAN_STUD_PAYOUT = {
-    9: 100,  # 同花大顺 100:1
+    9: 100,  # 皇家同花顺 100:1
     8: 50,   # 同花顺 50:1
     7: 20,   # 四条 20:1
     6: 7,    # 葫芦 7:1
@@ -41,13 +41,15 @@ CARIBBEAN_STUD_PAYOUT = {
     0: 1     # 高牌 1:1
 }
 
-# Bonus赔付表
-BONUS_PAYOUT = {
-    "royal_flush": "赢得整个Jackpot",
-    "straight_flush": "赢得Jackpot的10%",
-    "four_of_a_kind": "$500",
-    "full_house": "$100",
-    "flush": "$75"
+# 5+1 Side Bet赔付表
+FIVE_PLUS_ONE_PAYOUT = {
+    9: 1001,  # 皇家同花顺 1000:1
+    8: 201,   # 同花顺 200:1
+    7: 101,   # 四条 100:1
+    6: 21,    # 葫芦 20:1
+    5: 16,    # 同花 15:1
+    4: 11,    # 顺子 10:1
+    3: 8,     # 三条 7:1
 }
 
 def get_data_file_path():
@@ -356,10 +358,10 @@ def evaluate_five_card_hand(cards):
             is_straight = True
             straight_values = [5, 4, 3, 2, 1]  # 作为5-high顺子
     
-    # 检查同花大顺（A,K,Q,J,10 同花）
+    # 检查皇家同花顺（A,K,Q,J,10 同花）
     is_royal = is_straight and is_flush and values[0] == 14 and values[4] == 10
     
-    # 同花顺（包括同花大顺）
+    # 同花顺（包括皇家同花顺）
     if is_straight and is_flush:
         return (9 if is_royal else 8, straight_values)
     
@@ -440,8 +442,8 @@ class CaribbeanStudGame:
     def __init__(self):
         self.reset_game()
         # 初始化Jackpot
-        self.jackpot_amount = load_jackpot()[1]
-        self.initial_jackpot = self.jackpot_amount  # 保存初始值用于重置
+        self.progressive_amount = load_jackpot()[1]
+        self.initial_jackpot = self.progressive_amount  # 保存初始值用于重置
         # 添加牌序记录
         self.card_sequence = []  # 记录整副牌的序列
         self.cut_position = 0    # 切牌位置
@@ -452,6 +454,7 @@ class CaribbeanStudGame:
         self.dealer_hand = []
         self.ante = 0
         self.jackpot_bet = 0
+        self.five_plus_one_bet = 0  # 新增5+1下注
         self.play_bet = 0
         self.stage = "pre_flop"  # pre_flop, decision, showdown
         self.folded = False
@@ -491,9 +494,9 @@ class CaribbeanStudGame:
 class CaribbeanStudGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
-        self.title("加勒比扑克")
-        self.geometry("1050x660+50+10")
-        self.resizable(0,0)
+        self.title("加勒⽐梭哈扑克")
+        self.geometry("1150x650+50+10")  # 增加窗口尺寸以适应更大的卡片
+        ## self.resizable(0,0)
         self.configure(bg='#35654d')
         
         self.username = username
@@ -509,14 +512,17 @@ class CaribbeanStudGUI(tk.Tk):
         self.last_win = 0
         self.auto_reset_timer = None
         self.buttons_disabled = False  # 跟踪按钮是否被禁用
+        self.five_plus_one_win = 0
         self.last_jackpot_state = 0
         self.win_details = {
             "ante": 0,
             "play": 0,
-            "bonus": 0
+            "bonus": 0,
+            "five_plus_one": 0  # 新增5+1赢钱详情
         }
         self.bet_widgets = {}  # 存储下注显示控件
         self.jackpot_bet_var = tk.IntVar(value=0)  # Jackpot下注变量
+        self.five_plus_one_bet_var = tk.IntVar(value=0)  # 新增5+1下注变量
         self.flipping_cards = []  # 存储正在翻转的卡片
         self.flip_step = 0  # 翻转动画的当前步骤
         self.moved_cards = []  # 存储下移的卡片
@@ -524,10 +530,22 @@ class CaribbeanStudGUI(tk.Tk):
         self.fold_button = None  # 弃牌按钮引用
         self.play_button = None  # 下注按钮引用
         self.ak_animation_active = False  # 标记AK动画是否进行中
+        self._resetting = False
 
         self._load_assets()
         self._create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def cancel_auto_reset_timer(self):
+        """安全地取消自动重置计时器"""
+        if self.auto_reset_timer:
+            try:
+                self.after_cancel(self.auto_reset_timer)
+            except:
+                # 忽略任何异常，确保计时器被标记为已取消
+                pass
+            finally:
+                self.auto_reset_timer = None
     
     def on_close(self):
         # 取消自动重置计时器
@@ -537,7 +555,7 @@ class CaribbeanStudGUI(tk.Tk):
         self.quit()
         
     def _load_assets(self):
-        card_size = (80, 120)  # 缩小卡片尺寸以适应5张牌
+        card_size = (100, 150)  # 修改卡片尺寸为120x180
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
         
@@ -616,15 +634,33 @@ class CaribbeanStudGUI(tk.Tk):
             return
             
         # 获取筹码金额
-        chip_value = float(self.selected_chip.replace('$', '').replace('K', '000'))
+        chip_text = self.selected_chip.replace('$', '')
+        if 'K' in chip_text:
+            # 处理带K的筹码，如1K或2.5K
+            chip_value = float(chip_text.replace('K', '')) * 1000
+        else:
+            chip_value = float(chip_text)
         
         # 更新对应的下注变量
         if bet_type == "ante":
             current = float(self.ante_var.get())
-            self.ante_var.set(str(int(current + chip_value)))
+            new_value = current + chip_value
+            # 检查上限
+            if new_value > 10000:
+                new_value = 10000
+                messagebox.showwarning("下注限制", f"底注上限为10000，已自动调整")
+            self.ante_var.set(str(int(new_value)))
             # 如果Play已经有值，则更新Play为Ante的2倍
             if int(self.play_var.get()) > 0:
-                self.play_var.set(str(int((current + chip_value) * 2)))
+                self.play_var.set(str(int(new_value * 2)))
+        elif bet_type == "five_plus_one":
+            current = float(self.five_plus_one_var.get())
+            new_value = current + chip_value
+            # 检查上限
+            if new_value > 2500:
+                new_value = 2500
+                messagebox.showwarning("下注限制", f"5+1上限为2500，已自动调整")
+            self.five_plus_one_var.set(str(int(new_value)))
     
     def toggle_play_bet(self, event):
         """切换Play下注状态"""
@@ -666,9 +702,9 @@ class CaribbeanStudGUI(tk.Tk):
         # 牌桌背景
         table_bg = table_canvas.create_rectangle(0, 0, 800, 600, fill='#35654d', outline='')
         
-        # 庄家区域 - 固定高度200
+        # 庄家区域 - 增加高度以适应更大的卡片
         dealer_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        dealer_frame.place(x=50, y=50, width=500, height=230)  # 加宽以适应5张牌
+        dealer_frame.place(x=50, y=20, width=600, height=250)  # 加宽以适应5张更大的牌
         self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.dealer_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.dealer_cards_frame = tk.Frame(dealer_frame, bg='#2a4a3c')
@@ -677,8 +713,8 @@ class CaribbeanStudGUI(tk.Tk):
         # 在庄家和玩家区域之间添加提示文字
         self.ante_info_label = tk.Label(
             table_canvas, 
-            text="庄家不合格 玩家赢Ante 退还Play", 
-            font=('Arial', 20), 
+            text="庄家必须持有高牌A/K或以上牌型才合格\n庄家不合格的 底注获胜 加注平局", 
+            font=('Arial', 22), 
             bg='#35654d', 
             fg='#FFD700'
         )
@@ -693,65 +729,68 @@ class CaribbeanStudGUI(tk.Tk):
 
         # 居中放置在庄家和玩家区域之间（然后向左偏移50像素）
         center_x = (canvas_width - label_width) // 2
-        self.ante_info_label.place(x=center_x + 300, y=300, anchor='n')  # 向左移动50像素
+        self.ante_info_label.place(x=center_x + 355, y=280, anchor='n')  # 调整Y位置以适应更大的卡片
         
-        # 玩家区域 - 固定高度200
+        # 玩家区域 - 增加高度以适应更大的卡片
         player_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        player_frame.place(x=50, y=350, width=500, height=230)  # 加宽以适应5张牌
+        player_frame.place(x=50, y=365, width=600, height=250)  # 加宽以适应5张更大的牌
         self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.player_cards_frame = tk.Frame(player_frame, bg='#2a4a3c')
         self.player_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # 右侧控制面板
-        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=300, padx=10, pady=10)
+        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=250, padx=10, pady=5)
         control_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
         # 顶部信息栏
         info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        info_frame.pack(fill=tk.X, pady=10)
+        info_frame.pack(fill=tk.X, pady=5)
         
         self.balance_label = tk.Label(
             info_frame, 
             text=f"余额: ${self.balance:.2f}",
-            font=('Arial', 14),
+            font=('Arial', 18),
             bg='#2a4a3c',
             fg='white'
         )
-        self.balance_label.pack(side=tk.LEFT, padx=20, pady=10)
+        self.balance_label.pack(side=tk.LEFT, padx=20, pady=5)
         
         self.stage_label = tk.Label(
             info_frame, 
-            text="阶段: 下注",
-            font=('Arial', 14, 'bold'),
+            text="翻牌前",
+            font=('Arial', 18, 'bold'),
             bg='#2a4a3c',
             fg='#FFD700'
         )
-        self.stage_label.pack(side=tk.LEFT, padx=20, pady=10)
+        self.stage_label.pack(side=tk.RIGHT, padx=20, pady=5)
         
-        # Jackpot显示区域
-        jackpot_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        jackpot_frame.pack(fill=tk.X, pady=10)
-        
-        # 创建一个内部框架用于居中
-        jackpot_inner_frame = tk.Frame(jackpot_frame, bg='#2a4a3c')
-        jackpot_inner_frame.pack(expand=True, pady=5)  # 使用expand和居中
+        # Progressive显示区域 - 修改后的代码
+        progressive_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        progressive_frame.pack(fill=tk.X, pady=5)
 
-        jackpot_label = tk.Label(jackpot_inner_frame, text="Progressive:", 
+        # 使用网格布局确保标签在左边，金额在中间
+        progressive_frame.columnconfigure(0, weight=1)  # 标签列
+        progressive_frame.columnconfigure(1, weight=2)  # 金额列（更宽）
+        progressive_frame.columnconfigure(2, weight=1)  # 空白列（平衡布局）
+
+        # 标签放在左边
+        progressive_label = tk.Label(progressive_frame, text="累进大奖:", 
                                 font=('Arial', 18), bg='#2a4a3c', fg='gold')
-        jackpot_label.pack(side=tk.LEFT, padx=(0, 5))  # 右侧留5像素间距
+        progressive_label.grid(row=0, column=0, sticky='w', padx=(10, 0), pady=5)
 
-        self.jackpot_var = tk.StringVar()
-        self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
-        self.jackpot_display = tk.Label(jackpot_inner_frame, textvariable=self.jackpot_var, 
-                                    font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='gold')
-        self.jackpot_display.pack(side=tk.LEFT)
+        # 金额放在中间 - 使用StringVar
+        self.progressive_amount_var = tk.StringVar()
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
+        self.progressive_display = tk.Label(progressive_frame, textvariable=self.progressive_amount_var, 
+                                    font=('Arial', 22, 'bold'), bg='#2a4a3c', fg='gold')
+        self.progressive_display.grid(row=0, column=1, sticky='w', pady=3)
         
         # 筹码区域
         chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        chips_frame.pack(fill=tk.X, pady=10)
+        chips_frame.pack(fill=tk.X, pady=5)
         
-        chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 12), bg='#2a4a3c', fg='white')
+        chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         chips_label.pack(anchor='w', padx=10, pady=5)
         
         # 单行放置5个筹码 - 增加50%大小
@@ -759,27 +798,59 @@ class CaribbeanStudGUI(tk.Tk):
         chip_row.pack(fill=tk.X, pady=5, padx=5)
         
         chip_configs = [
-            ("$5", '#ff0000', 'white'),     # 红色背景，白色文字
             ('$10', '#ffa500', 'black'),   # 橙色背景，黑色文字
             ("$25", '#00ff00', 'black'),    # 绿色背景，黑色文字
-            ("$50", '#ffffff', 'black'),    # 白色背景，黑色文字
             ("$100", '#000000', 'white'),   # 黑色背景，白色文字
+            ("$500", "#FF7DDA", 'black'),   # 粉色背景，黑色文字
+            ("$1K", '#ffffff', 'black'),    # 白色背景，黑色文字
+            ("$2.5K", '#ff0000', 'white'),     # 红色背景，白色文字
         ]
         
         self.chip_buttons = []
         self.chip_texts = {}  # 存储每个筹码按钮的文本
         for text, bg_color, fg_color in chip_configs:
-            # 使用Canvas创建圆形筹码 - 增加50%大小 (60x60)
-            chip_canvas = tk.Canvas(chip_row, width=60, height=60, bg='#2a4a3c', highlightthickness=0)
-            chip_canvas.create_oval(2, 2, 58, 58, fill=bg_color, outline='black')
-            text_id = chip_canvas.create_text(30, 30, text=text, fill=fg_color, font=('Arial', 16, 'bold'))
+            # 使用Canvas创建圆形筹码 - 尺寸改为55x55
+            chip_canvas = tk.Canvas(chip_row, width=57, height=57, bg='#2a4a3c', highlightthickness=0)
+            
+            # 创建圆形（尺寸调整为51x51，在55x55画布中居中）
+            chip_canvas.create_oval(2, 2, 55, 55, fill=bg_color, outline='black')
+            
+            # 创建文本（位置调整为画布中心）
+            text_id = chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 14, 'bold'))
+            
             chip_canvas.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
             chip_canvas.pack(side=tk.LEFT, padx=5)
             self.chip_buttons.append(chip_canvas)
             self.chip_texts[chip_canvas] = text  # 存储文本
         
-        # 默认选中$5筹码
-        self.select_chip("$5")
+        # 默认选中$10筹码
+        self.select_chip("$10")
+
+        # 每注限制
+        minmax_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
+        minmax_frame.pack(fill=tk.X, pady=5)
+        
+        # 标题行
+        header_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        header_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
+        
+        tk.Label(header_frame, text="底注最低", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=7).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="底注最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=7).pack(side=tk.LEFT, expand=True)
+        tk.Label(header_frame, text="边注最高", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='white', width=7).pack(side=tk.LEFT, expand=True)
+        
+        # 数值行
+        value_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
+        value_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+        
+        tk.Label(value_frame, text="$10", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=7).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$10,000", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=7).pack(side=tk.LEFT, expand=True)
+        tk.Label(value_frame, text="$2,500", font=('Arial', 12, 'bold'), 
+                bg='#2a4a3c', fg='#FFD700', width=7).pack(side=tk.LEFT, expand=True)
         
         # 下注区域
         bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
@@ -787,70 +858,72 @@ class CaribbeanStudGUI(tk.Tk):
         
         # Jackpot下注区域
         bonus_bet_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        bonus_bet_frame.pack(fill=tk.X, padx=20, pady=5)
+        bonus_bet_frame.pack(fill=tk.X, padx=40, pady=5)
         
         # Jackpot下注
         self.jackpot_check = tk.Checkbutton(
             bonus_bet_frame, 
-            text="Progressive ($1)", 
+            text="累进大奖 ($1)", 
             variable=self.jackpot_bet_var,
-            font=('Arial', 12), 
+            font=('Arial', 14), 
             bg='#2a4a3c', 
             fg='white', 
             selectcolor='black'
         )
         self.jackpot_check.pack(side=tk.LEFT)
         
-        # Ante 和 Play 在同一行
-        ante_play_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        ante_play_frame.pack(fill=tk.X, padx=20, pady=5)
-        
+        # Ante 和 5+1 在同一行（第一行）
+        ante_five_frame = tk.Frame(bet_frame, bg='#2a4a3c')
+        ante_five_frame.pack(fill=tk.X, padx=40, pady=3)
+
         # Ante 部分
-        ante_label = tk.Label(ante_play_frame, text="Ante:", font=('Arial', 12), bg='#2a4a3c', fg='white')
+        ante_label = tk.Label(ante_five_frame, text="底注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         ante_label.pack(side=tk.LEFT)
-        
+
         self.ante_var = tk.StringVar(value="0")
-        self.ante_display = tk.Label(ante_play_frame, textvariable=self.ante_var, font=('Arial', 12), 
+        self.ante_display = tk.Label(ante_five_frame, textvariable=self.ante_var, font=('Arial', 14), 
                                     bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.ante_display.pack(side=tk.LEFT, padx=5)
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.bet_widgets["ante"] = self.ante_display
-        
+
         # 添加间距
-        tk.Label(ante_play_frame, text="   ", bg='#2a4a3c').pack(side=tk.LEFT)
-        
+        tk.Label(ante_five_frame, text="   ", bg='#2a4a3c').pack(side=tk.LEFT, padx=10)
+
+        # 5+1 部分
+        five_plus_one_label = tk.Label(ante_five_frame, text="5+1:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        five_plus_one_label.pack(side=tk.LEFT)
+
+        self.five_plus_one_var = tk.StringVar(value="0")
+        self.five_plus_one_display = tk.Label(ante_five_frame, textvariable=self.five_plus_one_var, font=('Arial', 14), 
+                                            bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
+        self.five_plus_one_display.pack(side=tk.LEFT, padx=5)
+        self.five_plus_one_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("five_plus_one"))
+        self.bet_widgets["five_plus_one"] = self.five_plus_one_display
+
+        # Play 在第二行
+        play_frame = tk.Frame(bet_frame, bg='#2a4a3c')
+        play_frame.pack(fill=tk.X, padx=40, pady=3)
+
         # Play 部分
-        self.play_label = tk.Label(ante_play_frame, text="Play:", font=('Arial', 12), bg='#2a4a3c', fg='white')
+        self.play_label = tk.Label(play_frame, text="加注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
         self.play_label.pack(side=tk.LEFT)
-        
+
         self.play_var = tk.StringVar(value="0")
-        self.play_display = tk.Label(ante_play_frame, textvariable=self.play_var, font=('Arial', 12), 
-                                bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
+        self.play_display = tk.Label(play_frame, textvariable=self.play_var, font=('Arial', 14), 
+                                    bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.play_display.pack(side=tk.LEFT, padx=5)
         # Play Bet 点击事件
         self.play_display.bind("<Button-1>", self.toggle_play_bet)
         self.bet_widgets["play"] = self.play_display
         
-        # 添加提示文字
-        tip_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        tip_frame.pack(fill=tk.X, padx=20, pady=(0, 10))
-        
-        tip_label = tk.Label(
-            tip_frame, 
-            text="庄家A和K的高牌或以上牌型合格", 
-            font=('Arial', 14, 'bold'), 
-            bg='#2a4a3c', 
-            fg='#FFD700'
-        )
-        tip_label.pack(side=tk.LEFT)
-        
         # 游戏操作按钮框架 - 用于放置所有操作按钮
         self.action_frame = tk.Frame(control_frame, bg='#2a4a3c')
-        self.action_frame.pack(fill=tk.X, pady=10)
+        self.action_frame.pack(fill=tk.X)
 
         # 创建一个框架来容纳重置按钮和开始游戏按钮
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重置金额"按钮
         self.reset_bets_button = tk.Button(
@@ -871,16 +944,9 @@ class CaribbeanStudGUI(tk.Tk):
         # 状态信息
         self.status_label = tk.Label(
             control_frame, text="设置下注金额并开始游戏", 
-            font=('Arial', 12), bg='#2a4a3c', fg='white'
+            font=('Arial', 14), bg='#2a4a3c', fg='white'
         )
         self.status_label.pack(pady=5, fill=tk.X)
-        
-        # 结果展示
-        self.result_label = tk.Label(
-            control_frame, text="", 
-            font=('Arial', 12, 'bold'), bg='#2a4a3c', fg='white', justify='center'
-        )
-        self.result_label.pack(pady=5, fill=tk.X)
         
         # 本局下注和上局获胜金额显示
         bet_info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
@@ -913,8 +979,7 @@ class CaribbeanStudGUI(tk.Tk):
         # 创建自定义弹窗
         win = tk.Toplevel(self)
         win.title("加勒比扑克游戏规则")
-        win.geometry("800x650")
-        win.resizable(0,0)
+        win.geometry("900x700")  # 增加窗口宽度以适应合并的表格
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
         
@@ -937,26 +1002,29 @@ class CaribbeanStudGUI(tk.Tk):
         
         # 游戏规则文本
         rules_text = """
-        加勒比扑克 (Caribbean Stud Poker) 游戏规则
+        加勒⽐梭哈扑克 游戏规则
 
         1. 游戏开始前下注:
-           - Ante: 基础下注（必须）
-           - Progressive: 可选$1下注（参与Bonus奖励）
+           - 底注: 基础下注（必须）
+           - 累进大奖: 可选$1下注
+           - 5+1: 可选下注（使用庄家第一张明牌和玩家五张牌，共6张牌选出最佳5张牌型）
 
         2. 游戏流程:
            a. 下注阶段:
-               - 玩家下注Ante
-               - 可选择下注$1参与Jackpot奖金
+               - 玩家下注底注
+               - 可选择下注$1参与累进大奖
+               - 可选择下注5+1
                - 点击"开始游戏"按钮开始
 
            b. 发牌:
                - 玩家和庄家各发五张牌
                - 玩家牌面朝上，庄家牌面朝下（只显示第一张）
+               - 立刻结算5+1
 
            c. 决策阶段:
                - 玩家查看自己的五张牌后选择:
-                 * 弃牌: 输掉Ante下注，但Progressive可能赢
-                 * 下注2X: 下注金额等于Ante
+                 * 弃牌: 输掉底注下注，但累进大奖可能赢
+                 * 下注2倍: 下注金额等于底注*2
 
            d. 摊牌:
                - 庄家开牌
@@ -964,18 +1032,22 @@ class CaribbeanStudGUI(tk.Tk):
                - 结算所有下注
 
         3. 结算规则:
-           - Ante和Bet:
+           - 底注和加注:
              * 如果庄家不合格:
-                 - Ante支付1:1
-                 - Bet: 退还
+                 - 底注：1:1
+                 - 加注: 退还
              * 如果庄家合格:
                  - 比较玩家和庄家的牌:
-                   - 玩家赢: Ante支付1:1，Bet根据玩家牌型支付（见赔率表）
-                   - 平局: Ante和Bet都退还
-                   - 玩家输: 输掉Ante和Bet
+                   - 玩家赢: 底注支付1:1，加注根据玩家牌型支付（见赔率表）
+                   - 平局: 底注和下注都退还
+                   - 玩家输: 输掉底注和下注
                    
-           - Progressive (需下注Progressive):
-             * 根据玩家手牌支付（无论庄家是否合格）
+           - 累进大奖:
+             * 只根据玩家手牌支付
+             * 赔付表见下方
+             
+           - 5+1 (需下注5+1):
+             * 使用庄家第一张明牌和玩家五张牌，共6张牌选出最佳5张牌型
              * 赔付表见下方
         """
         
@@ -990,35 +1062,36 @@ class CaribbeanStudGUI(tk.Tk):
         )
         rules_label.pack(fill=tk.X, padx=10, pady=5)
         
-        # Bet赔付表
+        # 合并赔付表
         tk.Label(
             content_frame, 
-            text="Bet 赔付表",
-            font=('微软雅黑', 12, 'bold'),
+            text="赔付表汇总",
+            font=('微软雅黑', 14, 'bold'),
             bg='#F0F0F0'
-        ).pack(fill=tk.X, padx=10, pady=(20, 5), anchor='w')
+        ).pack(fill=tk.X, padx=10, pady=(20, 10), anchor='center')
         
-        odds_frame = tk.Frame(content_frame, bg='#F0F0F0')
-        odds_frame.pack(fill=tk.X, padx=20, pady=5)
+        # 创建合并的赔付表
+        payout_frame = tk.Frame(content_frame, bg='#F0F0F0')
+        payout_frame.pack(fill=tk.X, padx=20, pady=5)
 
-        headers = ["牌型", "赔率"]
-        odds_data = [
-            ("同花大顺", "100:1"),
-            ("同花顺", "50:1"),
-            ("四条", "20:1"),
-            ("葫芦", "7:1"),
-            ("同花", "5:1"),
-            ("顺子", "4:1"),
-            ("三条", "3:1"),
-            ("两对", "2:1"),
-            ("对子", "1:1"),
-            ("高牌", "1:1")
+        headers = ["牌型", "加注赔率", "5+1赔率", "累进大奖"]
+        payout_data = [
+            ("皇家同花顺", "100:1", "1000:1", "100%累进大奖"),
+            ("同花顺", "50:1", "200:1", "10%累进大奖"),
+            ("四条", "20:1", "100:1", "$500"),
+            ("葫芦", "7:1", "20:1", "$150"),
+            ("同花", "5:1", "15:1", "$100"),
+            ("顺子", "4:1", "10:1", "-"),
+            ("三条", "3:1", "7:1", "-"),
+            ("两对", "2:1", "-", "-"),
+            ("对子", "1:1", "-", "-"),
+            ("高牌", "1:1", "-", "-")
         ]
 
         # 表头
         for col, h in enumerate(headers):
             tk.Label(
-                odds_frame,
+                payout_frame,
                 text=h,
                 font=('微软雅黑', 10, 'bold'),
                 bg='#4B8BBE',
@@ -1029,65 +1102,11 @@ class CaribbeanStudGUI(tk.Tk):
             ).grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
 
         # 表格内容
-        for r, row_data in enumerate(odds_data, start=1):
+        for r, row_data in enumerate(payout_data, start=1):
             bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
             for c, txt in enumerate(row_data):
                 tk.Label(
-                    odds_frame,
-                    text=txt,
-                    font=('微软雅黑', 10),
-                    bg=bg,
-                    padx=10, pady=5,
-                    anchor='center',
-                    justify='center'
-                ).grid(row=r, column=c, sticky='nsew', padx=1, pady=1)
-
-        # 平均分配每列宽度，让 sticky='nsew' 生效
-        for c in range(len(headers)):
-            odds_frame.columnconfigure(c, weight=1)
-        # 可选：也给行设置权重，支持垂直拉伸
-        for r in range(len(odds_data) + 1):
-            odds_frame.rowconfigure(r, weight=1)
-            
-        # Jackpot赔付表
-        tk.Label(
-            content_frame, 
-            text="Jackpot 赔付表 (需下注Jackpot)",
-            font=('微软雅黑', 12, 'bold'),
-            bg='#F0F0F0'
-        ).pack(fill=tk.X, padx=10, pady=(20, 5), anchor='w')
-        
-        jackpot_frame = tk.Frame(content_frame, bg='#F0F0F0')
-        jackpot_frame.pack(fill=tk.X, padx=20, pady=5)
-
-        headers = ["牌型", "奖励"]
-        jackpot_data = [
-            ("同花大顺", "赢得整个Jackpot"),
-            ("同花顺", "赢得Jackpot的10%"),
-            ("四条", "$500"),
-            ("葫芦", "$100"),
-            ("同花", "$75")
-        ]
-
-        # 表头
-        for col, h in enumerate(headers):
-            tk.Label(
-                jackpot_frame,
-                text=h,
-                font=('微软雅黑', 10, 'bold'),
-                bg='#4B8BBE',
-                fg='white',
-                padx=10, pady=5,
-                anchor='center',
-                justify='center'
-            ).grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
-
-        # 表格内容
-        for r, row_data in enumerate(jackpot_data, start=1):
-            bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
-            for c, txt in enumerate(row_data):
-                tk.Label(
-                    jackpot_frame,
+                    payout_frame,
                     text=txt,
                     font=('微软雅黑', 10),
                     bg=bg,
@@ -1098,16 +1117,13 @@ class CaribbeanStudGUI(tk.Tk):
 
         # 平均分配每列宽度
         for c in range(len(headers)):
-            jackpot_frame.columnconfigure(c, weight=1)
+            payout_frame.columnconfigure(c, weight=1)
             
         # 注释
         notes = """
         注: 
         * 庄家必须至少有一张A和K才合格
-        * Bet 金额等于Ante下注金额
-        * Progressive奖励需要下注Progressive($1)才有效
-        * 同花大顺赢得整个Progressive后，Progressive将重置为初始值
-        * 同花顺赢得当前Progressive的10%
+        * 下注金额等于底注*2的下注金额
         """
         
         notes_label = tk.Label(
@@ -1220,11 +1236,11 @@ class CaribbeanStudGUI(tk.Tk):
                 self.player_cards_frame, 
                 image=self.back_image,  # 先显示背面
                 bg='#2a4a3c',
-                width=90,  # 增加宽度确保完整显示
-                height=130  # 增加高度确保完整显示
+                width=110,  # 增加宽度确保完整显示
+                height=180  # 增加高度确保完整显示
             )
             # 使用place布局并设置合适的偏移量
-            card_label.place(x=i*90, y=0, width=90, height=130)
+            card_label.place(x=i*110, y=0, width=110, height=180)
             card_label.card = card
             card_label.is_face_up = False
             # 添加到活动卡片列表
@@ -1246,14 +1262,8 @@ class CaribbeanStudGUI(tk.Tk):
         
         # 如果没有需要翻转的卡片，直接返回
         if not self.flipping_cards:
-            # 动画完成，启用决策按钮（如果不是自动下注模式）
-            if self.fold_button and self.play_button and self.game.play_bet == 0:
-                self.fold_button.config(state=tk.NORMAL)
-                self.play_button.config(state=tk.NORMAL)
-            else:
-                # 自动下注模式：等待2秒后自动下注
-                if self.game.stage == "pre_flop" and self.game.play_bet > 0:
-                    self.after(2000, self.auto_play_action)
+            # 动画完成，结算5+1 Side Bet
+            self.after(500, self.settle_five_plus_one_bet)
             return
             
         # 开始翻转动画
@@ -1262,6 +1272,9 @@ class CaribbeanStudGUI(tk.Tk):
     
     def animate_flip_to_front_step(self):
         """执行翻转动画的每一步（翻到正面）"""
+        if self._resetting:  # 如果正在重置，停止动画
+            return
+    
         if self.flip_step > 10:  # 假设10步完成
             # 翻转完成，将所有正在翻转的卡片设为正面
             for card_label in self.flipping_cards:
@@ -1271,31 +1284,14 @@ class CaribbeanStudGUI(tk.Tk):
                     card_label.config(image=front_img)
                     card_label.is_face_up = True
                     # 重置宽度为正常值 - 关键修复
-                    card_label.place(width=80, height=120)
+                    card_label.place(width=120, height=180)
                     
-            # 修改开始：安全地检查按钮状态
-            try:
-                # 动画完成，启用决策按钮（如果不是自动下注模式）
-                if (self.fold_button and self.play_button and 
-                    self.fold_button.winfo_exists() and 
-                    self.play_button.winfo_exists() and 
-                    self.game.play_bet == 0):
-                    
-                    self.fold_button.config(state=tk.NORMAL)
-                    self.play_button.config(state=tk.NORMAL)
-                else:
-                    # 自动下注模式：等待2秒后自动下注
-                    if self.game.stage == "pre_flop" and self.game.play_bet > 0:
-                        self.after(2000, self.auto_play_action)
-            except tk.TclError:
-                # 按钮已被销毁，忽略错误
-                pass
-            # 修改结束
-            
+            # 动画完成，结算5+1 Side Bet
+            self.after(500, self.settle_five_plus_one_bet)
             return
 
         # 模拟翻转效果
-        width = 80 - (self.flip_step * 8) if self.flip_step < 5 else (self.flip_step - 5) * 8
+        width = 120 - (self.flip_step * 12) if self.flip_step < 5 else (self.flip_step - 5) * 12
         if width <= 0:
             width = 1
 
@@ -1305,6 +1301,54 @@ class CaribbeanStudGUI(tk.Tk):
 
         self.flip_step += 1
         self.after(50, self.animate_flip_to_front_step)
+    
+    def settle_five_plus_one_bet(self):
+        """结算5+1 Side Bet"""
+        self.five_plus_one_win = 0  # 重置5+1赢钱
+        
+        if self.game.five_plus_one_bet > 0:
+            # 获取庄家第一张明牌和玩家五张牌
+            dealer_first_card = self.game.dealer_hand[0] if self.game.dealer_hand else None
+            player_cards = self.game.player_hand
+            
+            if dealer_first_card and player_cards and len(player_cards) == 5:
+                # 组合6张牌
+                six_cards = player_cards + [dealer_first_card]
+                
+                # 找出最佳5张牌组合
+                best_hand_rank = 0
+                best_payout = 0
+                
+                # 尝试所有可能的5张牌组合
+                from itertools import combinations
+                for combo in combinations(six_cards, 5):
+                    rank, _ = evaluate_five_card_hand(list(combo))
+                    if rank in FIVE_PLUS_ONE_PAYOUT and FIVE_PLUS_ONE_PAYOUT[rank] > best_payout:
+                        best_hand_rank = rank
+                        best_payout = FIVE_PLUS_ONE_PAYOUT[rank]
+                
+                # 计算赢得的金额
+                if best_payout > 0:
+                    self.five_plus_one_win = self.game.five_plus_one_bet * best_payout
+                    
+                    # 更新5+1显示为金色并显示赢得的金额
+                    self.five_plus_one_display.config(bg='gold')
+                    self.five_plus_one_var.set(f"{int(self.five_plus_one_win)}")
+                    
+                    # 显示获胜消息
+                    hand_name = HAND_RANK_NAMES.get(best_hand_rank, "")
+                else:
+                    # 没有赢，显示"未赢"
+                    self.five_plus_one_var.set("未赢")
+        
+        # 启用决策按钮（如果不是自动下注模式）
+        if self.fold_button and self.play_button and self.game.play_bet == 0:
+            self.fold_button.config(state=tk.NORMAL)
+            self.play_button.config(state=tk.NORMAL)
+        else:
+            # 自动下注模式：等待2秒后自动下注
+            if self.game.stage == "pre_flop" and self.game.play_bet > 0:
+                self.after(2000, self.auto_play_action)
     
     def flip_all_player_cards_to_back(self):
         """将所有玩家牌翻转到背面"""
@@ -1332,7 +1376,7 @@ class CaribbeanStudGUI(tk.Tk):
                     card_label.config(image=self.back_image)
                     card_label.is_face_up = False
                     # 重置宽度为正常值
-                    card_label.place(width=80, height=120)
+                    card_label.place(width=120, height=180)
             
             # 根据当前是否在处理庄家，调用不同的排序方法
             if getattr(self, '_flipping_dealer', False):
@@ -1346,7 +1390,7 @@ class CaribbeanStudGUI(tk.Tk):
             return
 
         # 模拟翻转效果
-        width = 80 - (self.flip_step * 8) if self.flip_step < 5 else (self.flip_step - 5) * 8
+        width = 120 - (self.flip_step * 12) if self.flip_step < 5 else (self.flip_step - 5) * 12
         if width <= 0:
             width = 1
 
@@ -1405,7 +1449,7 @@ class CaribbeanStudGUI(tk.Tk):
                     card_label.config(image=front_img)
                     card_label.is_face_up = True
                     # 重置宽度为正常值
-                    card_label.place(width=80, height=120)
+                    card_label.place(width=120, height=180)
             
             # 动画完成，调用回调函数
             if hasattr(self, 'callback_after_flip') and self.callback_after_flip:
@@ -1413,7 +1457,7 @@ class CaribbeanStudGUI(tk.Tk):
             return
 
         # 模拟翻转效果
-        width = 80 - (self.flip_step * 8) if self.flip_step < 5 else (self.flip_step - 5) * 8
+        width = 120 - (self.flip_step * 12) if self.flip_step < 5 else (self.flip_step - 5) * 12
         if width <= 0:
             width = 1
 
@@ -1441,11 +1485,11 @@ class CaribbeanStudGUI(tk.Tk):
                 self.dealer_cards_frame, 
                 image=self.back_image,  # 先显示背面
                 bg='#2a4a3c',
-                width=90,  # 增加宽度确保完整显示
-                height=130  # 增加高度确保完整显示
+                width=110,  # 增加宽度确保完整显示
+                height=180  # 增加高度确保完整显示
             )
             # 使用place布局并设置合适的偏移量
-            card_label.place(x=i*90, y=0, width=90, height=130)
+            card_label.place(x=i*110, y=0, width=110, height=180)
             card_label.card = card
             card_label.is_face_up = False
             # 添加到活动卡片列表
@@ -1475,17 +1519,30 @@ class CaribbeanStudGUI(tk.Tk):
         
         # 如果不需要移动AK牌，直接显示重新开始按钮
         self.show_restart_button()
-    
+        
     def start_game(self):
         try:
             self.ante = int(self.ante_var.get())
             self.jackpot_bet = self.jackpot_bet_var.get()  # 获取Jackpot下注
+            self.five_plus_one_bet = int(self.five_plus_one_var.get())  # 获取5+1下注
             self.last_jackpot_state = self.jackpot_bet_var.get()   
             
-            # 检查Ante至少5块
-            if self.ante < 5:
-                messagebox.showerror("错误", "Ante至少需要5块")
+            # 检查Ante至少10块
+            if self.ante < 10:
+                messagebox.showerror("错误", "底注至少需要10块")
                 return
+                
+            # 检查Ante上限
+            if self.ante > 10000:
+                self.ante = 10000
+                self.ante_var.set("10000")
+                messagebox.showwarning("下注限制", "底注上限为10000，已自动调整")
+                
+            # 检查5+1上限
+            if self.five_plus_one_bet > 2500:
+                self.five_plus_one_bet = 2500
+                self.five_plus_one_var.set("2500")
+                messagebox.showwarning("下注限制", "5+1上限为2500，已自动调整")
                 
             # 获取Play下注
             play_bet = 0
@@ -1494,23 +1551,35 @@ class CaribbeanStudGUI(tk.Tk):
             except:
                 play_bet = 0
                 
-            # 计算总下注
-            total_bet = self.ante + self.jackpot_bet + play_bet
-                
-            if self.balance < total_bet:
-                messagebox.showwarning("警告", "余额不足")
-                return
-                
+            # 计算总下注（包括可能的Play下注）
+            total_bet = self.ante + self.jackpot_bet + self.five_plus_one_bet
+            
+            # 如果Play下注非0（自动下注模式），则检查余额是否足够支付所有下注
+            if play_bet > 0:
+                total_bet_with_play = total_bet + play_bet
+                if self.balance < total_bet_with_play:
+                    messagebox.showerror("错误", "余额不足以支付所有下注！")
+                    return
+            else:
+                # 如果Play下注为0（手动下注模式），检查余额是否足够支付Ante/5+1/Progressive以及可能的Play下注（Ante*2）
+                required_for_play = self.ante * 2
+                if self.balance < total_bet + required_for_play:
+                    messagebox.showerror("错误", "余额不足以支付所有下注！")
+                    return
+                    
+            # 扣除当前下注（Ante/5+1/Progressive）
             self.balance -= total_bet
             self.update_balance()
             
             # 更新本局下注显示
             self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
+            self.last_win_label.config(text="上局获胜: $0.00")
             
             self.game.reset_game()
             self.game.deal_initial()
             self.game.ante = self.ante
             self.game.jackpot_bet = self.jackpot_bet  # 保存Jackpot下注
+            self.game.five_plus_one_bet = self.five_plus_one_bet  # 保存5+1下注
             self.game.play_bet = play_bet   # 保存Play下注
             
             # 清除所有卡片
@@ -1535,7 +1604,7 @@ class CaribbeanStudGUI(tk.Tk):
                 card_id = f"player_{i}"
                 self.card_positions[card_id] = {
                     "current": (50, 50), 
-                    "target": (i * 90, 0)  # 水平排列
+                    "target": (i * 110, 0)  # 水平排列，增加间距
                 }
                 self.animation_queue.append(card_id)
             
@@ -1544,7 +1613,7 @@ class CaribbeanStudGUI(tk.Tk):
                 card_id = f"dealer_{i}"
                 self.card_positions[card_id] = {
                     "current": (50, 50), 
-                    "target": (i * 90, 0)  # 水平排列
+                    "target": (i * 110, 0)  # 水平排列，增加间距
                 }
                 self.animation_queue.append(card_id)
 
@@ -1552,21 +1621,21 @@ class CaribbeanStudGUI(tk.Tk):
             for widget in self.action_frame.winfo_children():
                 widget.destroy()
                 
-            # 如果Play下注非0，则自动执行“下注2X”操作
+            # 如果Play下注非0，则自动执行"下注2倍"操作
             if play_bet > 0:
                 # 更新游戏状态
-                self.stage_label.config(text="阶段: 派牌")
-                self.status_label.config(text="Play已下注 等待结算")
+                self.stage_label.config(text="派牌")
+                self.status_label.config(text="本次选择盲注 等待结算")
 
-                # 自动选择下注2X - 不立即执行，等待玩家牌排序动画完成
+                # 自动选择下注2倍 - 不立即执行，等待玩家牌排序动画完成
             else:
                 # 更新游戏状态
-                self.stage_label.config(text="阶段: 决策")
-                self.status_label.config(text="做出决策: 弃牌或下注2X")
+                self.stage_label.config(text="决策")
+                self.status_label.config(text="做出决策: 弃牌或下注2倍")
 
                 # 正常显示决策按钮
                 action_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-                action_button_frame.pack(pady=10)
+                action_button_frame.pack(pady=5)
 
                 self.fold_button = tk.Button(
                     action_button_frame, text="弃牌",
@@ -1577,7 +1646,7 @@ class CaribbeanStudGUI(tk.Tk):
                 self.fold_button.pack(side=tk.LEFT, padx=(0, 10))
 
                 self.play_button = tk.Button(
-                    action_button_frame, text="下注2X",
+                    action_button_frame, text="下注2倍",
                     command=self.play_action,
                     state=tk.DISABLED,
                     font=('Arial', 14), bg='#4CAF50', fg='white', width=10
@@ -1587,6 +1656,7 @@ class CaribbeanStudGUI(tk.Tk):
             # 禁用下注区域
             self.ante_display.unbind("<Button-1>")
             self.play_display.unbind("<Button-1>")
+            self.five_plus_one_display.unbind("<Button-1>")
             for chip in self.chip_buttons:
                 chip.unbind("<Button-1>")
             
@@ -1624,8 +1694,8 @@ class CaribbeanStudGUI(tk.Tk):
         card_label.place(
             x=self.card_positions[card_id]["current"][0],
             y=self.card_positions[card_id]["current"][1] + 20,
-            width=80,
-            height=120
+            width=120,
+            height=180
         )
         
         # 存储卡片信息
@@ -1658,7 +1728,7 @@ class CaribbeanStudGUI(tk.Tk):
             # 如果已经到达目标位置
             if distance < 5:
                 # 确保设置正确的宽度和高度
-                card_label.place(x=target_x, y=target_y, width=80, height=120)
+                card_label.place(x=target_x, y=target_y, width=120, height=180)
                 card_label.is_moving = False
                 
                 # 如果是回收动画且到达左上角，销毁卡片
@@ -1677,7 +1747,7 @@ class CaribbeanStudGUI(tk.Tk):
             # 更新位置 - 确保保持宽度和高度
             new_x = current_x + step_x
             new_y = current_y + step_y
-            card_label.place(x=new_x, y=new_y, width=80, height=120)
+            card_label.place(x=new_x, y=new_y, width=120, height=180)
             
             # 继续动画
             self.after(20, lambda: self.animate_card_move(card_label))
@@ -1699,7 +1769,7 @@ class CaribbeanStudGUI(tk.Tk):
         for i, card_label in enumerate(self.player_cards_frame.winfo_children()):
             if hasattr(card_label, "card") and not card_label.is_face_up:
                 # 确保卡片标签有足够的空间
-                card_label.place(width=90, height=130)
+                card_label.place(width=110, height=180)
                 self.flip_card_animation(card_label)
                 # 标记玩家牌已翻开
                 self.game.cards_revealed["player"][i] = True
@@ -1739,7 +1809,7 @@ class CaribbeanStudGUI(tk.Tk):
         """自动下注模式：直接进入摊牌阶段，翻开所有庄家牌，2秒后结算"""
         # 切换到摊牌阶段
         self.game.stage = "showdown"
-        self.stage_label.config(text="阶段: 摊牌")
+        self.stage_label.config(text="摊牌")
         self.status_label.config(text="摊牌中…")
         
         # 翻开庄家所有牌（带动画）
@@ -1794,38 +1864,38 @@ class CaribbeanStudGUI(tk.Tk):
         steps = 10  # 动画总步数
         
         if step > steps:
-            # 动画结束
+            # 动画结束 - 关键修复：确保设置正确的宽度和高度
+            card_label.config(image=front_img)
             card_label.is_face_up = True
             self.animation_in_progress = False  # 清除动画标志
+            # 确保设置正确的宽度和高度 - 关键修复
+            card_label.place(width=120, height=180)
             return
             
-        if step <= steps // 2:
+        if step <= steps / 2:
             # 第一阶段：从背面翻转到侧面（宽度减小）
-            width = 80 - (step * 16)
+            width = 120 - (step * 12)
             if width <= 0:
                 width = 1
-            # 创建缩放后的背面图像
-            back_img = Image.new('RGBA', (width, 120), (0, 0, 0, 0))
-            orig_back = self.back_image
-            # 这里简化处理，实际应该缩放图像
-            card_label.config(image=orig_back)
+            # 使用背面图像
+            card_label.config(image=self.back_image)
         else:
             # 第二阶段：从侧面翻转到正面（宽度增加）
-            width = (step - steps // 2) * 16
+            width = (step - steps / 2) * 12
             if width <= 0:
                 width = 1
-            # 创建缩放后的正面图像
+            # 使用正面图像
             card_label.config(image=front_img)
         
-        # 更新卡片显示
-        card_label.place(width=width)
+        # 更新卡片显示 - 确保保持高度不变
+        card_label.place(width=width, height=180)
         
         # 下一步
         step += 1
         self.after(50, lambda: self.animate_flip(card_label, front_img, step))
     
     def auto_play_action(self):
-        """自动执行下注2X操作（盲注模式）"""
+        """自动执行下注2倍操作（盲注模式）"""
         # 立即禁用决策按钮
         if self.fold_button and self.fold_button.winfo_exists():
             self.fold_button.config(state=tk.DISABLED)
@@ -1834,12 +1904,12 @@ class CaribbeanStudGUI(tk.Tk):
             
         # 进入摊牌阶段
         self.game.stage = "showdown"
-        self.stage_label.config(text="阶段: 摊牌")
+        self.stage_label.config(text="摊牌")
         self.status_label.config(text="摊牌中...")
         self.after(1000, self.show_showdown)
     
     def play_action(self):
-        """玩家选择下注2X（或者自动下注）"""
+        """玩家选择下注2倍（或者自动下注）"""
         # 立即禁用决策按钮
         if self.fold_button and self.fold_button.winfo_exists():
             self.fold_button.config(state=tk.DISABLED)
@@ -1851,7 +1921,7 @@ class CaribbeanStudGUI(tk.Tk):
             # 自动下注模式
             # 进入摊牌阶段
             self.game.stage = "showdown"
-            self.stage_label.config(text="阶段: 摊牌")
+            self.stage_label.config(text="摊牌")
             self.status_label.config(text="摊牌中…")
             # 翻开庄家牌并结算
             self.after(1000, self.reveal_dealer_cards_for_autobet)
@@ -1870,12 +1940,12 @@ class CaribbeanStudGUI(tk.Tk):
         self.play_var.set(str(play_bet))
         
         # 更新本局下注显示
-        total_bet = self.ante + play_bet + self.jackpot_bet
+        total_bet = self.ante + play_bet + self.jackpot_bet + self.game.five_plus_one_bet
         self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
         
         # 进入摊牌阶段
         self.game.stage = "showdown"
-        self.stage_label.config(text="阶段: 摊牌")
+        self.stage_label.config(text="摊牌")
         self.status_label.config(text="摊牌中...")
         self.after(1000, self.show_showdown)
     
@@ -1905,8 +1975,8 @@ class CaribbeanStudGUI(tk.Tk):
                 self.update_balance()
                 player_eval = evaluate_five_card_hand(self.game.player_hand)
                 player_hand_type = HAND_RANK_NAMES.get(player_eval[0], "高牌")
-                messagebox.showinfo("恭喜您获得Jackpot大奖！", 
-                                f"{player_hand_type}! 恭喜中了JP大奖${bonus_win:.2f}")
+                messagebox.showinfo("恭喜您获得累进大奖！", 
+                                f"牌型为{player_hand_type}! 赢得奖金${bonus_win:.2f}")
         
         # 设置背景色
         self.ante_display.config(bg='white')  # 输
@@ -1918,11 +1988,6 @@ class CaribbeanStudGUI(tk.Tk):
         # 更新上局赢得金额显示
         self.last_win_label.config(text=f"上局获胜: ${total_win:.2f}")
         
-        # 构建主消息
-        result_text = "本局您选择弃牌"
-
-        self.result_label.config(text=result_text, fg='white')
-        
         # 添加重新开始按钮
         for widget in self.action_frame.winfo_children():
             widget.destroy()
@@ -1932,7 +1997,7 @@ class CaribbeanStudGUI(tk.Tk):
             command=self.reset_game, 
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
-        restart_btn.pack(pady=10)
+        restart_btn.pack(pady=5)
         restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
@@ -1944,9 +2009,12 @@ class CaribbeanStudGUI(tk.Tk):
         
         # 结算
         winnings, details = self.calculate_winnings()
+        
+        # 添加5+1赢钱到总赢钱中
+        winnings += self.five_plus_one_win
         self.last_win = winnings
         
-        # 更新余额
+        # 更新余额（包括5+1赢钱）
         self.balance += winnings
         self.update_balance()
         
@@ -1983,14 +2051,14 @@ class CaribbeanStudGUI(tk.Tk):
         comparison = compare_hands(self.game.player_hand, self.game.dealer_hand)
         
         if not dealer_qualifies:
-            base_text = "庄家不合格，只支付Ante，退还Play"
+            status_label = "庄家不合格，只支付底注，退还下注"
         else:
             if comparison > 0:  # 玩家赢
-                base_text = "本局您赢了"
+                status_label = "本局您赢了"
             elif comparison < 0:  # 玩家输
-                base_text = "本局您输了"
+                status_label = "本局您输了"
             else:  # 平局
-                base_text = "本局Push"
+                status_label = "本局Push"
         
         bonus_win = 0
         if self.game.jackpot_bet:
@@ -2000,16 +2068,12 @@ class CaribbeanStudGUI(tk.Tk):
                 self.update_balance()
                 player_eval = evaluate_five_card_hand(self.game.player_hand)
                 player_hand_type = HAND_RANK_NAMES.get(player_eval[0], "高牌")
-                messagebox.showinfo("恭喜您获得Jackpot大奖！", 
-                                f"{player_hand_type}! 恭喜中了JP大奖${bonus_win:.2f}")
+                messagebox.showinfo("恭喜您获得累进大奖！", 
+                                f"牌型为{player_hand_type}! 赢得奖金${bonus_win:.2f}")
         
-        # 组合消息
-        result_text = base_text
-
-        self.result_label.config(text=result_text, fg='white')
-        self.status_label.config(text="游戏结束")
+        self.status_label.config(text=status_label)
         
-        # 更新上局赢得金额
+        # 更新上局赢得金额（包含5+1赢钱）
         self.last_win_label.config(text=f"上局获胜: ${winnings:.2f}")
     
     def move_ak_cards(self):
@@ -2049,7 +2113,7 @@ class CaribbeanStudGUI(tk.Tk):
         for card_label, original_y in self.moved_cards:
             if card_label.winfo_exists():  # 确保组件还存在
                 current_y = card_label.winfo_y()
-                new_y = current_y + 4  # 每步移动4px
+                new_y = current_y + 2  # 每步移动2px
                 card_label.place(y=new_y)
         
         # 下一步
@@ -2067,7 +2131,7 @@ class CaribbeanStudGUI(tk.Tk):
             command=self.reset_game, 
             font=('Arial', 14), bg='#2196F3', fg='white', width=15
         )
-        restart_btn.pack(pady=10)
+        restart_btn.pack(pady=5)
         restart_btn.bind("<Button-3>", self.show_card_sequence)
         
         # 设置30秒后自动重置
@@ -2079,7 +2143,8 @@ class CaribbeanStudGUI(tk.Tk):
         details = {
             "ante": 0,
             "play": 0,
-            "bonus": 0
+            "bonus": 0,
+            "five_plus_one": 0
         }
         bonus_win = 0
         
@@ -2125,33 +2190,22 @@ class CaribbeanStudGUI(tk.Tk):
     
     def update_jackpot(self, winnings, ante_win, ante_bet, play_win, play_bet):
         """更新Jackpot奖池金额"""
-        # 计算本局贡献：(赢得金额 * 0.01 + Push金额 * 0.05 + 输的金额 * 0.1)
-        # 赢得金额 = 玩家赢得的纯利润（不包括本金）
-        win_amount = winnings - (ante_bet + play_bet + self.game.jackpot_bet)
+        # 计算总下注额
+        total_bet = self.game.ante + self.game.play_bet + self.game.five_plus_one_bet
         
-        # Push金额 = 平局时退还的本金部分
-        push_amount = 0
-        if ante_win == ante_bet:  # Ante平局
-            push_amount += ante_bet
-        if play_win == play_bet:  # Bet平局
-            push_amount += play_bet
+        # 无论如何，都把总下注额的8%加进Progressive彩池
+        jackpot_contribution = total_bet * 0.08
         
-        # 输的金额 = 输掉的下注金额
-        loss_amount = 0
-        if ante_win == 0:  # Ante输
-            loss_amount += ante_bet
-        if play_win == 0:  # Bet输
-            loss_amount += play_bet
-        
-        # 计算贡献值
-        jackpot_contribution = (win_amount * 0.01) + (push_amount * 0.05) + (loss_amount * 0.1)
+        # 如果下注了Jackpot，额外加入0.95
+        if self.game.jackpot_bet:
+            jackpot_contribution += 0.95
         
         # 更新Jackpot金额
-        self.game.jackpot_amount += jackpot_contribution
-        self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
+        self.game.progressive_amount += jackpot_contribution
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
         
         # 保存到文件
-        save_jackpot(self.game.jackpot_amount)
+        save_jackpot(self.game.progressive_amount)
     
     def calculate_bonus(self):
         """计算Jackpot奖金"""
@@ -2161,32 +2215,41 @@ class CaribbeanStudGUI(tk.Tk):
         cards = self.game.player_hand
         hand_rank, _ = evaluate_five_card_hand(cards)
         
-        # 同花大顺
+        bonus = 0
+        
+        # 皇家同花顺
         if hand_rank == 9:
-            bonus = self.game.jackpot_amount
-            # 重置Jackpot为初始值
-            self.game.jackpot_amount = self.game.initial_jackpot
-            self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
-            save_jackpot(self.game.jackpot_amount)
-            return bonus
+            bonus = self.game.progressive_amount
         
         # 同花顺
         if hand_rank == 8:
-            return self.game.jackpot_amount * 0.1
+            bonus = self.game.progressive_amount * 0.1
         
         # 四条
         if hand_rank == 7:
-            return 500
+            bonus = 500
         
         # 葫芦
         if hand_rank == 6:
-            return 100
+            bonus = 150
         
         # 同花
         if hand_rank == 5:
-            return 75
+            bonus = 100
         
-        return 0
+        # 从奖池中扣除奖金
+        if bonus > 0:
+            self.game.progressive_amount -= bonus
+            
+            # 确保奖池不低于最低金额197301.26
+            if self.game.progressive_amount < 197301.26:
+                self.game.progressive_amount = 197301.26
+            
+            # 更新显示和保存
+            self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
+            save_jackpot(self.game.progressive_amount)
+        
+        return bonus
 
     def animate_collect_cards(self, auto_reset):
         """执行收牌动画：先翻转所有牌为背面，然后向右收起"""
@@ -2209,7 +2272,7 @@ class CaribbeanStudGUI(tk.Tk):
         for card_label, original_y in self.moved_cards:
             if card_label.winfo_exists():  # 确保组件还存在
                 current_y = card_label.winfo_y()
-                new_y = current_y - 4  # 每步向上移动4px
+                new_y = current_y - 2  # 每步向上移动4px
                 card_label.place(y=new_y)
         
         # 下一步
@@ -2266,10 +2329,15 @@ class CaribbeanStudGUI(tk.Tk):
             self._do_reset(auto_reset)
 
     def reset_game(self, auto_reset=False):
-        # 取消30秒自动重置计时器
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-            self.auto_reset_timer = None
+        # 安全地取消自动重置计时器
+        self.cancel_auto_reset_timer()
+        
+        # 设置重置标志，停止所有动画
+        self._resetting = True
+        
+        # 清除所有挂起的after事件
+        for after_id in self.tk.eval('after info').split():
+            self.after_cancel(after_id)
         
         # 如果当前有牌在桌上，先执行收牌动画
         if self.active_card_labels:
@@ -2284,6 +2352,7 @@ class CaribbeanStudGUI(tk.Tk):
         """重置下注金额为0"""
         self.ante_var.set("0")
         self.play_var.set("0")
+        self.five_plus_one_var.set("0")
         
         # 更新显示
         self.status_label.config(text="已重置所有下注金额")
@@ -2295,22 +2364,23 @@ class CaribbeanStudGUI(tk.Tk):
         # 短暂高亮显示重置效果
         self.ante_display.config(bg='#FFCDD2')  # 浅红色
         self.play_display.config(bg='#FFCDD2')  # 浅红色
+        self.five_plus_one_display.config(bg='#FFCDD2')  # 浅红色
         self.after(500, lambda: self.ante_display.config(bg='white'))
         self.after(500, lambda: self.play_display.config(bg='white'))
+        self.after(500, lambda: self.five_plus_one_display.config(bg='white'))
     
     def _do_reset(self, auto_reset=False):
         """真正的重置游戏界面"""
-
-        # 取消自动重置计时器
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-            self.auto_reset_timer = None
+        self.cancel_auto_reset_timer()
+        
+        # 清除所有挂起的after事件
+        for after_id in self.tk.eval('after info').split():
+            self.after_cancel(after_id)
 
         # 重置游戏状态
         self.game.reset_game()
-        self.stage_label.config(text="阶段: 下注")
+        self.stage_label.config(text="翻牌前")
         self.status_label.config(text="设置下注金额并开始游戏")
-        self.result_label.config(text="")
         
         # 重置标签显示
         self.player_label.config(text="玩家")
@@ -2319,6 +2389,7 @@ class CaribbeanStudGUI(tk.Tk):
         # 重置下注金额为0
         self.ante_var.set("0")
         self.play_var.set("0")
+        self.five_plus_one_var.set("0")
         self.jackpot_bet_var.set(self.last_jackpot_state)
         
         # 重置背景色为白色
@@ -2331,9 +2402,16 @@ class CaribbeanStudGUI(tk.Tk):
         self.ak_moved = False
         self.ak_animation_active = False
         
+        # 清除所有动画状态
+        self.animation_queue = []
+        self.animation_in_progress = False
+        self.flipping_cards = []
+        self.flip_step = 0
+        
         # 恢复下注区域
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.play_display.bind("<Button-1>", self.toggle_play_bet)
+        self.five_plus_one_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("five_plus_one"))
         for chip in self.chip_buttons:
             # 使用存储的文本重新绑定事件
             text = self.chip_texts[chip]
@@ -2344,7 +2422,7 @@ class CaribbeanStudGUI(tk.Tk):
             widget.destroy()
         
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=10)
+        start_button_frame.pack(pady=5)
 
         # 添加"重置金额"按钮
         self.reset_bets_button = tk.Button(
@@ -2368,10 +2446,15 @@ class CaribbeanStudGUI(tk.Tk):
         # 重置本局下注显示
         self.current_bet_label.config(text="本局下注: $0.00")
         
+        # 重置标志
+        self._resetting = False
+        
         # 如果是自动重置，显示消息
         if auto_reset:
             self.status_label.config(text="30秒已到，自动开始新游戏")
             self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
+        else:
+            self.status_label.config(text="设置下注金额并开始游戏")
 
     def show_card_sequence(self, event):
         """显示本局牌序窗口 - 右键点击时取消30秒计时"""
@@ -2380,6 +2463,11 @@ class CaribbeanStudGUI(tk.Tk):
             self.after_cancel(self.auto_reset_timer)
             self.auto_reset_timer = None
         
+        # 确保有牌序信息
+        if not hasattr(self.game, 'deck') or not self.game.deck:
+            messagebox.showinfo("提示", "没有牌序信息")
+            return
+            
         win = tk.Toplevel(self)
         win.title("本局牌序")
         win.geometry("650x600")  # 固定窗口大小
@@ -2387,7 +2475,7 @@ class CaribbeanStudGUI(tk.Tk):
         win.configure(bg='#f0f0f0')
         
         # 显示切牌位置
-        cut_pos = self.game.cut_position
+        cut_pos = self.game.deck.start_pos
         cut_label = tk.Label(
             win, 
             text=f"本局切牌位置: {cut_pos + 1}", 
@@ -2418,23 +2506,38 @@ class CaribbeanStudGUI(tk.Tk):
         card_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # 创建缩小版卡片图像
-        small_size = (60, 90)  # 卡片尺寸
-        small_images = {}  # 存储缩小后的卡片图像
+        small_size = (60, 90)
+        small_images = {}
+
+        # 尝试加载字体
+        from PIL import ImageFont, ImageDraw
         
-        for i, card in enumerate(self.game.card_sequence):
+        # 创建卡片图像
+        for i, card in enumerate(self.game.deck.full_deck):
+            # 使用花色和点数作为键获取原始图片
             key = (card.suit, card.rank)
+            
             if key in self.original_images:
+                # 获取原始图像
                 orig_img = self.original_images[key]
-                # 使用新的图像缩放方法
+                
+                # 创建缩小版图像
                 small_img = orig_img.resize(small_size, Image.LANCZOS)
                 small_images[i] = ImageTk.PhotoImage(small_img)
             else:
-                # 如果没有找到原始图像，使用背面图像
-                back_img = self.original_images.get("back", None)
-                if back_img:
-                    # 使用新的图像缩放方法
-                    small_img = back_img.resize(small_size, Image.LANCZOS)
-                    small_images[i] = ImageTk.PhotoImage(small_img)
+                # 创建带文字的占位图像
+                img = Image.new('RGB', small_size, 'blue')
+                draw = ImageDraw.Draw(img)
+                text = f"{card.rank}{card.suit}"
+                try:
+                    font = ImageFont.truetype("arial.ttf", 12)
+                except:
+                    font = ImageFont.load_default()
+                text_width, text_height = draw.textsize(text, font=font)
+                x = (small_size[0] - text_width) / 2
+                y = (small_size[1] - text_height) / 2
+                draw.text((x, y), text, fill="white", font=font)
+                small_images[i] = ImageTk.PhotoImage(img)
         
         # 创建表格显示牌序 - 每行8张，共7行
         for row in range(7):  # 7行
@@ -2453,33 +2556,21 @@ class CaribbeanStudGUI(tk.Tk):
                 card_container = tk.Frame(row_frame, bg='#f0f0f0')
                 card_container.grid(row=0, column=col, padx=5, pady=5)
                 
-                # 标记切牌位置
-                bg_color = 'light blue' if card_index == self.game.cut_position else '#f0f0f0'
+                # 标记切牌位置 - 显示在原始牌序中的位置
+                is_cut_position = card_index == self.game.deck.start_pos
+                bg_color = 'light blue' if is_cut_position else '#f0f0f0'
                 
                 # 显示卡片
-                if card_index in small_images:
-                    card_label = tk.Label(
-                        card_container, 
-                        image=small_images[card_index], 
-                        bg=bg_color,
-                        borderwidth=1,
-                        relief="solid"
-                    )
-                    card_label.image = small_images[card_index]  # 保持引用
-                    card_label.pack()
-                else:
-                    # 如果无法创建图像，显示文字表示
-                    card = self.game.card_sequence[card_index]
-                    card_label = tk.Label(
-                        card_container, 
-                        text=f"{card.rank}{card.suit}",
-                        bg=bg_color,
-                        width=6,
-                        height=3,
-                        borderwidth=1,
-                        relief="solid"
-                    )
-                    card_label.pack()
+                card = self.game.deck.full_deck[card_index]
+                card_label = tk.Label(
+                    card_container, 
+                    image=small_images[card_index], 
+                    bg=bg_color,
+                    borderwidth=1,
+                    relief="solid"
+                )
+                card_label.image = small_images[card_index]  # 保持引用
+                card_label.pack()
                 
                 # 显示牌位置编号
                 pos_label = tk.Label(
@@ -2497,7 +2588,7 @@ class CaribbeanStudGUI(tk.Tk):
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-def main(initial_balance=1000, username="Guest"):
+def main(initial_balance=10000, username="Guest"):
     app = CaribbeanStudGUI(initial_balance, username)
     app.mainloop()
     return app.balance

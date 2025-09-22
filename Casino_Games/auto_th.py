@@ -92,7 +92,7 @@ class Deck:
         try:
             # 调用外部 shuffle.py，超时 30 秒
             result = subprocess.run(
-                [sys.executable, shuffle_script],
+                [sys.executable, shuffle_script, "false", "1"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -139,7 +139,7 @@ class Deck:
         dealt = [self.full_deck[self.indexes[self.pointer + i]] for i in range(n)]
         self.pointer += n
         return dealt
-
+    
 def evaluate_hand(cards):
     values = sorted((c.value for c in cards), reverse=True)
     counts = Counter(values)
