@@ -311,7 +311,7 @@ class UTHGame:
 class UTHGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
-        self.title("Ultimate Texas Hold'em")
+        self.title("终极德州扑克")
         self.geometry("1150x735+50+10")
         self.resizable(0,0)
         self.configure(bg='#35654d')

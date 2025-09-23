@@ -26,6 +26,7 @@ from Casino_Games import EZ_21
 from Casino_Games import Let_It_Ride
 from Casino_Games import Klondike_Dice
 from Casino_Games import Wild_Five_Card_poker
+from Casino_Games import Four_Card_Poker_Basic
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -56,9 +57,9 @@ def display_menu(selected_row, selected_col):
     menu_layout = [
         ["法罗(变种)", "高牌同花", "德州扑克双人对决"],
         ["三张牌扑克", "视频扑克", "加勒比梭哈扑克"],
-        ["任逍遥扑克", "赌场扑克", "终极德州扑克"],
-        ["简单21点  ", "21点    ", "百家乐"],
-        ["牌五張撲克"],
+        ["四张牌扑克", "赌场扑克", "终极德州扑克"],
+        ["任逍遥扑克", "简单21点", "21点      "],
+        ["牌五張撲克", "百家乐  "],
         ["花旗骰    ", "克朗代克", "骰宝"],
         ["返回主目录", "", ""]  # 新增返回选项
     ]
@@ -151,21 +152,22 @@ def main(balance, user):
         (1, 0): ('4', Three_Card_Poker.main),
         (1, 1): ('5', Video_Poker.main),
         (1, 2): ('6', Caribbean_Stud_Poker.main),
-        (2, 0): ('7', Let_It_Ride.main),
+        (2, 0): ('7', Four_Card_Poker_Basic.main),
         (2, 1): ('8', Casino_Holdem.main),
         (2, 2): ('9', UTH_GUI.main),
-        (3, 0): ('10', EZ_21.main),
-        (3, 1): ('11', Blackjack.main),
-        (3, 2): ('12', transfer_baccarat.play_game),
+        (3, 0): ('10', Let_It_Ride.main),
+        (3, 1): ('11', EZ_21.main),
+        (3, 2): ('12', Blackjack.main),
         (4, 0): ('13', Wild_Five_Card_poker.main),
-        (5, 0): ('14', craps.main),
-        (5, 1): ('15', Klondike_Dice.main),
-        (5, 2): ('16', Sicbo.main),
+        (4, 1): ('14', transfer_baccarat.play_game),
+        (5, 0): ('15', craps.main),
+        (5, 1): ('16', Klondike_Dice.main),
+        (5, 2): ('17', Sicbo.main),
         (6, 0): ('return', None)  # 返回主目录选项
     }
     
     # 定义每行的列数
-    row_cols = [3, 3, 3, 3, 1, 3, 1]  # 每行的列数
+    row_cols = [3, 3, 3, 3, 2, 3, 1]  # 每行的列数
     
     while True:
         display_menu(selected_row, selected_col)
@@ -219,7 +221,7 @@ def main(balance, user):
                     
         # 处理回车键
         elif key == 'enter':
-            if current_game and current_game[0] == '14' or current_game and current_game[0] == '15':
+            if current_game and current_game[0] == '15' or current_game and current_game[0] == '16':
                 print("维护中 请稍后再试")
                 time.sleep(2)
                 continue
