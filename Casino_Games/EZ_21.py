@@ -90,16 +90,16 @@ class Deck:
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         # 新的Card文件夹路径
         card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
-        shuffle_script = os.path.join(card_dir, 'shuffle_baccarat.py')
+        shuffle_script = os.path.join(card_dir, 'shuffle.py')
         
         # 保证 Python 输出为 UTF-8
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
         
         try:
-            # 调用外部 shuffle_baccarat.py，超时 30 秒
+            # 调用外部 shuffle.py，超时 30 秒
             result = subprocess.run(
-                [sys.executable, shuffle_script],
+                [sys.executable, shuffle_script, "false", "8"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -130,7 +130,7 @@ class Deck:
                 json.JSONDecodeError,
                 ValueError,
                 KeyError) as e:
-            print(f"Error calling shuffle_baccarat.py: {e}. Using fallback shuffle.")
+            print(f"Error calling shuffle.py: {e}. Using fallback shuffle.")
             # fallback：标准顺序+安全乱序
             self.full_deck = [Card(s, r) for _ in range(DECKS) for s in SUITS for r in RANKS]
             self._secure_shuffle()
@@ -603,7 +603,7 @@ class Simple21GUI(tk.Tk):
     def _load_assets(self):
         card_size = (100, 140)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -1392,7 +1392,7 @@ class Simple21GUI(tk.Tk):
             
             front_img = None
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+            card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
             
             # 尝试多种可能的文件名组合
             possible_filenames = [
@@ -1570,7 +1570,7 @@ class Simple21GUI(tk.Tk):
                     }
                     front_img = None
                     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                    card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+                    card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
                     
                     # 尝试多种可能的文件名组合
                     possible_filenames = [

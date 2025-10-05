@@ -330,6 +330,10 @@ class LetItRideGUI(tk.Tk):
         self.resizable(0,0)
         self.configure(bg='#35654d')
         
+        # 下注上限设置
+        self.MAIN_BET_MAX = 10000  # A/B/C注上限
+        self.TRIPS_BET_MAX = 2500  # 三张手牌加注上限
+        
         self.username = username
         self.balance = initial_balance
         self.game = LetItRideGame()
@@ -538,7 +542,16 @@ class LetItRideGUI(tk.Tk):
     def _load_assets(self):
         card_size = (100, 140)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        
+        # 使用实例变量来跟踪当前使用的扑克牌文件夹
+        if not hasattr(self, 'current_poker_folder'):
+            # 第一次加载时随机选择
+            self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
+        else:
+            # 交替使用 Poker1 和 Poker2
+            self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
+        
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -569,7 +582,10 @@ class LetItRideGUI(tk.Tk):
             for rank in RANKS:
                 # 获取映射后的文件名
                 suit_name = suit_mapping.get(suit, suit)
-                filename = f"{suit_name}{rank}.png"
+                if suit == 'JOKER':
+                    filename = f"JOKER-A.png"  # 鬼牌文件名
+                else:
+                    filename = f"{suit_name}{rank}.png"
                 path = os.path.join(card_dir, filename)
                 
                 try:
@@ -585,7 +601,10 @@ class LetItRideGUI(tk.Tk):
                         img_orig = Image.new('RGB', card_size, 'blue')
                         draw = ImageDraw.Draw(img_orig)
                         # 绘制卡片文本
-                        text = f"{rank}{suit}"
+                        if suit == 'JOKER':
+                            text = "JOKER"
+                        else:
+                            text = f"{rank}{suit}"
                         try:
                             font = ImageFont.truetype("arial.ttf", 20)
                         except:
@@ -619,39 +638,82 @@ class LetItRideGUI(tk.Tk):
                     # 创建缩放后的图像用于显示
                     self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
                     
+    def check_bet_limit(self, bet_type, current_value, chip_value):
+        """检查下注是否超过上限，如果超过则自动调整并显示警告"""
+        new_value = current_value + chip_value
+        
+        if bet_type in ["bet_a", "bet_b", "bet_c"]:
+            # 主注上限检查
+            if new_value > self.MAIN_BET_MAX:
+                messagebox.showwarning("下注上限", "主注已达上限，自动调整为 10000")
+                return self.MAIN_BET_MAX
+        elif bet_type == "trips":
+            # 三张手牌加注上限检查
+            if new_value > self.TRIPS_BET_MAX:
+                messagebox.showwarning("下注上限", "三张手牌加注已达上限，自动调整为 2500")
+                return self.TRIPS_BET_MAX
+        
+        return new_value
+    
+    def is_bet_full(self, bet_type, current_value):
+        """检查下注是否已满"""
+        if bet_type in ["bet_a", "bet_b", "bet_c"]:
+            return current_value >= self.MAIN_BET_MAX
+        elif bet_type == "trips":
+            return current_value >= self.TRIPS_BET_MAX
+        return False
+    
     def add_chip_to_bet(self, bet_type):
         """添加筹码到下注区域"""
         if not self.selected_chip:
             return
             
         # 获取筹码金额
-        chip_value = float(self.selected_chip.replace('$', '').replace('K', '000'))
+        chip_text = self.selected_chip.replace('$', '')
+        if 'K' in chip_text:
+            # 处理带K的筹码，如1K或2.5K
+            chip_value = float(chip_text.replace('K', '')) * 1000
+        else:
+            chip_value = float(chip_text)
+        
+        # 检查下注是否已满
+        if bet_type in ["bet_a", "bet_b", "bet_c"]:
+            current = float(self.bet_a_var.get())
+            if self.is_bet_full(bet_type, current):
+                messagebox.showwarning("下注已满", "主注已满，不能再下注！")
+                return
+        elif bet_type == "trips":
+            current = float(self.trips_var.get())
+            if self.is_bet_full(bet_type, current):
+                messagebox.showwarning("下注已满", "三张手牌加注已满，不能再下注！")
+                return
         
         # 更新对应的下注变量
         if bet_type == "bet_a":
             current = float(self.bet_a_var.get())
-            new_value = current + chip_value
+            new_value = self.check_bet_limit(bet_type, current, chip_value)
             self.bet_a_var.set(str(int(new_value)))
             # B和C注自动等于A注
             self.bet_b_var.set(self.bet_a_var.get())
             self.bet_c_var.set(self.bet_a_var.get())
         elif bet_type == "bet_b":
             current = float(self.bet_b_var.get())
-            new_value = current + chip_value
+            new_value = self.check_bet_limit(bet_type, current, chip_value)
             self.bet_b_var.set(str(int(new_value)))
             # A和C注自动等于B注
             self.bet_a_var.set(self.bet_b_var.get())
             self.bet_c_var.set(self.bet_b_var.get())
         elif bet_type == "bet_c":
             current = float(self.bet_c_var.get())
-            new_value = current + chip_value
+            new_value = self.check_bet_limit(bet_type, current, chip_value)
             self.bet_c_var.set(str(int(new_value)))
             # A和B注自动等于C注
             self.bet_a_var.set(self.bet_c_var.get())
             self.bet_b_var.set(self.bet_c_var.get())
         elif bet_type == "trips":
             current = float(self.trips_var.get())
-            self.trips_var.set(str(int(current + chip_value)))
+            new_value = self.check_bet_limit(bet_type, current, chip_value)
+            self.trips_var.set(str(int(new_value)))
     
     def _create_widgets(self):
         # 主框架 - 左右布局
@@ -1033,15 +1095,37 @@ class LetItRideGUI(tk.Tk):
     
     def start_game(self):
         try:
+            # 检查并调整下注金额是否超过上限
+            bet_a = int(self.bet_a_var.get())
+            bet_b = int(self.bet_b_var.get())
+            bet_c = int(self.bet_c_var.get())
+            trips = int(self.trips_var.get())
+            
+            # 检查主注上限
+            if bet_a > self.MAIN_BET_MAX or bet_b > self.MAIN_BET_MAX or bet_c > self.MAIN_BET_MAX:
+                messagebox.showwarning("下注上限", "主注已达上限，自动调整为 10000")
+                bet_a = self.MAIN_BET_MAX
+                bet_b = self.MAIN_BET_MAX
+                bet_c = self.MAIN_BET_MAX
+                self.bet_a_var.set(str(bet_a))
+                self.bet_b_var.set(str(bet_b))
+                self.bet_c_var.set(str(bet_c))
+            
+            # 检查Trips注上限
+            if trips > self.TRIPS_BET_MAX:
+                messagebox.showwarning("下注上限", "三张手牌加注已达上限，自动调整为 2500")
+                trips = self.TRIPS_BET_MAX
+                self.trips_var.set(str(trips))
+            
             # 重置退款状态和金额
             self.bet_refunded = {"a": False, "b": False}
             self.current_refund = 0.0
             self.refund_label.config(text="本局退还: $0.00")
             
-            self.bet_a = int(self.bet_a_var.get())
-            self.bet_b = int(self.bet_b_var.get())
-            self.bet_c = int(self.bet_c_var.get())
-            self.trips = int(self.trips_var.get())
+            self.bet_a = bet_a
+            self.bet_b = bet_b
+            self.bet_c = bet_c
+            self.trips = trips
             self.participate_jackpot = bool(self.progressive_var.get())
             self.last_jackpot_selection = bool(self.progressive_var.get())  # 记录当前选择
             
@@ -1749,6 +1833,9 @@ class LetItRideGUI(tk.Tk):
                                 self.trips_display.config(bg='white')])
     
     def _do_reset(self, auto_reset=False):
+        # 重新加载资源（切换扑克牌图片）
+        self._load_assets()
+
         """真正的重置游戏界面"""
         # 重置游戏状态
         self.game.reset_game()

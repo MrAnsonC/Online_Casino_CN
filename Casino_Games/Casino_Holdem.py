@@ -212,18 +212,24 @@ def evaluate_hand(cards):
     flush_suit = next((s for s in SUITS if suits.count(s) >= 5), None)
     flush_cards = [c for c in cards if c.suit == flush_suit] if flush_suit else []
 
-    if flush_cards and straight_vals:
-        flush_vals = sorted({c.value for c in flush_cards}, reverse=True)
-        if 14 in flush_vals:
-            flush_vals.append(1)
-        seq2 = []
-        for v in flush_vals:
-            if not seq2 or seq2[-1] - 1 == v:
-                seq2.append(v)
-            else:
-                seq2 = [v]
-            if len(seq2) >= 5:
-                return (9, seq2[:5]) if seq2[0] == 14 else (8, seq2[:5])
+    # 同花顺和皇家顺检测
+    if flush_cards:
+        flush_vals = sorted([c.value for c in flush_cards], reverse=True)
+        # 检查同花中是否有顺子
+        if 14 in flush_vals:  # 如果有A，添加1
+            flush_vals_with_ace = flush_vals + [1]
+        else:
+            flush_vals_with_ace = flush_vals
+            
+        # 检查同花顺
+        for i in range(len(flush_vals_with_ace) - 4):
+            if flush_vals_with_ace[i] - flush_vals_with_ace[i + 4] == 4:
+                straight_flush = flush_vals_with_ace[i:i + 5]
+                # 检查是否是皇家顺
+                if straight_flush[0] == 14 and straight_flush[1] == 13:
+                    return (9, straight_flush)
+                else:
+                    return (8, straight_flush)
 
     counts_list = sorted(counts.items(), key=lambda x: (x[1], x[0]), reverse=True)
     if counts_list[0][1] == 4:
@@ -361,6 +367,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         self.bet_widgets = {}  # 存储下注显示控件
         self.original_images = {}
         self.last_jackpot_selection = False  # 记录上局Jackpot选择
+        self.ante_max = 10000  # 底注上限 $10,000
+        self.aa_max = 2500     # AA+上限 $2,500
         
         self._load_assets()
         self._create_widgets()
@@ -548,10 +556,16 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
     def _load_assets(self):
         card_size = (100, 140)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
         
-        # 初始化原始图像字典
-        self.original_images = {}
+        # 使用实例变量来跟踪当前使用的扑克牌文件夹
+        if not hasattr(self, 'current_poker_folder'):
+            # 第一次加载时随机选择
+            self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
+        else:
+            # 交替使用 Poker1 和 Poker2
+            self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
+        
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -560,67 +574,83 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             '♦': 'Diamond',
             '♣': 'Club'
         }
+
+        self.original_images = {}
         
         # 加载背面图片
         back_path = os.path.join(card_dir, 'Background.png')
         try:
-            # 保存原始背面图像
-            self.original_images["back"] = Image.open(back_path)
-            # 创建缩放后的背面图像
-            back_img = self.original_images["back"].resize(card_size, Image.LANCZOS)
+            back_img_orig = Image.open(back_path)  # 原始尺寸
+            self.original_images["back"] = back_img_orig  # 保存原始图像
+            back_img = back_img_orig.resize(card_size)  # 缩放
             self.back_image = ImageTk.PhotoImage(back_img)
         except Exception as e:
             print(f"Error loading back image: {e}")
-            # 如果没有背景图，创建一个黑色背景
-            img = Image.new('RGB', card_size, 'black')
-            self.back_image = ImageTk.PhotoImage(img)
-            self.original_images["back"] = img.copy()
+            # 创建黑色背景
+            img_orig = Image.new('RGB', card_size, 'black')
+            self.original_images["back"] = img_orig
+            self.back_image = ImageTk.PhotoImage(img_orig)
         
         # 加载扑克牌图片
         for suit in SUITS:
             for rank in RANKS:
                 # 获取映射后的文件名
                 suit_name = suit_mapping.get(suit, suit)
+                if suit == 'JOKER':
+                    filename = f"JOKER-A.png"  # 鬼牌文件名
+                else:
+                    filename = f"{suit_name}{rank}.png"
+                path = os.path.join(card_dir, filename)
                 
-                # 尝试可能的文件名组合
-                possible_filenames = [
-                    f"{suit_name}{rank}.png",       # 如 "SpadeA.png"
-                ]
-                
-                img_found = False
-                for filename in possible_filenames:
-                    path = os.path.join(card_dir, filename)
+                try:
                     if os.path.exists(path):
+                        img = Image.open(path)
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img
+                        # 创建缩放后的图像用于显示
+                        img_resized = img.resize(card_size)
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_resized)
+                    else:
+                        # 创建占位图片
+                        img_orig = Image.new('RGB', card_size, 'blue')
+                        draw = ImageDraw.Draw(img_orig)
+                        # 绘制卡片文本
+                        if suit == 'JOKER':
+                            text = "JOKER"
+                        else:
+                            text = f"{rank}{suit}"
                         try:
-                            # 加载原始图像
-                            orig_img = Image.open(path)
-                            # 保存原始图像
-                            self.original_images[(suit, rank)] = orig_img.copy()
-                            
-                            # 创建缩放后的图像
-                            img = orig_img.resize(card_size, Image.LANCZOS)
-                            self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                            img_found = True
-                            break
-                        except Exception as e:
-                            print(f"Error loading {path}: {e}")
-                
-                # 如果没有找到图片，创建一个占位图片
-                if not img_found:
-                    print(f"Card image not found for {suit}{rank}")
-                    img = Image.new('RGB', card_size, 'blue')
-                    draw = ImageDraw.Draw(img)
-                    # 在图片上绘制花色和点数
+                            font = ImageFont.truetype("arial.ttf", 20)
+                        except:
+                            font = ImageFont.load_default()
+                        text_width, text_height = draw.textsize(text, font=font)
+                        x = (card_size[0] - text_width) / 2
+                        y = (card_size[1] - text_height) / 2
+                        draw.text((x, y), text, fill="white", font=font)
+                        
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img_orig
+                        # 创建缩放后的图像用于显示
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                except Exception as e:
+                    print(f"Error loading card image {path}: {e}")
+                    # 创建占位图片
+                    img_orig = Image.new('RGB', card_size, 'red')
+                    draw = ImageDraw.Draw(img_orig)
+                    text = "Error"
                     try:
-                        font = ImageFont.truetype("arial.ttf", 24)
-                        text = f"{suit}{rank}"
-                        draw.text((10, 10), text, font=font, fill="white")
+                        font = ImageFont.truetype("arial.ttf", 20)
                     except:
-                        # 如果字体加载失败，使用简单文本
-                        draw.text((10, 10), f"{suit}{rank}", fill="white")
+                        font = ImageFont.load_default()
+                    text_width, text_height = draw.textsize(text, font=font)
+                    x = (card_size[0] - text_width) / 2
+                    y = (card_size[1] - text_height) / 2
+                    draw.text((x, y), text, fill="white", font=font)
                     
-                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                    self.original_images[(suit, rank)] = img.copy()
+                    # 保存原始图像
+                    self.original_images[(suit, rank)] = img_orig
+                    # 创建缩放后的图像用于显示
+                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
 
     def add_chip_to_bet(self, bet_type):
         """添加筹码到下注区域"""
@@ -635,13 +665,47 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         else:
             chip_value = float(chip_text)
         
-        # 更新对应的下注变量
+        # 检查下注类型和上限
         if bet_type == "ante":
             current = float(self.ante_var.get())
-            self.ante_var.set(str(int(current + chip_value)))
-        elif bet_type == "aa":  # 新增AA下注
+            new_value = current + chip_value
+            
+            # 检查是否超过上限
+            if new_value > self.ante_max:
+                # 自动调整为上限值
+                new_value = self.ante_max
+                # 显示警告信息
+                messagebox.showwarning("下注上限", 
+                    f"底注已达上限，自动调整为 ${int(self.ante_max):,}")
+            
+            self.ante_var.set(str(int(new_value)))
+            
+        elif bet_type == "aa":
             current = float(self.aa_var.get())
-            self.aa_var.set(str(int(current + chip_value)))
+            new_value = current + chip_value
+            
+            # 检查是否超过上限
+            if new_value > self.aa_max:
+                # 自动调整为上限值
+                new_value = self.aa_max
+                # 显示警告信息
+                messagebox.showwarning("下注上限", 
+                    f"AA+已达上限，自动调整为 ${int(self.aa_max):,}")
+            
+            self.aa_var.set(str(int(new_value)))
+    
+    def reset_bet_on_right_click(self, bet_type):
+        """右键点击下注区域时将该下注归零"""
+        if bet_type == "ante":
+            self.ante_var.set("0")
+        elif bet_type == "aa":
+            self.aa_var.set("0")
+        
+        # 短暂高亮显示重置效果
+        widget = self.bet_widgets[bet_type]
+        original_color = widget.cget("bg")
+        widget.config(bg='#FFCDD2')  # 浅红色
+        self.after(500, lambda: widget.config(bg=original_color))
     
     def _create_widgets(self):
         # 主框架 - 左右布局
@@ -717,15 +781,6 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             fg='white'
         )
         self.balance_label.pack(side=tk.LEFT, padx=20, pady=10)
-        
-        self.stage_label = tk.Label(
-            info_frame, 
-            text="翻牌前",
-            font=('Arial', 18, 'bold'),
-            bg='#2a4a3c',
-            fg='#FFD700'
-        )
-        self.stage_label.pack(side=tk.RIGHT, padx=20, pady=10)
         
         # Progressive显示区域 - 修改后的代码
         progressive_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
@@ -843,6 +898,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                                     bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.ante_display.pack(side=tk.LEFT, padx=5)
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
+        # 添加右键事件
+        self.ante_display.bind("<Button-3>", lambda e: self.reset_bet_on_right_click("ante"))
         self.bet_widgets["ante"] = self.ante_display
         
         # 添加间距
@@ -857,6 +914,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                                  bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
         self.aa_display.pack(side=tk.LEFT, padx=5)
         self.aa_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("aa"))
+        # 添加右键事件
+        self.aa_display.bind("<Button-3>", lambda e: self.reset_bet_on_right_click("aa"))
         self.bet_widgets["aa"] = self.aa_display
         
         # 第三行：Call下注区域
@@ -1001,10 +1060,28 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
     
     def start_game(self):
         try:
-            self.ante = int(self.ante_var.get())
-            self.aa = int(self.aa_var.get())
+            # 在开始游戏前检查并调整下注金额
+            ante_value = int(self.ante_var.get())
+            aa_value = int(self.aa_var.get())
+            
+            # 检查底注是否超过上限
+            if ante_value > self.ante_max:
+                ante_value = self.ante_max
+                self.ante_var.set(str(ante_value))
+                messagebox.showwarning("下注上限", 
+                    f"底注已达上限，自动调整为 ${int(self.ante_max):,}")
+            
+            # 检查AA+是否超过上限
+            if aa_value > self.aa_max:
+                aa_value = self.aa_max
+                self.aa_var.set(str(aa_value))
+                messagebox.showwarning("下注上限", 
+                    f"AA+已达上限，自动调整为 ${int(self.aa_max):,}")
+            
+            self.ante = ante_value
+            self.aa = aa_value
             self.participate_jackpot = bool(self.progressive_var.get())
-            self.last_jackpot_selection = bool(self.progressive_var.get())  # 记录当前选择
+            self.last_jackpot_selection = bool(self.progressive_var.get())
             
             # 检查Ante至少5块
             if self.ante < 5:
@@ -1017,7 +1094,7 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                 total_bet += 2.5
                 
             # 检查余额是否足够
-            if self.balance < total_bet + self.ante * 2:  # 确保有足够余额下注Bet
+            if self.balance < total_bet + self.ante * 2:
                 messagebox.showwarning("警告", "余额不足以支付Bet")
                 return
                 
@@ -1097,7 +1174,6 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             self.animate_deal()
             
             # 更新游戏状态
-            self.stage_label.config(text="阶段: 翻牌前")
             self.status_label.config(text="做出决策: 弃牌或下注")
             
             # 创建操作按钮 - 替换开始按钮
@@ -1374,8 +1450,26 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             
             self.status_label.config(text="您输掉了所有下注。")
 
-            self.last_win = 0
-            self.last_win_label.config(text="上局获胜: $0.00")
+            # +++ 修改部分：弃牌时也计算AA+边注赔付 +++
+            aa_winnings = 0
+            if self.game.aa > 0:
+                # 获取玩家的最终牌型（使用所有5张公共牌）
+                all_cards = self.game.player_hole + self.game.community_cards
+                aa_eval, _ = find_best_5(all_cards)
+                aa_winnings = self.calculate_aa_winnings(aa_eval)
+                
+                # 更新AA+边注的显示
+                self.win_details['aa'] = aa_winnings
+                self.aa_var.set(str(int(aa_winnings)))
+                self.bet_widgets["aa"].config(bg='gold' if aa_winnings > 0 else 'white')
+
+            # 计算总赢取金额（弃牌时只有AA+边注可能赢钱）
+            total_winnings = aa_winnings
+            self.last_win = total_winnings
+            self.balance += total_winnings
+            self.update_balance()
+            
+            self.last_win_label.config(text=f"上局获胜: ${total_winnings:.2f}")
             
             # +++ 新增部分：翻开所有公共牌 +++
             for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
@@ -1405,12 +1499,11 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             
             # 更新下注显示为0（输）
             self.ante_var.set("0")
-            self.aa_var.set("0")
             self.call_var.set("0")
             
             # 设置背景色为白色（输）
-            for widget in self.bet_widgets.values():
-                widget.config(bg='white')
+            self.bet_widgets["ante"].config(bg='white')
+            self.bet_widgets["call"].config(bg='white')
             
             # 添加重新开始按钮
             for widget in self.action_frame.winfo_children():
@@ -1426,6 +1519,29 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             
             # 设置30秒后自动重置
             self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
+    
+    def calculate_aa_winnings(self, aa_eval):
+        """计算AA+边注的赢取金额"""
+        if self.game.aa <= 0:
+            return 0
+            
+        aa_hand_rank = aa_eval[0]
+        aa_hand_cards = aa_eval[1]
+        
+        # 检查是否是对子Aces
+        is_pair_aces = (aa_hand_rank == 1 and 
+                    len(aa_hand_cards) > 0 and 
+                    aa_hand_cards[0] == 14)
+        
+        if is_pair_aces:
+            # 对子Aces特殊赔付 7:1
+            return self.game.aa * (1 + 7)
+        elif aa_hand_rank in AA_PAYOUT:
+            odds = AA_PAYOUT[aa_hand_rank]
+            return self.game.aa * (1 + odds)
+        else:
+            # 未达到支付牌型，输掉AA下注
+            return 0
     
     def show_showdown(self):
         # 翻开所有未翻开的牌
@@ -1571,37 +1687,19 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         total_winnings += self.win_details['call']
         
         # 3. AA 副注结算 (修改后的赔率)
+        # +++ 修改部分：AA+边注独立计算，无论玩家输赢 +++
         if self.game.aa > 0:
-            # 获取前3张公共牌
-            flop_cards = self.game.community_cards[:3]
-            # 组合玩家手牌和前3张公共牌
-            aa_cards = self.game.player_hole + flop_cards
-            
-            # 评估AA手牌
-            aa_eval, _ = find_best_5(aa_cards)
-            aa_hand_rank = aa_eval[0]
-            aa_hand_cards = aa_eval[1]
-            
-            # 检查是否是对子Aces
-            is_pair_aces = (aa_hand_rank == 1 and 
-                        len(aa_hand_cards) > 0 and 
-                        aa_hand_cards[0] == 14)
-            
-            if is_pair_aces:
-                # 对子Aces特殊赔付 7:1
-                self.win_details['aa'] = self.game.aa * (1 + 7)
-                total_winnings += self.win_details['aa']
-            elif aa_hand_rank in AA_PAYOUT:
-                odds = AA_PAYOUT[aa_hand_rank]
-                self.win_details['aa'] = self.game.aa * (1 + odds)
-                total_winnings += self.win_details['aa']
-            else:
-                # 未达到支付牌型，输掉AA下注
-                self.win_details['aa'] = 0
+            # 获取玩家的最终牌型（使用所有5张公共牌）
+            all_cards = self.game.player_hole + self.game.community_cards
+            aa_eval, _ = find_best_5(all_cards)
+            aa_winnings = self.calculate_aa_winnings(aa_eval)
+            self.win_details['aa'] = aa_winnings
+            total_winnings += aa_winnings
 
+        # 4. Jackpot 结算
         if self.game.participate_jackpot:
             progressive_cards = self.game.player_hole + self.game.community_cards[:3]
-            pg_eval, _ = evaluate_hand(progressive_cards)
+            pg_eval = evaluate_hand(progressive_cards)
             
             # 定义奖金规则
             jackpot_rules = {
@@ -1612,8 +1710,9 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                 5: {"amount": 250, "message": "同花! 赢得累进大奖 $250!"}
             }
             
-            if pg_eval in jackpot_rules:
-                rule = jackpot_rules[pg_eval]
+            # 修复：直接使用pg_eval[0]而不是pg_eval
+            if pg_eval[0] in jackpot_rules:
+                rule = jackpot_rules[pg_eval[0]]
                 
                 # 计算奖金金额
                 if callable(rule["amount"]):
@@ -1720,9 +1819,11 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
     
     def _do_reset(self, auto_reset=False):
         """真正的重置游戏界面"""
+        # 重新加载资源（切换扑克牌图片）
+        self._load_assets()
+
         # 重置游戏状态
         self.game.reset_game()
-        self.stage_label.config(text="阶段: 翻牌前")
         
         # 重置标签显示
         self.player_label.config(text="玩家")
@@ -1745,6 +1846,9 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         # 恢复下注区域
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.aa_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("aa"))
+        # 重新绑定右键事件
+        self.ante_display.bind("<Button-3>", lambda e: self.reset_bet_on_right_click("ante"))
+        self.aa_display.bind("<Button-3>", lambda e: self.reset_bet_on_right_click("aa"))
         self.progressive_cb.config(state=tk.NORMAL)
         for chip in self.chip_buttons:
             # 使用存储的文本重新绑定事件

@@ -275,7 +275,7 @@ class VideoPokerGUI(tk.Tk):
     def _load_assets(self):
         card_size = (100, 140)  # 稍微增大卡片尺寸
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {

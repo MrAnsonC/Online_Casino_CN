@@ -204,7 +204,16 @@ class FaroGUI(tk.Tk):
     def _load_assets(self):
         card_size = (100, 140)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        
+        # 使用实例变量来跟踪当前使用的扑克牌文件夹
+        if not hasattr(self, 'current_poker_folder'):
+            # 第一次加载时随机选择
+            self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
+        else:
+            # 交替使用 Poker1 和 Poker2
+            self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
+        
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -213,60 +222,83 @@ class FaroGUI(tk.Tk):
             '♦': 'Diamond',
             '♣': 'Club'
         }
+
+        self.original_images = {}
         
         # 加载背面图片
         back_path = os.path.join(card_dir, 'Background.png')
         try:
-            back_img = Image.open(back_path).resize(card_size)
+            back_img_orig = Image.open(back_path)  # 原始尺寸
+            self.original_images["back"] = back_img_orig  # 保存原始图像
+            back_img = back_img_orig.resize(card_size)  # 缩放
             self.back_image = ImageTk.PhotoImage(back_img)
-            self.original_images["back"] = Image.open(back_path)  # 保存原始图像
         except Exception as e:
             print(f"Error loading back image: {e}")
-            # 如果没有背景图，创建一个黑色背景
-            img = Image.new('RGB', card_size, 'black')
-            self.back_image = ImageTk.PhotoImage(img)
-            self.original_images["back"] = img  # 保存原始图像
+            # 创建黑色背景
+            img_orig = Image.new('RGB', card_size, 'black')
+            self.original_images["back"] = img_orig
+            self.back_image = ImageTk.PhotoImage(img_orig)
         
         # 加载扑克牌图片
         for suit in SUITS:
             for rank in RANKS:
                 # 获取映射后的文件名
                 suit_name = suit_mapping.get(suit, suit)
+                if suit == 'JOKER':
+                    filename = f"JOKER-A.png"  # 鬼牌文件名
+                else:
+                    filename = f"{suit_name}{rank}.png"
+                path = os.path.join(card_dir, filename)
                 
-                # 尝试可能的文件名组合
-                possible_filenames = [
-                    f"{suit_name}{rank}.png",       # 如 "SpadeA.png"
-                ]
-                
-                img_found = False
-                for filename in possible_filenames:
-                    path = os.path.join(card_dir, filename)
+                try:
                     if os.path.exists(path):
+                        img = Image.open(path)
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img
+                        # 创建缩放后的图像用于显示
+                        img_resized = img.resize(card_size)
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_resized)
+                    else:
+                        # 创建占位图片
+                        img_orig = Image.new('RGB', card_size, 'blue')
+                        draw = ImageDraw.Draw(img_orig)
+                        # 绘制卡片文本
+                        if suit == 'JOKER':
+                            text = "JOKER"
+                        else:
+                            text = f"{rank}{suit}"
                         try:
-                            img = Image.open(path).resize(card_size)
-                            self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                            self.original_images[(suit, rank)] = Image.open(path)  # 保存原始图像
-                            img_found = True
-                            break
-                        except Exception as e:
-                            print(f"Error loading {path}: {e}")
-                
-                # 如果没有找到图片，创建一个占位图片
-                if not img_found:
-                    print(f"Card image not found for {suit}{rank}")
-                    img = Image.new('RGB', card_size, 'blue')
-                    draw = ImageDraw.Draw(img)
-                    # 在图片上绘制花色和点数
+                            font = ImageFont.truetype("arial.ttf", 20)
+                        except:
+                            font = ImageFont.load_default()
+                        text_width, text_height = draw.textsize(text, font=font)
+                        x = (card_size[0] - text_width) / 2
+                        y = (card_size[1] - text_height) / 2
+                        draw.text((x, y), text, fill="white", font=font)
+                        
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img_orig
+                        # 创建缩放后的图像用于显示
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                except Exception as e:
+                    print(f"Error loading card image {path}: {e}")
+                    # 创建占位图片
+                    img_orig = Image.new('RGB', card_size, 'red')
+                    draw = ImageDraw.Draw(img_orig)
+                    text = "Error"
                     try:
-                        font = ImageFont.truetype("arial.ttf", 24)
-                        text = f"{suit}{rank}"
-                        draw.text((10, 10), text, font=font, fill="white")
+                        font = ImageFont.truetype("arial.ttf", 20)
                     except:
-                        # 如果字体加载失败，使用简单文本
-                        draw.text((10, 10), f"{suit}{rank}", fill="white")
+                        font = ImageFont.load_default()
+                    text_width, text_height = draw.textsize(text, font=font)
+                    x = (card_size[0] - text_width) / 2
+                    y = (card_size[1] - text_height) / 2
+                    draw.text((x, y), text, fill="white", font=font)
                     
-                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                    self.original_images[(suit, rank)] = img  # 保存原始图像
+                    # 保存原始图像
+                    self.original_images[(suit, rank)] = img_orig
+                    # 创建缩放后的图像用于显示
+                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
 
     def add_chip_to_bet(self, bet_type):
         """添加筹码到下注区域"""
@@ -472,8 +504,6 @@ class FaroGUI(tk.Tk):
                 bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
         tk.Label(header_frame, text="每注最高", font=('Arial', 12, 'bold'), 
                 bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
-        tk.Label(header_frame, text="每局最高", font=('Arial', 12, 'bold'), 
-                bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
         
         # 数值行
         value_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
@@ -481,9 +511,7 @@ class FaroGUI(tk.Tk):
         
         tk.Label(value_frame, text="$10", font=('Arial', 12, 'bold'), 
                 bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
-        tk.Label(value_frame, text="$1,000", font=('Arial', 12, 'bold'), 
-                bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
-        tk.Label(value_frame, text="$2,000", font=('Arial', 12, 'bold'), 
+        tk.Label(value_frame, text="$5,000", font=('Arial', 12, 'bold'), 
                 bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
         
         # 下注区域 - 现在有多个下注区域：IN, OUT, 黑/红, 大/小
@@ -1129,6 +1157,9 @@ class FaroGUI(tk.Tk):
         self.after(500, lambda: [w.config(bg='white') for w in self.bet_widgets.values()])
     
     def _do_reset(self, auto_reset=False):
+        # 重新加载资源（切换扑克牌图片）
+        self._load_assets()
+
         """真正的重置游戏界面"""
         # 重置游戏状态
         self.game.reset_game()

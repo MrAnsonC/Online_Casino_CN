@@ -506,10 +506,18 @@ class TexasHoldemGUI(tk.Tk):
         self.quit()
         
     def _load_assets(self):
-        # 缩小卡片尺寸25% (75x105)
         card_size = (75, 105)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        
+        # 使用实例变量来跟踪当前使用的扑克牌文件夹
+        if not hasattr(self, 'current_poker_folder'):
+            # 第一次加载时随机选择
+            self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
+        else:
+            # 交替使用 Poker1 和 Poker2
+            self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
+        
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -540,7 +548,10 @@ class TexasHoldemGUI(tk.Tk):
             for rank in RANKS:
                 # 获取映射后的文件名
                 suit_name = suit_mapping.get(suit, suit)
-                filename = f"{suit_name}{rank}.png"
+                if suit == 'JOKER':
+                    filename = f"JOKER-A.png"  # 鬼牌文件名
+                else:
+                    filename = f"{suit_name}{rank}.png"
                 path = os.path.join(card_dir, filename)
                 
                 try:
@@ -556,9 +567,12 @@ class TexasHoldemGUI(tk.Tk):
                         img_orig = Image.new('RGB', card_size, 'blue')
                         draw = ImageDraw.Draw(img_orig)
                         # 绘制卡片文本
-                        text = f"{rank}{suit}"
+                        if suit == 'JOKER':
+                            text = "JOKER"
+                        else:
+                            text = f"{rank}{suit}"
                         try:
-                            font = ImageFont.truetype("arial.ttf", 14)  # 缩小字体
+                            font = ImageFont.truetype("arial.ttf", 20)
                         except:
                             font = ImageFont.load_default()
                         text_width, text_height = draw.textsize(text, font=font)
@@ -577,7 +591,7 @@ class TexasHoldemGUI(tk.Tk):
                     draw = ImageDraw.Draw(img_orig)
                     text = "Error"
                     try:
-                        font = ImageFont.truetype("arial.ttf", 14)  # 缩小字体
+                        font = ImageFont.truetype("arial.ttf", 20)
                     except:
                         font = ImageFont.load_default()
                     text_width, text_height = draw.textsize(text, font=font)
@@ -1488,6 +1502,8 @@ class TexasHoldemGUI(tk.Tk):
         self.after(500, lambda: [w.config(bg='white') for w in self.bet_widgets.values()])
     
     def reset_game(self, auto_reset=False):
+        self._load_assets()
+        
         if self.destroyed:
             return
             

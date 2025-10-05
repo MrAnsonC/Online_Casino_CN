@@ -362,7 +362,16 @@ class ThreeCardPokerGUI(tk.Tk):
     def _load_assets(self):
         card_size = (100, 140)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        
+        # 使用实例变量来跟踪当前使用的扑克牌文件夹
+        if not hasattr(self, 'current_poker_folder'):
+            # 第一次加载时随机选择
+            self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
+        else:
+            # 交替使用 Poker1 和 Poker2
+            self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
+        
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -371,60 +380,83 @@ class ThreeCardPokerGUI(tk.Tk):
             '♦': 'Diamond',
             '♣': 'Club'
         }
+
+        self.original_images = {}
         
         # 加载背面图片
         back_path = os.path.join(card_dir, 'Background.png')
         try:
-            back_img = Image.open(back_path).resize(card_size)
+            back_img_orig = Image.open(back_path)  # 原始尺寸
+            self.original_images["back"] = back_img_orig  # 保存原始图像
+            back_img = back_img_orig.resize(card_size)  # 缩放
             self.back_image = ImageTk.PhotoImage(back_img)
-            self.original_images["back"] = Image.open(back_path)  # 保存原始图像
         except Exception as e:
             print(f"Error loading back image: {e}")
-            # 如果没有背景图，创建一个黑色背景
-            img = Image.new('RGB', card_size, 'black')
-            self.back_image = ImageTk.PhotoImage(img)
-            self.original_images["back"] = img  # 保存原始图像
+            # 创建黑色背景
+            img_orig = Image.new('RGB', card_size, 'black')
+            self.original_images["back"] = img_orig
+            self.back_image = ImageTk.PhotoImage(img_orig)
         
         # 加载扑克牌图片
         for suit in SUITS:
             for rank in RANKS:
                 # 获取映射后的文件名
                 suit_name = suit_mapping.get(suit, suit)
+                if suit == 'JOKER':
+                    filename = f"JOKER-A.png"  # 鬼牌文件名
+                else:
+                    filename = f"{suit_name}{rank}.png"
+                path = os.path.join(card_dir, filename)
                 
-                # 尝试可能的文件名组合
-                possible_filenames = [
-                    f"{suit_name}{rank}.png",       # 如 "SpadeA.png"
-                ]
-                
-                img_found = False
-                for filename in possible_filenames:
-                    path = os.path.join(card_dir, filename)
+                try:
                     if os.path.exists(path):
+                        img = Image.open(path)
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img
+                        # 创建缩放后的图像用于显示
+                        img_resized = img.resize(card_size)
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_resized)
+                    else:
+                        # 创建占位图片
+                        img_orig = Image.new('RGB', card_size, 'blue')
+                        draw = ImageDraw.Draw(img_orig)
+                        # 绘制卡片文本
+                        if suit == 'JOKER':
+                            text = "JOKER"
+                        else:
+                            text = f"{rank}{suit}"
                         try:
-                            img = Image.open(path).resize(card_size)
-                            self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                            self.original_images[(suit, rank)] = Image.open(path)  # 保存原始图像
-                            img_found = True
-                            break
-                        except Exception as e:
-                            print(f"Error loading {path}: {e}")
-                
-                # 如果没有找到图片，创建一个占位图片
-                if not img_found:
-                    print(f"Card image not found for {suit}{rank}")
-                    img = Image.new('RGB', card_size, 'blue')
-                    draw = ImageDraw.Draw(img)
-                    # 在图片上绘制花色和点数
+                            font = ImageFont.truetype("arial.ttf", 20)
+                        except:
+                            font = ImageFont.load_default()
+                        text_width, text_height = draw.textsize(text, font=font)
+                        x = (card_size[0] - text_width) / 2
+                        y = (card_size[1] - text_height) / 2
+                        draw.text((x, y), text, fill="white", font=font)
+                        
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img_orig
+                        # 创建缩放后的图像用于显示
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                except Exception as e:
+                    print(f"Error loading card image {path}: {e}")
+                    # 创建占位图片
+                    img_orig = Image.new('RGB', card_size, 'red')
+                    draw = ImageDraw.Draw(img_orig)
+                    text = "Error"
                     try:
-                        font = ImageFont.truetype("arial.ttf", 24)
-                        text = f"{suit}{rank}"
-                        draw.text((10, 10), text, font=font, fill="white")
+                        font = ImageFont.truetype("arial.ttf", 20)
                     except:
-                        # 如果字体加载失败，使用简单文本
-                        draw.text((10, 10), f"{suit}{rank}", fill="white")
+                        font = ImageFont.load_default()
+                    text_width, text_height = draw.textsize(text, font=font)
+                    x = (card_size[0] - text_width) / 2
+                    y = (card_size[1] - text_height) / 2
+                    draw.text((x, y), text, fill="white", font=font)
                     
-                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                    self.original_images[(suit, rank)] = img  # 保存原始图像
+                    # 保存原始图像
+                    self.original_images[(suit, rank)] = img_orig
+                    # 创建缩放后的图像用于显示
+                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
 
     def add_chip_to_bet(self, bet_type):
         """添加筹码到下注区域"""
@@ -439,16 +471,43 @@ class ThreeCardPokerGUI(tk.Tk):
         else:
             chip_value = float(chip_text)
         
-        # 更新对应的下注变量
-        if bet_type == "ante":
-            current = float(self.ante_var.get())
-            self.ante_var.set(str(int(current + chip_value)))
-        elif bet_type == "pair_plus":
-            current = float(self.pair_plus_var.get())
-            self.pair_plus_var.set(str(int(current + chip_value)))
-        elif bet_type == "six_card":  # 新增6 Card下注
-            current = float(self.six_card_var.get())
-            self.six_card_var.set(str(int(current + chip_value)))
+        # 定义下注上限
+        bet_limits = {
+            "ante": 10000,        # 底注上限10000
+            "pair_plus": 10000,   # 对子加注上限10000
+            "six_card": 2500      # 六张牌外注上限2500
+        }
+        
+        # 获取对应的下注变量和上限
+        if bet_type in bet_limits:
+            current = float(self.__getattribute__(f"{bet_type}_var").get())
+            limit = bet_limits[bet_type]
+            
+            # 检查是否超过上限
+            if current >= limit:
+                bet_names = {
+                    "ante": "底注",
+                    "pair_plus": "对子加注", 
+                    "six_card": "六张牌外注"
+                }
+                messagebox.showwarning("下注限制", f"{bet_names[bet_type]}已满，不能再下注！")
+                return
+            
+            # 计算新的下注金额
+            new_amount = current + chip_value
+            
+            # 如果超过上限，自动调整为上限值
+            if new_amount > limit:
+                allowed_amount = limit
+                bet_names = {
+                    "ante": "底注",
+                    "pair_plus": "对子加注",
+                    "six_card": "六张牌外注"
+                }
+                messagebox.showwarning("下注限制", f"{bet_names[bet_type]}已达上限，自动调整为 {int(allowed_amount)}")
+                self.__getattribute__(f"{bet_type}_var").set(str(int(allowed_amount)))
+            else:
+                self.__getattribute__(f"{bet_type}_var").set(str(int(new_amount)))
     
     def _create_widgets(self):
         # 主框架 - 左右布局
@@ -1042,13 +1101,32 @@ class ThreeCardPokerGUI(tk.Tk):
         try:
             self.ante = int(self.ante_var.get())
             self.pair_plus = int(self.pair_plus_var.get())
-            self.progressive_bet = 20 if self.progressive_var.get() == 1 else 0  # 修改：Progressive下注为20或0
-            self.six_card_bet = int(self.six_card_var.get())  # 获取6 Card下注
-            self.last_progressive_state = self.progressive_var.get()  # 保存Progressive状态（0或1）
-            self.last_six_card_state = self.six_card_bet  # 保存6 Card状态
+            self.progressive_bet = 20 if self.progressive_var.get() == 1 else 0
+            self.six_card_bet = int(self.six_card_var.get())
+            self.last_progressive_state = self.progressive_var.get()
+            self.last_six_card_state = self.six_card_bet
+            
+            # 检查下注是否超过上限
+            if self.ante > 10000:
+                messagebox.showwarning("下注限制", "底注不能超过$10,000")
+                self.ante_var.set("10000")
+                self.ante = 10000
+                return
+                
+            if self.pair_plus > 10000:
+                messagebox.showwarning("下注限制", "对子加注不能超过$10,000")
+                self.pair_plus_var.set("10000")
+                self.pair_plus = 10000
+                return
+                
+            if self.six_card_bet > 2500:
+                messagebox.showwarning("下注限制", "六张牌外注不能超过$2,500")
+                self.six_card_var.set("2500")
+                self.six_card_bet = 2500
+                return
             
             # 检查Ante至少5块
-            if self.ante < 5 and self.pair_plus < 5:  # 修改这里：改为检查两者总和
+            if self.ante < 5 and self.pair_plus < 5:
                 messagebox.showerror("错误", "底注/对子加注至少需要10块")
                 return
                 
@@ -1070,8 +1148,8 @@ class ThreeCardPokerGUI(tk.Tk):
             self.game.deal_initial()
             self.game.ante = self.ante
             self.game.pair_plus = self.pair_plus
-            self.game.progressive_bet = self.progressive_bet  # 保存Progressive下注
-            self.game.six_card_bet = self.six_card_bet  # 保存6 Card下注
+            self.game.progressive_bet = self.progressive_bet
+            self.game.six_card_bet = self.six_card_bet
             
             # 清除所有卡片
             for widget in self.dealer_cards_frame.winfo_children():
@@ -1126,7 +1204,7 @@ class ThreeCardPokerGUI(tk.Tk):
             self.progressive_cb.config(state=tk.DISABLED)
 
             # 如果Ante为0，则跳过决策阶段
-            if self.ante == 0:  # 添加这个判断
+            if self.ante == 0:
                 # 直接进入摊牌阶段
                 self.game.stage = "showdown"
                 self.stage_label.config(text="阶段: 摊牌")
@@ -1946,6 +2024,9 @@ class ThreeCardPokerGUI(tk.Tk):
                                 self.six_card_display.config(bg='white')])
     
     def _do_reset(self, auto_reset=False):
+        # 重新加载资源（切换扑克牌图片）
+        self._load_assets()
+
         """真正的重置游戏界面"""
         # 重置游戏状态
         self.game.reset_game()

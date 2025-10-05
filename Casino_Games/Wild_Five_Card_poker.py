@@ -186,7 +186,7 @@ class Deck:
             self.full_deck.append(Card('JOKER', 'A'))
             self._secure_shuffle()
             self.cut_position = secrets.randbelow(53)  # 53张牌
-
+        
         # 通用的洗牌后索引 & 发牌序列逻辑
         self.start_pos = self.cut_position
         self.indexes = [(self.start_pos + i) % 53 for i in range(53)]  # 53张牌
@@ -1353,7 +1353,16 @@ class WildFiveGUI(tk.Tk):
     def _load_assets(self):
         card_size = (100, 140)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        
+        # 使用实例变量来跟踪当前使用的扑克牌文件夹
+        if not hasattr(self, 'current_poker_folder'):
+            # 第一次加载时随机选择
+            self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
+        else:
+            # 交替使用 Poker1 和 Poker2
+            self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
+        
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -3077,6 +3086,9 @@ class WildFiveGUI(tk.Tk):
     
     def _do_reset(self, auto_reset=False):
         """真正的重置游戏界面：确保所有牌被移除，弃牌区标题被重建，状态复位。"""
+        # 重新加载资源（切换扑克牌图片）
+        self._load_assets()
+        
         # 取消自动重置计时器（保险）
         if self.auto_reset_timer:
             try:
@@ -3547,7 +3559,7 @@ class WildFiveGUI(tk.Tk):
 
         self.ante_info_label = tk.Label(
             table_canvas, 
-            text="庄家最少对子或更好牌型才及格\n不及格的 底注以平局结算\n\n>>🃏🃏公共牌二选一🃏🃏<<\n>>🃏🃏鬼牌为万能牌🃏🃏<<\n系统自动寻找对牌型最有利的牌", 
+            text="庄家最少对子或更好牌型才及格\n不合格的 底注以平局结算\n\n>>🃏🃏公共牌二选一🃏🃏<<\n>>🃏🃏鬼牌为万能牌🃏🃏<<\n系统自动寻找对牌型最有利的牌", 
             font=('Arial', 24), 
             bg='#35654d', 
             fg='#FFD700',

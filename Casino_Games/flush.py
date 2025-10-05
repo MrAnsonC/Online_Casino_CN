@@ -290,9 +290,18 @@ class HighCardFlushGUI(tk.Tk):
         self.quit()
         
     def _load_assets(self):
-        card_size = (96, 144)  # 增加20%尺寸
+        card_size = (100, 150)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        
+        # 使用实例变量来跟踪当前使用的扑克牌文件夹
+        if not hasattr(self, 'current_poker_folder'):
+            # 第一次加载时随机选择
+            self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
+        else:
+            # 交替使用 Poker1 和 Poker2
+            self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
+        
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
@@ -301,67 +310,83 @@ class HighCardFlushGUI(tk.Tk):
             '♦': 'Diamond',
             '♣': 'Club'
         }
-        
-        # 存储原始图像对象
+
         self.original_images = {}
         
         # 加载背面图片
         back_path = os.path.join(card_dir, 'Background.png')
         try:
-            back_img = Image.open(back_path)
-            # 使用新的图像缩放方法
-            self.back_image = ImageTk.PhotoImage(back_img.resize(card_size, Image.LANCZOS))
-            self.original_images["back"] = back_img  # 保存原始背面图像
+            back_img_orig = Image.open(back_path)  # 原始尺寸
+            self.original_images["back"] = back_img_orig  # 保存原始图像
+            back_img = back_img_orig.resize(card_size)  # 缩放
+            self.back_image = ImageTk.PhotoImage(back_img)
         except Exception as e:
             print(f"Error loading back image: {e}")
-            # 如果没有背景图，创建一个黑色背景
-            img = Image.new('RGB', card_size, 'black')
-            self.back_image = ImageTk.PhotoImage(img)
-            self.original_images["back"] = img
+            # 创建黑色背景
+            img_orig = Image.new('RGB', card_size, 'black')
+            self.original_images["back"] = img_orig
+            self.back_image = ImageTk.PhotoImage(img_orig)
         
         # 加载扑克牌图片
         for suit in SUITS:
             for rank in RANKS:
                 # 获取映射后的文件名
                 suit_name = suit_mapping.get(suit, suit)
+                if suit == 'JOKER':
+                    filename = f"JOKER-A.png"  # 鬼牌文件名
+                else:
+                    filename = f"{suit_name}{rank}.png"
+                path = os.path.join(card_dir, filename)
                 
-                # 尝试可能的文件名组合
-                possible_filenames = [
-                    f"{suit_name}{rank}.png",       # 如 "SpadeA.png"
-                ]
-                
-                img_found = False
-                for filename in possible_filenames:
-                    path = os.path.join(card_dir, filename)
+                try:
                     if os.path.exists(path):
+                        img = Image.open(path)
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img
+                        # 创建缩放后的图像用于显示
+                        img_resized = img.resize(card_size)
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_resized)
+                    else:
+                        # 创建占位图片
+                        img_orig = Image.new('RGB', card_size, 'blue')
+                        draw = ImageDraw.Draw(img_orig)
+                        # 绘制卡片文本
+                        if suit == 'JOKER':
+                            text = "JOKER"
+                        else:
+                            text = f"{rank}{suit}"
                         try:
-                            img = Image.open(path)
-                            # 保存原始图像
-                            self.original_images[(suit, rank)] = img
-                            # 使用新的图像缩放方法
-                            resized_img = img.resize(card_size, Image.LANCZOS)
-                            self.card_images[(suit, rank)] = ImageTk.PhotoImage(resized_img)
-                            img_found = True
-                            break
-                        except Exception as e:
-                            print(f"Error loading {path}: {e}")
-                
-                # 如果没有找到图片，创建一个占位图
-                if not img_found:
-                    print(f"Card image not found for {suit}{rank}")
-                    img = Image.new('RGB', card_size, 'blue')
-                    draw = ImageDraw.Draw(img)
-                    # 在图片上绘制花色和点数
+                            font = ImageFont.truetype("arial.ttf", 20)
+                        except:
+                            font = ImageFont.load_default()
+                        text_width, text_height = draw.textsize(text, font=font)
+                        x = (card_size[0] - text_width) / 2
+                        y = (card_size[1] - text_height) / 2
+                        draw.text((x, y), text, fill="white", font=font)
+                        
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img_orig
+                        # 创建缩放后的图像用于显示
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                except Exception as e:
+                    print(f"Error loading card image {path}: {e}")
+                    # 创建占位图片
+                    img_orig = Image.new('RGB', card_size, 'red')
+                    draw = ImageDraw.Draw(img_orig)
+                    text = "Error"
                     try:
-                        font = ImageFont.truetype("arial.ttf", 24)
-                        text = f"{suit}{rank}"
-                        draw.text((10, 10), text, font=font, fill="white")
+                        font = ImageFont.truetype("arial.ttf", 20)
                     except:
-                        # 如果字体加载失败，使用简单文本
-                        draw.text((10, 10), f"{suit}{rank}", fill="white")
+                        font = ImageFont.load_default()
+                    text_width, text_height = draw.textsize(text, font=font)
+                    x = (card_size[0] - text_width) / 2
+                    y = (card_size[1] - text_height) / 2
+                    draw.text((x, y), text, fill="white", font=font)
                     
-                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                    self.original_images[(suit, rank)] = img.copy()
+                    # 保存原始图像
+                    self.original_images[(suit, rank)] = img_orig
+                    # 创建缩放后的图像用于显示
+                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
 
     def add_chip_to_bet(self, bet_type):
         """添加筹码到下注区域"""
@@ -1553,51 +1578,8 @@ class HighCardFlushGUI(tk.Tk):
         # 禁用所有按钮
         self.disable_action_buttons()
         
-        # 第一步：翻转所有牌为背面
-        self.flip_all_to_back()
-        
-        # 第二步：设置动画完成后执行真正的重置
-        self.after(1000, lambda: self.animate_move_cards_out(auto_reset))
-
-    def flip_all_to_back(self):
-        """将所有牌翻转为背面"""
-        self.flipping_cards = []  # 存储正在翻转的卡片
-        
-        # 收集所有需要翻转的卡片
-        for card_label in self.active_card_labels:
-            if card_label.is_face_up:
-                self.flipping_cards.append(card_label)
-        
-        # 如果没有需要翻转的卡片，直接返回
-        if not self.flipping_cards:
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-            
-        # 开始翻转动画
-        self.animate_flip_to_back_step(0)
-
-    def animate_flip_to_back_step(self, step):
-        """执行翻转动画的每一步"""
-        if step >= 10:  # 假设10步完成
-            # 翻转完成，将所有正在翻转的卡片设为背面
-            for card_label in self.flipping_cards:
-                card_label.config(image=self.back_image)
-                card_label.is_face_up = False
-                
-            # 开始移动动画
-            self.after(500, lambda: self.animate_move_cards_out(False))
-            return
-
-        # 模拟翻转效果：先缩小宽度，再放大（但背面）
-        width = 96 - (step * 9.6) if step < 5 else (step - 5) * 9.6
-        if width <= 0:
-            width = 1
-
-        for card_label in self.flipping_cards:
-            card_label.place(width=width)
-
-        step += 1
-        self.after(50, lambda: self.animate_flip_to_back_step(step))
+        # 设置动画完成后执行真正的重置
+        self.animate_move_cards_out(auto_reset)
 
     def animate_move_cards_out(self, auto_reset):
         """将所有牌向右移出屏幕"""
@@ -1644,6 +1626,9 @@ class HighCardFlushGUI(tk.Tk):
             self._do_reset(auto_reset)
 
     def reset_game(self, auto_reset=False):
+        # 重新加载资源（切换扑克牌图片）
+        self._load_assets()
+
         # 取消自动重置计时器
         if self.auto_reset_timer:
             self.after_cancel(self.auto_reset_timer)

@@ -141,12 +141,12 @@ class BaccaratGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
         self.title("Baccarat")
-        self.geometry("1350x720")
+        self.geometry("1350x690+50+10")
+        self.resizable(0,0)
         self.configure(bg='#35654d')
-        self.is_muted = True  # 始终静音
 
-        self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Baccarant')
-        self.data_file = os.path.join(self.data_dir, 'Baccarant_data.json')
+        self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../', 'A_Logs')
+        self.data_file = os.path.join(self.data_dir, 'Baccarant.json')
         self._ensure_data_file()
         
         self.bet_buttons = []
@@ -191,7 +191,7 @@ class BaccaratGUI(tk.Tk):
 
         self.max_marker_rows = 6  # 最大行数
         self.max_marker_cols = 11  # 最大列数
-        self.view_mode = "betting"
+        self.view_mode = "marker"  # 默认显示珠路图
         self.bigroad_results = []
         self._max_rows = 6
         self._max_cols = 50
@@ -201,16 +201,16 @@ class BaccaratGUI(tk.Tk):
         self._create_widgets()
         self._setup_bindings()
         self.point_labels = {}
-        self._player_area = (200, 200, 400, 400)
-        self._banker_area = (600, 200, 800, 400)
+        self._player_area = (200, 150, 400, 350)  # 调整扑克牌区域位置
+        self._banker_area = (600, 150, 800, 350)  # 调整扑克牌区域位置
         self.selected_bet_amount = 1000
         self.current_bet = 0
         self.last_win = 0
-        self._draw_table_labels()
         self.game = None
-        self._initialize_game(False)
         self.username = username
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+   
+        self._initialize_game(False)
         
     def on_close(self):
         self.destroy()
@@ -566,12 +566,12 @@ class BaccaratGUI(tk.Tk):
             self.longest_banker_label.config(text=str(self.longest_streaks['Banker']))
 
     def _load_assets(self):
-        card_size = (100, 140)
+        card_size = (120, 170)
         suits = ['Club', 'Diamond', 'Heart', 'Spade']
         ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
         
         for suit in suits:
             for rank in ranks:
@@ -591,108 +591,207 @@ class BaccaratGUI(tk.Tk):
             print(f"Error loading back image: {e}")
 
     def _initialize_game(self, second):
+        # dialog size
+        dialog_w, dialog_h = 360, 190
+
         # 创建自定义对话框
         dialog = tk.Toplevel(self)
         dialog.title("Cut Card")
-        dialog.geometry("300x150")
         dialog.resizable(False, False)
         dialog.transient(self)  # 设置为主窗口的子窗口
         dialog.grab_set()  # 模态对话框
-        
-        # 添加标签
-        if second:
-            tk.Label(dialog, text="Deck finish. \nShuffle and cut the card from 103 to 299", 
-                    font=('Arial', 10)).pack(pady=10)
+
+        # 先调用 update_idletasks 确保 geometry 信息是最新的
+        dialog.update_idletasks()
+
+        # 尝试用父窗口坐标来居中对话框（优先）
+        try:
+            parent_x = self.winfo_rootx()
+            parent_y = self.winfo_rooty()
+            parent_w = self.winfo_width()
+            parent_h = self.winfo_height()
+        except Exception:
+            parent_x = parent_y = 0
+            parent_w = parent_h = 0
+
+        # 如果父窗口尚未正确给出尺寸（例如为 0 或 1），退回屏幕居中
+        if parent_w <= 1 or parent_h <= 1:
+            screen_w = dialog.winfo_screenwidth()
+            screen_h = dialog.winfo_screenheight()
+            x = (screen_w - dialog_w) // 2
+            y = (screen_h - dialog_h) // 2
         else:
-            tk.Label(dialog, text="Please cut the card from 103 to 299", 
-                font=('Arial', 10)).pack(pady=10)
-        
-        # 添加输入框
-        entry = tk.Entry(dialog, font=('Arial', 12), width=10)
-        entry.pack(pady=5)
+            x = parent_x + (parent_w - dialog_w) // 2
+            y = parent_y + (parent_h - dialog_h) // 2
+
+        dialog.geometry(f"{dialog_w}x{dialog_h}+{int(x)}+{int(y)}")
+
+        # 保证主窗口关闭事件被替换为 do_nothing（与你原逻辑相同）
+        try:
+            self.window.protocol("WM_DELETE_WINDOW", self.do_nothing)
+        except Exception:
+            # 如果没有 self.window 属性则忽略（保持健壮性）
+            pass
+
+        # 提示标签
+        if second:
+            tk.Label(dialog, text="Deck finish. \nShuffle and cut the card from 103 to 299",
+                    font=('Arial', 10)).pack(pady=(8, 4))
+        else:
+            tk.Label(dialog, text="Please cut the card from 103 to 299",
+                    font=('Arial', 10)).pack(pady=(8, 4))
+
+        # UI 行：Entry 与 Scale（大小条）同步
+        entry_frame = tk.Frame(dialog)
+        entry_frame.pack(pady=(2, 6))
+
+        tk.Label(entry_frame, text="Cut position:", font=('Arial', 10)).pack(side=tk.LEFT, padx=(6, 8))
+
+        entry_var = tk.StringVar()
+        entry = tk.Entry(entry_frame, font=('Arial', 12), width=8, textvariable=entry_var)
+        entry.pack(side=tk.LEFT)
         entry.focus_set()  # 自动聚焦
-        
+
+        # Scale：从 103 到 299（水平条），同步显示位置
+        scale_var = tk.IntVar(value=200)  # 默认值：中位
+        scale = tk.Scale(dialog, from_=103, to=299, orient=tk.HORIZONTAL, length=240,
+                        variable=scale_var, showvalue=False)
+        scale.pack(pady=(4, 4))
+
         # 存储结果
         result = [None]  # 使用列表以便在闭包中修改
         self.bigroad_results = []
-        
-        # 确定按钮回调
-        def on_ok():
+
+        # 当 scale 移动时：更新 entry（同步；entry 会显示被 clamp 到 scale 范围内的值）
+        def on_scale_change(v):
+            # v 可能是字符串形式
             try:
-                value = entry.get()
-                if not value:  # 空输入
-                    result[0] = None  # 标记为使用外部切牌位置
-                else:
-                    value = int(value)
-                    if 103 <= value <= 299:
-                        result[0] = value
-                    else:
-                        result[0] = None  # 无效输入，使用外部切牌位置
-                dialog.destroy()
-            except ValueError:
-                # 非整数输入，使用外部切牌位置
+                vi = int(float(v))
+            except Exception:
+                return
+            # 把 scale 的数值设置到 entry（保持同步）
+            entry_var.set(str(vi))
+
+        scale.configure(command=on_scale_change)
+
+        # 当 entry 内容改变时：如果数字在 [103,299] 内则更新 scale；否则不改变 scale（保持当前大小条位置）
+        def on_entry_change(event=None):
+            s = entry_var.get().strip()
+            if s == "":
+                # 空输入不改 scale
+                return
+            try:
+                v = int(s)
+            except Exception:
+                # 非整数输入忽略（不改 scale）
+                return
+
+        # 绑定 Entry 的键松开事件（实时检测）
+        entry.bind('<KeyRelease>', on_entry_change)
+
+        # 确定按钮回调（按下确定时：处理 entry，保证 clamp 到 [103,299]；空输入表示使用外部切牌）
+        def on_ok():
+            s = entry_var.get().strip()
+            if s == "":
+                # 保持 None：代表使用外部切牌位置（或后续随机）
                 result[0] = None
-                dialog.destroy()
-        
-        # 取消按钮回调
-        def on_cancel():
-            result[0] = None  # 使用外部切牌位置
+            else:
+                try:
+                    v = int(s)
+                except Exception:
+                    # 非整数或非法输入，使用外部切牌位置
+                    result[0] = None
+                    dialog.destroy()
+                    return
+                # 按用户要求：按下“确定”后 clamp 到合法范围
+                if v < 103:
+                    v = 103
+                elif v > 299:
+                    v = 299
+                # 更新 entry 与 scale 显示为被 clamp 后的值（让用户看到结果）
+                entry_var.set(str(v))
+                scale_var.set(v)
+                result[0] = v
             dialog.destroy()
-        
+
+        # 取消按钮回调（RANDOM：保持 None，表示后续使用外部或随机）
+        def on_cancel():
+            result[0] = None
+            dialog.destroy()
+
         # 添加按钮
         btn_frame = tk.Frame(dialog)
-        btn_frame.pack(pady=10)
-        
+        btn_frame.pack(pady=8)
+
+        tk.Button(btn_frame, text="RANDOM", width=8, command=on_cancel).pack(side=tk.LEFT, padx=10)
         tk.Button(btn_frame, text="OK", width=8, command=on_ok).pack(side=tk.LEFT, padx=10)
-        tk.Button(btn_frame, text="Cancel", width=8, command=on_cancel).pack(side=tk.LEFT, padx=10)
-        
-        # 绑定Enter键
+
+        # 绑定 Enter 键触发确定
         dialog.bind('<Return>', lambda e: on_ok())
-        
-        # 等待对话框关闭
+
+        # 等待对话框关闭（模态）
         self.wait_window(dialog)
-        
-        # 获取切牌位置
+
+        # 获取切牌位置（用户输入或 None）
         cut_position = result[0]
-        
-        # 获取工具目录和洗牌脚本路径
+
+        # 准备载入 A_Tools/Card/shuffle.py，并直接调用其生成函数（使用 8 副牌、不含 Joker）
         current_dir = os.path.dirname(os.path.abspath(__file__))
         tools_dir = os.path.join(os.path.dirname(current_dir), 'A_Tools')
         card_dir = os.path.join(tools_dir, 'Card')
-        shuffle_script = os.path.join(card_dir, 'shuffle_baccarat.py')
-        
-        # 运行洗牌脚本获取牌组和切牌位置
+        shuffle_py = os.path.join(card_dir, 'shuffle.py')
+
         external_deck = None
         external_cut_position = None
-        
+
         try:
-            # 使用subprocess运行洗牌脚本
-            import subprocess
-            process = subprocess.Popen(
-                [sys.executable, shuffle_script],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
-            stdout, stderr = process.communicate()
-            
-            if process.returncode == 0:
-                data = json.loads(stdout)
-                external_deck = data['deck']
-                external_cut_position = data['cut_position']
+            # 动态导入 shuffle.py 模块
+            import importlib.util
+            import secrets as _secrets
+            spec = importlib.util.spec_from_file_location("shuffle_mod", shuffle_py)
+            if spec and spec.loader:
+                shuffle_mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(shuffle_mod)
+                # 调用 generate_shuffled_deck，强制使用 8 副、不含 Joker
+                try:
+                    # 期望 shuffle.py 提供 generate_shuffled_deck(has_joker=False, deck_count=8)
+                    external_deck = shuffle_mod.generate_shuffled_deck(has_joker=False, deck_count=8)
+                    # external_deck 应为序列（如每张牌的列表），计算总张数
+                    if isinstance(external_deck, (list, tuple)):
+                        total_cards = len(external_deck)
+                        # 生成一个位于 [103,299] 的外部切牌位置（受牌堆实际大小限制）
+                        lower = 103
+                        upper = min(299, total_cards - 1)
+                        if upper >= lower:
+                            external_cut_position = int(_secrets.randbelow(upper - lower + 1)) + lower
+                        else:
+                            # 若牌数太少则使用总数中位（并保证在合法范围内）
+                            external_cut_position = min(max(total_cards // 2, lower), max(lower, total_cards - 1))
+                    else:
+                        external_deck = None
+                        external_cut_position = None
+                except Exception as e:
+                    print(f"调用 shuffle.generate_shuffled_deck 出错: {e}")
+                    external_deck = None
+                    external_cut_position = None
             else:
-                print(f"洗牌脚本错误: {stderr}")
+                print("无法加载 shuffle.py 模块（spec loader 缺失）")
         except Exception as e:
-            print(f"运行洗牌脚本时出错: {e}")
-        
-        # 如果用户没有提供切牌位置，使用外部切牌位置
+            print(f"载入 shuffle.py 时出错: {e}")
+            external_deck = None
+            external_cut_position = None
+
+        # 如果用户没有提供切牌位置，使用外部切牌位置（否则在 103-299 随机）
         if cut_position is None:
-            cut_position = external_cut_position if external_cut_position else random.randint(103, 299)
-        
-        # 初始化游戏
+            if external_cut_position is not None and 103 <= external_cut_position <= 299:
+                cut_position = external_cut_position
+            else:
+                cut_position = random.randint(103, 299)
+
+        # 初始化游戏：把外部牌组传入 Baccarat（如果 external_deck 为 None 则由 Baccarat 内部自行生成）
         self.game = Baccarat(external_deck=external_deck)
         self.game.advanced_shuffle(cut_position)
-        
+
         # 重新洗牌时重置
         self.marker_results = []
         self.marker_counts = {
@@ -703,6 +802,9 @@ class BaccaratGUI(tk.Tk):
         }
         self.reset_marker_road()
         self.reset_bigroad()
+
+    def do_nothing(self):
+        pass
 
     def reset_bigroad(self):
         """重置大路数据与视图"""
@@ -771,59 +873,98 @@ class BaccaratGUI(tk.Tk):
         main_frame = ttk.Frame(self)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        left_frame = ttk.Frame(main_frame, width=800)
+        # 左侧主区域
+        left_frame = ttk.Frame(main_frame, width=900)
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        right_frame = ttk.Frame(main_frame, width=400)
+        # 右侧面板
+        right_frame = ttk.Frame(main_frame, width=450)
         right_frame.pack(side=tk.RIGHT, fill=tk.Y)
 
-        self._create_control_panel(right_frame)
-
-        self.table_canvas = tk.Canvas(left_frame, bg='#35654d', highlightthickness=0)
-        self.table_canvas.pack(fill=tk.BOTH, expand=True)
+        # 扑克牌区域
+        self.table_canvas = tk.Canvas(left_frame, bg='#35654d', highlightthickness=0, height=400)
+        self.table_canvas.pack(fill=tk.BOTH, expand=False)
         self._draw_table_labels()
 
+        # 下注区域 - 在扑克牌区域下方
+        betting_area = tk.Frame(left_frame, bg='#D0E7FF', height=180)
+        betting_area.pack(fill=tk.BOTH, expand=True, pady=5)
+        
+        # 下注区域分为左中右三部分
+        betting_left = tk.Frame(betting_area, bg='#D0E7FF', width=500)
+        betting_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+        
+        betting_center = tk.Frame(betting_area, bg='#D0E7FF', width=200)
+        betting_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+        
+        betting_right = tk.Frame(betting_area, bg='#D0E7FF', width=200)
+        betting_right.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
+        
+        # 填充下注区域
+        self._populate_betting_area(betting_left, betting_center, betting_right)
+
+        # 右侧控制面板
+        self._create_control_panel(right_frame)
+
     def _draw_table_labels(self):
-        self.table_canvas.create_line(500, 50, 500, 550, width=3, fill='white', tags='divider')
-        self.table_canvas.create_text(250, 30, text="PLAYER", font=('Arial', 24, 'bold'), fill='white')
-        self.table_canvas.create_text(750, 30, text="BANKER", font=('Arial', 24, 'bold'), fill='white')
+        self.table_canvas.create_line(500, 50, 500, 350, width=3, fill='white', tags='divider')
+        self.table_canvas.create_text(300, 30, text="PLAYER", font=('Arial', 30, 'bold'), fill='white')
+        self.table_canvas.create_text(700, 30, text="BANKER", font=('Arial', 30, 'bold'), fill='white')
+
+        # 添加结果显示区域 - 在扑克牌区域下方
+        self.result_text_id = self.table_canvas.create_text(
+            500, 370,  # 位置调整到扑克牌区域下方
+            text="", 
+            font=('Arial', 34, 'bold'),
+            fill='white',
+            tags=('result_text')
+        )
+        self.result_bg_id = self.table_canvas.create_rectangle(
+            0, 0, 0, 0,  # 初始不可见
+            fill='',
+            outline='',
+            tags=('result_bg')
+        )
 
     def _get_card_positions(self, hand_type):
         area = self._player_area if hand_type == "player" else self._banker_area
         hand = self.game.player_hand if hand_type == "player" else self.game.banker_hand
         card_count = len(hand)
-        base_x = area[0] + (area[2]-area[0]-100)/2
+        base_x = area[0] + (area[2]-area[0]-120)/2
         positions = []
         for i in range(card_count):
-            x = base_x + i*110
+            x = base_x + i*120  # 减少卡片间距
             y = area[1]
             if i == 2:
-                x = (positions[0][0] + positions[1][0]) / 2
-                y = area[1] + 70
-            positions.append((x, y))
+                if hand_type == "player":
+                    x = (((positions[0][0] + positions[1][0]) / 2) - 10)
+                else:
+                    x = (((positions[0][0] + positions[1][0]) / 2) + 10)
+                y = area[1] + 80
+            positions.append((int(round(x)), int(round(y))))
         return positions
     
     def _create_chip_button(self, parent, text, bg_color):
         size = 60
-        canvas = tk.Canvas(parent, width=size, height=size, 
+        canvas = tk.Canvas(parent, width=size, height=size,
                         highlightthickness=0, background='#D0E7FF')
-        
-        # 绘制带发光效果的圆形
-        chip_id = canvas.create_oval(2, 2, size-2, size-2, 
-                                   fill=bg_color, outline='#D0E7FF', width=6)
-        
+
+        # 绘制不带发光/外圈的圆形
+        chip_id = canvas.create_oval(2, 2, size-2, size-2,
+                                    fill=bg_color, outline='', width=0)
+
         # 文字颜色计算（保持不变）
         rgb = ImageColor.getrgb(bg_color)
         luminance = 0.299*rgb[0] + 0.587*rgb[1] + 0.114*rgb[2]
         text_color = 'white' if luminance < 140 else 'black'
-        
+
         # 添加文字
-        canvas.create_text(size/2, size/2, text=text, 
-                         fill=text_color, font=('Arial', 12, 'bold'))
-        
+        canvas.create_text(size/2, size/2, text=text,
+                        fill=text_color, font=('Arial', 12, 'bold'))
+
         # 绑定点击事件
-        canvas.bind('<Button-1>', lambda e, t=text: self._set_bet_amount(t, canvas))
-        
+        canvas.bind('<Button-1>', lambda e, t=text, c=canvas, cid=chip_id: self._set_bet_amount(t, c, cid))
+
         # 存储按钮信息
         self.chip_buttons.append({
             'canvas': canvas,
@@ -832,37 +973,27 @@ class BaccaratGUI(tk.Tk):
         })
         return canvas
 
-    def _set_bet_amount(self, chip_text, clicked_canvas):
-        # 清除之前选中的发光效果
-        if self.selected_chip:
-            self.selected_canvas.itemconfig(self.selected_id, outline='#D0E7FF')
-        
-        # 设置新选中效果
+    def _set_bet_amount(self, chip_text, clicked_canvas, clicked_chip_id):
+        # 取消所有对 canvas outline 的修改（不再使用发光/外圈）
+        # 仅记录当前选中状态以供后续使用
         for chip in self.chip_buttons:
             if chip['canvas'] == clicked_canvas:
+                self.selected_chip = chip
+                # 保留这两个属性以兼容其它代码
                 self.selected_canvas = chip['canvas']
                 self.selected_id = chip['chip_id']
-                chip['canvas'].itemconfig(chip['chip_id'], outline='gold')
-                self.selected_chip = chip
                 break
-        
-        # 金额转换逻辑（保持原样）
+
+        # 金额转换逻辑（不变）
         if 'K' in chip_text:
             amount = int(chip_text.replace('K', '')) * 1000
         else:
             amount = int(chip_text)
-        
-        self.selected_bet_amount = amount
-        self.current_chip_label.config(text=f"Chips amount: ${amount:,}")
 
-    def _animate_chip_glow(self):
-        if not self.selected_chip:
-            return
-        
-        current_outline = self.selected_canvas.itemcget(self.selected_id, 'outline')
-        new_color = '#FFD700' if current_outline == 'gold' else 'gold'
-        self.selected_canvas.itemconfig(self.selected_id, outline=new_color)
-        self.after(500, self._animate_chip_glow)
+        self.selected_bet_amount = amount
+        # 更新显示标签
+        if hasattr(self, 'current_chip_label'):
+            self.current_chip_label.config(text=f"Select: ${amount:,}")
 
     def reset_bets(self):
         # Give all current bets back to the balance
@@ -905,9 +1036,10 @@ class BaccaratGUI(tk.Tk):
         self.mode_combo.set(self.mode_display_map.get(current_value, current_value))
 
     def _create_control_panel(self, parent):
-        # main panel with light-blue background
-        control_frame = tk.Frame(parent, bg='#D0E7FF')
-        control_frame.pack(pady=20, padx=10, fill=tk.X)
+        # main panel with light-blue background - 固定宽度
+        control_frame = tk.Frame(parent, bg='#D0E7FF', width=300)
+        control_frame.pack(pady=20, padx=10, fill=tk.BOTH, expand=True)
+        control_frame.pack_propagate(False)  # 禁止自动调整大小
 
         style = ttk.Style()
         style.configure('Bold.TCombobox', font=('Arial', 15, 'bold'))
@@ -940,7 +1072,7 @@ class BaccaratGUI(tk.Tk):
         tk.Label(
             mode_frame, 
             text="Game Mode:", 
-            font=('Arial', 15, 'bold'),
+            font=('Arial', 14, 'bold'),
             bg='#D0E7FF'
         ).pack(side=tk.LEFT, padx=(0, 5))
         
@@ -957,10 +1089,10 @@ class BaccaratGUI(tk.Tk):
         
         # 使用显示文本作为组合框的值
         display_values = [self.mode_display_map["classic"], 
-                          self.mode_display_map["2to1"], 
-                          self.mode_display_map["tiger"], 
-                          self.mode_display_map["ez"],
-                          self.mode_display_map["fabulous4"]
+                        self.mode_display_map["2to1"], 
+                        self.mode_display_map["tiger"], 
+                        self.mode_display_map["ez"],
+                        self.mode_display_map["fabulous4"]
                         ]
         
         # 创建组合框 - 使用显示文本作为选项
@@ -969,7 +1101,7 @@ class BaccaratGUI(tk.Tk):
             textvariable=self.mode_var,
             values=display_values,
             state='readonly',
-            font=('Arial', 15, 'bold'),
+            font=('Arial', 14, 'bold'),
             width=15
         )
         self.mode_combo.pack(side=tk.LEFT)
@@ -980,60 +1112,45 @@ class BaccaratGUI(tk.Tk):
         # 绑定选择事件
         self.mode_combo.bind("<<ComboboxSelected>>", self.change_game_mode)
 
-        # ===== 新增部分：视图切换按钮 =====
+        # ===== 修改部分：视图切换按钮 - 只保留Road和Static =====
         view_frame = tk.Frame(control_frame, bg='#D0E7FF')
-        view_frame.pack(fill=tk.X, pady=(5, 0))
+        view_frame.pack(fill=tk.X, pady=(15, 5))
         
-        self.betting_view_btn = tk.Button(
+        self.marker_view_btn = tk.Button(
             view_frame, 
-            text="Betting", 
-            command=self.show_betting_view,
+            text="Road", 
+            command=self.show_marker_view,
             bg='#4B8BBE',  # 蓝色背景
             fg='white',
             font=('Arial', 10, 'bold'),
             relief=tk.RAISED,
             width=10
         )
-        self.betting_view_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        self.marker_view_btn.pack(side=tk.LEFT, padx=5, pady=5)
 
         self.bigroad_view_btn = tk.Button(
             view_frame, text="Static", command=self.show_bigroad_view,
             bg='#888888', fg='white', font=('Arial',10,'bold'),
             relief=tk.FLAT, width=10
         )
-        
-        self.marker_view_btn = tk.Button(
-            view_frame, 
-            text="Road", 
-            command=self.show_marker_view,
-            bg='#888888',  # 灰色背景
-            fg='white',
-            font=('Arial', 10, 'bold'),
-            relief=tk.FLAT,
-            width=10
-        )
-        self.marker_view_btn.pack(side=tk.LEFT, padx=5, pady=5)
         self.bigroad_view_btn.pack(side=tk.LEFT, padx=5, pady=5)
         
-        # 创建一个统一大小的 view_container
-        self.view_container = tk.Frame(control_frame, bg='#D0E7FF')
+        # 创建一个统一大小的 view_container - 固定高度
+        self.view_container = tk.Frame(control_frame, bg='#D0E7FF', height=300)
         self.view_container.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.view_container.pack_propagate(False)  # 禁止自动调整大小
 
-        # 1) betting_view
-        self.betting_view = tk.Frame(self.view_container, bg='#D0E7FF', width=350)
+        # 1) marker_view
+        self.marker_view = tk.Frame(self.view_container, bg='#D0E7FF')
 
         # 2) bigroad_view
-        self.bigroad_view = tk.Frame(self.view_container, bg='#D0E7FF', width=350)
-
-        # 3) marker_view
-        self.marker_view = tk.Frame(self.view_container, bg='#D0E7FF', width=350)
+        self.bigroad_view = tk.Frame(self.view_container, bg='#D0E7FF')
 
         # 之后调用生成大路和珠路图等方法
-        self._populate_betting_view()
         self._create_marker_road()
 
-        # 默认显示下注视图
-        self.show_betting_view()
+        # 默认显示珠路图视图
+        self.show_marker_view()
 
     def change_game_mode(self, event=None):
         """切换游戏模式后，立即重绘并刷新静态统计面板"""
@@ -1128,52 +1245,26 @@ class BaccaratGUI(tk.Tk):
         self.bet_buttons = []
         
         # 销毁 betting_view 中的所有组件
-        for widget in self.betting_view.winfo_children():
+        for widget in self.betting_left.winfo_children():
             widget.destroy()
         
         # 重新创建下注视图
-        self._populate_betting_view()
-        
-        # 确保视图正确显示
-        if self.view_mode == "betting":
-            self.show_betting_view()
-        
-        # 重新绑定回车键
-        self.bind('<Return>', lambda e: self.start_game())
-
-    def show_betting_view(self):
-        """显示下注区域视图"""
-        # 切换按钮样式
-        self.betting_view_btn.config(relief=tk.RAISED, bg='#4B8BBE')
-        self.bigroad_view_btn.config(relief=tk.RAISED, bg='#888888')
-        self.marker_view_btn.config(relief=tk.FLAT, bg='#888888')
-        
-        # 隐藏珠路图视图，显示下注视图
-        self.marker_view.pack_forget()
-        self.bigroad_view.pack_forget()
-        self.betting_view.pack(fill=tk.BOTH, expand=True)
-        self.view_mode = "betting"
+        self._populate_betting_left(self.betting_left)
 
     def show_bigroad_view(self):
-        self.betting_view.pack_forget()
         self.marker_view.pack_forget()
         self.bigroad_view.pack(fill=tk.BOTH, expand=True)
-        self.betting_view_btn.config(relief=tk.FLAT, bg='#888888')
-        self.bigroad_view_btn.config(relief=tk.RAISED, bg='#4B8BBE')
         self.marker_view_btn.config(relief=tk.FLAT, bg='#888888')
+        self.bigroad_view_btn.config(relief=tk.RAISED, bg='#4B8BBE')
         self.view_mode = "bigroad"
 
     def show_marker_view(self):
         """显示珠路图视图"""
         # 切换按钮样式
-        self.betting_view_btn.config(relief=tk.FLAT, bg='#888888')
-        self.bigroad_view_btn.config(relief=tk.RAISED, bg='#888888')
-        self.marker_view_btn.config(relief=tk.RAISED, bg='#4B8BBE')
-        
-        # 隐藏下注视图，显示珠路图视图
-        self.betting_view.pack_forget()
         self.bigroad_view.pack_forget()
         self.marker_view.pack(fill=tk.BOTH, expand=True)
+        self.marker_view_btn.config(relief=tk.RAISED, bg='#4B8BBE')
+        self.bigroad_view_btn.config(relief=tk.FLAT, bg='#888888')
         self.view_mode = "marker"
 
     def _create_marker_road(self):
@@ -1284,7 +1375,7 @@ class BaccaratGUI(tk.Tk):
         )
         self.marker_canvas.pack(fill=tk.BOTH, expand=True)
 
-        # ↓↓↓ ③ 最后再绘制“统计面板”↓↓↓
+        # ↓↓↓ ③ 最后再绘制"统计面板"↓↓↓
         # 注意：这里调用依然是 self._create_stats_panel(self.bigroad_view)
         #      但将它放在 Marker Road 视图的逻辑末尾，也就是 Big Road + Marker Road 画布 之后。
         self._create_stats_panel(self.bigroad_view)
@@ -1293,7 +1384,7 @@ class BaccaratGUI(tk.Tk):
         """创建统计信息面板 - 使用网格布局实现表格效果"""
         # 主框架
         stats_frame = tk.Frame(parent, bg='#D0E7FF')
-        stats_frame.pack(fill=tk.X, pady=(10, 0), padx=10)
+        stats_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 0), padx=10)
         
         # 创建表格样式的框架
         table_frame = tk.Frame(stats_frame, bg='#D0E7FF')
@@ -1559,7 +1650,7 @@ class BaccaratGUI(tk.Tk):
             bg='#D0E7FF',
             highlightthickness=0
         )
-        self.pie_canvas.pack(side=tk.LEFT, padx=(0, 10))
+        self.pie_canvas.pack(side=tk.LEFT)
 
         # 创建一个空行（占位符） - 新增这行
         tk.Frame(pie_frame, height=30, bg='#D0E7FF').pack(side=tk.TOP, fill=tk.X)
@@ -1588,7 +1679,7 @@ class BaccaratGUI(tk.Tk):
             text="TIE: 0.0%",
             font=('Arial', 12),
             bg='#D0E7FF',
-            fg="#00ff00",  # 绿色
+            fg="#009700",  # 绿色
             anchor='w'
         )
         self.tie_percent_label.pack(fill=tk.X, pady=2)
@@ -1618,12 +1709,12 @@ class BaccaratGUI(tk.Tk):
         
         # 创建记录显示框架
         record_frame = tk.Frame(streak_frame, bg='#D0E7FF')
-        record_frame.pack(fill=tk.X, padx=10)
+        record_frame.pack(fill=tk.X, padx=5)
         
         # 使用网格布局使三个记录水平居中
         # PLAYER 记录
         player_frame = tk.Frame(record_frame, bg='#D0E7FF')
-        player_frame.grid(row=0, column=0, padx=10)
+        player_frame.grid(row=0, column=0, padx=5)
         tk.Label(
             player_frame, text="PLAYER:", 
             font=('Arial', 12), 
@@ -1642,7 +1733,7 @@ class BaccaratGUI(tk.Tk):
         tk.Label(
             tie_frame, text="TIE:", 
             font=('Arial', 12), 
-            bg='#D0E7FF', fg='#00ff00'
+            bg='#D0E7FF', fg='#009700'
         ).pack(side=tk.LEFT)
         self.longest_tie_label = tk.Label(
             tie_frame, text=str(self.longest_streaks['Tie']),
@@ -2016,63 +2107,30 @@ class BaccaratGUI(tk.Tk):
                 return f.read().strip()
         return ''
         
-    def _populate_betting_view(self):
-        """将所有的控制面板内容移动到betting_view中"""
-        # 筹码区
-        chips_frame = tk.Frame(self.betting_view, bg='#D0E7FF')
-        chips_frame.pack(pady=5)
-        row1 = tk.Frame(chips_frame, bg='#D0E7FF')
-        row1.pack()
-        for text, bg_color in [
-            ('25', '#00ff00'),
-            ('100', '#000000'),
-            ('200', '#0000ff'),
-            ('500', "#FF7DDA"),
-            ('1K', '#ffffff')
-        ]:
-            btn = self._create_chip_button(row1, text, bg_color)
-            btn.pack(side=tk.LEFT, padx=2)
-        row2 = tk.Frame(chips_frame, bg='#D0E7FF')
-        row2.pack(pady=3)
-        for text, bg_color in [
-            ('2K', '#0000ff'),
-            ('5K', '#ff0000'),
-            ('10K', '#800080'),
-            ('20K', '#ffa500'),
-            ('50K', '#006400')
-        ]:
-            btn = self._create_chip_button(row2, text, bg_color)
-            btn.pack(side=tk.LEFT, padx=2)
+    def _populate_betting_area(self, left, center, right):
+        """填充下注区域的三部分"""
+        self.betting_left = left
+        self.betting_center = center
+        self.betting_right = right
+        
+        # 左部分：下注格子
+        self._populate_betting_left(left)
+        
+        # 中部分：按钮和显示
+        self._populate_betting_center(center)
+        
+        # 右部分：筹码区域
+        self._populate_betting_right(right)
 
-        # pre-select default chip and start glow
-        for chip in self.chip_buttons:
-            if chip['text'] == '1K':
-                self.selected_canvas = chip['canvas']
-                self.selected_id = chip['chip_id']
-                chip['canvas'].itemconfig(chip['chip_id'], outline='gold')
-                self.selected_chip = chip
-                # 确保设置了金额
-                self.selected_bet_amount = 1000  # 明确设置金额
-                break
-
-        # 当前选中筹码显示
-        self.current_chip_label = tk.Label(
-            self.betting_view,
-            text="Current Chip: $1,000",
-            font=('Arial', 12),
-            fg='black',
-            bg='#D0E7FF'
-        )
-        self.current_chip_label.pack(pady=5)
-
-        # 赔率按钮区
+    def _populate_betting_left(self, parent):
+        """填充左部分：下注格子 - 固定高度长度"""
         if self.game_mode == "tiger":
             odds_map = {
                 'Small Tiger': ('22:1', "#ff8ef6"),
                 'Tiger Tie':   ('35:1', '#44ff44'),
                 'Big Tiger':   ('50:1', '#44ffff'),
                 'Tiger':       ('12/20:1', '#ffaa44'),
-                'Tiger Pair':  ('4-100:1', '#ff44ff'),
+                'Tiger Pair':  ('4/20/100:1', '#ff44ff'),
                 'Player':      ('1:1', '#4444ff'),
                 'Tie':         ('8:1', '#44ff44'),
                 'Banker':      ('1:1*', '#ff4444')
@@ -2124,8 +2182,10 @@ class BaccaratGUI(tk.Tk):
                 'Banker': ('1:1*', '#ff4444')
             }
 
-        row1_frame = tk.Frame(self.betting_view, bg='#D0E7FF')
-        row1_frame.pack(fill=tk.X, pady=3)
+        # 创建三行下注按钮 - 固定高度和宽度
+        row1_frame = tk.Frame(parent, bg='#D0E7FF', height=80)  # 固定高度
+        row1_frame.pack(fill=tk.BOTH, expand=True, pady=3)
+        row1_frame.pack_propagate(False)  # 防止框架收缩
 
         # 根据模式选择要显示的按钮
         if self.game_mode == "tiger":
@@ -2143,17 +2203,19 @@ class BaccaratGUI(tk.Tk):
                 row1_frame,
                 text=f"{odds}\n{bt}\n~~",
                 bg=color,
-                font=('Arial', 9, 'bold'),
-                height=3,
-                wraplength=80,
+                font=('Arial', 12, 'bold'),  # 减小字体
+                height=3,  # 固定高度
+                width=12,   # 固定宽度
+                wraplength=90,
                 command=lambda t=bt: self.place_bet(t)
             )
             btn.bet_type = bt
-            btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+            btn.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=2)  # 使用fill=tk.BOTH
             self.bet_buttons.append(btn)
 
-        row2_frame = tk.Frame(self.betting_view, bg='#D0E7FF')
-        row2_frame.pack(fill=tk.X, pady=3)
+        row2_frame = tk.Frame(parent, bg='#D0E7FF', height=80)  # 固定高度
+        row2_frame.pack(fill=tk.BOTH, expand=True, pady=3)
+        row2_frame.pack_propagate(False)
 
         if self.game_mode == "tiger":
             buttons_to_show_2 = ['Tiger','Tiger Pair']
@@ -2170,17 +2232,20 @@ class BaccaratGUI(tk.Tk):
                 row2_frame,
                 text=f"{odds}\n{bt}\n~~",
                 bg=color,
-                font=('Arial', 9, 'bold'),
-                height=3,
+                font=('Arial', 12, 'bold'),
+                height=3,  # 固定高度
+                width=12,   # 固定宽度
                 wraplength=100,
                 command=lambda t=bt: self.place_bet(t)
             )
             btn.bet_type = bt
-            btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+            btn.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=2)
             self.bet_buttons.append(btn)
 
-        row3_frame = tk.Frame(self.betting_view, bg='#D0E7FF')
-        row3_frame.pack(fill=tk.X, pady=3)
+        row3_frame = tk.Frame(parent, bg='#D0E7FF', height=80)  # 固定高度
+        row3_frame.pack(fill=tk.BOTH, expand=True, pady=3)
+        row3_frame.pack_propagate(False)
+        
         for bt in ['Player','Tie','Banker']:
             odds, color = odds_map[bt]
             text_color = 'white' if bt in ['Player','Banker'] else 'black'
@@ -2189,17 +2254,18 @@ class BaccaratGUI(tk.Tk):
                 row3_frame,
                 text=f"{odds}\n{bt}\n~~",
                 bg=color,
-                font=('Arial', 9, 'bold'),
-                height=3,
+                font=('Arial', 12, 'bold'),
+                height=3,  # 固定高度
+                width=12,   # 固定宽度
                 fg=text_color,
                 disabledforeground=disabled_color,
                 highlightthickness=0,
                 highlightbackground='black',
-                wraplength=60,
+                wraplength=80,
                 command=lambda t=bt: self.place_bet(t)
             )
             btn.bet_type = bt
-            btn.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=2)
+            btn.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=2)
             self.bet_buttons.append(btn)
 
         # 说明 - 根据模式显示不同的说明
@@ -2210,77 +2276,131 @@ class BaccaratGUI(tk.Tk):
         elif self.game_mode == "classic":
             explanation = "BANKER PAYS 5% COMMISSION EVERY WIN"
         elif self.game_mode == "2to1":
-            explanation = "*WIN WITH 3-CARD 8/9 PAYS 200%| TIE LOSE"
+            explanation = "*WIN WITH 3-CARD 8/9 PAYS 200% | TIE LOSE"
         elif self.game_mode == "fabulous4":
-            explanation = "*WIN ON 1 PAYS 200% \nPLAYER(BANKER) WIN ON 4 PAYS 50%(PUSH)"
+            explanation = "*WIN ON 1 PAYS 200% | P(B) WIN ON 4 PAYS 50%(PUSH)"
             
+        explanation_frame = tk.Frame(parent, bg='#D0E7FF', height=40)  # 固定高度
+        explanation_frame.pack(fill=tk.BOTH, expand=True, pady=2)
+        explanation_frame.pack_propagate(False)
+        
         tk.Label(
-            self.betting_view,
+            explanation_frame,
             text=explanation,
-            font=('Arial', 10),
+            font=('Arial', 12),  # 减小字体
             bg='#D0E7FF'
-        ).pack(pady=2)
+        ).pack(expand=True)
 
+    def _populate_betting_center(self, parent):
+        """填充中部分：按钮和显示"""
         # DEAL/RESET 按钮行
-        btn_frame = tk.Frame(self.betting_view, bg='#D0E7FF')
-        btn_frame.pack(fill=tk.X, pady=15)
+        btn_frame = tk.Frame(parent, bg='#D0E7FF')
+        btn_frame.pack(fill=tk.X, pady=10)
         self.reset_button = tk.Button(
             btn_frame, text="RESET", command=self.reset_bets,
             bg='#ff4444', fg='white',
-            font=('Arial', 14, 'bold')
+            font=('Arial', 18, 'bold')
         )
-        self.reset_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=10)
+        self.reset_button.pack(side=tk.TOP, expand=True, fill=tk.X, padx=10, pady=5)
         self.deal_button = tk.Button(
             btn_frame, text="DEAL (Enter)", command=self.start_game,
             bg='gold', fg='black',
-            font=('Arial', 14, 'bold')
+            font=('Arial', 18, 'bold')
         )
-        self.deal_button.pack(side=tk.LEFT, expand=True, fill=tk.X)
+        self.deal_button.pack(side=tk.TOP, expand=True, fill=tk.X, padx=10, pady=5)
 
         # 分隔线 + 当前/上次下注显示
-        separator = ttk.Separator(self.betting_view, orient=tk.HORIZONTAL)
+        separator = ttk.Separator(parent, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, pady=(5, 0), padx=5)
 
-        current_bet_frame = tk.Frame(self.betting_view, bg='#D0E7FF')
+        current_bet_frame = tk.Frame(parent, bg='#D0E7FF')
         current_bet_frame.pack(pady=(0, 5))
         tk.Label(
             current_bet_frame, text="Current Bet:", width=12,
-            font=('Arial', 14), bg='#D0E7FF'
+            font=('Arial', 18), bg='#D0E7FF'
         ).pack(side=tk.LEFT)
         self.current_bet_label = tk.Label(
             current_bet_frame, text="$0", width=10,
-            font=('Arial', 14), bg='#D0E7FF'
+            font=('Arial', 18), bg='#D0E7FF'
         )
         self.current_bet_label.pack(side=tk.RIGHT)
 
-        last_win_frame = tk.Frame(self.betting_view, bg='#D0E7FF')
+        last_win_frame = tk.Frame(parent, bg='#D0E7FF')
         last_win_frame.pack(pady=5)
         tk.Label(
             last_win_frame, text="Last Win:", width=12,
-            font=('Arial', 14), bg='#D0E7FF'
+            font=('Arial', 18), bg='#D0E7FF'
         ).pack(side=tk.LEFT)
         self.last_win_label = tk.Label(
             last_win_frame, text="$0", width=10,
-            font=('Arial', 14), bg='#D0E7FF'
+            font=('Arial', 18), bg='#D0E7FF'
         )
         self.last_win_label.pack(side=tk.RIGHT)
-        self._set_default_chip()
 
-    def _set_default_chip(self):
-        """设置默认选中的筹码（1K）"""
-        # 清除之前选中的发光效果
-        if self.selected_chip:
-            self.selected_canvas.itemconfig(self.selected_id, outline='#D0E7FF')
-        
-        # 设置新选中的筹码（1K）
+    def _populate_betting_right(self, parent):
+        """填充右部分：筹码区域（取消任何 outline / 发光 设置）"""
+        # 筹码区
+        chips_frame = tk.Frame(parent, bg='#D0E7FF')
+        chips_frame.pack(pady=5)
+        row1 = tk.Frame(chips_frame, bg='#D0E7FF')
+        row1.pack()
+        for text, bg_color in [
+            ('100', '#000000'),
+            ('500', "#FF7DDA"),
+            ('1K', '#ffffff')
+        ]:
+            btn = self._create_chip_button(row1, text, bg_color)
+            btn.pack(side=tk.LEFT, padx=2)
+        row2 = tk.Frame(chips_frame, bg='#D0E7FF')
+        row2.pack(pady=3)
+        for text, bg_color in [
+            ('2K', '#0000ff'),
+            ('5K', '#ff0000'),
+            ('10K', '#800080')
+        ]:
+            btn = self._create_chip_button(row2, text, bg_color)
+            btn.pack(side=tk.LEFT, padx=2)
+        row3 = tk.Frame(chips_frame, bg='#D0E7FF')
+        row3.pack(pady=3)
+        for text, bg_color in [
+            ('20K', '#ffa500'),
+            ('50K', '#006400'),
+            ('100K', '#00ff00'),
+        ]:
+            btn = self._create_chip_button(row3, text, bg_color)
+            btn.pack(side=tk.LEFT, padx=2)
+
+        # pre-select default chip（不设置 outline，只设置选中状态变量）
         for chip in self.chip_buttons:
             if chip['text'] == '1K':
                 self.selected_canvas = chip['canvas']
                 self.selected_id = chip['chip_id']
-                chip['canvas'].itemconfig(chip['chip_id'], outline='gold')
+                self.selected_chip = chip
+                # 确保设置了金额
+                self.selected_bet_amount = 1000
+                break
+
+        # 当前选中筹码显示
+        self.current_chip_label = tk.Label(
+            parent,
+            text="Select: $1,000",
+            font=('Arial', 18),
+            fg='black',
+            bg='#D0E7FF'
+        )
+        self.current_chip_label.pack(side=tk.LEFT, padx=0)
+
+    def _set_default_chip(self):
+        """设置默认选中的筹码（1K），但不显示任何发光/外圈效果"""
+        # 不再清除/设置 canvas outline；仅设置选中引用
+        for chip in self.chip_buttons:
+            if chip['text'] == '1K':
+                self.selected_canvas = chip['canvas']
+                self.selected_id = chip['chip_id']
                 self.selected_chip = chip
                 self.selected_bet_amount = 1000
-                self.current_chip_label.config(text="Chips amount: $1,000")
+                if hasattr(self, 'current_chip_label'):
+                    self.current_chip_label.config(text="Select: $1,000")
                 break
 
     def _setup_bindings(self):
@@ -2291,9 +2411,6 @@ class BaccaratGUI(tk.Tk):
         if amount > self.balance:
             messagebox.showerror("Error", "Insufficient balance")
             return
-        
-        # 触发发光动画
-        self._animate_chip_glow()
         
         self.balance -= amount
         self.current_bet += amount  # 累加当前回合下注总额
@@ -2333,31 +2450,17 @@ class BaccaratGUI(tk.Tk):
         self._draw_table_labels()
 
         # ← NEW: create two "total" displays
-        # positions chosen below the “PLAYER” and “BANKER” areas:
+        # positions chosen below the "PLAYER" and "BANKER" areas:
         self.player_total_id = self.table_canvas.create_text(
-            250, 400, text="", font=('Arial', 50, 'bold'), fill='white')
+            120, 200, text="~", font=('Arial', 80, 'bold'), fill='white')
         self.banker_total_id = self.table_canvas.create_text(
-            750, 400, text="", font=('Arial', 50, 'bold'), fill='white')
+            880, 200, text="~", font=('Arial', 80, 'bold'), fill='white')
 
-        # track which cards we’ve flipped face‐up
+        # track which cards we've flipped face-up
         self.revealed_cards = {'player': [], 'banker': []}
 
         self._deal_initial_cards()
         self.after(1000, self._reveal_initial_phase1)
-
-        self.result_text_id = self.table_canvas.create_text(
-            500, 600, 
-            text="", 
-            font=('Arial', 34, 'bold'),
-            fill='white',
-            tags=('result_text')
-        )
-        self.result_bg_id = self.table_canvas.create_rectangle(
-            0,0,0,0,  # 初始不可见
-            fill='',
-            outline='',
-            tags=('result_bg')
-        )
 
     def _deal_initial_cards(self):
         self.initial_card_ids = []
@@ -2369,7 +2472,7 @@ class BaccaratGUI(tk.Tk):
             self._animate_card_entrance("banker", i, pos)
 
     def _animate_card_entrance(self, hand_type, index, target_pos):
-        start_x, start_y = (100, 50) if hand_type == "player" else (1100, 50)
+        start_x, start_y = 500, 0
         card_id = self.table_canvas.create_image(start_x, start_y, image=self.back_image)
         
         def move_step(step=0):
@@ -2392,7 +2495,7 @@ class BaccaratGUI(tk.Tk):
         card_info = self.initial_card_ids[1]
         real_card = self.game.player_hand[1]
         self._flip_card(card_info, real_card, 1)
-        self.after(1000, self._reveal_initial_phase4)
+        self.after(500, self._reveal_initial_phase4)
 
     def _reveal_initial_phase3(self):
         card_info = self.initial_card_ids[2]
@@ -2404,7 +2507,7 @@ class BaccaratGUI(tk.Tk):
         card_info = self.initial_card_ids[3]
         real_card = self.game.banker_hand[1]
         self._flip_card(card_info, real_card, 3)
-        self.after(1000, self._process_extra_cards)
+        self.after(500, self._process_extra_cards)
 
     def _process_extra_cards(self):
         if len(self.game.player_hand) > 2:
@@ -2420,26 +2523,121 @@ class BaccaratGUI(tk.Tk):
         else:
             self.resolve_bets()
 
-    def _flip_card(self, card_info, real_card, seq):
+    def _flip_card(self, card_info, real_card, seq, step=0):
+        """
+        用水平缩放模拟翻牌。
+        card_info: (hand_type, canvas_image_id)
+        real_card: ('Club','A') 形式或类似 tuple，用于打开正面图片
+        seq: 序号（原来代码传的）
+        step: 内部递归帧计数，外部调用不需要传
+        """
+        # 参数/帧设置（可以微调）
+        steps = 12               # 总帧数（偶数更好）
+        orig_w, orig_h = 120, 170  # 与 _load_assets 中使用的大小一致
+
         hand_type, card_id = card_info
-        steps = 10
-        for i in range(steps):
-            angle = 180 * (i/steps)
-            img = self._create_flip_image(real_card, angle)
-            self.table_canvas.itemconfig(card_id, image=img)
-            self.update()
-            self.after(30)
-        self.table_canvas.itemconfig(card_id, image=self.card_images[real_card])
-        self.revealed_cards[hand_type].append(real_card)
 
-        # compute the mod-10 total of all face-up cards
-        total = sum(self.game.card_value(c) for c in self.revealed_cards[hand_type]) % 10
+        # 结束条件：最后一帧将真实牌面放回缓存的 full-size 图
+        if step > steps:
+            try:
+                # 用缓存的完整图片作为最终帧（避免再次读取）
+                self.table_canvas.itemconfig(card_id, image=self.card_images[real_card])
+            except Exception:
+                # 容错：如果出错，忽略
+                pass
 
-        # update the appropriate “total” text item
-        if hand_type == 'player':
-            self.table_canvas.itemconfig(self.player_total_id, text=str(total))
+            # 记录已翻开的牌并更新总点数显示（与原逻辑一致）
+            try:
+                self.revealed_cards[hand_type].append(real_card)
+            except Exception:
+                # 初始化保护
+                if not hasattr(self, 'revealed_cards'):
+                    self.revealed_cards = {'player': [], 'banker': []}
+                self.revealed_cards[hand_type].append(real_card)
+
+            # 更新已翻开的点数显示（复用你原来计算/显示逻辑）
+            try:
+                total = sum(self.game.card_value(c) for c in self.revealed_cards[hand_type]) % 10
+                display_text = "~" if total is None or str(total) == "~" else str(total)
+                if hand_type == 'player':
+                    self.table_canvas.itemconfig(self.player_total_id, text=display_text)
+                else:
+                    self.table_canvas.itemconfig(self.banker_total_id, text=display_text)
+            except Exception:
+                pass
+
+            # 清理临时图像引用（可选）
+            if card_id in getattr(self, '_temp_flip_images', {}):
+                try:
+                    del self._temp_flip_images[card_id]
+                except Exception:
+                    pass
+
+            return
+
+        # 计算当前帧显示哪一侧（前/背）和当前宽度
+        half = steps // 2
+        if step <= half:
+            # 缩窄阶段：显示背面（从 full -> 1px）
+            ratio = 1 - (step / float(half))
+            use_back = True
         else:
-            self.table_canvas.itemconfig(self.banker_total_id, text=str(total))
+            # 展开阶段：显示正面（从 1px -> full）
+            ratio = (step - half) / float(half)
+            use_back = False
+
+        w = max(1, int(orig_w * ratio))
+
+        # 生成缩放后的 PhotoImage（会缓存到 self._temp_flip_images 防止 GC）
+        img = self._create_scaled_image(real_card, w, orig_h, use_back=use_back)
+        # 保存引用避免被回收（key 用 canvas id）
+        if not hasattr(self, '_temp_flip_images'):
+            self._temp_flip_images = {}
+        self._temp_flip_images[card_id] = img
+
+        # 更新 canvas 上的图像
+        try:
+            self.table_canvas.itemconfig(card_id, image=img)
+        except Exception:
+            pass
+
+        # 下一帧（延迟值可调，值越小越流畅但消耗更多）
+        self.after(20, lambda: self._flip_card(card_info, real_card, seq, step+1))
+
+    def _create_scaled_image(self, card, w, h, use_back=False):
+        """
+        按宽度 w、高度 h 生成 ImageTk.PhotoImage。
+        如果 use_back=True 则读取背面 Background.png，否则读取正面 card 的图片文件。
+        card: ('Club','A') 形式（当 use_back 为 True 时可以传 None）
+        返回：ImageTk.PhotoImage
+        注意：此函数每帧会打开并缩放图片，代价在可接受范围内；若担心性能可改为在 _load_assets 时缓存 PIL 原图。
+        """
+        from PIL import Image, ImageTk
+        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
+
+        try:
+            if use_back:
+                path = os.path.join(card_dir, 'Background.png')
+            else:
+                # card 预期为 ('Club','A') 或类似
+                path = os.path.join(card_dir, f"{card[0]}{card[1]}.png")
+
+            img = Image.open(path).convert('RGBA')
+            # 防止 w == 0
+            w = max(1, int(w))
+            img = img.resize((w, int(h)), Image.LANCZOS)
+
+            return ImageTk.PhotoImage(img)
+        except Exception as e:
+            # 出问题时返回一个占位图（1px x h）以避免崩溃
+            try:
+                from PIL import Image
+                placeholder = Image.new('RGBA', (max(1, int(w)), int(h)), (0,0,0,0))
+                return ImageTk.PhotoImage(placeholder)
+            except Exception:
+                # 最后兜底：返回已有的 back_image 或任一缓存图片
+                return getattr(self, 'back_image', None)
 
     def _create_flip_image(self, card, angle):
         # 获取当前脚本所在目录的绝对路径
@@ -2447,25 +2645,25 @@ class BaccaratGUI(tk.Tk):
         
         if angle < 90:
             # 修改为使用绝对路径
-            bg_path = os.path.join(parent_dir, 'A_Tools', 'Card', 'Background.png')
+            bg_path = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1', 'Background.png')
             img = Image.open(bg_path)
         else:
             # 修改为使用绝对路径
-            card_path = os.path.join(parent_dir, 'A_Tools', 'Card', f"{card[0]}{card[1]}.png")
+            card_path = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1', f"{card[0]}{card[1]}.png")
             img = Image.open(card_path)
         
-        img = img.resize((100, 140))
+        img = img.resize((120, 170))
         return ImageTk.PhotoImage(img.rotate(angle if angle < 90 else 180-angle))
 
     def _deal_extra_card(self, hand_type, index):
         hand = self.game.player_hand if hand_type == "player" else self.game.banker_hand
         card = hand[index]
         target_pos = self._get_card_positions(hand_type)[index]
-        card_id = self.table_canvas.create_image(100, 300, image=self.back_image)
+        card_id = self.table_canvas.create_image(500, 0, image=self.back_image)  # 从中心位置开始
         self.initial_card_ids.append((hand_type, card_id))
         for step in range(30):
-            x = 100 + (target_pos[0]-100)*(step/30)
-            y = 300 + (target_pos[1]-300)*(step/30)
+            x = 500 + (target_pos[0]-500)*(step/30)  # 从500开始移动到目标x坐标
+            y = 0 + (target_pos[1]-0)*(step/30)      # 从0开始移动到目标y坐标
             self.table_canvas.coords(card_id, x, y)
             self.update()
             self.after(10)
@@ -2532,7 +2730,7 @@ class BaccaratGUI(tk.Tk):
             tiger_bet = self.current_bets.get('Tiger Pair', 0)
             if tiger_bet and 'Tiger Pair' in side_results:
                 odds = side_results['Tiger Pair']
-                # “Win X:1” means profit = bet * X, total returned = (X + 1) * bet
+                # "Win X:1" means profit = bet * X, total returned = (X + 1) * bet
                 payouts += tiger_bet * (odds + 1)
 
             # Small Tiger
@@ -2663,7 +2861,7 @@ class BaccaratGUI(tk.Tk):
         self.current_bet_label.config(text="$0")
 
         # 修复2：正确更新last_win
-        self.last_win = payouts  # 计算净盈利
+        self.last_win = int(payouts)  # 计算净盈利
         self.last_win_label.config(text=f"${max(self.last_win, 0):,}")  # 新增这行
 
         if self.game.winner == 'Tie':
@@ -2680,10 +2878,10 @@ class BaccaratGUI(tk.Tk):
         def enable_buttons():
             for btn in self.bet_buttons:
                 btn.config(state=tk.NORMAL)
-            self.deal_button.config(state=tk.NORMAL)
             self.reset_button.config(state=tk.NORMAL)
-            self.bind('<Return>', lambda e: self.start_game())
             self.mode_combo.config(state='readonly')
+            self.after(3000, lambda: self.deal_button.config(state=tk.NORMAL))
+            self.after(3000, lambda: self.bind('<Return>', lambda e: self.start_game()))
                 
         self.after(1000, enable_buttons)
         time.sleep(1)
@@ -2738,6 +2936,30 @@ class BaccaratGUI(tk.Tk):
         
         # 强制Canvas更新布局
         self.table_canvas.update_idletasks()
+
+        # 获取文字边界并更新背景框
+        text_bbox = self.table_canvas.bbox(self.result_text_id)
+        if text_bbox:
+            # 扩展边界增加内边距
+            padding = 15
+            expanded_bbox = (
+                text_bbox[0]-padding, 
+                text_bbox[1]-padding,
+                text_bbox[2]+padding, 
+                text_bbox[3]+padding
+            )
+            
+            # 更新背景框
+            self.table_canvas.coords(self.result_bg_id, expanded_bbox)
+            self.table_canvas.itemconfig(
+                self.result_bg_id,
+                fill=bg_color,
+                outline=bg_color
+            )
+            
+            # 确保层级顺序
+            self.table_canvas.tag_raise(self.result_text_id)  # 文字置顶
+            self.table_canvas.tag_lower(self.result_bg_id)   # 背景置底
 
         is_natural = False
         if self.game.winner != 'Tie':
@@ -2824,11 +3046,11 @@ class BaccaratGUI(tk.Tk):
 
     def _update_bigroad(self):
         """
-        更新“大路” (3 行测试版)：
+        更新"大路" (3 行测试版)：
         • 先向下；如果向下越界或目标被占，则保持行不变、向右一格。
         • 新跑道 (胜方切换时)：起始列 = last_run_start_col + 1，在 row=0 放；若(0,col)被占则向右依次找。
         • 连胜时：只有当当前 winner == last_winner（都为非 Tie）才绘制连线。
-        • Tie(和局)不占新格，在“最后一次非 Tie”所在格子累加：若整个开局都 Tie，则把(0,0)当隐形锚点，先画斜线再累加数字。
+        • Tie(和局)不占新格，在"最后一次非 Tie"所在格子累加：若整个开局都 Tie，则把(0,0)当隐形锚点，先画斜线再累加数字。
         """
         # 如果画布不存在，直接 return
         if not hasattr(self, 'bigroad_canvas'):
@@ -2840,7 +3062,7 @@ class BaccaratGUI(tk.Tk):
         label_w = 30      # 左侧留给行号的宽度
         label_h = 20      # 顶部留给列号的高度
 
-        # 1. 清空上一轮绘制的“data”层：删除 tags=('data',) 的所有元素
+        # 1. 清空上一轮绘制的"data"层：删除 tags=('data',) 的所有元素
         self.bigroad_canvas.delete('data')
 
         # 2. 重置占用矩阵 (重新标记哪些格子已被占)
@@ -2848,7 +3070,7 @@ class BaccaratGUI(tk.Tk):
             [False] * self._max_cols for _ in range(self._max_rows)
         ]
 
-        # 3. 用于追踪“最后一次非 Tie” 的信息
+        # 3. 用于追踪"最后一次非 Tie" 的信息
         last_winner = None         # 上一次胜方 ('Player' / 'Banker')
         last_run_start_col = -1    # 上一次跑道的起始列 (初值 -1)
         prev_row, prev_col = None, None   # 上一次非 Tie 所占用的 (row, col)
@@ -2863,8 +3085,8 @@ class BaccaratGUI(tk.Tk):
 
             # —— A. 处理 Tie (和局) —— 
             if winner == 'Tie':
-                # A.1 如果此前“从没出现过非 Tie” (prev_row / prev_col 皆为 None)，
-                #     就把 (0,0) 当作“隐形锚点”并绘制第一条斜线
+                # A.1 如果此前"从没出现过非 Tie" (prev_row / prev_col 皆为 None)，
+                #     就把 (0,0) 当作"隐形锚点"并绘制第一条斜线
                 if prev_row is None and prev_col is None:
                     r0, c0 = 0, 0
                     # 标记(0,0)被占
@@ -2876,7 +3098,7 @@ class BaccaratGUI(tk.Tk):
                     cx0 = x0 + cell / 2
                     cy0 = y0 + cell / 2
 
-                    # 更新“最后一次非 Tie” 指向 (0,0)，用于后续连线与 Tie 累加
+                    # 更新"最后一次非 Tie" 指向 (0,0)，用于后续连线与 Tie 累加
                     prev_row, prev_col = r0, c0
                     prev_cx, prev_cy = cx0, cy0
 
@@ -2918,7 +3140,7 @@ class BaccaratGUI(tk.Tk):
 
         # —— B. 处理非 Tie (庄家 or 闲家) —— 
 
-            # B.1 判断是否“新的跑道”（胜方切换，或之前尚未出现任何非 Tie）
+            # B.1 判断是否"新的跑道"（胜方切换，或之前尚未出现任何非 Tie）
             if last_winner is None or winner != last_winner:
                 # 新跑道：跑道起始列 = 上一次跑道起始列 + 1
                 run_start_col = last_run_start_col + 1
@@ -2936,8 +3158,8 @@ class BaccaratGUI(tk.Tk):
                 row, col = row0, col0
 
             else:
-                # 同一跑道内连胜：优先“向下” -> (row = prev_row + 1, col = prev_col)
-                # 如果“向下”越界或被占，就改为“行不变，列 + 1”
+                # 同一跑道内连胜：优先"向下" -> (row = prev_row + 1, col = prev_col)
+                # 如果"向下"越界或被占，就改为"行不变，列 + 1"
                 nr = prev_row + 1
                 nc = prev_col
                 if nr < self._max_rows and not self._bigroad_occupancy[nr][nc]:
@@ -2992,7 +3214,7 @@ class BaccaratGUI(tk.Tk):
                         tags=('data',)
                     )
 
-            # B.6 更新“最后一次非 Tie”的各项信息，以便下一局画连线或累计 Tie
+            # B.6 更新"最后一次非 Tie"的各项信息，以便下一局画连线或累计 Tie
             prev_row, prev_col = row, col
             prev_cx, prev_cy = cx, cy
             last_winner = winner
@@ -3078,175 +3300,116 @@ class BaccaratGUI(tk.Tk):
                     results['Tiger'] = 20  # 20:1
 
             # now Small/Big Tiger
-            # “Banker wins on a 6”:
+            # "Banker wins on a 6":
             if self.game.winner == 'Banker' and self.game.banker_score == 6:
                 # length 2 ⇒ no third card dealt ⇒ Small Tiger
                 if len(b) == 2:
                     results['Small Tiger'] = 22   # pays 22:1
-                # length 3 ⇒ Banker drew third card ⇒ Big Tiger
-                elif len(b) == 3:
-                    results['Big Tiger'] = 50    # pays 50:1
+                else:  # length 3 ⇒ Big Tiger
+                    results['Big Tiger'] = 50     # pays 50:1
 
-            # “Player and Banker tie on a 6”:
-            if self.game.winner == 'Tie' and self.game.player_score == 6 and self.game.banker_score == 6:
-                results['Tiger Tie'] = 35
+            # "Tie with 6" ⇒ Tiger Tie
+            if self.game.winner == 'Tie' and self.game.banker_score == 6:
+                results['Tiger Tie'] = 35   # pays 35:1
 
         elif self.game_mode == "ez":
             # EZ百家乐边注检查
-            # 1. Monkey 6: 需要6张牌，第5张不是J/Q/K，第6张是J/Q/K
-            if len(p) == 3 and len(b) == 3:
-                # 检查第5张牌（玩家第三张）
-                fifth_card = p[2] if len(p) > 2 else None
-                # 检查第6张牌（庄家第三张）
-                sixth_card = b[2] if len(b) > 2 else None
-                
-                # Monkey代表J、Q、K（点数为0）
-                is_monkey = lambda card: card[1] in ['J', 'Q', 'K']
-                
-                if fifth_card and sixth_card:
-                    if not is_monkey(fifth_card) and is_monkey(sixth_card):
-                        results['Monkey 6'] = 12
-                        
-                        # 如果同时是和局
-                        if self.game.winner == 'Tie':
-                            results['Monkey Tie'] = 150
-                    
-                    # 检查是否所有牌都是Monkey
-                    all_monkey = all(is_monkey(card) for card in p + b)
-                    if all_monkey:
-                        results['Big Monkey'] = 5000
-            
-            # 2. Panda 8: 玩家三张牌刚好8点并获胜
-            if len(p) == 3 and self.game.player_score == 8 and self.game.winner == 'Player':
-                results['Panda 8'] = 25
-            
-            # 3. Divine 9: 任意一方以三张牌9点获胜
-            player_divine = len(p) == 3 and self.game.player_score == 9
-            banker_divine = len(b) == 3 and self.game.banker_score == 9
-            
-            if player_divine and banker_divine:
-                results['Divine 9'] = 75
-            elif player_divine and self.game.winner == 'Player':
-                results['Divine 9'] = 10
-            elif banker_divine and self.game.winner == 'Banker':
-                results['Divine 9'] = 10
-            
-            # 4. Dragon 7: 庄家以三张牌7点获胜
-            if len(b) == 3 and self.game.banker_score == 7 and self.game.winner == 'Banker':
-                results['Dragon 7'] = 40
+            # Dragon 7
+            if self.game.winner == 'Banker' and len(b) == 3 and self.game.banker_score == 7:
+                results['Dragon 7'] = 40  # 40:1
+
+            # Divine 9
+            if self.game.winner == 'Player' and len(p) == 3 and self.game.player_score == 9:
+                results['Divine 9'] = 10  # 10:1
+            elif self.game.winner == 'Banker' and len(b) == 3 and self.game.banker_score == 9:
+                results['Divine 9'] = 10  # 10:1
+            elif self.game.winner == 'Tie' and len(p) == 3 and len(b) == 3 and self.game.player_score == 9 and self.game.banker_score == 9:
+                results['Divine 9'] = 75  # 75:1
+
+            # Panda 8
+            if self.game.winner == 'Player' and len(p) == 3 and self.game.player_score == 8:
+                results['Panda 8'] = 25  # 25:1
+
+            # Monkey 6
+            # 检查第一张牌是否不是J/Q/K，第二张牌是J/Q/K
+            if self.game.winner != 'Tie':
+                # 定义Monkey卡牌
+                monkey_cards = ['J', 'Q', 'K']
+                # 检查Player的第一张牌不是Monkey，Banker的第一张牌是Monkey
+                if p[0][1] not in monkey_cards and b[0][1] in monkey_cards:
+                    results['Monkey 6'] = 12  # 12:1
+
+            # Monkey Tie
+            if self.game.winner == 'Tie':
+                # 检查Player的第一张牌不是Monkey，Banker的第一张牌是Monkey
+                if p[0][1] not in monkey_cards and b[0][1] in monkey_cards:
+                    results['Monkey Tie'] = 150  # 150:1
+
+            # Big Monkey
+            # 检查所有6张牌都是J/Q/K
+            all_cards = p + b
+            if len(all_cards) == 6 and all(card[1] in monkey_cards for card in all_cards):
+                results['Big Monkey'] = 5000  # 5000:1
 
         elif self.game_mode == "classic" or self.game_mode == "2to1":
-            p_score = self.game.player_score
-            b_score = self.game.banker_score
-            # 1. 龙奖金 - Player
-            if 'Dragon P' in self.current_bets:
-                # 例牌赢（两张牌8或9点）
-                if len(p) == 2 and p_score >= 8 and self.game.winner == 'Player':
-                    results['Dragon P'] = 2  
-                if len(p) == 2 and p_score >= 8 and self.game.winner == 'Tie':
-                    results['Dragon P'] = 1
-                
-                # 非例牌赢（三张牌以上）
-                elif self.game.winner == 'Player':
-                    point_diff = abs(p_score - b_score)
-                    if point_diff >= 9:
-                        results['Dragon P'] = 31
-                    elif point_diff == 8:
-                        results['Dragon P'] = 11
-                    elif point_diff == 7:
-                        results['Dragon P'] = 7
-                    elif point_diff == 6:
-                        results['Dragon P'] = 5
-                    elif point_diff == 5:
-                        results['Dragon P'] = 3
-                    elif point_diff == 4:
-                        results['Dragon P'] = 2
-            
-            # 2. Quik
-            if 'Quik' in self.current_bets:
-                t_score = p_score + b_score
-                if t_score == 0:
-                    results['Quik'] = 51
-                elif t_score == 18:
-                    results['Quik'] = 26
-                elif t_score in [1, 2, 3, 15, 16, 17]:
-                    results['Quik'] = 2
-            
-            # 3. 龙奖金 - Banker
-            if 'Dragon B' in self.current_bets:
-                # 例牌赢（两张牌8或9点）
-                if len(b) == 2 and b_score >= 8 and self.game.winner == 'Banker':
-                    results['Dragon B'] = 2
-                elif len(b) == 2 and b_score >= 8 and self.game.winner == 'Tie':
-                    results['Dragon B'] = 1
-                
-                # 非例牌赢（三张牌以上）
-                elif self.game.winner == 'Banker':
-                    point_diff = abs(b_score - p_score)
-                    if point_diff >= 9:
-                        results['Dragon B'] = 31
-                    elif point_diff == 8:
-                        results['Dragon B'] = 11
-                    elif point_diff == 7:
-                        results['Dragon B'] = 7
-                    elif point_diff == 6:
-                        results['Dragon B'] = 5
-                    elif point_diff == 5:
-                        results['Dragon B'] = 3
-                    elif point_diff == 4:
-                        results['Dragon B'] = 2
-        
-            # 4. 对子 - Player
-            if 'Pair Player' in self.current_bets:
-                # 检查前两张牌是否同点数
-                if player_pair:
-                    results['Pair Player'] = 11  # 11:1
-            
-            # 5. 对子 - Banker
-            if 'Pair Banker' in self.current_bets:
-                # 检查前两张牌是否同点数
-                if banker_pair:
-                    results['Pair Banker'] = 11  # 11:1
-            
-            # 6. 对子 - Both
-            if 'Any Pair' in self.current_bets:
-                if player_pair or banker_pair:
-                    results['Any Pair'] = 5
-                if banker_pair:
-                    results['Any Pair'] = 5
-                if player_pair:
-                    results['Any Pair'] = 5
+            # 经典百家乐边注检查
+            # Player Pair
+            if player_pair:
+                results['Pair Player'] = 11  # 11:1
+
+            # Banker Pair
+            if banker_pair:
+                results['Pair Banker'] = 11  # 11:1
+
+            # Any Pair
+            if player_pair or banker_pair:
+                results['Any Pair'] = 5  # 5:1
+
+            # Dragon Player
+            diff = self.game.player_score - self.game.banker_score
+            if self.game.winner == 'Player' and diff >= 4:
+                odds_map = {4:1, 5:2, 6:4, 7:6, 8:10, 9:30}
+                results['Dragon P'] = odds_map.get(diff, 1)
+
+            # Dragon Banker
+            diff = self.game.banker_score - self.game.player_score
+            if self.game.winner == 'Banker' and diff >= 4:
+                odds_map = {4:1, 5:2, 6:4, 7:6, 8:10, 9:30}
+                results['Dragon B'] = odds_map.get(diff, 1)
+
+            # Quik
+            combined = self.game.player_score + self.game.banker_score
+            if combined == 0:
+                results['Quik'] = 50  # 50:1
+            elif combined == 18:
+                results['Quik'] = 25  # 25:1
+            elif combined in [1,2,3,15,16,17]:
+                results['Quik'] = 1   # 1:1
 
         elif self.game_mode == "fabulous4":
-            # 1. 閒家神奇對子
-            if p0 and p1:
-                same_rank = p0[1] == p1[1]
-                same_suit = p0[0] == p1[0]
-                
-                if same_rank and same_suit:
-                    results['P Fab Pair'] = 7  # 同花對子 7:1
-                elif same_rank:
-                    results['P Fab Pair'] = 4  # 非同花對子 4:1
-                elif same_suit:
-                    results['P Fab Pair'] = 1  # 同花非對子 1:1
-            
-            # 2. 莊家神奇對子
-            if b0 and b1:
-                same_rank = b0[1] == b1[1]
-                same_suit = b0[0] == b1[0]
-                
-                if same_rank and same_suit:
-                    results['B Fab Pair'] = 7  # 同花對子 7:1
-                elif same_rank:
-                    results['B Fab Pair'] = 4  # 非同花對子 4:1
-                elif same_suit:
-                    results['B Fab Pair'] = 1  # 同花非對子 1:1
-            
-            # 3. 閒家神奇4點
+            # Player Fab Pair
+            if player_pair:
+                if p0[0] == p1[0]:  # 同花对子
+                    results['P Fab Pair'] = 7  # 7:1
+                else:  # 非同花对子
+                    results['P Fab Pair'] = 4  # 4:1
+            elif p0[0] == p1[0]:  # 同花非对子
+                results['P Fab Pair'] = 1  # 1:1
+
+            # Banker Fab Pair
+            if banker_pair:
+                if b0[0] == b1[0]:  # 同花对子
+                    results['B Fab Pair'] = 7  # 7:1
+                else:  # 非同花对子
+                    results['B Fab Pair'] = 4  # 4:1
+            elif b0[0] == b1[0]:  # 同花非对子
+                results['B Fab Pair'] = 1  # 1:1
+
+            # P Fabulous 4
             if self.game.winner == 'Player' and self.game.player_score == 4:
                 results['P Fabulous 4'] = 50  # 50:1
-            
-            # 4. 莊家神奇4點
+
+            # B Fabulous 4
             if self.game.winner == 'Banker' and self.game.banker_score == 4:
                 results['B Fabulous 4'] = 25  # 25:1
 
@@ -3259,7 +3422,7 @@ class BaccaratGUI(tk.Tk):
         return self.balance
 
 # 在Baccarat.py中的main函数
-def main(initial_balance=10000, username="Guest"):
+def main(initial_balance=1000000, username="Guest"):
     app = BaccaratGUI(initial_balance, username)
     app.mainloop()
     return app.balance  # 正确返回数值

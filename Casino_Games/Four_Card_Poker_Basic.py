@@ -234,10 +234,10 @@ def sort_hand_by_rank(hand):
         sorted_by_value = sorted(hand, key=lambda c: c.value)
         # 检查是否是A-2-3-4（即最小的顺子，其中A是1）
         if sorted_by_value[0].value == 2 and sorted_by_value[-1].value == 14:
-            # 将A移到最前面
+            # 将A移到最前面（A作为1是最小的）
             aces = [card for card in sorted_by_value if card.value == 14]
             non_aces = [card for card in sorted_by_value if card.value != 14]
-            sorted_hand = non_aces + aces  # 2-3-4-A
+            sorted_hand = aces + non_aces  # A-2-3-4
             return sorted_hand
         else:
             # 普通顺子，按升序排列（最小在左，最大在右）
@@ -487,78 +487,104 @@ class CrazyFourGUI(tk.Tk):
         self.quit()
         
     def _load_assets(self):
-        card_size = (100, 150)  # 修改卡片尺寸为120x180
+        card_size = (100, 150)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
+        
+        # 使用实例变量来跟踪当前使用的扑克牌文件夹
+        if not hasattr(self, 'current_poker_folder'):
+            # 第一次加载时随机选择
+            self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
+        else:
+            # 交替使用 Poker1 和 Poker2
+            self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
+        
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
         
         # 花色映射：将符号映射为英文名称
         suit_mapping = {
             '♠': 'Spade',
             '♥': 'Heart',
             '♦': 'Diamond',
-            '♣': 'Club'
+            '♣': 'Club',
+            'JOKER': 'JOKER'
         }
-        
-        # 存储原始图像对象
+
         self.original_images = {}
         
         # 加载背面图片
         back_path = os.path.join(card_dir, 'Background.png')
         try:
-            back_img = Image.open(back_path)
-            # 使用新的图像缩放方法
-            self.back_image = ImageTk.PhotoImage(back_img.resize(card_size, Image.LANCZOS))
-            self.original_images["back"] = back_img  # 保存原始背面图像
+            back_img_orig = Image.open(back_path)  # 原始尺寸
+            self.original_images["back"] = back_img_orig  # 保存原始图像
+            back_img = back_img_orig.resize(card_size)  # 缩放
+            self.back_image = ImageTk.PhotoImage(back_img)
         except Exception as e:
             print(f"Error loading back image: {e}")
-            # 如果没有背景图，创建一个黑色背景
-            img = Image.new('RGB', card_size, 'black')
-            self.back_image = ImageTk.PhotoImage(img)
-            self.original_images["back"] = img
+            # 创建黑色背景
+            img_orig = Image.new('RGB', card_size, 'black')
+            self.original_images["back"] = img_orig
+            self.back_image = ImageTk.PhotoImage(img_orig)
         
         # 加载扑克牌图片
         for suit in SUITS:
             for rank in RANKS:
                 # 获取映射后的文件名
                 suit_name = suit_mapping.get(suit, suit)
+                if suit == 'JOKER':
+                    filename = f"JOKER-A.png"  # 鬼牌文件名
+                else:
+                    filename = f"{suit_name}{rank}.png"
+                path = os.path.join(card_dir, filename)
                 
-                # 尝试可能的文件名组合
-                possible_filenames = [
-                    f"{suit_name}{rank}.png",       # 如 "SpadeA.png"
-                ]
-                
-                img_found = False
-                for filename in possible_filenames:
-                    path = os.path.join(card_dir, filename)
+                try:
                     if os.path.exists(path):
+                        img = Image.open(path)
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img
+                        # 创建缩放后的图像用于显示
+                        img_resized = img.resize(card_size)
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_resized)
+                    else:
+                        # 创建占位图片
+                        img_orig = Image.new('RGB', card_size, 'blue')
+                        draw = ImageDraw.Draw(img_orig)
+                        # 绘制卡片文本
+                        if suit == 'JOKER':
+                            text = "JOKER"
+                        else:
+                            text = f"{rank}{suit}"
                         try:
-                            img = Image.open(path)
-                            # 保存原始图像
-                            self.original_images[(suit, rank)] = img
-                            # 使用新的图像缩放方法
-                            resized_img = img.resize(card_size, Image.LANCZOS)
-                            self.card_images[(suit, rank)] = ImageTk.PhotoImage(resized_img)
-                            img_found = True
-                            break
-                        except Exception as e:
-                            print(f"Error loading {path}: {e}")
-                
-                # 如果没有找到图片，创建一个占位图
-                if not img_found:
-                    print(f"Card image not found for {suit}{rank}")
-                    img = Image.new('RGB', card_size, 'blue')
-                    draw = ImageDraw.Draw(img)
-                    # 在图片上绘制花色和点数
+                            font = ImageFont.truetype("arial.ttf", 20)
+                        except:
+                            font = ImageFont.load_default()
+                        text_width, text_height = draw.textsize(text, font=font)
+                        x = (card_size[0] - text_width) / 2
+                        y = (card_size[1] - text_height) / 2
+                        draw.text((x, y), text, fill="white", font=font)
+                        
+                        # 保存原始图像
+                        self.original_images[(suit, rank)] = img_orig
+                        # 创建缩放后的图像用于显示
+                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                except Exception as e:
+                    print(f"Error loading card image {path}: {e}")
+                    # 创建占位图片
+                    img_orig = Image.new('RGB', card_size, 'red')
+                    draw = ImageDraw.Draw(img_orig)
+                    text = "Error"
                     try:
-                        font = ImageFont.truetype("arial.ttf", 18)
-                        text = f"{suit}{rank}"
-                        draw.text((10, 10), text, font=font, fill="white")
+                        font = ImageFont.truetype("arial.ttf", 20)
                     except:
-                        # 如果字体加载失败，使用简单文本
-                        draw.text((10, 10), f"{suit}{rank}", fill="white")
+                        font = ImageFont.load_default()
+                    text_width, text_height = draw.textsize(text, font=font)
+                    x = (card_size[0] - text_width) / 2
+                    y = (card_size[1] - text_height) / 2
+                    draw.text((x, y), text, fill="white", font=font)
                     
-                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                    self.original_images[(suit, rank)] = img.copy()
+                    # 保存原始图像
+                    self.original_images[(suit, rank)] = img_orig
+                    # 创建缩放后的图像用于显示
+                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
 
     def add_chip_to_bet(self, bet_type):
         """添加筹码到下注区域"""
@@ -2162,7 +2188,15 @@ class CrazyFourGUI(tk.Tk):
     
     def _do_reset(self, auto_reset=False):
         """真正的重置游戏界面"""
-        self.cancel_auto_reset_timer()
+        self._load_assets()
+        
+        # 取消自动重置计时器（保险）
+        if self.auto_reset_timer:
+            try:
+                self.after_cancel(self.auto_reset_timer)
+            except:
+                pass
+            self.auto_reset_timer = None
         
         # 清除所有挂起的after事件
         for after_id in self.tk.eval('after info').split():
