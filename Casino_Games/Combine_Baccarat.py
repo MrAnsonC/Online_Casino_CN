@@ -141,7 +141,7 @@ class BaccaratGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
         self.title("Baccarat")
-        self.geometry("1350x690+50+10")
+        self.geometry("1350x700+50+10")
         self.resizable(0,0)
         self.configure(bg='#35654d')
 
@@ -168,6 +168,14 @@ class BaccaratGUI(tk.Tk):
             'Player': 0,
             'Tie': 0,
             'Banker': 0
+        }
+
+        # 新增对子统计属性
+        self.pair_stats = {
+            'player_only': 0,   # 只有玩家对子
+            'banker_only': 0,   # 只有庄家对子  
+            'both_diff': 0,     # 双方对子但点数不同
+            'both_same': 0      # 双方对子且点数相同
         }
         
         # 加載最長連勝記錄
@@ -571,7 +579,7 @@ class BaccaratGUI(tk.Tk):
         ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker0')
         
         for suit in suits:
             for rank in ranks:
@@ -591,6 +599,7 @@ class BaccaratGUI(tk.Tk):
             print(f"Error loading back image: {e}")
 
     def _initialize_game(self, second):
+        self.unbind('<Return>')
         # dialog size
         dialog_w, dialog_h = 360, 190
 
@@ -703,7 +712,7 @@ class BaccaratGUI(tk.Tk):
                     result[0] = None
                     dialog.destroy()
                     return
-                # 按用户要求：按下“确定”后 clamp 到合法范围
+                # 按用户要求：按下"确定"后 clamp 到合法范围
                 if v < 103:
                     v = 103
                 elif v > 299:
@@ -802,6 +811,164 @@ class BaccaratGUI(tk.Tk):
         }
         self.reset_marker_road()
         self.reset_bigroad()
+        
+        # 开局抽牌和弃牌流程
+        self._initial_draw_and_discard()
+
+    def _initial_draw_and_discard(self):
+        """开局抽牌和弃牌流程"""
+        # 禁用按钮
+        for btn in self.bet_buttons:
+            btn.config(state=tk.DISABLED)
+        self.deal_button.config(state=tk.DISABLED)
+        self.reset_button.config(state=tk.DISABLED)
+        self.mode_combo.config(state='disabled')
+        
+        # 清除牌桌
+        self.table_canvas.delete('all')
+        self._draw_table_labels()
+        
+        # 抽第一张牌
+        first_card = self.game.deck[0]
+        self.game.deck = self.game.deck[1:]  # 从牌堆中移除
+        
+        # 创建第一张牌的动画
+        first_card_id = self.table_canvas.create_image(500, 0, image=self.back_image)
+        
+        # 移动第一张牌到(120, 225)位置
+        def move_first_card(step=0):
+            if step <= 30:
+                x = 500 + (120 - 500) * (step / 30)
+                y = 0 + (225 - 0) * (step / 30)
+                self.table_canvas.coords(first_card_id, x, y)
+                self.after(10, move_first_card, step+1)
+            else:
+                # 移动完成后翻开牌
+                self._flip_first_card(first_card_id, first_card)
+        
+        move_first_card()
+
+    def _flip_first_card(self, card_id, card):
+        """翻开第一张牌并计算弃牌数"""
+        # 翻牌动画
+        def flip_step(step=0):
+            steps = 12
+            if step > steps:
+                # 翻牌完成，显示牌面
+                self.table_canvas.itemconfig(card_id, image=self.card_images[card])
+                
+                # 计算弃牌数
+                deduct_map = {
+                    'A': 1, 'J': 10, 'Q': 10, 'K': 10, 
+                    '10': 10, '2':2, '3':3, '4':4, '5':5,
+                    '6':6, '7':7, '8':8, '9':9
+                }
+                discard_count = deduct_map.get(card[1], 0)
+                
+                # 开始弃牌动画
+                self.after(500, lambda: self._discard_cards_animation(discard_count))
+                return
+                
+            # 翻牌动画逻辑
+            half = steps // 2
+            if step <= half:
+                ratio = 1 - (step / float(half))
+                use_back = True
+            else:
+                ratio = (step - half) / float(half)
+                use_back = False
+
+            w = max(1, int(150 * ratio))
+            
+            # 生成缩放后的图像
+            img = self._create_scaled_image(card, w, 170, use_back=use_back)
+            if not hasattr(self, '_temp_flip_images'):
+                self._temp_flip_images = {}
+            self._temp_flip_images[card_id] = img
+            
+            self.table_canvas.itemconfig(card_id, image=img)
+            self.after(20, lambda: flip_step(step+1))
+        
+        flip_step()
+
+    def _discard_cards_animation(self, discard_count):
+        """弃牌动画 - 一张一张地从500,0位置抽出来"""
+        if discard_count == 0:
+            # 没有弃牌，直接完成
+            self._finish_initial_discard()
+            return
+            
+        self.discard_cards = []
+        self.current_discard_index = 0
+        
+        # 开始逐张动画
+        self._animate_single_discard_card(discard_count)
+    
+    def _animate_single_discard_card(self, total_discard_count):
+        """动画单张弃牌"""
+        if self.current_discard_index >= total_discard_count:
+            # 所有弃牌动画完成，等待5秒后删除
+            self.after(5000, self._remove_discard_cards)
+            return
+            
+        # 创建单张弃牌
+        start_x, start_y = 500, 0
+        card_id = self.table_canvas.create_image(start_x, start_y, image=self.back_image)
+        self.discard_cards.append(card_id)
+        
+        # 计算目标位置
+        i = self.current_discard_index
+        row = i // 5
+        col = i % 5
+        
+        # 根据行数调整位置
+        if total_discard_count <= 5:  # 只有一行
+            target_x = 260 + col * 120
+            target_y = 225  # 使用与第一张牌相同的Y轴位置
+        else:  # 有多行
+            target_x = 260 + col * 120
+            target_y = 130 + row * 170  # 每5张换行
+        
+        # 移动单张弃牌
+        def move_single_card(step=0):
+            if step <= 30:
+                x = start_x + (target_x - start_x) * (step / 30)
+                y = start_y + (target_y - start_y) * (step / 30)
+                self.table_canvas.coords(card_id, x, y)
+                self.after(10, move_single_card, step+1)
+            else:
+                # 当前弃牌移动完成，开始下一张
+                self.current_discard_index += 1
+                self.after(200, lambda: self._animate_single_discard_card(total_discard_count))
+        
+        move_single_card()
+
+    def _remove_discard_cards(self):
+        """删除弃牌"""
+        for card_id in self.discard_cards:
+            self.table_canvas.delete(card_id)
+        
+        # 从牌堆中移除弃牌
+        discard_count = len(self.discard_cards)
+        if discard_count > 0:
+            self.game.deck = self.game.deck[discard_count:]
+        
+        self.discard_cards = []
+        self._finish_initial_discard()
+
+    def _finish_initial_discard(self):
+        """完成开局流程，启用按钮"""
+        # 清除牌桌
+        self.table_canvas.delete('all')
+        self._draw_table_labels()
+        
+        # 启用按钮
+        for btn in self.bet_buttons:
+            btn.config(state=tk.NORMAL)
+        self.deal_button.config(state=tk.NORMAL)
+        self.reset_button.config(state=tk.NORMAL)
+        self.mode_combo.config(state='readonly')
+        self.bind('<Return>', lambda e: self.start_game())
 
     def do_nothing(self):
         pass
@@ -815,11 +982,294 @@ class BaccaratGUI(tk.Tk):
         ]
         if hasattr(self, 'bigroad_canvas'):
             self.bigroad_canvas.delete('data')
+    
+    # 新增：更新对子统计显示的方法
+    def _update_pair_stats_display(self):
+        """更新对子统计显示"""
+        if hasattr(self, 'pair_stats_frame'):
+            # 更新数字标签
+            self.player_only_label.config(text=str(self.pair_stats['player_only']))
+            self.banker_only_label.config(text=str(self.pair_stats['banker_only']))
+            self.both_diff_label.config(text=str(self.pair_stats['both_diff']))
+            self.both_same_label.config(text=str(self.pair_stats['both_same']))
+
+    def _create_pair_stats_display(self, parent):
+        """在对子统计行创建对子统计显示"""
+        self.pair_stats_frame = tk.Frame(parent, bg='#D0E7FF', height=99)
+        self.pair_stats_frame.pack(fill=tk.X, pady=(0, 0))
+        self.pair_stats_frame.pack_propagate(False)
+        # （其余代码保持不变 — 使用 self.pair_stats_frame 作为父容器）
+        # 第一行框架
+        first_row_frame = tk.Frame(self.pair_stats_frame, bg='#D0E7FF')
+        first_row_frame.pack(fill=tk.X, pady=(5, 0))
+        # 第二行框架
+        second_row_frame = tk.Frame(self.pair_stats_frame, bg='#D0E7FF')
+        second_row_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        # 第二行框架
+        second_row_frame = tk.Frame(self.pair_stats_frame, bg='#D0E7FF')
+        second_row_frame.pack(fill=tk.X, pady=(5, 0))
+        
+        # 定义统计项
+        first_row_items = [
+            {'key': 'player_only', 'text': 'Player Pair', 'dots': ['blue']},
+            {'key': 'banker_only', 'text': 'Banker Pair', 'dots': ['red']}
+        ]
+        
+        second_row_items = [
+            {'key': 'both_diff', 'text': 'Double Pairs', 'dots': ['blue', 'red']},
+            {'key': 'both_same', 'text': 'Twins Pairs', 'dots': ['black_top_left', 'black_bottom_right']}  # 修改为只有两个黑点
+        ]
+        
+        # 创建第一行统计项
+        for item in first_row_items:
+            item_frame = tk.Frame(first_row_frame, bg='#D0E7FF')
+            item_frame.pack(side=tk.LEFT, padx=10, expand=True)  # 修改padx=10
+            
+            # 创建画布用于显示圆圈和点
+            canvas = tk.Canvas(
+                item_frame, 
+                width=40, 
+                height=40, 
+                bg='#D0E7FF',
+                highlightthickness=0
+            )
+            canvas.pack(side=tk.LEFT)
+            
+            # 绘制灰色实体圆圈
+            center_x, center_y = 20, 20
+            radius = 12
+            canvas.create_oval(
+                center_x - radius, center_y - radius,
+                center_x + radius, center_y + radius,
+                fill='#888888',  # 灰色
+                outline='#666666',
+                width=2
+            )
+            
+            # 绘制对应的点
+            dot_radius = 4  # 点的大小
+            border_width = 1.5  # 白色边框宽度
+            
+            if 'blue' in item['dots']:
+                # 左上角蓝点（带白色边框）
+                pos_x = center_x - radius * 0.9
+                pos_y = center_y - radius * 0.9
+                
+                # 白色边框
+                canvas.create_oval(
+                    pos_x - dot_radius - border_width, 
+                    pos_y - dot_radius - border_width,
+                    pos_x + dot_radius + border_width, 
+                    pos_y + dot_radius + border_width,
+                    fill='#FFFFFF',  # 白色边框
+                    outline=''
+                )
+                # 蓝色点
+                canvas.create_oval(
+                    pos_x - dot_radius, pos_y - dot_radius,
+                    pos_x + dot_radius, pos_y + dot_radius,
+                    fill='#0000FF',  # 蓝色
+                    outline=''
+                )
+            
+            if 'red' in item['dots']:
+                # 右下角红点（带白色边框）
+                pos_x = center_x + radius * 0.9
+                pos_y = center_y + radius * 0.9
+                
+                # 白色边框
+                canvas.create_oval(
+                    pos_x - dot_radius - border_width, 
+                    pos_y - dot_radius - border_width,
+                    pos_x + dot_radius + border_width, 
+                    pos_y + dot_radius + border_width,
+                    fill='#FFFFFF',  # 白色边框
+                    outline=''
+                )
+                # 红色点
+                canvas.create_oval(
+                    pos_x - dot_radius, pos_y - dot_radius,
+                    pos_x + dot_radius, pos_y + dot_radius,
+                    fill='#FF0000',  # 红色
+                    outline=''
+                )
+            
+            # 文本标签和数字
+            text_frame = tk.Frame(item_frame, bg='#D0E7FF')
+            text_frame.pack(side=tk.LEFT, padx=(5, 0))
+            
+            # 描述文本
+            desc_label = tk.Label(
+                text_frame, 
+                text=item['text'],
+                font=('Arial', 9),
+                bg='#D0E7FF'
+            )
+            desc_label.pack(anchor='w')
+            
+            # 数字显示
+            count_label = tk.Label(
+                text_frame, 
+                text="0",
+                font=('Arial', 12, 'bold'),
+                bg='#D0E7FF',
+                fg='#000000'
+            )
+            count_label.pack(anchor='w')
+            
+            # 保存数字标签的引用
+            if item['key'] == 'player_only':
+                self.player_only_label = count_label
+            elif item['key'] == 'banker_only':
+                self.banker_only_label = count_label
+        
+        # 创建第二行统计项
+        for item in second_row_items:
+            item_frame = tk.Frame(second_row_frame, bg='#D0E7FF')
+            item_frame.pack(side=tk.LEFT, padx=10, expand=True)  # 修改padx=10
+            
+            # 创建画布用于显示圆圈和点
+            canvas = tk.Canvas(
+                item_frame, 
+                width=40, 
+                height=40, 
+                bg='#D0E7FF',
+                highlightthickness=0
+            )
+            canvas.pack(side=tk.LEFT)
+            
+            # 绘制灰色实体圆圈
+            center_x, center_y = 20, 20
+            radius = 12
+            canvas.create_oval(
+                center_x - radius, center_y - radius,
+                center_x + radius, center_y + radius,
+                fill='#888888',  # 灰色
+                outline='#666666',
+                width=2
+            )
+            
+            # 绘制对应的点
+            dot_radius = 4  # 点的大小
+            border_width = 1.5  # 白色边框宽度
+            
+            if 'blue' in item['dots'] and 'red' in item['dots'] and item['key'] != 'both_same':
+                # 左上角蓝点（带白色边框）
+                pos_x = center_x - radius * 0.9
+                pos_y = center_y - radius * 0.9
+                
+                # 白色边框
+                canvas.create_oval(
+                    pos_x - dot_radius - border_width, 
+                    pos_y - dot_radius - border_width,
+                    pos_x + dot_radius + border_width, 
+                    pos_y + dot_radius + border_width,
+                    fill='#FFFFFF',  # 白色边框
+                    outline=''
+                )
+                # 蓝色点
+                canvas.create_oval(
+                    pos_x - dot_radius, pos_y - dot_radius,
+                    pos_x + dot_radius, pos_y + dot_radius,
+                    fill='#0000FF',  # 蓝色
+                    outline=''
+                )
+                
+                # 右下角红点（带白色边框）
+                pos_x = center_x + radius * 0.9
+                pos_y = center_y + radius * 0.9
+                
+                # 白色边框
+                canvas.create_oval(
+                    pos_x - dot_radius - border_width, 
+                    pos_y - dot_radius - border_width,
+                    pos_x + dot_radius + border_width, 
+                    pos_y + dot_radius + border_width,
+                    fill='#FFFFFF',  # 白色边框
+                    outline=''
+                )
+                # 红色点
+                canvas.create_oval(
+                    pos_x - dot_radius, pos_y - dot_radius,
+                    pos_x + dot_radius, pos_y + dot_radius,
+                    fill='#FF0000',  # 红色
+                    outline=''
+                )
+            
+            if item['key'] == 'both_same':
+                # 只绘制左上角和右下角的黑色点
+                positions = [
+                    (center_x - radius * 0.9, center_y - radius * 0.9),  # 左上
+                    (center_x + radius * 0.9, center_y + radius * 0.9)   # 右下
+                ]
+                
+                for pos_x, pos_y in positions:
+                    # 白色边框
+                    canvas.create_oval(
+                        pos_x - dot_radius - border_width, 
+                        pos_y - dot_radius - border_width,
+                        pos_x + dot_radius + border_width, 
+                        pos_y + dot_radius + border_width,
+                        fill='#FFFFFF',  # 白色边框
+                        outline=''
+                    )
+                    # 黑色点
+                    canvas.create_oval(
+                        pos_x - dot_radius, pos_y - dot_radius,
+                        pos_x + dot_radius, pos_y + dot_radius,
+                        fill='#000000',  # 黑色
+                        outline=''
+                    )
+            
+            # 文本标签和数字
+            text_frame = tk.Frame(item_frame, bg='#D0E7FF')
+            text_frame.pack(side=tk.LEFT, padx=(5, 0))
+            
+            # 描述文本
+            desc_label = tk.Label(
+                text_frame, 
+                text=item['text'],
+                font=('Arial', 9),
+                bg='#D0E7FF'
+            )
+            desc_label.pack(anchor='w')
+            
+            # 数字显示
+            count_label = tk.Label(
+                text_frame, 
+                text="0",
+                font=('Arial', 12, 'bold'),
+                bg='#D0E7FF',
+                fg='#000000'
+            )
+            count_label.pack(anchor='w')
+            
+            # 保存数字标签的引用
+            if item['key'] == 'both_diff':
+                self.both_diff_label = count_label
+            elif item['key'] == 'both_same':
+                self.both_same_label = count_label
 
     def reset_marker_road(self):
         """重置珠路图数据"""
         # 清空所有结果
         self.marker_results = []
+    
+        # 重置对子统计
+        self.pair_stats = {
+            'player_only': 0,
+            'banker_only': 0, 
+            'both_diff': 0,
+            'both_same': 0
+        }
+    
+        # 更新对子统计显示
+        if hasattr(self, 'player_only_label'):
+            self.player_only_label.config(text="0")
+            self.banker_only_label.config(text="0") 
+            self.both_diff_label.config(text="0")
+            self.both_same_label.config(text="0")
 
         # 重置所有统计键（Tiger + EZ 两套都要清零）
         self.marker_counts = {
@@ -960,7 +1410,7 @@ class BaccaratGUI(tk.Tk):
 
         # 添加文字
         canvas.create_text(size/2, size/2, text=text,
-                        fill=text_color, font=('Arial', 12, 'bold'))
+                        fill=text_color, font=('Arial', 15, 'bold'))
 
         # 绑定点击事件
         canvas.bind('<Button-1>', lambda e, t=text, c=canvas, cid=chip_id: self._set_bet_amount(t, c, cid))
@@ -1038,34 +1488,13 @@ class BaccaratGUI(tk.Tk):
     def _create_control_panel(self, parent):
         # main panel with light-blue background - 固定宽度
         control_frame = tk.Frame(parent, bg='#D0E7FF', width=300)
-        control_frame.pack(pady=20, padx=10, fill=tk.BOTH, expand=True)
+        control_frame.pack(pady=12, padx=10, fill=tk.BOTH, expand=True)
         control_frame.pack_propagate(False)  # 禁止自动调整大小
 
         style = ttk.Style()
         style.configure('Bold.TCombobox', font=('Arial', 15, 'bold'))
-
-        # 余额行 - 保持不变
-        balance_frame = tk.Frame(control_frame, bg='#D0E7FF')
-        balance_frame.pack(fill=tk.X, pady=10)
-        self.balance_label = tk.Label(
-            balance_frame,
-            text=f"Balance: ${self.balance:,}",
-            font=('Arial', 14),
-            fg='black',
-            bg='#D0E7FF'
-        )
-        self.balance_label.pack(side=tk.LEFT)
-        self.info_button = tk.Button(
-            balance_frame,
-            text="ℹ️",
-            command=self.show_game_instructions,
-            bg='#4B8BBE',
-            fg='white',
-            font=('Arial', 12)
-        )
-        self.info_button.pack(side=tk.RIGHT, padx=5)
         
-        # ===== 新增：游戏模式切换 =====
+        # ===== 游戏模式切换 =====
         mode_frame = tk.Frame(control_frame, bg='#D0E7FF')
         mode_frame.pack(fill=tk.X, pady=5)
         
@@ -1080,10 +1509,10 @@ class BaccaratGUI(tk.Tk):
         
         # 定义显示文本和内部值的映射
         self.mode_display_map = {
-            "tiger": "Tiger Baccarat",
-            "2to1": "2 To 1 Baccarat",
-            "ez": "EZ Baccarat",
-            "classic": "Classic Baccarat",
+            "tiger": "Tiger",
+            "2to1": "2 To 1",
+            "ez": "EZ",
+            "classic": "Classic",
             "fabulous4": "Fabulous 4"
         }
         
@@ -1114,7 +1543,7 @@ class BaccaratGUI(tk.Tk):
 
         # ===== 修改部分：视图切换按钮 - 只保留Road和Static =====
         view_frame = tk.Frame(control_frame, bg='#D0E7FF')
-        view_frame.pack(fill=tk.X, pady=(15, 5))
+        view_frame.pack(fill=tk.X, pady=(5, 5))
         
         self.marker_view_btn = tk.Button(
             view_frame, 
@@ -1122,18 +1551,18 @@ class BaccaratGUI(tk.Tk):
             command=self.show_marker_view,
             bg='#4B8BBE',  # 蓝色背景
             fg='white',
-            font=('Arial', 10, 'bold'),
+            font=('Arial', 14, 'bold'),
             relief=tk.RAISED,
             width=10
         )
-        self.marker_view_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        self.marker_view_btn.pack(side=tk.LEFT, padx=5)
 
         self.bigroad_view_btn = tk.Button(
             view_frame, text="Static", command=self.show_bigroad_view,
-            bg='#888888', fg='white', font=('Arial',10,'bold'),
+            bg='#888888', fg='white', font=('Arial',14,'bold'),
             relief=tk.FLAT, width=10
         )
-        self.bigroad_view_btn.pack(side=tk.LEFT, padx=5, pady=5)
+        self.bigroad_view_btn.pack(side=tk.LEFT, padx=5)
         
         # 创建一个统一大小的 view_container - 固定高度
         self.view_container = tk.Frame(control_frame, bg='#D0E7FF', height=300)
@@ -1301,7 +1730,7 @@ class BaccaratGUI(tk.Tk):
             font=('Arial', 14, 'bold'),
             bg='#D0E7FF'
         )
-        big_title.pack(pady=(0, 10))  # 与上方留一些空隙
+        big_title.pack(pady=(0, 5))  # 与上方留一些空隙
 
         # ──【Big Road 画布及滚动条】
         big_frame = tk.Frame(marker_frame, bg='#D0E7FF')
@@ -1365,7 +1794,7 @@ class BaccaratGUI(tk.Tk):
             font=('Arial', 14, 'bold'),
             bg='#D0E7FF'
         )
-        marker_title.pack(pady=(20, 10))  # 与 Big Road 画布之间留出一些空间
+        marker_title.pack(pady=(0, 5))  # 与 Big Road 画布之间留出一些空间
         
         # 创建 Marker Road 画布
         self.marker_canvas = tk.Canvas(
@@ -1373,7 +1802,9 @@ class BaccaratGUI(tk.Tk):
             bg='#D0E7FF',
             highlightthickness=0
         )
-        self.marker_canvas.pack(fill=tk.BOTH, expand=True)
+        self.marker_canvas.pack(fill=tk.BOTH, expand=True, padx=3, pady=(0, 0))
+
+        self._create_pair_stats_display(marker_frame)
 
         # ↓↓↓ ③ 最后再绘制"统计面板"↓↓↓
         # 注意：这里调用依然是 self._create_stats_panel(self.bigroad_view)
@@ -1394,7 +1825,7 @@ class BaccaratGUI(tk.Tk):
         # 左侧永远显示 BASIC 列
         basic_label = tk.Label(
             table_frame, text="BASIC",
-            font=('Arial', 13, 'bold'),
+            font=('Arial', 14, 'bold'),
             bg='#D0E7FF', width=12
         )
 
@@ -1847,14 +2278,18 @@ class BaccaratGUI(tk.Tk):
         )
 
     def _draw_marker_grid(self):
-        """绘制珠路图网格"""
+        """绘制珠路图网格 - 修改为每行7个格子"""
         # 清除现有内容
         self.marker_canvas.delete('all')
         
-        # 网格参数
-        rows, cols = 6, 11
-        cell_size = 20
-        padding = 5
+        # 网格参数 - 修改为每行7个格子，每个格子放大1.5倍
+        rows, cols = 6, 9  # 改为7列
+        cell_size = 30  # 从20放大到30 (1.5倍)
+        padding = 0     # 相应增加内边距
+        
+        # 更新实例变量
+        self.max_marker_rows = rows
+        self.max_marker_cols = cols
         
         # 计算画布所需大小
         width = cols * (cell_size + padding) + padding
@@ -1878,11 +2313,12 @@ class BaccaratGUI(tk.Tk):
                 )
 
     def add_marker_result(self, winner, is_natural=False, is_stiger=False, is_btiger=False, 
-                          player_hand_len=0, banker_hand_len=0, player_score=0, banker_score=0):
+                        player_hand_len=0, banker_hand_len=0, player_score=0, banker_score=0,
+                        is_player_pair=False, is_banker_pair=False, is_same_rank_pair=False):
         """添加新的珠路图结果"""
-        # 如果珠路图已满（72个点），移除最旧的一行数据
+        # 如果珠路图已满-，移除最旧的一行数据-）
         if len(self.marker_results) >= self.max_marker_rows * self.max_marker_cols:
-            # 移除最旧的一行（6个点）
+            # 移除最旧的一行（7个点）
             for _ in range(self.max_marker_rows):
                 if self.marker_results:
                     self.marker_results.pop(0)
@@ -1899,11 +2335,12 @@ class BaccaratGUI(tk.Tk):
         elif winner == 'Tie' and is_stiger:  # Tiger Tie
             self.marker_counts['Tiger Tie'] += 1
         
-        # 存储结果到 marker_results
+        # 存储结果到 marker_results（新增对子信息）
         self.marker_results.append((
             winner, is_natural, is_stiger, is_btiger,
             player_hand_len, banker_hand_len,
-            player_score, banker_score
+            player_score, banker_score,
+            is_player_pair, is_banker_pair, is_same_rank_pair  # 新增对子参数
         ))
         
         # 如果触发 EZ 模式下的 Panda 8/Divine 9/Dragon 7，则累加对应键
@@ -1926,6 +2363,19 @@ class BaccaratGUI(tk.Tk):
         self.player_count_label.config(text=str(self.marker_counts['Player']))
         self.banker_count_label.config(text=str(self.marker_counts['Banker']))
         self.tie_count_label.config(text=str(self.marker_counts['Tie']))
+
+        # 新增：更新对子统计
+        if is_same_rank_pair:
+            self.pair_stats['both_same'] += 1
+        elif is_player_pair and is_banker_pair:
+            self.pair_stats['both_diff'] += 1
+        elif is_player_pair:
+            self.pair_stats['player_only'] += 1
+        elif is_banker_pair:
+            self.pair_stats['banker_only'] += 1
+        
+        # 更新对子统计显示
+        self._update_pair_stats_display()
 
         # 根据当前模式，更新右侧统计面板对应的标签和值
         if self.game_mode == "tiger":
@@ -1976,12 +2426,33 @@ class BaccaratGUI(tk.Tk):
         # 保留网格线，只删除圆点
         self.marker_canvas.delete('dot')  # 只删除圆点，保留网格
         
-        # 网格参数
-        rows, cols = self.max_marker_rows, self.max_marker_cols
-        cell_size = 20
-        padding = 5
+        # 网格参数 - 修改为每行7个格子，每个格子放大1.5倍
+        rows, cols = 6, 9
+        cell_size = 30  # 从20放大到30 (1.5倍)
+        padding = 0     # 相应增加内边距
         
-        # 计算起始索引（如果结果超过72个，只显示最近的72个）
+        # 计算画布所需大小
+        width = cols * (cell_size + padding) + padding
+        height = rows * (cell_size + padding) + padding
+        
+        # 设置画布大小
+        self.marker_canvas.config(width=width, height=height)
+        
+        # 绘制网格
+        for col in range(cols):
+            for row in range(rows):
+                x1 = padding + col * (cell_size + padding)
+                y1 = padding + row * (cell_size + padding)
+                x2 = x1 + cell_size
+                y2 = y1 + cell_size
+                
+                self.marker_canvas.create_rectangle(
+                    x1, y1, x2, y2,
+                    outline='#888888',
+                    fill='#D0E7FF'
+                )
+
+        # 计算起始索引（如果结果超过42个，只显示最近的42个）
         start_idx = max(0, len(self.marker_results) - rows * cols)
         
         # 绘制圆点
@@ -2004,7 +2475,10 @@ class BaccaratGUI(tk.Tk):
             radius = cell_size * 0.4
             
             # 根据结果绘制圆点
-            (winner, is_natural, is_stiger, is_btiger, player_hand_len, banker_hand_len, player_score, banker_score) = result
+            (winner, is_natural, is_stiger, is_btiger, 
+            player_hand_len, banker_hand_len, 
+            player_score, banker_score,
+            is_player_pair, is_banker_pair, is_same_rank_pair) = result  # 新增对子参数
             
             outline_color = ''
             if self.game_mode == "classic" or self.game_mode == "2to1" or self.game_mode == "fabulous4":
@@ -2078,6 +2552,7 @@ class BaccaratGUI(tk.Tk):
                     text = "T"
                     text_color = 'black'
                 
+            # 绘制主圆点
             self.marker_canvas.create_oval(
                 center_x - radius, center_y - radius,
                 center_x + radius, center_y + radius,
@@ -2087,10 +2562,93 @@ class BaccaratGUI(tk.Tk):
                 tags='dot'
             )
 
-            if is_stiger or is_btiger and self.game_mode == "tiger":
-                font_size = 7
+            # 绘制对子标记点
+            pair_radius = cell_size * 0.1  # 对子点半径
+            border_width = 2.5  # 白色边框宽度
+
+            # 双方对子且点数相同 - 在四个角都显示黑色点（带白色边框）
+            if is_same_rank_pair:
+                # 四个角的位置
+                positions = [
+                    (x1 + pair_radius * 1.5, y1 + pair_radius * 1.5),  # 左上角
+                    (x2 - pair_radius * 1.5, y2 - pair_radius * 1.5)   # 右下角
+                ]
+                
+                for pos_x, pos_y in positions:
+                    # 先绘制白色边框
+                    self.marker_canvas.create_oval(
+                        pos_x - pair_radius - border_width/2, 
+                        pos_y - pair_radius - border_width/2,
+                        pos_x + pair_radius + border_width/2, 
+                        pos_y + pair_radius + border_width/2,
+                        fill='#FFFFFF',  # 白色边框
+                        outline='',
+                        tags='dot'
+                    )
+                    
+                    # 再绘制黑色点
+                    self.marker_canvas.create_oval(
+                        pos_x - pair_radius, pos_y - pair_radius,
+                        pos_x + pair_radius, pos_y + pair_radius,
+                        fill='#000000',  # 黑色
+                        outline='',
+                        tags='dot'
+                    )
             else:
-                font_size = 8
+                # 玩家对子 - 左上角蓝色点（带白色边框）
+                if is_player_pair:
+                    pair_x = x1 + pair_radius * 1.5
+                    pair_y = y1 + pair_radius * 1.5
+                    
+                    # 先绘制白色边框
+                    self.marker_canvas.create_oval(
+                        pair_x - pair_radius - border_width/2, 
+                        pair_y - pair_radius - border_width/2,
+                        pair_x + pair_radius + border_width/2, 
+                        pair_y + pair_radius + border_width/2,
+                        fill='#FFFFFF',  # 白色边框
+                        outline='',
+                        tags='dot'
+                    )
+                    
+                    # 再绘制蓝色点
+                    self.marker_canvas.create_oval(
+                        pair_x - pair_radius, pair_y - pair_radius,
+                        pair_x + pair_radius, pair_y + pair_radius,
+                        fill="#0000FF",  # 蓝色
+                        outline='',
+                        tags='dot'
+                    )
+                
+                # 庄家对子 - 右下角红色点（带白色边框）
+                if is_banker_pair:
+                    pair_x = x2 - pair_radius * 1.5
+                    pair_y = y2 - pair_radius * 1.5
+                    
+                    # 先绘制白色边框
+                    self.marker_canvas.create_oval(
+                        pair_x - pair_radius - border_width/2, 
+                        pair_y - pair_radius - border_width/2,
+                        pair_x + pair_radius + border_width/2, 
+                        pair_y + pair_radius + border_width/2,
+                        fill='#FFFFFF',  # 白色边框
+                        outline='',
+                        tags='dot'
+                    )
+                    
+                    # 再绘制红色点
+                    self.marker_canvas.create_oval(
+                        pair_x - pair_radius, pair_y - pair_radius,
+                        pair_x + pair_radius, pair_y + pair_radius,
+                        fill='#FF0000',  # 红色
+                        outline='',
+                        tags='dot'
+                    )
+
+            if text == "TT" or text == "ST" or text == "BT" :
+                font_size = 10  # 稍微增大字体
+            else:
+                font_size = 12  # 稍微增大字体
 
             self.marker_canvas.create_text(
                 center_x, center_y,
@@ -2206,9 +2764,12 @@ class BaccaratGUI(tk.Tk):
                 font=('Arial', 12, 'bold'),  # 减小字体
                 height=3,  # 固定高度
                 width=12,   # 固定宽度
-                wraplength=90,
-                command=lambda t=bt: self.place_bet(t)
+                wraplength=90
             )
+            # 绑定左键点击事件（下注）
+            btn.bind('<Button-1>', lambda e, t=bt: self.place_bet(t))
+            # 绑定右键点击事件（清除下注）
+            btn.bind('<Button-3>', lambda e, t=bt: self.clear_single_bet(t))
             btn.bet_type = bt
             btn.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=2)  # 使用fill=tk.BOTH
             self.bet_buttons.append(btn)
@@ -2235,9 +2796,12 @@ class BaccaratGUI(tk.Tk):
                 font=('Arial', 12, 'bold'),
                 height=3,  # 固定高度
                 width=12,   # 固定宽度
-                wraplength=100,
-                command=lambda t=bt: self.place_bet(t)
+                wraplength=100
             )
+            # 绑定左键点击事件（下注）
+            btn.bind('<Button-1>', lambda e, t=bt: self.place_bet(t))
+            # 绑定右键点击事件（清除下注）
+            btn.bind('<Button-3>', lambda e, t=bt: self.clear_single_bet(t))
             btn.bet_type = bt
             btn.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=2)
             self.bet_buttons.append(btn)
@@ -2261,9 +2825,12 @@ class BaccaratGUI(tk.Tk):
                 disabledforeground=disabled_color,
                 highlightthickness=0,
                 highlightbackground='black',
-                wraplength=80,
-                command=lambda t=bt: self.place_bet(t)
+                wraplength=80
             )
+            # 绑定左键点击事件（下注）
+            btn.bind('<Button-1>', lambda e, t=bt: self.place_bet(t))
+            # 绑定右键点击事件（清除下注）
+            btn.bind('<Button-3>', lambda e, t=bt: self.clear_single_bet(t))
             btn.bet_type = bt
             btn.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=2)
             self.bet_buttons.append(btn)
@@ -2291,8 +2858,62 @@ class BaccaratGUI(tk.Tk):
             bg='#D0E7FF'
         ).pack(expand=True)
 
+    def clear_single_bet(self, bet_type):
+        """清除单个下注类型的全部下注"""
+        if bet_type in self.current_bets:
+            # 获取该下注类型的总金额
+            bet_amount = self.current_bets[bet_type]
+            
+            # 将金额加回余额
+            self.balance += bet_amount
+            
+            # 从当前总下注中减去这个金额
+            self.current_bet -= bet_amount
+            
+            # 从当前下注字典中移除这个下注类型
+            del self.current_bets[bet_type]
+            
+            # 更新UI
+            self.update_balance()
+            self.current_bet_label.config(text=f"${self.current_bet:,}")
+            
+            # 更新按钮文本
+            for btn in self.bet_buttons:
+                if hasattr(btn, 'bet_type') and btn.bet_type == bet_type:
+                    original_text = btn.cget("text").split('\n')
+                    new_text = f"{original_text[0]}\n{original_text[1]}\n~~"
+                    btn.config(text=new_text)
+
     def _populate_betting_center(self, parent):
         """填充中部分：按钮和显示"""
+        balance_display_frame = tk.Frame(parent, bg='#D0E7FF')
+        balance_display_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # 余额标签
+        self.balance_label = tk.Label(
+            balance_display_frame,
+            text=f"Balance: ${int(round(self.balance)):,}",
+            font=('Arial', 19),
+            fg='black',
+            bg='#D0E7FF'
+        )
+        self.balance_label.pack(side=tk.LEFT)
+        
+        # 信息按钮
+        self.info_button = tk.Button(
+            balance_display_frame,
+            text="ℹ️",
+            command=self.show_game_instructions,
+            bg='#4B8BBE',
+            fg='white',
+            font=('Arial', 12)
+        )
+        self.info_button.pack(side=tk.RIGHT, padx=5)
+
+        # 分隔线 + 当前/上次下注显示
+        separator = ttk.Separator(parent, orient=tk.HORIZONTAL)
+        separator.pack(fill=tk.X, padx=5)
+
         # DEAL/RESET 按钮行
         btn_frame = tk.Frame(parent, bg='#D0E7FF')
         btn_frame.pack(fill=tk.X, pady=10)
@@ -2430,8 +3051,19 @@ class BaccaratGUI(tk.Tk):
         self.table_canvas.itemconfig(self.result_bg_id, fill='', outline='')
         self.table_canvas.itemconfig(self.result_text_id, text='')
         
+        # 检查牌堆剩余张数，如果少于60张则重新初始化
         if len(self.game.deck) - self.game.cut_position < 60:
+            # 禁用按钮和键盘绑定
+            for btn in self.bet_buttons:
+                btn.config(state=tk.DISABLED)
+            self.deal_button.config(state=tk.DISABLED)
+            self.reset_button.config(state=tk.DISABLED)
+            self.mode_combo.config(state='disabled')
+            self.unbind('<Return>')
+            
+            # 重新初始化游戏
             self._initialize_game(True)
+            return
 
         # 禁用按钮
         for btn in self.bet_buttons:
@@ -2614,7 +3246,7 @@ class BaccaratGUI(tk.Tk):
         """
         from PIL import Image, ImageTk
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
+        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker0')
 
         try:
             if use_back:
@@ -2645,11 +3277,11 @@ class BaccaratGUI(tk.Tk):
         
         if angle < 90:
             # 修改为使用绝对路径
-            bg_path = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1', 'Background.png')
+            bg_path = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker0', 'Background.png')
             img = Image.open(bg_path)
         else:
             # 修改为使用绝对路径
-            card_path = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1', f"{card[0]}{card[1]}.png")
+            card_path = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker0', f"{card[0]}{card[1]}.png")
             img = Image.open(card_path)
         
         img = img.resize((120, 170))
@@ -2874,14 +3506,28 @@ class BaccaratGUI(tk.Tk):
         p_score = self.game.player_score
         b_score = self.game.banker_score
         b_hand_len = len(self.game.banker_hand)
+   
+        # 检查牌堆剩余张数，如果少于60张则重新初始化
+        if len(self.game.deck) - self.game.cut_position < 60:
+            # 禁用按钮和键盘绑定
+            for btn in self.bet_buttons:
+                btn.config(state=tk.DISABLED)
+            self.deal_button.config(state=tk.DISABLED)
+            self.reset_button.config(state=tk.DISABLED)
+            self.mode_combo.config(state='disabled')
+            self.unbind('<Return>')
+            
+            # 重新初始化游戏
+            self._initialize_game(True)
+            return
 
         def enable_buttons():
             for btn in self.bet_buttons:
                 btn.config(state=tk.NORMAL)
             self.reset_button.config(state=tk.NORMAL)
             self.mode_combo.config(state='readonly')
-            self.after(3000, lambda: self.deal_button.config(state=tk.NORMAL))
-            self.after(3000, lambda: self.bind('<Return>', lambda e: self.start_game()))
+            self.after(2000, lambda: self.deal_button.config(state=tk.NORMAL))
+            self.after(2000, lambda: self.bind('<Return>', lambda e: self.start_game()))
                 
         self.after(1000, enable_buttons)
         time.sleep(1)
@@ -2923,7 +3569,7 @@ class BaccaratGUI(tk.Tk):
             if b_score == 6 and self.game_mode == "tiger":
                 text = "TIGER TIE"
             else:
-                text = "TIE WIN"
+                text = "TIE"
             bg_color = '#44ff44'
             text_color = 'black'
 
@@ -2979,11 +3625,17 @@ class BaccaratGUI(tk.Tk):
         banker_hand_len = len(self.game.banker_hand)
         player_score = self.game.player_score
         banker_score = self.game.banker_score
+        p0, p1 = self.game.player_hand[:2]
+        b0, b1 = self.game.banker_hand[:2]
+        is_player_pair = (p0[1] == p1[1])
+        is_banker_pair = (b0[1] == b1[1])
+        is_same_rank_pair = (is_player_pair and is_banker_pair and p0[1] == b0[1])
 
         self.add_marker_result(
             self.game.winner, is_natural, is_stiger, is_btiger,
             player_hand_len, banker_hand_len,
-            player_score, banker_score
+            player_score, banker_score,
+            is_player_pair, is_banker_pair, is_same_rank_pair
         )
 
         # 保存结果到数据文件
@@ -3331,10 +3983,10 @@ class BaccaratGUI(tk.Tk):
                 results['Panda 8'] = 25  # 25:1
 
             # Monkey 6
+            monkey_cards = ['J', 'Q', 'K']
             # 检查第一张牌是否不是J/Q/K，第二张牌是J/Q/K
             if self.game.winner != 'Tie':
                 # 定义Monkey卡牌
-                monkey_cards = ['J', 'Q', 'K']
                 # 检查Player的第一张牌不是Monkey，Banker的第一张牌是Monkey
                 if p[0][1] not in monkey_cards and b[0][1] in monkey_cards:
                     results['Monkey 6'] = 12  # 12:1
@@ -3365,17 +4017,29 @@ class BaccaratGUI(tk.Tk):
             if player_pair or banker_pair:
                 results['Any Pair'] = 5  # 5:1
 
+            all_cards = p + b
+
             # Dragon Player
             diff = self.game.player_score - self.game.banker_score
-            if self.game.winner == 'Player' and diff >= 4:
-                odds_map = {4:1, 5:2, 6:4, 7:6, 8:10, 9:30}
-                results['Dragon P'] = odds_map.get(diff, 1)
+            if self.game.winner == 'Player' and len(all_cards) != 4:
+                odds_map = {4:2, 5:3, 6:5, 7:7, 8:11, 9:31}
+                results['Dragon P'] = odds_map.get(diff, 0)
+            elif self.game.winner == 'Player' and len(all_cards) == 4 and self.game.player_score == 8 or self.game.player_score == 9:
+                if self.game.banker_score != self.game.player_score:
+                    results['Dragon P'] = 2
+                else:
+                    results['Dragon P'] = 1
 
             # Dragon Banker
             diff = self.game.banker_score - self.game.player_score
-            if self.game.winner == 'Banker' and diff >= 4:
-                odds_map = {4:1, 5:2, 6:4, 7:6, 8:10, 9:30}
-                results['Dragon B'] = odds_map.get(diff, 1)
+            if self.game.winner == 'Banker' and len(all_cards) != 4:
+                odds_map = {4:2, 5:3, 6:5, 7:7, 8:11, 9:31}
+                results['Dragon B'] = odds_map.get(diff, 0)
+            elif self.game.winner == 'Banker' and len(all_cards) == 4 and self.game.banker_score == 8 or self.game.banker_score == 9:
+                if self.game.banker_score != self.game.player_score:
+                    results['Dragon B'] = 2
+                else:
+                    results['Dragon B'] = 1
 
             # Quik
             combined = self.game.player_score + self.game.banker_score
