@@ -337,7 +337,7 @@ class BaccaratGUI(tk.Tk):
                 - Player draw a non-monkey card.
                 - Banker draw a monkey card.
                 - Result of this round is Tie.
-            Requirment to win Monkey 6: 
+            Requirment to win Big Monkey: 
                 - 6 monkey cards.
 
             # 10:1 for either side winning three-card total of 9.
@@ -1862,7 +1862,7 @@ class BaccaratGUI(tk.Tk):
         if right_header:
             tk.Label(
                 table_frame, text=right_header,
-                font=('Arial', 13, 'bold'),
+                font=('Arial', 14, 'bold'),
                 bg='#D0E7FF', width=12
             ).grid(row=0, column=2, sticky='w')  # 放在第 2 列
         
@@ -2563,15 +2563,15 @@ class BaccaratGUI(tk.Tk):
             )
 
             # 绘制对子标记点
-            pair_radius = cell_size * 0.1  # 对子点半径
+            pair_radius = cell_size * 0.13  # 对子点半径
             border_width = 2.5  # 白色边框宽度
 
             # 双方对子且点数相同 - 在四个角都显示黑色点（带白色边框）
             if is_same_rank_pair:
-                # 四个角的位置
+                # 两个角的位置
                 positions = [
-                    (x1 + pair_radius * 1.5, y1 + pair_radius * 1.5),  # 左上角
-                    (x2 - pair_radius * 1.5, y2 - pair_radius * 1.5)   # 右下角
+                    (x1 + pair_radius * 1.25, y1 + pair_radius * 1.25),  # 左上角
+                    (x2 - pair_radius * 1.25, y2 - pair_radius * 1.25)   # 右下角
                 ]
                 
                 for pos_x, pos_y in positions:
@@ -2597,8 +2597,8 @@ class BaccaratGUI(tk.Tk):
             else:
                 # 玩家对子 - 左上角蓝色点（带白色边框）
                 if is_player_pair:
-                    pair_x = x1 + pair_radius * 1.5
-                    pair_y = y1 + pair_radius * 1.5
+                    pair_x = x1 + pair_radius * 1.25
+                    pair_y = y1 + pair_radius * 1.25
                     
                     # 先绘制白色边框
                     self.marker_canvas.create_oval(
@@ -2622,7 +2622,7 @@ class BaccaratGUI(tk.Tk):
                 
                 # 庄家对子 - 右下角红色点（带白色边框）
                 if is_banker_pair:
-                    pair_x = x2 - pair_radius * 1.5
+                    pair_x = x2 - pair_radius * 1.25
                     pair_y = y2 - pair_radius * 1.5
                     
                     # 先绘制白色边框
@@ -2837,9 +2837,9 @@ class BaccaratGUI(tk.Tk):
 
         # 说明 - 根据模式显示不同的说明
         if self.game_mode == "tiger":
-            explanation = "*BANKER WIN ON 6 PAYS 50%"
+            explanation = "*BANKER PAYS 50% WHEN BANKER WIN ON 6 "
         elif self.game_mode == "ez":
-            explanation = "*BANKER WIN WITH 3-CARD 7 PUSH"
+            explanation = "*BANKER PUSH WHEN BANKER WIN WITH 3-CARD 7"
         elif self.game_mode == "classic":
             explanation = "BANKER PAYS 5% COMMISSION EVERY WIN"
         elif self.game_mode == "2to1":
@@ -3506,20 +3506,6 @@ class BaccaratGUI(tk.Tk):
         p_score = self.game.player_score
         b_score = self.game.banker_score
         b_hand_len = len(self.game.banker_hand)
-   
-        # 检查牌堆剩余张数，如果少于60张则重新初始化
-        if len(self.game.deck) - self.game.cut_position < 60:
-            # 禁用按钮和键盘绑定
-            for btn in self.bet_buttons:
-                btn.config(state=tk.DISABLED)
-            self.deal_button.config(state=tk.DISABLED)
-            self.reset_button.config(state=tk.DISABLED)
-            self.mode_combo.config(state='disabled')
-            self.unbind('<Return>')
-            
-            # 重新初始化游戏
-            self._initialize_game(True)
-            return
 
         def enable_buttons():
             for btn in self.bet_buttons:
@@ -3529,7 +3515,6 @@ class BaccaratGUI(tk.Tk):
             self.after(2000, lambda: self.deal_button.config(state=tk.NORMAL))
             self.after(2000, lambda: self.bind('<Return>', lambda e: self.start_game()))
                 
-        self.after(1000, enable_buttons)
         time.sleep(1)
         
         text = ""
@@ -3695,6 +3680,22 @@ class BaccaratGUI(tk.Tk):
         if self.current_streak > self.longest_streaks.get(winner, 0):
             self.longest_streaks[winner] = self.current_streak
         self.update_streak_labels()
+   
+        # 检查牌堆剩余张数，如果少于60张则重新初始化
+        if len(self.game.deck) - self.game.cut_position < 60:
+            # 禁用按钮和键盘绑定
+            for btn in self.bet_buttons:
+                btn.config(state=tk.DISABLED)
+            self.deal_button.config(state=tk.DISABLED)
+            self.reset_button.config(state=tk.DISABLED)
+            self.mode_combo.config(state='disabled')
+            self.unbind('<Return>')
+            
+            # 重新初始化游戏
+            self._initialize_game(True)
+            return
+        else:
+            self.after(1000, enable_buttons)
 
     def _update_bigroad(self):
         """
@@ -3754,11 +3755,17 @@ class BaccaratGUI(tk.Tk):
                     prev_row, prev_col = r0, c0
                     prev_cx, prev_cy = cx0, cy0
 
-                    # 记录这是第 1 次 Tie 并画绿色斜线
+                    # 记录这是第 1 次 Tie
                     tie_tracker[(r0, c0)] = 1
+
+                    # 使用唯一 tag 管理此格的 Tie 绘制，先删除旧的（如果有）
+                    tie_tag = f"tie_{r0}_{c0}"
+                    self.bigroad_canvas.delete(tie_tag)
+
+                    # 画绿色斜线（第一次通常不显示数字）
                     self.bigroad_canvas.create_line(
                         cx0 - 6, cy0 + 6, cx0 + 6, cy0 - 6,
-                        width=2, fill='#00AA00', tags=('data',)
+                        width=2, fill='#00AA00', tags=('data', tie_tag)
                     )
                     continue  # 跳过本手圆点放置
 
@@ -3773,21 +3780,28 @@ class BaccaratGUI(tk.Tk):
                 cx0 = x0 + cell / 2
                 cy0 = y0 + cell / 2
 
-                # 绘制绿色斜线
+                # 使用唯一 tag 管理此格的 Tie 绘制，先删除旧的（确保旧数字被清掉）
+                tie_tag = f"tie_{r0}_{c0}"
+                self.bigroad_canvas.delete(tie_tag)
+
+                # 绘制绿色斜线（用 tie_tag 标记，便于后续删除/替换）
                 self.bigroad_canvas.create_line(
-                    cx0 - 10, cy0 + 10,  # 起点坐标
-                    cx0 + 10, cy0 - 10,  # 终点坐标
-                    width=4,             # 宽度从2增加到4
-                    fill='#00AA00', 
-                    tags=('data',)
+                    cx0 - 10, cy0 + 10,   # 起点坐标
+                    cx0 + 10, cy0 - 10,   # 终点坐标
+                    width=4,
+                    fill="#00AA00",
+                    tags=('data', tie_tag)
                 )
-                # 如果 Tie 次数 > 1，再在中央画数字
+
+                # 如果 Tie 次数 > 1，再在中央画数字（并把数字置顶）
                 if cnt > 1:
-                    self.bigroad_canvas.create_text(
+                    txt_id = self.bigroad_canvas.create_text(
                         cx0, cy0, text=str(cnt),
-                        font=('Arial', 8, 'bold'), fill='#00AA00',
-                        tags=('data',)
+                        font=('Arial', 16, 'bold'), fill="#000000",
+                        tags=('data', tie_tag)
                     )
+                    # 确保数字在最上层
+                    self.bigroad_canvas.tag_raise(txt_id)
                 continue  # 本局仅是叠加 Tie，不放新圆点
 
         # —— B. 处理非 Tie (庄家 or 闲家) —— 
@@ -3851,20 +3865,29 @@ class BaccaratGUI(tk.Tk):
             # B.5 如果该 (row, col) 之前已有 Tie 次数，就在圆点上叠加斜线与数字
             if (row, col) in tie_tracker:
                 tcnt = tie_tracker[(row, col)]
-                # 修改点2：增加斜杠宽度和长度
+                self.bigroad_canvas.create_line(prev_cx, prev_cy, cx, cy, width=2, tags=('data', 'connect'))
+                tie_tag = f"tie_{row}_{col}"
+                self.bigroad_canvas.tag_raise(tie_tag)
+                # 删除旧的 tie tag 元素（这样连续 Tie 不会保留旧数字）
+                self.bigroad_canvas.delete(tie_tag)
+
+                # 画斜线（也加上 tie_tag）
                 self.bigroad_canvas.create_line(
-                    cx - 10, cy + 10,  # 起点坐标
-                    cx + 10, cy - 10,  # 终点坐标
-                    width=2,           # 宽度从2增加到4
-                    fill='#00AA00', 
-                    tags=('data',)
+                    cx - 10, cy + 10,
+                    cx + 10, cy - 10,
+                    width=2,
+                    fill='#00AA00',
+                    tags=('data', tie_tag)
                 )
+
+                # 如果计数大于1，画数字并置顶
                 if tcnt > 1:
-                    self.bigroad_canvas.create_text(
+                    txt_id = self.bigroad_canvas.create_text(
                         cx, cy, text=str(tcnt),
-                        font=('Arial', 12, 'bold'), fill="#FFFFFF",
-                        tags=('data',)
+                        font=('Arial', 16, 'bold'), fill="#FFFFFF",
+                        tags=('data', tie_tag)
                     )
+                    self.bigroad_canvas.tag_raise(txt_id)
 
             # B.6 更新"最后一次非 Tie"的各项信息，以便下一局画连线或累计 Tie
             prev_row, prev_col = row, col
@@ -4080,7 +4103,7 @@ class BaccaratGUI(tk.Tk):
         return results
 
     def update_balance(self):
-        self.balance_label.config(text=f"Balance: ${self.balance:,}")
+        self.balance_label.config(text=f"Balance: ${int(round(self.balance)):,}")
         if self.username != 'Guest':
             update_balance_in_json(self.username, self.balance)
         return self.balance

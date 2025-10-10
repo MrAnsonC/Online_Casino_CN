@@ -10,9 +10,9 @@ if os.name != 'nt':  # 不是 Windows 系统
     import tty
 
 ## Poker games import
-from Casino_Games import Blackjack
+from Casino_Games import Blackjack_gui
 from Casino_Games import UTH_GUI
-from Casino_Games import transfer_baccarat
+from Casino_Games import Combine_Baccarat
 from Casino_Games import Three_Card_Poker
 from Casino_Games import Sicbo
 from Casino_Games import Casino_Holdem
@@ -157,11 +157,11 @@ def main(balance, user):
         (2, 1): ('8', Casino_Holdem.main),
         (2, 2): ('9', UOH.main),
         (3, 0): ('10', Let_It_Ride.main),
-        (3, 1): ('11', transfer_baccarat.play_game),
+        (3, 1): ('11', Combine_Baccarat.main),
         (3, 2): ('12', UTH_GUI.main),
         (4, 0): ('13', Wild_Five_Card_poker.main),
         (4, 1): ('14', EZ_21.main),
-        (4, 2): ('15', Blackjack.main),
+        (4, 2): ('15', Blackjack_gui.main),
         (5, 0): ('16', craps.main),
         (5, 1): ('17', Klondike_Dice.main),
         (5, 2): ('18', Sicbo.main),
