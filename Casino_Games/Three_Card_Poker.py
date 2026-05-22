@@ -83,7 +83,7 @@ def update_balance_in_json(username, new_balance):
 
 # Progressive 文件加载与保存
 def load_progressive():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'jackpot.json')
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
     default_progressive = 197301.26
     min_progressive = 197301.26
     
@@ -104,7 +104,7 @@ def load_progressive():
     return True, max(default_progressive, min_progressive)
 
 def save_progressive(progressive):
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
     data = []
     # 如果文件存在，读取原有数据
     if os.path.exists(path):
@@ -304,7 +304,7 @@ class ThreeCardPokerGame:
 class ThreeCardPokerGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
-        self.title("Three Card Poker")
+        self.title("三张牌扑克")
         self.geometry("1020x640+50+10")
         self.resizable(0,0)
         self.configure(bg='#35654d')

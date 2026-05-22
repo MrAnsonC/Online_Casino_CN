@@ -1,3 +1,4 @@
+
 import json
 import os
 import time
@@ -15,7 +16,7 @@ import register
 import charge
 
 # Games import
-from Casino_Games import Casino_games
+from Casino_Games import casino_games
 from Lotto import lotto
 from Small_Games import small_games
 
@@ -341,7 +342,7 @@ def main():
             elif key == 'enter':
                 # 第一行第一列：赌场游戏
                 if selected_row == 0 and selected_col == 0:
-                    balance = Casino_games.main(balance, username)
+                    balance = casino_games.main(balance, username)
                 # 第一行第二列：刮刮乐
                 elif selected_row == 0 and selected_col == 1:
                     balance = lotto.main(balance, username)

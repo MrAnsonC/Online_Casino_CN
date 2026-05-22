@@ -1,0 +1,2206 @@
+{
+    "Total": 1556,
+    "Red": 724,
+    "Black": 736,
+    "Green": 96,
+    "Record1": {
+        "01_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "02_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "03_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "04_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "05_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "06_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "07_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "08_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "09_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "10_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "11_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "12_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "13_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "14_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "15_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "16_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "17_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "18_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "19_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "20_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "21_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "22_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "23_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "24_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "25_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "26_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "27_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "28_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "29_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "30_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "31_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "32_Data": {
+            "result": "6",
+            "color": "Black"
+        },
+        "33_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "34_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "35_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "36_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "37_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "38_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "39_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "40_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "41_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "42_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "43_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "44_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "45_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "46_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "47_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "48_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "49_Data": {
+            "result": "19",
+            "color": "Red"
+        }
+    },
+    "Record2": {
+        "01_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "02_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "03_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "04_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "05_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "06_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "07_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "08_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "09_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "10_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "11_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "12_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "13_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "14_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "15_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "16_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "17_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "18_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "19_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "20_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "21_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "22_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "23_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "24_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "25_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "26_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "27_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "28_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "29_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "30_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "31_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "32_Data": {
+            "result": "6",
+            "color": "Black"
+        },
+        "33_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "34_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "35_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "36_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "37_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "38_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "39_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "40_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "41_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "42_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "43_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "44_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "45_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "46_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "47_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "48_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "49_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "50_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "51_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "52_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "53_Data": {
+            "result": "34",
+            "color": "Red"
+        },
+        "54_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "55_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "56_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "57_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "58_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "59_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "60_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "61_Data": {
+            "result": "6",
+            "color": "Black"
+        },
+        "62_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "63_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "64_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "65_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "66_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "67_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "68_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "69_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "70_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "71_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "72_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "73_Data": {
+            "result": "20",
+            "color": "Black"
+        },
+        "74_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "75_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "76_Data": {
+            "result": "20",
+            "color": "Black"
+        },
+        "77_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "78_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "79_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "80_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "81_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "82_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "83_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "84_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "85_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "86_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "87_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "88_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "89_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "90_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "91_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "92_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "93_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "94_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "95_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "96_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "97_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "98_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "99_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "100_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "101_Data": {
+            "result": "20",
+            "color": "Black"
+        },
+        "102_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "103_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "104_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "105_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "106_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "107_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "108_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "109_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "110_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "111_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "112_Data": {
+            "result": "6",
+            "color": "Black"
+        },
+        "113_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "114_Data": {
+            "result": "34",
+            "color": "Red"
+        },
+        "115_Data": {
+            "result": "20",
+            "color": "Black"
+        },
+        "116_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "117_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "118_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "119_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "120_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "121_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "122_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "123_Data": {
+            "result": "34",
+            "color": "Red"
+        },
+        "124_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "125_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "126_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "127_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "128_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "129_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "130_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "131_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "132_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "133_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "134_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "135_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "136_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "137_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "138_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "139_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "140_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "141_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "142_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "143_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "144_Data": {
+            "result": "20",
+            "color": "Black"
+        },
+        "145_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "146_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "147_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "148_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "149_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "150_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "151_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "152_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "153_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "154_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "155_Data": {
+            "result": "28",
+            "color": "Black"
+        },
+        "156_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "157_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "158_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "159_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "160_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "161_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "162_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "163_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "164_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "165_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "166_Data": {
+            "result": "20",
+            "color": "Black"
+        },
+        "167_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "168_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "169_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "170_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "171_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "172_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "173_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "174_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "175_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "176_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "177_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "178_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "179_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "180_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "181_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "182_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "183_Data": {
+            "result": "34",
+            "color": "Red"
+        },
+        "184_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "185_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "186_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "187_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "188_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "189_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "190_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "191_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "192_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "193_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "194_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "195_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "196_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "197_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "198_Data": {
+            "result": "6",
+            "color": "Black"
+        },
+        "199_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "200_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "201_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "202_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "203_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "204_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "205_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "206_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "207_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "208_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "209_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "210_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "211_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "212_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "213_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "214_Data": {
+            "result": "34",
+            "color": "Red"
+        },
+        "215_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "216_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "217_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "218_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "219_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "220_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "221_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "222_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "223_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "224_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "225_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "226_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "227_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "228_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "229_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "230_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "231_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "232_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "233_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "234_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "235_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "236_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "237_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "238_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "239_Data": {
+            "result": "28",
+            "color": "Black"
+        },
+        "240_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "241_Data": {
+            "result": "6",
+            "color": "Black"
+        },
+        "242_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "243_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "244_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "245_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "246_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "247_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "248_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "249_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "250_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "251_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "252_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "253_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "254_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "255_Data": {
+            "result": "34",
+            "color": "Red"
+        },
+        "256_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "257_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "258_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "259_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "260_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "261_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "262_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "263_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "264_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "265_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "266_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "267_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "268_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "269_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "270_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "271_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "272_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "273_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "274_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "275_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "276_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "277_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "278_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "279_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "280_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "281_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "282_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "283_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "284_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "285_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "286_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "287_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "288_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "289_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "290_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "291_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "292_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "293_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "294_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "295_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "296_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "297_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "298_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "299_Data": {
+            "result": "6",
+            "color": "Black"
+        },
+        "300_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "301_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "302_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "303_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "304_Data": {
+            "result": "20",
+            "color": "Black"
+        },
+        "305_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "306_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "307_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "308_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "309_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "310_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "311_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "312_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "313_Data": {
+            "result": "34",
+            "color": "Red"
+        },
+        "314_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "315_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "316_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "317_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "318_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "319_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "320_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "321_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "322_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "323_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "324_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "325_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "326_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "327_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "328_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "329_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "330_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "331_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "332_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "333_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "334_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "335_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "336_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "337_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "338_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "339_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "340_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "341_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "342_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "343_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "344_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "345_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "346_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "347_Data": {
+            "result": "28",
+            "color": "Black"
+        },
+        "348_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "349_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "350_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "351_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "352_Data": {
+            "result": "20",
+            "color": "Black"
+        },
+        "353_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "354_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "355_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "356_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "357_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "358_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "359_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "360_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "361_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "362_Data": {
+            "result": "5",
+            "color": "Red"
+        },
+        "363_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "364_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "365_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "366_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "367_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "368_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "369_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "370_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "371_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "372_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "373_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "374_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "375_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "376_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "377_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "378_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "379_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "380_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "381_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "382_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "383_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "384_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "385_Data": {
+            "result": "2",
+            "color": "Black"
+        },
+        "386_Data": {
+            "result": "30",
+            "color": "Red"
+        },
+        "387_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "388_Data": {
+            "result": "28",
+            "color": "Black"
+        },
+        "389_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "390_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "391_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "392_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "393_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "394_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "395_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "396_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "397_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "398_Data": {
+            "result": "20",
+            "color": "Black"
+        },
+        "399_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "400_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "401_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "402_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "403_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "404_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "405_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "406_Data": {
+            "result": "1",
+            "color": "Red"
+        },
+        "407_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "408_Data": {
+            "result": "28",
+            "color": "Black"
+        },
+        "409_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "410_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "411_Data": {
+            "result": "6",
+            "color": "Black"
+        },
+        "412_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "413_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "414_Data": {
+            "result": "4",
+            "color": "Black"
+        },
+        "415_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "416_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "417_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "418_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "419_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "420_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "421_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "422_Data": {
+            "result": "34",
+            "color": "Red"
+        },
+        "423_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "424_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "425_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "426_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "427_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "428_Data": {
+            "result": "6",
+            "color": "Black"
+        },
+        "429_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "430_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "431_Data": {
+            "result": "7",
+            "color": "Red"
+        },
+        "432_Data": {
+            "result": "14",
+            "color": "Red"
+        },
+        "433_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "434_Data": {
+            "result": "13",
+            "color": "Black"
+        },
+        "435_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "436_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "437_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "438_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "439_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "440_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "441_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "442_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "443_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "444_Data": {
+            "result": "18",
+            "color": "Red"
+        },
+        "445_Data": {
+            "result": "23",
+            "color": "Red"
+        },
+        "446_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "447_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "448_Data": {
+            "result": "28",
+            "color": "Black"
+        },
+        "449_Data": {
+            "result": "15",
+            "color": "Black"
+        },
+        "450_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "451_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "452_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "453_Data": {
+            "result": "8",
+            "color": "Black"
+        },
+        "454_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "455_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "456_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "457_Data": {
+            "result": "11",
+            "color": "Black"
+        },
+        "458_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "459_Data": {
+            "result": "28",
+            "color": "Black"
+        },
+        "460_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "461_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "462_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "463_Data": {
+            "result": "34",
+            "color": "Red"
+        },
+        "464_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "465_Data": {
+            "result": "10",
+            "color": "Black"
+        },
+        "466_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "467_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "468_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "469_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "470_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "471_Data": {
+            "result": "36",
+            "color": "Red"
+        },
+        "472_Data": {
+            "result": "31",
+            "color": "Black"
+        },
+        "473_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "474_Data": {
+            "result": "21",
+            "color": "Red"
+        },
+        "475_Data": {
+            "result": "16",
+            "color": "Red"
+        },
+        "476_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "477_Data": {
+            "result": "25",
+            "color": "Red"
+        },
+        "478_Data": {
+            "result": "33",
+            "color": "Black"
+        },
+        "479_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "480_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "481_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "482_Data": {
+            "result": "32",
+            "color": "Red"
+        },
+        "483_Data": {
+            "result": "35",
+            "color": "Black"
+        },
+        "484_Data": {
+            "result": "22",
+            "color": "Black"
+        },
+        "485_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "486_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "487_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "488_Data": {
+            "result": "26",
+            "color": "Black"
+        },
+        "489_Data": {
+            "result": "3",
+            "color": "Red"
+        },
+        "490_Data": {
+            "result": "27",
+            "color": "Red"
+        },
+        "491_Data": {
+            "result": "0",
+            "color": "Green"
+        },
+        "492_Data": {
+            "result": "00",
+            "color": "Green"
+        },
+        "493_Data": {
+            "result": "12",
+            "color": "Red"
+        },
+        "494_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "495_Data": {
+            "result": "17",
+            "color": "Black"
+        },
+        "496_Data": {
+            "result": "29",
+            "color": "Black"
+        },
+        "497_Data": {
+            "result": "9",
+            "color": "Red"
+        },
+        "498_Data": {
+            "result": "24",
+            "color": "Black"
+        },
+        "499_Data": {
+            "result": "19",
+            "color": "Red"
+        },
+        "500_Data": {
+            "result": "8",
+            "color": "Black"
+        }
+    }
+}

@@ -111,7 +111,7 @@ def update_balance_in_json(username, new_balance):
 
 # Jackpot 文件加载与保存
 def load_jackpot():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
     # 文件不存在时使用默认奖池
     if not os.path.exists(path):
         return True, INITIAL_JACKPOT
@@ -126,8 +126,8 @@ def load_jackpot():
     # 未找到 KD 条目时也使用默认
     return True, INITIAL_JACKPOT
 
-def save_jackpot(jackpot):
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
+def save_progressive(jackpot):
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
     data = []
     # 如果文件存在，读取原有数据
     if os.path.exists(path):
@@ -155,8 +155,8 @@ class KlondikeDiceGame:
     def __init__(self):
         self.reset_game()
         # 初始化Jackpot
-        self.jackpot_amount = load_jackpot()[1]
-        self.initial_jackpot = self.jackpot_amount  # 保存初始值用于重置
+        self.progressive_amount = load_jackpot()[1]
+        self.initial_jackpot = self.progressive_amount  # 保存初始值用于重置
     
     def reset_game(self):
         self.dealer_dice = [Dice() for _ in range(5)]
@@ -171,7 +171,7 @@ class KlondikeDiceGame:
             "player": [False, False, False, False, False],
             "dealer": [False, False, False, False, False]
         }
-        self.jackpot_amount = load_jackpot()[1]  # 重新加载jackpot
+        self.progressive_amount = load_jackpot()[1]  # 重新加载jackpot
     
     def roll_all(self):
         """掷所有骰子"""
@@ -441,9 +441,9 @@ class KlondikeDiceGUI(tk.Tk):
                                 font=('Arial', 18), bg='#2a4a3c', fg='gold')
         jackpot_label.pack(side=tk.LEFT, padx=(0, 5))
 
-        self.jackpot_var = tk.StringVar()
-        self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
-        self.jackpot_display = tk.Label(jackpot_inner_frame, textvariable=self.jackpot_var, 
+        self.progressive_var = tk.StringVar()
+        self.progressive_var.set(f"${self.game.progressive_amount:.2f}")
+        self.jackpot_display = tk.Label(jackpot_inner_frame, textvariable=self.progressive_var, 
                                     font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='gold')
         self.jackpot_display.pack(side=tk.LEFT)
         
@@ -1025,9 +1025,9 @@ class KlondikeDiceGUI(tk.Tk):
             
             # 将下注金额的1%加入Progressive奖池
             jackpot_contribution = total_bet * 3.1415926 * 0.01
-            self.game.jackpot_amount += jackpot_contribution
-            save_jackpot(self.game.jackpot_amount)
-            self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
+            self.game.progressive_amount += jackpot_contribution
+            save_progressive(self.game.progressive_amount)
+            self.progressive_var.set(f"${self.game.progressive_amount:.2f}")
             
             self.game.reset_game()
             self.game.ante = self.ante
@@ -1352,7 +1352,7 @@ class KlondikeDiceGUI(tk.Tk):
         # 更新上局赢得金额
         self.last_win_label.config(text=f"上局获胜: ${winnings:.2f}")
         # 更新Jackpot显示
-        self.jackpot_var.set(f"${self.game.jackpot_amount:.2f}")
+        self.progressive_var.set(f"${self.game.progressive_amount:.2f}")
         
         # 重置操作区域
         for widget in self.action_frame.winfo_children():
@@ -1369,24 +1369,24 @@ class KlondikeDiceGUI(tk.Tk):
         """计算Progressive奖金"""
         win_amount = 0
         if player_hand == "big_straight":
-            win_amount = self.game.jackpot_amount * 0.03 + 300
-            self.game.jackpot_amount -= win_amount
+            win_amount = self.game.progressive_amount * 0.03 + 300
+            self.game.progressive_amount -= win_amount
         elif player_hand == "small_straight":
-            win_amount = self.game.jackpot_amount * 0.03 + 300
-            self.game.jackpot_amount -= win_amount
+            win_amount = self.game.progressive_amount * 0.03 + 300
+            self.game.progressive_amount -= win_amount
         elif player_hand == "five_of_a_kind":
-            win_amount = self.game.jackpot_amount * 0.1 + 1500
-            self.game.jackpot_amount -= win_amount
+            win_amount = self.game.progressive_amount * 0.1 + 1500
+            self.game.progressive_amount -= win_amount
         elif player_hand == "four_of_a_kind":
-            win_amount = self.game.jackpot_amount * 0.05 + 500
-            self.game.jackpot_amount -= win_amount
+            win_amount = self.game.progressive_amount * 0.05 + 500
+            self.game.progressive_amount -= win_amount
         
         # 确保奖池不低于4200
-        if self.game.jackpot_amount < 4200:
-            self.game.jackpot_amount = 4200
+        if self.game.progressive_amount < 4200:
+            self.game.progressive_amount = 4200
         
         # 保存更新后的奖池
-        save_jackpot(self.game.jackpot_amount)
+        save_progressive(self.game.progressive_amount)
         
         return win_amount
     

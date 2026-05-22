@@ -15,13 +15,13 @@ SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 RANK_VALUES = {r: i for i, r in enumerate(RANKS, start=2)}
 HAND_RANK_NAMES = {
-    9: '皇家顺', 8: '同花顺', 7: '四条', 6: '葫芦', 5: '同花',
+    9: '皇家同花顺', 8: '同花顺', 7: '四条', 6: '葫芦', 5: '同花',
     4: '顺子', 3: '三条', 2: '两对', 1: '对子', 0: '高牌'
 }
 
 # Ante下注支付表 (修改后的赔率)
 ANTE_PAYOUT = {
-    9: 100,   # 皇家顺 100:1
+    9: 100,   # 皇家同花顺 100:1
     8: 49,    # 同花顺 49:1
     7: 17,    # 四条 17:1
     6: 3,     # 葫芦 3:1
@@ -31,7 +31,7 @@ ANTE_PAYOUT = {
 
 # AA下注支付表 (修改后的赔率)
 AA_PAYOUT = {
-    9: 100,   # 皇家顺 100:1
+    9: 100,   # 皇家同花顺 100:1
     8: 50,    # 同花顺 50:1
     7: 40,    # 四条 40:1
     6: 30,    # 葫芦 30:1
@@ -66,24 +66,24 @@ def update_balance_in_json(username, new_balance):
 
 # Jackpot 文件加载与保存
 def load_jackpot():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
-    default_jackpot = 197301.26
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
+    default_progressive = 90912.01
     # 文件不存在时使用默认奖池
     if not os.path.exists(path):
-        return True, default_jackpot
+        return True, default_progressive
     try:
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             for item in data:
-                if item.get('Games') == 'CHE':  # 修改为CHE
-                    return False, float(item.get('jackpot', default_jackpot))
+                if item.get('Games') == 'UTH_&_UOH_&_CHE_&_HUH':
+                    return False, float(item.get('jackpot', default_progressive))
     except Exception:
-        return True, default_jackpot
+        return True, default_progressive
     # 未找到 CHE 条目时也使用默认
-    return True, default_jackpot
+    return True, default_progressive
 
 def save_progressive(jackpot):
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
     data = []
     # 如果文件存在，读取原有数据
     if os.path.exists(path):
@@ -96,13 +96,13 @@ def save_progressive(jackpot):
     # 查找是否已有CHE的记录
     found = False
     for item in data:
-        if item.get('Games') == 'CHE':  # 修改为CHE
+        if item.get('Games') == 'UTH_&_UOH_&_CHE_&_HUH':  # 修改为CHE
             item['jackpot'] = jackpot
             found = True
             break
     
     if not found:
-        data.append({"Games": "CHE", "jackpot": jackpot})  # 修改为CHE
+        data.append({"Games": "UTH_&_UOH_&_CHE_&_HUH", "jackpot": jackpot})  # 修改为CHE
     
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4)
@@ -212,7 +212,7 @@ def evaluate_hand(cards):
     flush_suit = next((s for s in SUITS if suits.count(s) >= 5), None)
     flush_cards = [c for c in cards if c.suit == flush_suit] if flush_suit else []
 
-    # 同花顺和皇家顺检测
+    # 同花顺和皇家同花顺检测
     if flush_cards:
         flush_vals = sorted([c.value for c in flush_cards], reverse=True)
         # 检查同花中是否有顺子
@@ -225,7 +225,7 @@ def evaluate_hand(cards):
         for i in range(len(flush_vals_with_ace) - 4):
             if flush_vals_with_ace[i] - flush_vals_with_ace[i + 4] == 4:
                 straight_flush = flush_vals_with_ace[i:i + 5]
-                # 检查是否是皇家顺
+                # 检查是否是皇家同花顺
                 if straight_flush[0] == 14 and straight_flush[1] == 13:
                     return (9, straight_flush)
                 else:
@@ -467,11 +467,11 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
 
         headers = ["牌型", "底注赔率", "AA+赔率", "累进大奖"]
         odds_data = [
-            ("皇家顺", "100:1", "100:1", "100%累进大奖"),
-            ("同花顺", "49:1", "50:1", "10%累进大奖"),
-            ("四条", "17:1", "40:1", "$1275"),
-            ("葫芦", "3:1", "30:1", "$375"),
-            ("同花", "2:1", "20:1", "$250"),
+            ("皇家同花顺", "100:1", "100:1", "100%累进大奖/$100,000"),
+            ("同花顺", "49:1", "50:1","10%累进大奖/$10,000"),
+            ("四条", "17:1", "40:1", "$3000"),
+            ("葫芦", "3:1", "30:1", "$500"),
+            ("同花", "2:1", "20:1", "$350"),
             ("顺子", "1:1", "10:1", "-"),
             ("三条", "1:1", "8:1", "-"),
             ("两对", "1:1", "7:1", "-"),
@@ -1102,9 +1102,9 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             self.update_balance()
             
             # 更新Progressive奖池
-            # 玩家下注的0.08（不包括Progressive下注）进入奖池
+            # 玩家下注的0.01（不包括Progressive下注）进入奖池
             ante_aa_bet = self.ante + self.aa
-            rake = ante_aa_bet * 0.08
+            rake = ante_aa_bet * 0.01
             self.game.progressive_amount += rake
             
             # 如果有下注Progressive，额外将2.21加入奖池
@@ -1412,8 +1412,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             self.call_var.set(str(int(call_amount)))
             self.status_label.config(text=f"加注: ${call_amount}")
 
-            # 更新Progressive奖池 - 添加Call Bet的0.08
-            call_rake = call_amount * 0.08
+            # 更新Progressive奖池 - 添加Call Bet的0.01
+            call_rake = call_amount * 0.01
             self.game.progressive_amount += call_rake
             
             # 保存更新后的奖池金额
@@ -1454,8 +1454,8 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             aa_winnings = 0
             if self.game.aa > 0:
                 # 获取玩家的最终牌型（使用所有5张公共牌）
-                all_cards = self.game.player_hole + self.game.community_cards
-                aa_eval, _ = find_best_5(all_cards)
+                aa_cards = self.game.player_hole + self.game.community_cards[:3]
+                aa_eval, _ = find_best_5(aa_cards)
                 aa_winnings = self.calculate_aa_winnings(aa_eval)
                 
                 # 更新AA+边注的显示
@@ -1689,9 +1689,9 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
         # 3. AA 副注结算 (修改后的赔率)
         # +++ 修改部分：AA+边注独立计算，无论玩家输赢 +++
         if self.game.aa > 0:
-            # 获取玩家的最终牌型（使用所有5张公共牌）
-            all_cards = self.game.player_hole + self.game.community_cards
-            aa_eval, _ = find_best_5(all_cards)
+            # AA+ 只根据玩家的 2 张手牌 + 公共牌的头 3 张（index 0,1,2）来计算
+            aa_cards = self.game.player_hole + self.game.community_cards[:3]
+            aa_eval, _ = find_best_5(aa_cards)
             aa_winnings = self.calculate_aa_winnings(aa_eval)
             self.win_details['aa'] = aa_winnings
             total_winnings += aa_winnings
@@ -1703,11 +1703,11 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
             
             # 定义奖金规则
             jackpot_rules = {
-                9: {"amount": lambda: max(self.game.progressive_amount, 10000), "message": "皇家顺! 赢得累进大奖 ${amount:.2f}!"},
-                8: {"amount": lambda: max(self.game.progressive_amount * 0.1, 1000), "message": "同花顺! 赢得累进大奖 ${amount:.2f}!"},
-                7: {"amount": 1250, "message": "四条! 赢得累进大奖 $1,250!"},
-                6: {"amount": 375, "message": "葫芦! 赢得累进大奖 $375!"},
-                5: {"amount": 250, "message": "同花! 赢得累进大奖 $250!"}
+                9: {"amount": lambda: max(self.game.progressive_amount, 100000), "message": "皇家同花顺! 赢得累进大奖 ${amount:.2f}!"},
+                8: {"amount": lambda: max(self.game.progressive_amount * 0.1, 10000), "message": "同花顺! 赢得累进大奖 ${amount:.2f}!"},
+                7: {"amount": 3000, "message": "四条! 赢得累进大奖 $3,000!"},
+                6: {"amount": 500,"message": "葫芦! 赢得累进大奖 $500!"},
+                5: {"amount": 350, "message": "同花! 赢得累进大奖 $350!"}
             }
             
             # 修复：直接使用pg_eval[0]而不是pg_eval
@@ -1725,6 +1725,12 @@ class CHEGUI(tk.Tk):  # 修改类名为CHEGUI
                 
                 # 从奖池扣除
                 self.game.progressive_amount -= amount
+                
+                if self.game.progressive_amount < 90912.01:
+                    self.game.progressive_amount = 90912.01
+                
+                save_progressive(self.game.progressive_amount)
+                self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
                 
                 # 显示消息
                 messagebox.showinfo("恭喜您获得累进大奖！", rule["message"].format(amount=amount))

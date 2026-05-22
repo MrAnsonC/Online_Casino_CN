@@ -2,6 +2,11 @@ import json
 import os
 import time
 import sys
+import unicodedata
+
+# 让本文件可直接运行时，也能找到上层项目路径
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 只在 Unix-like 系统上导入这些模块
 if os.name != 'nt':  # 不是 Windows 系统
@@ -9,8 +14,8 @@ if os.name != 'nt':  # 不是 Windows 系统
     import termios
     import tty
 
-## Poker games import
-from Small_Games import ChickenCrossing
+## Small games import
+from Small_Games import ChickenCrossing_tk
 from Small_Games import tower
 from Small_Games import keno
 from Small_Games import rocket_GUI
@@ -20,6 +25,11 @@ from Small_Games import RPS
 from Small_Games import plinko
 from Small_Games import slot_machine
 from Small_Games import Guess_color
+from Small_Games import Thimbles
+from Small_Games import lucky_num
+from Small_Games import stock_market
+from Small_Games import Shoot_Poker
+from Small_Games import deal_or_no_deal
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -45,34 +55,75 @@ def update_balance_in_json(username, new_balance):
             break
     save_user_data(users)  # 保存更新后的数据
 
-def display_menu(selected_row, selected_col):
-    # 定义游戏菜单布局（每行3个，选项间2个空格分隔）
-    menu_layout = [
-        ["小鸡过马路", "上塔游戏", "基诺  "],
-        ["剪刀石头布", "飞天倍数", "扫雷  "],
-        ["小钢珠跌落", "猜数字  ", "猜颜色"],
-        ["数字老虎机", "", ""],
-        ["返回主目录", "", ""]  # 新增返回选项
-    ]
-    
+def display_width(s):
+    width = 0
+    for ch in s:
+        ea = unicodedata.east_asian_width(ch)
+        if ea in ('F', 'W'):  # Fullwidth, Wide
+            width += 2
+        elif ea in ('Na', 'H', 'N', 'A'):  # Narrow, Halfwidth, Neutral, Ambiguous
+            # 对于 Ambiguous 通常按 1 处理（视终端而定）
+            width += 1
+        else:
+            width += 1
+    return width
+
+def pad_game_name(name, width, highlight=False):
+    """将游戏名格式化为固定显示宽度，左对齐，可选高亮（反色）"""
+    name_width = display_width(name)
+    padding = ' ' * (width - name_width)
+    if highlight:
+        # 反色显示
+        return f"\033[7m{name}\033[0m{padding}"
+    else:
+        return name + padding
+
+def display_menu(sections, selected_row, selected_col, fixed_width):
+    """显示分类菜单，选中项根据全局行列高亮，使用固定列宽"""
     os.system('cls' if os.name == 'nt' else 'clear')
     print(" 欢迎来到街机小游戏中心!\n")
     print("请使用方向键选择游戏，回车确认(ESC返回主目录):\n")
-    
-    # 打印菜单，高亮显示选中的游戏
-    for row_idx, row in enumerate(menu_layout):
-        line = ""
-        for col_idx, game in enumerate(row):
-            if game:  # 跳过空项
-                if row_idx == selected_row and col_idx == selected_col:
-                    # 高亮显示选中的游戏
-                    line += f">> {game} <<  "  # 选项间2个空格
+
+    current_global_idx = 0  # 当前输出的全局游戏行索引
+    interval = 2  # 列之间的空格数
+
+    for section_title, rows in sections:
+        if not rows:
+            continue
+
+        # 该分类的最大列数
+        max_cols = max(len(row) for row in rows)
+
+        # 计算标题线的总宽度
+        total_width = max_cols * fixed_width + (max_cols - 1) * interval
+
+        # 生成标题线
+        title = section_title
+        title_width = display_width(title)
+        left_eq = (total_width - title_width) // 2
+        right_eq = total_width - title_width - left_eq
+        title_line = '=' * left_eq + title + '=' * right_eq
+        print(title_line)
+
+        # 输出该分类下的所有游戏行
+        for row in rows:
+            line_parts = []
+            for col in range(max_cols):
+                if col < len(row):
+                    game_name = row[col]
+                    # 判断当前游戏是否为选中项
+                    is_selected = (current_global_idx == selected_row and col == selected_col)
                 else:
-                    line += f"   {game}     "  # 选项间2个空格
-            else:
-                line += " " * 12  # 空项占位
-        print(line)
-    print("\n")
+                    game_name = ""
+                    is_selected = False
+                # 格式化游戏名（固定宽度）
+                part = pad_game_name(game_name, fixed_width, highlight=is_selected)
+                line_parts.append(part)
+            # 用两个空格连接各列
+            line = '  '.join(line_parts)
+            print(line)
+            current_global_idx += 1
+        print()  # 分类间空一行
 
 def get_key():
     """跨平台获取键盘按键"""
@@ -131,90 +182,136 @@ def get_key():
         return None
 
 def main(balance, user):
-    # 初始选择位置 (第0行，第0列)
+    # ========== 定义菜单结构（分类 + 游戏行） ==========
+    sections = [
+        ("街机动作", [
+            ["小鸡过马路", "上塔游戏", "飞天倍数"],
+            ["扫雷"]
+        ]),
+        ("运气&博弈", [
+            ["小钢珠跌落", "幸运数字", "猜颜色"],
+            ["数字老虎机", "三杯球", "猜数字"],
+            ["基诺", "剪刀石头布"]
+        ]),
+        ("模拟&策略", [
+            ["股市大风云", "扑克足球", "成交与否"]
+        ]),
+        ("退出游戏", [
+            ["Esc 返回主目录"]
+        ])
+    ]
+
+    # ========== 游戏名称 -> (ID, 函数) 映射 ==========
+    game_config = {
+        "小鸡过马路": ("1", ChickenCrossing_tk.main),
+        "上塔游戏": ("2", tower.main),
+        "飞天倍数": ("3", rocket_GUI.main),
+        "扫雷": ("4", minus.main),
+        "小钢珠跌落": ("5", plinko.main),
+        "幸运数字": ("6", lucky_num.main),
+        "猜颜色": ("7", Guess_color.main),
+        "数字老虎机": ("8", slot_machine.main),
+        "三杯球": ("9", Thimbles.main),
+        "猜数字": ("10", guess_number.main),
+        "基诺": ("11", keno.main),
+        "剪刀石头布": ("12", RPS.main),
+        "股市大风云": ("13", stock_market.main),
+        "扑克足球": ("14", Shoot_Poker.main),
+        "成交与否": ("15", deal_or_no_deal.main),
+        "Esc 返回主目录": ("return", None)
+    }
+
+    # ========== 构建全局平排行列表，用于导航 ==========
+    # 每个元素格式: (section_index, row_index, game_names_list)
+    global_rows = []
+    for s_idx, (_, rows) in enumerate(sections):
+        for r_idx, row in enumerate(rows):
+            global_rows.append((s_idx, r_idx, row))
+
+    total_game_rows = len(global_rows)       # 总游戏行数
+    # 计算所有游戏名的最大显示宽度，并取至少12
+    all_game_names = [name for _, _, row in global_rows for name in row]
+    max_width = max(display_width(name) for name in all_game_names)
+    fixed_col_width = max(max_width, 12)     # 固定列宽
+
+    # 初始选中位置
     selected_row = 0
     selected_col = 0
-    
-    # 定义游戏映射
-    game_map = {
-        (0, 0): ('1', ChickenCrossing.main),
-        (0, 1): ('2', tower.main),
-        (0, 2): ('3', keno.main),
-        (1, 0): ('4', RPS.main),
-        (1, 1): ('5', rocket_GUI.main),
-        (1, 2): ('6', minus.main),
-        (2, 0): ('7', plinko.main),
-        (2, 1): ('8', guess_number.main),
-        (2, 2): ('9', Guess_color.main),
-        (3, 0): ('10', slot_machine.main),
-        (4, 0): ('return', None)  # 返回主目录选项
-    }
-    
-    # 定义每行的列数
-    row_cols = [3, 3, 3, 1, 1]  # 每行的列数
-    
+
     while True:
-        display_menu(selected_row, selected_col)
-        
-        # 获取当前选择对应的游戏
-        current_game = game_map.get((selected_row, selected_col))
-        
-        # 获取按键
+        # 显示菜单（根据分类 + 高亮选中项）
+        display_menu(sections, selected_row, selected_col, fixed_col_width)
+
         key = get_key()
-        
-        # 处理方向键
+
+        # 上下左右移动逻辑（支持边界循环）
         if key == 'up':
-            if selected_row == 0:  # 在第一行按上键
-                selected_row = 4  # 跳到最后一行
+            if selected_row == 0:
+                selected_row = total_game_rows - 1
             else:
                 selected_row -= 1
-            # 确保列在有效范围内
-            selected_col = min(selected_col, row_cols[selected_row] - 1)
-            
+            # 修正列索引，防止超出新行的范围
+            _, _, row_games = global_rows[selected_row]
+            selected_col = min(selected_col, len(row_games) - 1)
+
         elif key == 'down':
-            if selected_row == 4:  # 在最后一行按下键
-                selected_row = 0  # 跳到第一行
+            if selected_row == total_game_rows - 1:
+                selected_row = 0
             else:
                 selected_row += 1
-            # 确保列在有效范围内
-            selected_col = min(selected_col, row_cols[selected_row] - 1)
-            
+            _, _, row_games = global_rows[selected_row]
+            selected_col = min(selected_col, len(row_games) - 1)
+
         elif key == 'left':
-            if selected_col > 0:  # 同一行内向左移动
+            if selected_col > 0:
                 selected_col -= 1
             else:
-                # 移动到上一行的最后一个选项
+                # 移动到上一行的最右列
                 if selected_row > 0:
                     selected_row -= 1
-                    selected_col = row_cols[selected_row] - 1
-                else:  # 在第一行按左键
-                    selected_row = 4  # 跳到最后一行
-                    selected_col = 0  # 最后一行的第一个选项
-                    
+                else:
+                    selected_row = total_game_rows - 1
+                _, _, row_games = global_rows[selected_row]
+                selected_col = len(row_games) - 1
+
         elif key == 'right':
-            if selected_col < row_cols[selected_row] - 1:  # 同一行内向右移动
+            _, _, row_games = global_rows[selected_row]
+            max_col = len(row_games) - 1
+            if selected_col < max_col:
                 selected_col += 1
             else:
-                # 移动到下一行的第一个选项
-                if selected_row < 4:
+                # 移动到下一行的最左列
+                if selected_row < total_game_rows - 1:
                     selected_row += 1
-                    selected_col = 0
-                else:  # 在最后一行按右键
-                    selected_row = 0  # 跳到第一行
-                    selected_col = 0  # 第一行的第一个选项
-                    
-        # 处理回车键
+                else:
+                    selected_row = 0
+                selected_col = 0
+
         elif key == 'enter':
-            if current_game and current_game[1]:
+            # 获取当前选中的游戏名称
+            _, _, row_games = global_rows[selected_row]
+            game_name = row_games[selected_col]
+            game_id, game_func = game_config[game_name]
+
+            # 如果是返回主目录
+            if game_id == 'return':
+                return balance
+
+            # 运行游戏
+            if game_func:
                 try:
-                    balance = current_game[1](balance, user)
+                    balance = game_func(balance, user)
                     update_balance_in_json(user, balance)
                 except Exception as e:
                     print(f"游戏运行出错: {e}")
                     time.sleep(2)
-            elif current_game and current_game[0] == 'return':
-                return balance  # 返回主目录
-                
-        # 处理退出键
-        elif key == '0' or key == 'esc':  # 0 或 ESC 键
+
+        elif key == '0' or key == 'esc':
             return balance
+        
+def standalone_run_warning():
+    from tkinter import messagebox
+    messagebox.showinfo("提示", "本程式不能独立运作，请按下‘确认’退出")
+
+if __name__ == "__main__":
+    standalone_run_warning()

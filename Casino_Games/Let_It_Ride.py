@@ -15,13 +15,13 @@ SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 RANK_VALUES = {r: i for i, r in enumerate(RANKS, start=2)}
 HAND_RANK_NAMES = {
-    10: '皇家顺', 9: '同花顺', 8: '四条', 7: '葫芦', 6: '同花',
+    10: '皇家同花顺', 9: '同花顺', 8: '四条', 7: '葫芦', 6: '同花',
     5: '顺子', 4: '三条', 3: '两对', 2: '对子10+', 1: '对子', 0: '高牌'
 }
 
 # 支付表 - Let It Ride
 MAIN_BET_PAYOUT = {
-    10: 500,  # 皇家顺 500:1
+    10: 500,  # 皇家同花顺 500:1
     9: 200,   # 同花顺 200:1
     8: 50,    # 四条 50:1
     7: 11,    # 葫芦 11:1
@@ -33,7 +33,7 @@ MAIN_BET_PAYOUT = {
 }
 
 TRIPS_PAYOUT = {
-    10: 100,  # 皇家顺 100:1
+    10: 100,  # 皇家同花顺 100:1
     9: 40,    # 同花顺 40:1
     8: 30,    # 四条 30:1
     7: 6,     # 葫芦 6:1
@@ -44,7 +44,7 @@ TRIPS_PAYOUT = {
 
 # 修改后的Jackpot赔率表
 JACKPOT_PAYOUT = {
-    10: {"type": "percentage", "value": 1.0, "min": 175000},   # 皇家顺: 100% Jackpot 或 $175,000 (取较高者)
+    10: {"type": "percentage", "value": 1.0, "min": 175000},   # 皇家同花顺: 100% Jackpot 或 $175,000 (取较高者)
     9: {"type": "percentage", "value": 0.1, "min": 17500},     # 同花顺: 10% Jackpot 或 $17,500 (取较高者)
     8: {"type": "fixed", "value": 7000},    # 四条 $7,000
     7: {"type": "fixed", "value": 5000},    # 葫芦 $5,000
@@ -76,7 +76,7 @@ def update_balance_in_json(username, new_balance):
 
 # Jackpot 文件加载与保存
 def load_jackpot():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
     default_jackpot = 157301.26
     # 文件不存在时使用默认奖池
     if not os.path.exists(path):
@@ -93,7 +93,7 @@ def load_jackpot():
     return True, default_jackpot
 
 def save_progressive(jackpot):
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Jackpot.json')
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
     data = []
     # 如果文件存在，读取原有数据
     if os.path.exists(path):
@@ -413,7 +413,7 @@ class LetItRideGUI(tk.Tk):
           6. 翻开第二张公共牌，结算所有保留的下注
 
         牌型排名（从高到低）:
-          皇家顺 > 同花顺 > 四条 > 葫芦 > 同花 > 顺子 > 三条 > 两对 > 对子10+ > 对子 > 高牌
+          皇家同花顺 > 同花顺 > 四条 > 葫芦 > 同花 > 顺子 > 三条 > 两对 > 对子10+ > 对子 > 高牌
         """
         
         rules_label = tk.Label(
@@ -460,7 +460,7 @@ class LetItRideGUI(tk.Tk):
         
         # 表格数据
         odds_data = [
-            ("皇家顺", "500:1", "100:1", "100%累进大奖 或 $175,000\n(取较高者)"),
+            ("皇家同花顺", "500:1", "100:1", "100%累进大奖 或 $175,000\n(取较高者)"),
             ("同花顺", "200:1", "40:1", "10%累进大奖 或 $17,500\n(取较高者)"),
             ("四条", "50:1", "30:1", "$7,000"),
             ("葫芦", "11:1", "6:1", "$5,000"),
@@ -928,11 +928,6 @@ class LetItRideGUI(tk.Tk):
         self.bet_c_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("bet_c"))
         self.bet_widgets["bet_c"] = self.bet_c_display
 
-        # 新增提示文字
-        self.hint_label = tk.Label(bet_frame, text="", 
-                                font=('Arial', 12), bg='#2a4a3c', fg='#FFD700')
-        self.hint_label.pack(pady=(0, 10))
-
         # 游戏操作按钮框架 - 用于放置所有操作按钮
         self.action_frame = tk.Frame(control_frame, bg='#2a4a3c')
         self.action_frame.pack(fill=tk.X, pady=10)
@@ -976,32 +971,36 @@ class LetItRideGUI(tk.Tk):
         self.current_bet_label = tk.Label(
             row1_frame, text="本局下注: $0.00", 
             font=('Arial', 14), bg='#2a4a3c', fg='white',
-            width=15, anchor='w'
+            width=25, anchor='w'
         )
         self.current_bet_label.pack(side=tk.LEFT, padx=10)
         
-        # 本局退还金额 - 设置固定宽度
-        self.refund_label = tk.Label(
-            row1_frame, text="本局退还: $0.00", 
-            font=('Arial', 14), bg='#2a4a3c', fg='light blue',
-            width=15, anchor='w'
-        )
-        self.refund_label.pack(side=tk.LEFT, padx=10)
-        
-        # 第二行：上局获胜金额和规则按钮
+        # 第二行：本局退还
         row2_frame = tk.Frame(bet_info_frame, bg='#2a4a3c')
         row2_frame.pack(fill=tk.X, padx=10, pady=5)
         
+        # 本局退还金额 - 设置固定宽度
+        self.refund_label = tk.Label(
+            row2_frame, text="本局退还: $0.00", 
+            font=('Arial', 14), bg='#2a4a3c', fg='light blue',
+            width=25, anchor='w'
+        )
+        self.refund_label.pack(side=tk.LEFT, padx=10)
+        
+        # 第三行：上局获胜金额和规则按钮
+        row3_frame = tk.Frame(bet_info_frame, bg='#2a4a3c')
+        row3_frame.pack(fill=tk.X, padx=10, pady=5)
+        
         # 上局获胜金额 - 设置固定宽度
         self.last_win_label = tk.Label(
-            row2_frame, text="  上局获胜: $0.00", 
+            row3_frame, text="  上局获胜: $0.00", 
             font=('Arial', 14), bg='#2a4a3c', fg='#FFD700',
-            width=15, anchor='w'
+            width=30, anchor='w'
         )
         self.last_win_label.pack(side=tk.LEFT)
 
         self.info_button = tk.Button(
-            row2_frame,
+            row3_frame,
             text="ℹ️",
             command=self.show_game_instructions,
             bg='#4B8BBE',
@@ -1648,7 +1647,7 @@ class LetItRideGUI(tk.Tk):
             
             # 定义奖金规则 - 根据您的要求修改
             jackpot_rules = {
-                10: {"amount": lambda: max(self.game.progressive_amount, 175000), "message": "皇家顺! 赢得累进大奖 ${amount:.2f}!"},
+                10: {"amount": lambda: max(self.game.progressive_amount, 175000), "message": "皇家同花顺! 赢得累进大奖 ${amount:.2f}!"},
                 9: {"amount": lambda: max(self.game.progressive_amount * 0.1, 17500), "message": "同花顺! 赢得累进大奖 ${amount:.2f}!"},
                 8: {"amount": 7000, "message": "四条! 赢得累进大奖 $7,000!"},
                 7: {"amount": 5000, "message": "葫芦! 赢得累进大奖 $5,000!"},
@@ -2042,7 +2041,7 @@ class LetItRideGUI(tk.Tk):
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-def main(initial_balance=10000, username="Guest"):
+def main(initial_balance=1000000, username="Guest"):
     app = LetItRideGUI(initial_balance, username)
     app.mainloop()
     return app.balance

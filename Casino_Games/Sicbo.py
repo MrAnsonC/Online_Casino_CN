@@ -299,18 +299,18 @@ class SicboGame:
 
         # 筹码系统
         self.chip_values = [
-            ('25',   '#00ff00'),
-            ('100',  '#000000'),
-            ('200',  '#0000ff'),
-            ('500',  '#FF7DDA'),
-            ('1K',   '#ffffff'),
-            ('2K',   '#0000ff'),
-            ('5K',   '#ff0000'),
-            ('10K',  '#800080'),
-            ('20K',  '#ffa500'),
-            ('50K',  '#006400')
+            ('5', "#fcffd5"),
+            ('25', '#00ff00'),
+            ('100', '#000000'),
+            ('500', "#FF7DDA"),
+            ('1千', "#ab0058"),
+            ('5千', '#ff0000'),
+            ('1万', '#800080'),
+            ('3万', '#ffbf00'),
+            ('5万', '#006400'),
+            ('10万', '#00ff00')
         ]
-        self.chips = [25, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]
+        self.chips = [5, 25, 100, 500, 1000, 5000, 10000, 30000, 50000, 100000]
         self.history = []
         self.chip_widgets = []
         
@@ -491,11 +491,6 @@ class SicboGame:
     
     def format_amount(self, amount):
         """格式化金额显示"""
-        if amount >= 1000:
-            if amount >= 10000:
-                return f"{amount / 1000:.1f}K"
-            else:
-                return str(amount)
         return f"{amount}"
 
     def ensure_500_Record_structure(self, block):
@@ -695,7 +690,7 @@ class SicboGame:
         info_frame = tk.Frame(control_frame, bg='#D0E7FF')
         info_frame.pack(fill=tk.X, pady=5)
 
-        self.balance_label = tk.Label(info_frame, text=f"余额: ${self.balance}",
+        self.balance_label = tk.Label(info_frame, text=f"余额: ${self.balance:.2f}",
                                     font=("Arial", 18, "bold"), fg='black', bg='#D0E7FF')
         self.balance_label.pack(side=tk.LEFT, padx=10)
 
@@ -740,7 +735,7 @@ class SicboGame:
             canvas = tk.Canvas(row1, width=60, height=60, bg='#D0E7FF', highlightthickness=0, cursor="hand2")
             canvas.pack(side=tk.LEFT, padx=5)
             oval_id = canvas.create_oval(5, 5, 55, 55, fill=color, outline='#333', width=2)
-            text_color = 'white' if label in ['100', '200', '2K', '5K', '10K', '50K'] else 'black'
+            text_color = 'white' if label in ['100', '1千', '1万', '5万', '50万'] else 'black'
             canvas.create_text(30, 30, text=label, font=("Arial", 16, "bold"), fill=text_color)
             canvas.bind("<Button-1>", lambda e, c=value: self.set_bet_amount(c))
             self.chip_widgets.append((canvas, oval_id, value))
@@ -752,7 +747,7 @@ class SicboGame:
             canvas = tk.Canvas(row2, width=60, height=60, bg='#D0E7FF', highlightthickness=0, cursor="hand2")
             canvas.pack(side=tk.LEFT, padx=5)
             oval_id = canvas.create_oval(5, 5, 55, 55, fill=color, outline='#333', width=2)
-            text_color = 'white' if label in ['100', '200', '2K', '5K', '10K', '50K'] else 'black'
+            text_color = 'white' if label in ['100', '1千', '1万', '5万', '50万'] else 'black'
             canvas.create_text(30, 30, text=label, font=("Arial", 16, "bold"), fill=text_color)
             canvas.bind("<Button-1>", lambda e, c=value: self.set_bet_amount(c))
             self.chip_widgets.append((canvas, oval_id, value))
@@ -778,11 +773,11 @@ class SicboGame:
 
         content_frame = tk.Frame(outer_frame, bg=table_bg)
         content_frame.pack(fill=tk.X)
-        tk.Label(content_frame, text="25", font=("Arial", 12, "bold"),
+        tk.Label(content_frame, text="5", font=("Arial", 12, "bold"),
                  bg=table_bg, fg='black', width=9, pady=5).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Label(content_frame, text="50,000", font=("Arial", 12, "bold"),
+        tk.Label(content_frame, text="100,000", font=("Arial", 12, "bold"),
                  bg=table_bg, fg='black', width=9, pady=5).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Label(content_frame, text="500,000", font=("Arial", 12, "bold"),
+        tk.Label(content_frame, text="2,000,000", font=("Arial", 12, "bold"),
                  bg=table_bg, fg='black', width=9, pady=5).pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         # 上局信息
@@ -1112,8 +1107,8 @@ class SicboGame:
             self.small_frame.children['!label'].config(text="小（3-10）")
             self.big_frame.children['!label'].config(text="大（11-18）")
             # 更新围骰通杀条显示
-            self.small_triple_label.config(text="↑↓↑↓ 赔率1:0.97 围骰照赔 ↑↓↑↓")
-            self.big_triple_label.config(text="↑↓↑↓ 赔率1:0.97 围骰照赔 ↑↓↑↓")
+            self.small_triple_label.config(text="↑↓↑↓ 赔率1:0.92 围骰照赔 ↑↓↑↓")
+            self.big_triple_label.config(text="↑↓↑↓ 赔率1:0.92 围骰照赔 ↑↓↑↓")
         else:
             self.mode_switch.config(text="关")
             # 恢复大小范围显示
@@ -1906,34 +1901,34 @@ class SicboGame:
         # 获取本局总下注额
         total_bet_amount = self.current_bet
 
-        # 单区域最高下注限制 50K
-        if current_bet_amount >= 50000:
-            tk.messagebox.showwarning("下注限制", "当前区域已满 50K，不能再下注！")
+        # 单区域最高下注限制 10万
+        if current_bet_amount >= 100000:
+            tk.messagebox.showwarning("下注限制", "当前区域已满 10万，不能再下注！")
             return
 
-        # 本局总额最高限制 500K
-        if total_bet_amount >= 500000:
-            tk.messagebox.showwarning("下注限制", "本局总下注已满 500K，不能再下注！")
+        # 本局总额最高限制 100万
+        if total_bet_amount >= 2000000:
+            tk.messagebox.showwarning("下注限制", "本局总下注已满 200万，不能再下注！")
             return
 
         amount = self.bet_amount
         if amount <= 0 or amount > self.balance:
             return
 
-        # 如果下注会超过区域 50K，自动调整下注到剩余可下注额度
-        if current_bet_amount + amount > 50000:
-            allowed_amount = 50000 - current_bet_amount
+        # 如果下注会超过区域 10万，自动调整下注到剩余可下注额度
+        if current_bet_amount + amount > 100000:
+            allowed_amount = 100000 - current_bet_amount
             if allowed_amount <= 0:
-                tk.messagebox.showwarning("下注限制", "当前区域已满 50K，不能再下注！")
+                tk.messagebox.showwarning("下注限制", "当前区域已满 10万，不能再下注！")
                 return
             tk.messagebox.showwarning("下注限制", f"下注已达上限，自动调整为 {allowed_amount}")
             amount = allowed_amount
 
-        # 如果下注会超过本局总额 500K，自动调整下注到剩余额度
-        if total_bet_amount + amount > 500000:
-            allowed_amount = 500000 - total_bet_amount
+        # 如果下注会超过本局总额 200万，自动调整下注到剩余额度
+        if total_bet_amount + amount > 2000000:
+            allowed_amount = 2000000 - total_bet_amount
             if allowed_amount <= 0:
-                tk.messagebox.showwarning("下注限制", "本局总下注已满 500K，不能再下注！")
+                tk.messagebox.showwarning("下注限制", "本局总下注已满 200万，不能再下注！")
                 return
             tk.messagebox.showwarning("下注限制", f"本局总额已达上限，自动调整为 {allowed_amount}")
             amount = allowed_amount
@@ -1955,7 +1950,7 @@ class SicboGame:
 
     def update_display(self):
         """更新所有UI显示"""
-        self.balance_label.config(text=f"餘額: ${self.balance}")
+        self.balance_label.config(text=f"餘額: ${self.balance:.2f}")
         self.current_bet_display.config(text=f"${self.current_bet}")
         self.last_win_display.config(text=f"${self.last_win}")
         self.big_bet_label.config(text=f"${self.format_amount(self.bets['big'])}")
@@ -2040,7 +2035,7 @@ class SicboGame:
         
         if self.current_bet > 0:
             # 根据围骰模式确定赔率
-            size_odds = 0.97 if self.triple_mode else 1.0
+            size_odds = 0.92 if self.triple_mode else 1.0
             
             for bet_type, data in self.bets.items():
                 if bet_type == "small":

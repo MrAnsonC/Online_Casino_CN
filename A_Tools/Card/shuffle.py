@@ -304,7 +304,7 @@ if __name__ == "__main__":
     has_joker = False
     deck_count = 1
     
-    # 解析命令行参数
+    # 解析命令行参数True
     if len(sys.argv) > 1:
         # 第一个参数：是否包含鬼牌
         has_joker_arg = sys.argv[1].lower()
