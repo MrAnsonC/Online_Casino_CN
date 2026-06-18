@@ -21,10 +21,12 @@ from Casino_Games import I_Love_Flush
 from Casino_Games import Let_It_Ride
 from Casino_Games import Lunar_Poker
 from Casino_Games import Mississippi_Stud_Poker
+from Casino_Games import Pai_Gow_Poker
 from Casino_Games import Super_In_Or_Out
 from Casino_Games import Three_Card_Poker
 from Casino_Games import Video_Poker
 from Casino_Games import Ultimate_Texas_Holdem
+from Casino_Games import Ultimate_Three_Card_Poker
 from Casino_Games import Ultimate_Omaha_Holdem
 from Casino_Games import Wild_Five_Card_Poker
 
@@ -38,6 +40,9 @@ from Casino_Games import Blackjack_Easy
 from Casino_Games import Blackjack_Classic
 from Casino_Games import Blackjack_Multiply
 from Casino_Games import Blackjack_Spanish
+from Casino_Games import Blackjack_Double_Up
+from Casino_Games import Blackjack_Double
+from Casino_Games import Blackjack_Premiere
 
 ## Dice
 from Casino_Games import BacBo
@@ -52,6 +57,7 @@ from Casino_Games import Auto_Texas_Holdem
 ## Wheel games
 from Casino_Games import Big_Six_Wheel
 from Casino_Games import Roulette_American
+from Casino_Games import Roulette_Europe
 
 
 def get_data_file_path():
@@ -218,13 +224,15 @@ def main(balance, user):
             ["三张牌扑克", "视频扑克", "加勒比梭哈扑克", "月亮梭哈扑克"],
             ["四张牌扑克", "赌场扑克", "DJ Wild梭哈扑克", "密⻄⻄⽐梭哈撲克"],
             ["任逍遥扑克", "单挑扑克", "终极德州扑克", "终极奥马哈扑克"],
-            ["超级内外住", "我爱同花", "⺩牌五張撲克", "赌场战争"]
+            ["超级内外住", "牌九扑克", "⺩牌五張撲克", "终极三张牌扑克"],
+            ["赌场战争", "我爱同花"]
         ]),
         ("百家乐", [
             ["百家乐", "龙虎斗", "龙虎凤"]
         ]),
         ("21点", [
-            ["简单21点", "经典21点", "西班牙式21點", "豪赢21点"]
+            ["简单21点", "经典21点", "西班牙式21點", "豪赢21点"],
+            ["免牌加倍21点", "双向21点", "免牌加倍21点"]
         ]),
         ("骰子", [
             ["花旗骰", "克朗代克", "骰宝", "骰子百家乐"]
@@ -233,7 +241,7 @@ def main(balance, user):
             ["德州扑克双人对决", "梭哈扑克双人对决"]
         ]),
         ("轮盘赌", [
-            ["美式轮盘","幸运之轮"]
+            ["美式轮盘", "欧式轮盘", "幸运之轮"]
         ]),
         ("退出游戏", [
             ["ESC 返回主目录"]
@@ -258,26 +266,32 @@ def main(balance, user):
         "赌场战争": ("14", Casino_War.main),
         "单挑扑克": ("15", Heads_Up_Holdem.main),
         "DJ Wild梭哈扑克": ("16", DJ_Wild.main),
+        "终极三张牌扑克": ("17", Ultimate_Three_Card_Poker.main),
+        "牌九扑克": ("36", Pai_Gow_Poker.main),
 
-        "百家乐": ("17", Baccarat.main),
-        "龙虎斗": ("18", Dragon_Tiger.main),
-        "龙虎凤": ("19", Dragon_Tiger_Phoenix.main),
+        "百家乐": ("18", Baccarat.main),
+        "龙虎斗": ("19", Dragon_Tiger.main),
+        "龙虎凤": ("20", Dragon_Tiger_Phoenix.main),
 
-        "简单21点": ("20", Blackjack_Easy.main),
-        "经典21点": ("21", Blackjack_Classic.main),
-        "西班牙式21點": ("22", Blackjack_Spanish.main),
-        "豪赢21点": ("23", Blackjack_Multiply.main),
+        "简单21点": ("21", Blackjack_Easy.main),
+        "经典21点": ("22", Blackjack_Classic.main),
+        "西班牙式21點": ("23", Blackjack_Spanish.main),
+        "豪赢21点": ("24", Blackjack_Multiply.main),
+        "无限加倍21点": ("25", Blackjack_Double_Up.main),
+        "免牌加倍21点": ("26", Blackjack_Double.main),
+        "双向21点": ("37", Blackjack_Premiere.main),
 
-        "花旗骰": ("24", Craps.main),
-        "克朗代克": ("25", Klondike_Dice.main),
-        "骰宝": ("26", Sicbo.main),
-        "骰子百家乐": ("27", BacBo.main),
+        "花旗骰": ("27", Craps.main),
+        "克朗代克": ("28", Klondike_Dice.main),
+        "骰宝": ("29", Sicbo.main),
+        "骰子百家乐": ("30", BacBo.main),
 
-        "德州扑克双人对决": ("28", Auto_Texas_Holdem.main),
-        "梭哈扑克双人对决": ("29", Auto_Stud_Poker.main),
+        "德州扑克双人对决": ("31", Auto_Texas_Holdem.main),
+        "梭哈扑克双人对决": ("32", Auto_Stud_Poker.main),
 
-        "幸运之轮": ("30", Big_Six_Wheel.main),
-        "美式轮盘":("31", Roulette_American.main),
+        "幸运之轮": ("33", Big_Six_Wheel.main),
+        "美式轮盘":("34", Roulette_American.main),
+        "欧式轮盘":("35", Roulette_Europe.main),
 
         "ESC 返回主目录": ("return", None)
     }
@@ -346,7 +360,7 @@ def main(balance, user):
             game_name = row_games[selected_global_col]
             game_id, game_func = game_config[game_name]
 
-            if game_id in ('24', '25'):
+            if game_id in ('27', '28'):
                 from tkinter import messagebox
                 messagebox.showinfo("维护通知", "本程式正在维护，请按下‘确认’退出")
                 continue

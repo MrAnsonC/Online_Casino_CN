@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-from PIL import Image, ImageTk, ImageColor
+from PIL import Image, ImageTk, ImageColor, ImageDraw
 import random
 import json
 import os, sys
@@ -163,6 +163,14 @@ class BaccaratGUI(tk.Tk):
         self.balance = initial_balance
         self.current_bets = {}
         self.card_images = {}
+        self.card_pil_images = {}
+        self.back_pil_image = None
+        self.reveal_mode = "auto"  # auto / scratch
+        self.reveal_target_side = "player"
+        self.card_items = {}
+        self.card_scratch_states = {}
+        self.active_scratch_card_id = None
+        self.round_resolved = False
 
         # 新增連勝記錄追蹤屬性
         self.current_streak = 0
@@ -370,8 +378,8 @@ class BaccaratGUI(tk.Tk):
             print(f"保存jackpot失败: {e}")
 
     def _update_jackpot(self, bet_amount):
-        """更新累进大奖 - 每局下注的0.8%加入奖池"""
-        jackpot_increase = bet_amount * 0.008
+        """更新累进大奖 - 每局下注的1%加入奖池"""
+        jackpot_increase = bet_amount * 0.01
         self.jackpot_amount += jackpot_increase
         self._save_jackpot()
         
@@ -1731,8 +1739,12 @@ class BaccaratGUI(tk.Tk):
 
     def _load_assets(self):
         card_size = (120, 170)
+        self.card_size = card_size
         suits = ['Club', 'Diamond', 'Heart', 'Spade']
         ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
+
+        self.card_pil_images = {}
+        self.back_pil_image = None
 
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
@@ -1743,14 +1755,16 @@ class BaccaratGUI(tk.Tk):
                 filename = f"{suit}{rank}.png"
                 path = os.path.join(card_dir, filename)
                 try:
-                    img = Image.open(path).resize(card_size)
-                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
+                    pil_img = Image.open(path).convert('RGBA').resize(card_size, Image.LANCZOS)
+                    self.card_pil_images[(suit, rank)] = pil_img
+                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(pil_img)
                 except Exception as e:
                     print(f"Error loading {path}: {e}")
 
         back_path = os.path.join(card_dir, 'Background.png')
         try:
-            self.back_image = ImageTk.PhotoImage(Image.open(back_path).resize(card_size))
+            self.back_pil_image = Image.open(back_path).convert('RGBA').resize(card_size, Image.LANCZOS)
+            self.back_image = ImageTk.PhotoImage(self.back_pil_image)
         except Exception as e:
             print(f"Error loading back image: {e}")
 
@@ -2735,6 +2749,8 @@ class BaccaratGUI(tk.Tk):
                 # 恢复初始文本格式（最后一行显示~~）
                 new_text = f"{original_text[0]}\n{original_text[1]}\n~~"
                 btn.config(text=new_text)
+
+        self._sync_reveal_mode_button()
 
     def update_mode_display(self):
         """更新组合框显示文本"""
@@ -4972,21 +4988,34 @@ class BaccaratGUI(tk.Tk):
         separator = ttk.Separator(parent, orient=tk.HORIZONTAL)
         separator.pack(fill=tk.X, padx=5, pady=2)  # 减少pady
 
-        # DEAL/RESET 按钮行 - 减小字体
+        # RESET + 咪牌 按钮同一行
         btn_frame = tk.Frame(parent, bg='#D0E7FF')
-        btn_frame.pack(fill=tk.X)  # 减少pady
+        btn_frame.pack(fill=tk.X)
+
         self.reset_button = tk.Button(
             btn_frame, text="重设金额", command=self.reset_bets,
             bg='#ff4444', fg='white',
-            font=('微软雅黑', 16, 'bold')  # 从18改为16
+            font=('微软雅黑', 16, 'bold')
         )
-        self.reset_button.pack(side=tk.TOP, expand=True, fill=tk.X, padx=10, pady=2)  # 减少pady
+        self.reset_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(10, 4), pady=2)
+
+        self.scratch_mode_button = tk.Button(
+            btn_frame, text="咪牌", command=self._toggle_reveal_mode,
+            bg='#4444ff', fg='white',
+            font=('微软雅黑', 16, 'bold')
+        )
+        self.scratch_mode_button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=(4,10), pady=2)
+
+        # 开始游戏独立一行
+        deal_frame = tk.Frame(parent, bg='#D0E7FF')
+        deal_frame.pack(fill=tk.X)
+
         self.deal_button = tk.Button(
-            btn_frame, text="开始游戏 (Enter)", command=self.start_game,
+            deal_frame, text="开始游戏 (Enter)", command=self.start_game,
             bg='gold', fg='black',
-            font=('微软雅黑', 16, 'bold')  # 从18改为16
+            font=('微软雅黑', 16, 'bold')
         )
-        self.deal_button.pack(side=tk.TOP, expand=True, fill=tk.X, padx=10, pady=(0,2))  # 减少pady
+        self.deal_button.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(2,2))
 
         # 分隔线 + 当前/上次下注显示
         separator = ttk.Separator(parent, orient=tk.HORIZONTAL)
@@ -5351,6 +5380,8 @@ class BaccaratGUI(tk.Tk):
                 btn.config(state=tk.DISABLED)
             self.deal_button.config(state=tk.DISABLED)
             self.reset_button.config(state=tk.DISABLED)
+            if hasattr(self, 'scratch_mode_button'):
+                self.scratch_mode_button.config(state=tk.DISABLED)
             self.mode_combo.config(state='disabled')
             self.unbind('<Return>')
             
@@ -5363,9 +5394,13 @@ class BaccaratGUI(tk.Tk):
             btn.config(state=tk.DISABLED)
         self.deal_button.config(state=tk.DISABLED)
         self.reset_button.config(state=tk.DISABLED)
+        if hasattr(self, 'scratch_mode_button'):
+            self.scratch_mode_button.config(state=tk.DISABLED)
         self.unbind('<Return>')
         self.mode_combo.config(state='disabled')
         
+        self.reveal_target_side = self._get_mi_pai_target_side()
+        self.round_resolved = False
         self.game.play_game()
         self.animate_dealing()
 
@@ -5383,9 +5418,17 @@ class BaccaratGUI(tk.Tk):
 
         # track which cards we've flipped face-up
         self.revealed_cards = {'player': [], 'banker': []}
+        self.card_items = {}
+        self.card_scratch_states = {}
+        self.active_scratch_card_id = None
+        self.round_resolved = False
+        self.reveal_target_side = self._get_mi_pai_target_side()
 
         self._deal_initial_cards()
-        self.after(1000, self._reveal_initial_phase1)
+        if self.reveal_mode == 'auto':
+            self.after(1000, self._reveal_initial_phase1)
+        else:
+            self.after(1200, self._manual_prepare_reveal)
 
     def _deal_initial_cards(self):
         self.initial_card_ids = []
@@ -5398,7 +5441,9 @@ class BaccaratGUI(tk.Tk):
 
     def _animate_card_entrance(self, hand_type, index, target_pos):
         start_x, start_y = 500, 0
-        card_id = self.table_canvas.create_image(start_x, start_y, image=self.back_image)
+        card_tag = f"{hand_type}_{index}_{len(self.initial_card_ids)}"
+        card_id = self.table_canvas.create_image(start_x, start_y, image=self.back_image, tags=(card_tag, 'game_card'))
+        self._register_card_item(card_id, hand_type, index, card_tag)
         
         def move_step(step=0):
             if step <= 30:
@@ -5479,6 +5524,8 @@ class BaccaratGUI(tk.Tk):
                 if not hasattr(self, 'revealed_cards'):
                     self.revealed_cards = {'player': [], 'banker': []}
                 self.revealed_cards[hand_type].append(real_card)
+
+            self._on_card_revealed(hand_type, card_id, real_card)
 
             # 更新已翻开的点数显示（复用你原来计算/显示逻辑）
             try:
@@ -5564,6 +5611,251 @@ class BaccaratGUI(tk.Tk):
                 # 最后兜底：返回已有的 back_image 或任一缓存图片
                 return getattr(self, 'back_image', None)
 
+    def _get_mi_pai_target_side(self):
+        """根据当前主注判断咪牌侧；默认选下注更高的一边。"""
+        player_bet = int(self.current_bets.get('Player', 0) or 0)
+        banker_bet = int(self.current_bets.get('Banker', 0) or 0)
+        if banker_bet > player_bet:
+            return 'banker'
+        return 'player'
+
+    def _sync_reveal_mode_button(self):
+        if not hasattr(self, 'scratch_mode_button'):
+            return
+        try:
+            if self.reveal_mode == 'scratch':
+                self.scratch_mode_button.config(text='自动')
+            else:
+                self.scratch_mode_button.config(text='咪牌')
+        except Exception:
+            pass
+
+    def _toggle_reveal_mode(self):
+        if self.reveal_mode == 'scratch':
+            self.reveal_mode = 'auto'
+        else:
+            self.reveal_mode = 'scratch'
+        self._sync_reveal_mode_button()
+
+    def _register_card_item(self, card_id, hand_type, index, tag_name):
+        try:
+            self.card_items[card_id] = {
+                'hand_type': hand_type,
+                'index': index,
+                'tag': tag_name,
+                'revealed': False,
+                'mode': self.reveal_mode,
+                'card': self.game.player_hand[index] if hand_type == 'player' else self.game.banker_hand[index],
+            }
+            self.card_scratch_states[card_id] = {'points': []}
+            self.table_canvas.tag_bind(card_id, '<ButtonPress-1>', self._on_card_press)
+            self.table_canvas.tag_bind(card_id, '<B1-Motion>', self._on_card_drag)
+            self.table_canvas.tag_bind(card_id, '<ButtonRelease-1>', self._on_card_release)
+        except Exception:
+            pass
+
+    def _attach_card_face(self, card_id, hand_type, card, index):
+        try:
+            if card_id not in self.card_items:
+                self.card_items[card_id] = {}
+            self.card_items[card_id].update({
+                'hand_type': hand_type,
+                'index': index,
+                'card': card,
+                'revealed': False,
+            })
+        except Exception:
+            pass
+
+    def _on_card_press(self, event):
+        if self.reveal_mode != 'scratch':
+            return
+        try:
+            item = event.widget.find_withtag('current')
+            if not item:
+                return
+            card_id = item[0]
+            info = self.card_items.get(card_id)
+            if not info or info.get('revealed'):
+                return
+            if info.get('hand_type') != self.reveal_target_side:
+                self._reveal_card_with_flip(card_id)
+                return
+            self.active_scratch_card_id = card_id
+            self._add_scratch_point(card_id, event.x, event.y, force=True)
+        except Exception:
+            pass
+
+    def _on_card_drag(self, event):
+        if self.reveal_mode != 'scratch':
+            return
+        card_id = self.active_scratch_card_id
+        if not card_id:
+            return
+        try:
+            info = self.card_items.get(card_id)
+            if not info or info.get('revealed'):
+                return
+            if info.get('hand_type') != self.reveal_target_side:
+                return
+            self._add_scratch_point(card_id, event.x, event.y, force=False)
+        except Exception:
+            pass
+
+    def _on_card_release(self, event):
+        if self.reveal_mode != 'scratch':
+            return
+        try:
+            if self.active_scratch_card_id:
+                self._add_scratch_point(self.active_scratch_card_id, event.x, event.y, force=False)
+        finally:
+            self.active_scratch_card_id = None
+
+    def _add_scratch_point(self, card_id, x, y, force=False):
+        info = self.card_items.get(card_id)
+        if not info:
+            return
+        if info.get('revealed'):
+            return
+        center = self.table_canvas.coords(card_id)
+        if not center:
+            return
+        cx, cy = center[0], center[1]
+        w, h = getattr(self, 'card_size', (120, 170))
+        left = cx - w / 2
+        top = cy - h / 2
+        local_x = x - left
+        local_y = y - top
+        if local_x < 0 or local_y < 0 or local_x > w or local_y > h:
+            return
+        # 保护左上角与右下角黑色遮挡区，不允许被提前刮开
+        if (local_x <= 26 and local_y <= 36) or (local_x >= w - 26 and local_y >= h - 36):
+            return
+        state = self.card_scratch_states.setdefault(card_id, {'points': []})
+        points = state['points']
+        # 去重：避免同一点重复太多
+        if points and not force:
+            last_x, last_y, _ = points[-1]
+            if abs(last_x - local_x) < 6 and abs(last_y - local_y) < 6:
+                return
+        points.append((int(local_x), int(local_y), 24))
+        self._refresh_scratch_card(card_id)
+        if self._scratch_complete(card_id):
+            self._finish_scratch_card(card_id)
+
+    def _refresh_scratch_card(self, card_id):
+        info = self.card_items.get(card_id)
+        if not info:
+            return
+        card = info.get('card')
+        if not card:
+            return
+        state = self.card_scratch_states.get(card_id, {'points': []})
+        try:
+            img = self._create_scratch_image(card, state.get('points', []))
+            if not hasattr(self, '_temp_scratch_images'):
+                self._temp_scratch_images = {}
+            self._temp_scratch_images[card_id] = img
+            self.table_canvas.itemconfig(card_id, image=img)
+        except Exception:
+            pass
+
+    def _create_scratch_image(self, card, points):
+        face = self.card_pil_images.get(card)
+        if face is None:
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
+            face = Image.open(os.path.join(card_dir, f'{card[0]}{card[1]}.png')).convert('RGBA').resize(getattr(self, 'card_size', (120, 170)), Image.LANCZOS)
+        else:
+            face = face.copy()
+        w, h = face.size
+        overlay = Image.new('RGBA', (w, h), (215, 215, 215, 255))
+        draw_overlay = ImageDraw.Draw(overlay)
+        # 左上角与右下角黑色颜料遮挡
+        draw_overlay.rectangle((0, 0, 28, 36), fill=(0, 0, 0, 255))
+        draw_overlay.rectangle((w - 28, h - 36, w, h), fill=(0, 0, 0, 255))
+
+        mask = Image.new('L', (w, h), 255)
+        draw_mask = ImageDraw.Draw(mask)
+        for px, py, pr in points:
+            draw_mask.ellipse((px-pr, py-pr, px+pr, py+pr), fill=0)
+
+        result = face.copy()
+        result.paste(overlay, (0, 0), mask)
+        return ImageTk.PhotoImage(result)
+
+    def _scratch_complete(self, card_id):
+        state = self.card_scratch_states.get(card_id, {'points': []})
+        return len(state.get('points', [])) >= 18
+
+    def _finish_scratch_card(self, card_id):
+        info = self.card_items.get(card_id)
+        if not info or info.get('revealed'):
+            return
+        card = info.get('card')
+        hand_type = info.get('hand_type')
+        if card is None or hand_type not in ('player', 'banker'):
+            return
+        try:
+            self.table_canvas.itemconfig(card_id, image=self.card_images[card])
+        except Exception:
+            pass
+        info['revealed'] = True
+        try:
+            if not hasattr(self, 'revealed_cards'):
+                self.revealed_cards = {'player': [], 'banker': []}
+            if card not in self.revealed_cards[hand_type]:
+                self.revealed_cards[hand_type].append(card)
+        except Exception:
+            pass
+        self._on_card_revealed(hand_type, card_id, card)
+
+    def _reveal_card_with_flip(self, card_id):
+        info = self.card_items.get(card_id)
+        if not info or info.get('revealed'):
+            return
+        hand_type = info.get('hand_type')
+        card = info.get('card')
+        if hand_type not in ('player', 'banker') or card is None:
+            return
+        info['revealed'] = True
+        self._flip_card((hand_type, card_id), card, info.get('index', 0))
+
+    def _on_card_revealed(self, hand_type, card_id, real_card):
+        try:
+            if not hasattr(self, 'revealed_cards'):
+                self.revealed_cards = {'player': [], 'banker': []}
+            if card_id in self.card_items:
+                self.card_items[card_id]['revealed'] = True
+        except Exception:
+            pass
+        try:
+            total = sum(self.game.card_value(c) for c in self.revealed_cards[hand_type]) % 10
+            display_text = '~' if total is None or str(total) == '~' else str(total)
+            if hand_type == 'player' and hasattr(self, 'player_total_id'):
+                self.table_canvas.itemconfig(self.player_total_id, text=display_text)
+            elif hand_type == 'banker' and hasattr(self, 'banker_total_id'):
+                self.table_canvas.itemconfig(self.banker_total_id, text=display_text)
+        except Exception:
+            pass
+        if self.reveal_mode == 'scratch' and not self.round_resolved:
+            if len(self.revealed_cards.get('player', [])) >= len(self.game.player_hand) and len(self.revealed_cards.get('banker', [])) >= len(self.game.banker_hand):
+                self.round_resolved = True
+                self.after(500, self.resolve_bets)
+
+    def _manual_prepare_reveal(self):
+        try:
+            self.table_canvas.itemconfig(self.result_text_id, text='请点击牌面；选中下注方可“咪牌”')
+        except Exception:
+            pass
+        if len(self.game.player_hand) > 2 or len(self.game.banker_hand) > 2:
+            self.after(300, self._manual_deal_extra_cards)
+
+    def _manual_deal_extra_cards(self):
+        if len(self.game.player_hand) > 2:
+            self._deal_extra_card('player', 2)
+        if len(self.game.banker_hand) > 2:
+            self.after(350, lambda: self._deal_extra_card('banker', 2))
     def _create_flip_image(self, card, angle):
         # 获取当前脚本所在目录的绝对路径
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -5584,7 +5876,9 @@ class BaccaratGUI(tk.Tk):
         hand = self.game.player_hand if hand_type == "player" else self.game.banker_hand
         card = hand[index]
         target_pos = self._get_card_positions(hand_type)[index]
-        card_id = self.table_canvas.create_image(500, 0, image=self.back_image)  # 从中心位置开始
+        card_tag = f"extra_{hand_type}_{index}_{len(self.initial_card_ids)}"
+        card_id = self.table_canvas.create_image(500, 0, image=self.back_image, tags=(card_tag, 'game_card'))  # 从中心位置开始
+        self._register_card_item(card_id, hand_type, index, card_tag)
         self.initial_card_ids.append((hand_type, card_id))
         for step in range(30):
             x = 500 + (target_pos[0]-500)*(step/30)  # 从500开始移动到目标x坐标
@@ -5592,7 +5886,10 @@ class BaccaratGUI(tk.Tk):
             self.table_canvas.coords(card_id, x, y)
             self.update()
             self.after(10)
-        self._flip_card((hand_type, card_id), card, index+4)
+        if self.reveal_mode == 'auto':
+            self._flip_card((hand_type, card_id), card, index+4)
+        else:
+            self._attach_card_face(card_id, hand_type, card, index)
 
     def resolve_bets(self):
         is_natural = False
@@ -5986,6 +6283,12 @@ class BaccaratGUI(tk.Tk):
                 pass
             try:
                 self.mode_combo.config(state='readonly')
+            except Exception:
+                pass
+            try:
+                if hasattr(self, 'scratch_mode_button'):
+                    self.scratch_mode_button.config(state=tk.NORMAL)
+                    self._sync_reveal_mode_button()
             except Exception:
                 pass
 

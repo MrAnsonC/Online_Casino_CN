@@ -170,9 +170,10 @@ class BlackjackGame:
         self.dealer_forced_hit_for_insurance = False  # 标记是否因保险而强制补牌
     
     def deal_initial_cards(self):
-        """发初始牌：玩家第1张，庄家第1张，玩家第2张"""
-        self.player_hand = [self.deck.deal_card(), self.deck.deal_card()]
-        self.dealer_hand = [self.deck.deal_card()]
+        # 发牌顺序：玩家第一张 -> 庄家一张 -> 玩家第二张
+        self.player_hand = [self.deck.deal_card()]   # 玩家第一张
+        self.dealer_hand = [self.deck.deal_card()]   # 庄家明牌
+        self.player_hand.append(self.deck.deal_card())  # 玩家第二张
         # 庄家第二张牌暂不发
     
     def get_hand_value(self, hand):
@@ -1302,394 +1303,159 @@ class BlackjackGUI(tk.Tk):
         self.after(300, lambda: widget.config(bg=original_color))
 
     def show_game_instructions(self):
-        """显示游戏规则说明 - 以表格形式展示边注和立即结算规则"""
         win = tk.Toplevel(self)
         win.title("西班牙21点游戏规则")
-        win.geometry("900x500")
+        win.geometry("750x650")
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
-        
-        # 计算居中位置
-        parent_x = self.winfo_x()
-        parent_y = self.winfo_y()
-        parent_width = self.winfo_width()
-        parent_height = self.winfo_height()
-        
-        win_width = 900
-        win_height = 500
-        x = parent_x + (parent_width - win_width) // 2
-        y = parent_y + (parent_height - win_height) // 2
-        win.geometry(f"{win_width}x{win_height}+{x}+{y}")
-        
-        # 创建主框架
+
         main_frame = tk.Frame(win, bg='#F0F0F0')
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # 添加滚动条
+
         scrollbar = ttk.Scrollbar(main_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # 创建画布用于滚动
+
         canvas = tk.Canvas(main_frame, bg='#F0F0F0', yscrollcommand=scrollbar.set)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=canvas.yview)
-        
-        # 创建内部框架放置所有内容
-        scrollable_frame = tk.Frame(canvas, bg='#F0F0F0')
-        canvas_frame = canvas.create_window((0, 0), window=scrollable_frame, anchor='nw')
-        
-        # 内部 helper：统一创建三列表格，"条件" 列加宽，"赔率" 列减窄
-        def _create_rules_table(parent, headers, data, header_bg, row_color_even, row_color_odd):
-            """
-            parent: 父容器
-            headers: 列标题列表（长度必须为3）
-            data: 行数据列表，每项为三元组
-            header_bg: 表头背景色
-            row_color_even/odd: 交替行背景色（even: r%2==0）
-            返回创建的 table frame（以备需要进一步操作）
-            """
-            table = tk.Frame(parent, bg='#F0F0F0')
-            table.pack(fill=tk.X)
-            
-            # 字符宽度近似值（label width 参数，字符数单位）
-            header_widths = [18, 26, 14]  # 类型, 条件（加宽）, 赔率（减窄）
-            # 对应像素下限（minsize），可保证在窗口拉伸/字体差异下有较稳定表现
-            minsizes = [140, 340, 100]  # 以像素为单位：第2列更宽，第3列更窄
-            
-            # 表头
-            for col, header in enumerate(headers):
-                tk.Label(
-                    table,
-                    text=header,
-                    font=('微软雅黑', 14, 'bold'),
-                    bg=header_bg,
-                    fg='white',
-                    padx=15, pady=10,
-                    anchor='w',
-                    width=header_widths[col]
-                ).grid(row=0, column=col, sticky='ew', padx=1, pady=1)
-            
-            # 表格内容（交替行色）
-            for r, row_data in enumerate(data, start=1):
-                bg = row_color_even if r % 2 == 0 else row_color_odd
-                for c, txt in enumerate(row_data):
-                    tk.Label(
-                        table,
-                        text=txt,
-                        font=('微软雅黑', 14),
-                        bg=bg,
-                        padx=15, pady=8,
-                        anchor='w',
-                        width=header_widths[c]
-                    ).grid(row=r, column=c, sticky='ew', padx=1, pady=1)
-            
-            # 列宽分配：中间列权重大（占比更高），并设置 minsize
-            table.columnconfigure(0, weight=1, minsize=minsizes[0])
-            table.columnconfigure(1, weight=2, minsize=minsizes[1])
-            table.columnconfigure(2, weight=1, minsize=minsizes[2])
-            
-            return table
-        
-        # ===== 第一部分：游戏基本规则 =====
-        basic_rules_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        # 左侧距离窗口最左边 15px，右侧不额外留白
-        basic_rules_frame.pack(fill=tk.X, padx=(0, 0), pady=10)
-        
-        tk.Label(
-            basic_rules_frame,
-            text="西班牙21点游戏基本规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#2E86AB'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        basic_rules_text = (
-            "1. 游戏目标: 使手中牌的点数总和尽可能接近21点，但不能超过21点。\n"
+
+        content_frame = tk.Frame(canvas, bg='#F0F0F0')
+        canvas.create_window((0, 0), window=content_frame, anchor='nw')
+
+        # ========== 基本规则与保险规则文本 ==========
+        rules_text = (
+            "西班牙21点 游戏规则\n\n"
+            "1. 游戏目标: 使手中牌的点数总和尽可能接近21点，但不能超过21点。\n\n"
             "2. 牌值计算:\n"
-            "- 2-9: 牌面值\n"
-            "- J, Q, K: 10点\n"
-            "- A: 1点或11点（自动选择最有利的值）\n"
+            "   - 2-9: 牌面值\n"
+            "   - J, Q, K: 10点\n"
+            "   - A: 1点或11点（自动选择最有利的值）\n\n"
             "3. 游戏流程:\n"
-            "a. 下注阶段: 玩家下注主注，可选择下注边注\n"
-            "b. 发牌: 玩家第1张，庄家第1张，玩家第2张\n"
-            "c. 保险: 如果庄家第一张是A，玩家可选择购买保险\n"
-            "d. 玩家回合: 可选择要牌、停牌、加倍、投降\n"
-            "e. 庄家回合: 庄家必须补牌直到手牌点数达到17点或更高，Soft 17必须补牌\n"
+            "   a. 下注阶段: 玩家下注主注，可选择下注边注\n"
+            "   b. 发牌: 玩家第1张，庄家第1张，玩家第2张\n"
+            "   c. 保险: 庄家第一张为A时，可购买保险（赔率5:2）\n"
+            "   d. 玩家回合: 要牌、停牌、加倍、投降\n"
+            "   e. 庄家回合: 必须补牌至17点或以上，Soft 17必须补牌\n\n"
             "4. 特殊规则:\n"
-            "- 使用8副牌，移除所有10点牌\n"
-            "- 切牌位置: 剩余45张牌时重新洗牌\n"
-            "- 庄家Soft 17必须补牌\n"
-            "- 庄家22点且玩家未爆牌（20点以内）时，主注平局\n"
+            "   - 使用8副牌，移除所有10点牌\n"
+            "   - 切牌位置: 剩余45张牌时重新洗牌\n"
+            "   - 庄家Soft 17必须补牌\n"
+            "   - 庄家22点且玩家未爆牌（20点以内）时，主注平局\n\n"
+            "5. 保险规则:\n"
+            "   - 条件: 庄家第一张牌是A时可选\n"
+            "   - 金额: 主注的50%\n"
+            "   - 赔付: 5:2（庄家Blackjack时获胜）\n"
+            "   - 检查: 庄家第二张为10点牌（J/Q/K）时保险获胜\n"
+            "   - 特殊情况: 玩家Blackjack时跳过保险，直接结算"
         )
-        
-        basic_rules_label = tk.Label(
-            basic_rules_frame,
-            text=basic_rules_text,
-            font=('微软雅黑', 14),
-            bg='#F0F0F0',
-            fg='#333333',
-            justify=tk.LEFT,
-            wraplength=850
-        )
-        # 取消 label 的额外横向内边距，使其与 frame 左侧的 15px 间距对齐
-        basic_rules_label.pack(fill=tk.X, padx=0, pady=5, anchor='w')
-        
-        # ===== 第二部分：立即结算规则表格 =====
-        immediate_settlement_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        immediate_settlement_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Label(
-            immediate_settlement_frame,
-            text="立即结算规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#A23B72'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        immediate_headers = ["类型", "条件", "赔率"]
-        immediate_data = [
-            ("Blackjack", "玩家前2张牌达到21点", "3:2"),
-            ("5龙21点", "玩家5张牌且总点数为21点", "2:1"),
-            ("任何21点", "玩家任何21点（非2张牌）", "1:1"),
-            ("5张牌", "玩家5张牌且未爆牌", "1:1")
-        ]
-        
-        _create_rules_table(
-            parent=immediate_settlement_frame,
-            headers=immediate_headers,
-            data=immediate_data,
-            header_bg='#4B8BBE',
-            row_color_even='#E8F4FD',
-            row_color_odd='#FFFFFF'
-        )
-        
-        # ===== 第三部分：完美对子边注规则表格 =====
-        perfect_pair_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        perfect_pair_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Label(
-            perfect_pair_frame,
-            text="完美对子边注规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#2E86AB'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        pair_headers = ["类型", "条件", "赔率"]
-        pair_data = [
-            ("完美对子", "相同花色和点数", "21:1"),
-            ("同色对子", "相同颜色和点数", "11:1"),
-            ("混合对子", "相同点数", "6:1")
-        ]
-        
-        _create_rules_table(
-            parent=perfect_pair_frame,
-            headers=pair_headers,
-            data=pair_data,
-            header_bg='#A23B72',
-            row_color_even='#F5E6F0',
-            row_color_odd='#FFFFFF'
-        )
-        
-        # ===== 第四部分：21+3边注规则表格 =====
-        twenty_one_plus_three_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        twenty_one_plus_three_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Label(
-            twenty_one_plus_three_frame,
-            text="21+3边注规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#F18F01'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        three_headers = ["类型", "条件", "赔率"]
-        three_data = [
-            ("同花三条", "三张牌同花色且点数相同", "90:1"),
-            ("同花顺", "三张牌同花色且点数连续", "35:1"),
-            ("三条", "三张牌点数相同", "29:1"),
-            ("顺子", "三张牌点数连续", "9:1"),
-            ("同花", "三张牌同花色", "9:2")
-        ]
-        
-        _create_rules_table(
-            parent=twenty_one_plus_three_frame,
-            headers=three_headers,
-            data=three_data,
-            header_bg='#F18F01',
-            row_color_even='#FDF0E0',
-            row_color_odd='#FFFFFF'
-        )
-        
-        # ===== 第五部分：皇家同花边注规则表格 =====
-        royal_match_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        royal_match_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Label(
-            royal_match_frame,
-            text="皇家同花边注规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#2E86AB'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        royal_headers = ["类型", "条件", "赔率"]
-        royal_data = [
-            ("皇家同花", "同花Q和K", "30:1"),
-            ("同花", "同花但不是Q和K", "5:2")
-        ]
-        
-        _create_rules_table(
-            parent=royal_match_frame,
-            headers=royal_headers,
-            data=royal_data,
-            header_bg='#2E86AB',
-            row_color_even='#E8F4FD',
-            row_color_odd='#FFFFFF'
-        )
-        
-        # ===== 第六部分：22点边注规则表格 =====
-        twenty_two_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        twenty_two_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Label(
-            twenty_two_frame,
-            text="22点边注规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#A23B72'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        twenty_two_headers = ["类型", "条件", "赔率"]
-        twenty_two_data = [
-            ("同花", "庄家最终点数为22点且所有牌花色相同", "50:1"),
-            ("同色", "庄家最终点数为22点且所有牌颜色相同", "20:1"),
-            ("混色", "庄家最终点数为22点但花色不一致", "8:1")
-        ]
-        
-        _create_rules_table(
-            parent=twenty_two_frame,
-            headers=twenty_two_headers,
-            data=twenty_two_data,
-            header_bg='#A23B72',
-            row_color_even='#F5E6F0',
-            row_color_odd='#FFFFFF'
-        )
-        
-        # ===== 第七部分：热门3边注规则表格 =====
-        hot_3_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        hot_3_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Label(
-            hot_3_frame,
-            text="热门3边注规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#F18F01'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        hot_3_headers = ["类型", "条件", "赔率"]
-        hot_3_data = [
-            ("三张7同花", "三张牌都是7点且同花色", "350:1"),
-            ("三张7混花", "三张牌都是7点但花色不同", "75:1"),
-            ("21点同花", "三张牌总点数21点且同花色", "19:1"),
-            ("21点混花", "三张牌总点数21点但花色不同", "4:1"),
-            ("20点", "三张牌总点数20点", "3:2"),
-            ("19点", "三张牌总点数19点", "1:1")
-        ]
-        
-        _create_rules_table(
-            parent=hot_3_frame,
-            headers=hot_3_headers,
-            data=hot_3_data,
-            header_bg='#F18F01',
-            row_color_even='#FDF0E0',
-            row_color_odd='#FFFFFF'
-        )
-        
-        # ===== 第八部分：幸运女王边注规则表格 =====
-        lucky_queen_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        lucky_queen_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Label(
-            lucky_queen_frame,
-            text="幸运女王边注规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#2E86AB'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        lucky_headers = ["类型", "条件", "赔率"]
-        lucky_data = [
-            ("女王同花+庄家BJ", "两张同花Q且庄家Blackjack", "600:1"),
-            ("女王同花", "两张同花Q", "60:1"),
-            ("同点数同花", "两张同点数同花牌", "20:1"),
-            ("同花", "两张总点数20点同花牌(非Q)", "8:1"),
-            ("混花", "两张总点数20点但花色不同", "7:2")
-        ]
-        
-        _create_rules_table(
-            parent=lucky_queen_frame,
-            headers=lucky_headers,
-            data=lucky_data,
-            header_bg='#2E86AB',
-            row_color_even='#E8F4FD',
-            row_color_odd='#FFFFFF'
-        )
-        
-        # ===== 第九部分：保险规则说明 =====
-        insurance_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        # 同样将 insurance 部分左侧与窗口左边保持 15px 空隙
-        insurance_frame.pack(fill=tk.X, padx=(0, 0), pady=10)
-        
-        tk.Label(
-            insurance_frame,
-            text="保险规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#A23B72'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        insurance_text = (
-            "1. 保险条件: 当庄家第一张牌是A时，玩家可选择购买保险\n"
-            "2. 保险金额: 主注的50%（下注10元可购买5元保险）\n"
-            "3. 保险赔付: 2:1（下注5元保险，如果庄家Blackjack则赢10元，共返回15元）\n"
-            "4. 保险检查: 庄家第二张牌是J/Q/K时保险获胜\n"
-            "5. 特殊情况:\n"
-            "- 玩家Blackjack时跳过保险阶段，直接结算\n"
-            "- 玩家投降后如果有保险，庄家仍需行动检查保险\n"
-        )
-        
-        insurance_label = tk.Label(
-            insurance_frame,
-            text=insurance_text,
-            font=('微软雅黑', 14),
-            bg='#F0F0F0',
-            fg='#333333',
-            justify=tk.LEFT,
-            wraplength=850
-        )
-        insurance_label.pack(fill=tk.X, padx=0, pady=5, anchor='w')
-        
-        # ===== 滚动区域更新 =====
-        scrollable_frame.update_idletasks()
+
+        tk.Label(content_frame, text=rules_text, font=('微软雅黑', 11),
+                bg='#F0F0F0', justify=tk.LEFT, padx=10, pady=10).pack(fill=tk.X)
+
+        # ========== 辅助函数：创建风格统一的支付表 ==========
+        def create_pay_table(parent, title, headers, data):
+            tk.Label(parent, text=title, font=('微软雅黑', 12, 'bold'),
+                    bg='#F0F0F0').pack(anchor='w', padx=10, pady=(10, 0))
+            table_frame = tk.Frame(parent, bg='#F0F0F0')
+            table_frame.pack(fill=tk.X, padx=20, pady=5)
+
+            # 表头
+            for col, h in enumerate(headers):
+                tk.Label(table_frame, text=h, font=('微软雅黑', 10, 'bold'),
+                        bg='#4B8BBE', fg='white', padx=10, pady=5).grid(
+                    row=0, column=col, sticky='nsew', padx=1, pady=1)
+
+            # 数据行
+            for r, row_data in enumerate(data, start=1):
+                bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
+                for c, txt in enumerate(row_data):
+                    tk.Label(table_frame, text=txt, font=('微软雅黑', 10),
+                            bg=bg, padx=10, pady=5).grid(
+                        row=r, column=c, sticky='nsew', padx=1, pady=1)
+
+            for c in range(len(headers)):
+                table_frame.columnconfigure(c, weight=1)
+
+        # ========== 立即结算规则 ==========
+        create_pay_table(content_frame, "立即结算规则",
+                        ["类型", "条件", "赔率"],
+                        [
+                            ("Blackjack", "玩家前2张牌达到21点", "3:2"),
+                            ("5龙21点", "玩家5张牌且总点数为21点", "2:1"),
+                            ("任何21点", "玩家任何21点（非2张牌）", "1:1"),
+                            ("5张牌", "玩家5张牌且未爆牌", "1:1"),
+                        ])
+
+        # ========== 完美对子边注 ==========
+        create_pay_table(content_frame, "完美对子边注规则",
+                        ["类型", "条件", "赔率"],
+                        [
+                            ("完美对子", "相同花色和点数", "21:1"),
+                            ("同色对子", "相同颜色和点数", "11:1"),
+                            ("混合对子", "相同点数", "6:1"),
+                        ])
+
+        # ========== 21+3 边注 ==========
+        create_pay_table(content_frame, "21+3边注规则",
+                        ["类型", "条件", "赔率"],
+                        [
+                            ("同花三条", "三张牌同花色且点数相同", "90:1"),
+                            ("同花顺", "三张牌同花色且点数连续", "35:1"),
+                            ("三条", "三张牌点数相同", "29:1"),
+                            ("顺子", "三张牌点数连续", "9:1"),
+                            ("同花", "三张牌同花色", "9:2"),
+                        ])
+
+        # ========== 皇家同花边注 ==========
+        create_pay_table(content_frame, "皇家同花边注规则",
+                        ["类型", "条件", "赔率"],
+                        [
+                            ("皇家同花", "同花Q和K", "30:1"),
+                            ("同花", "同花但不是Q和K", "5:2"),
+                        ])
+
+        # ========== 22点边注 ==========
+        create_pay_table(content_frame, "22点边注规则",
+                        ["类型", "条件", "赔率"],
+                        [
+                            ("同花", "庄家最终22点且所有牌同花", "50:1"),
+                            ("同色", "庄家最终22点且所有牌同色", "20:1"),
+                            ("混色", "庄家最终22点但花色不一致", "8:1"),
+                        ])
+
+        # ========== 热门3边注 ==========
+        create_pay_table(content_frame, "热门3边注规则",
+                        ["类型", "条件", "赔率"],
+                        [
+                            ("三张7同花", "三张牌都是7点且同花色", "350:1"),
+                            ("三张7混花", "三张牌都是7点但花色不同", "75:1"),
+                            ("21点同花", "三张牌总点数21点且同花色", "19:1"),
+                            ("21点混花", "三张牌总点数21点但花色不同", "4:1"),
+                            ("20点", "三张牌总点数20点", "3:2"),
+                            ("19点", "三张牌总点数19点", "1:1"),
+                        ])
+
+        # ========== 幸运女王边注 ==========
+        create_pay_table(content_frame, "幸运女王边注规则",
+                        ["类型", "条件", "赔率"],
+                        [
+                            ("女王同花+庄家BJ", "两张同花Q且庄家Blackjack", "600:1"),
+                            ("女王同花", "两张同花Q", "60:1"),
+                            ("同点数同花", "两张同点数同花牌", "20:1"),
+                            ("同花", "两张总点数20点同花牌(非Q)", "8:1"),
+                            ("混花", "两张总点数20点但花色不同", "7:2"),
+                        ])
+
+        # 刷新滚动区域
+        content_frame.update_idletasks()
         canvas.config(scrollregion=canvas.bbox("all"))
-        
-        # ===== 关闭按钮 =====
-        close_btn = ttk.Button(
-            win,
-            text="关闭",
-            command=win.destroy
-        )
+
+        # 关闭按钮
+        close_btn = ttk.Button(win, text="关闭", command=win.destroy)
         close_btn.pack(pady=10)
-        
-        # ===== 绑定鼠标滚轮滚动 =====
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        
-        win.bind("<MouseWheel>", _on_mousewheel)
-        canvas.bind("<MouseWheel>", _on_mousewheel)
-        scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
+
+        # 鼠标滚轮支持
+        win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
     
     def select_chip(self, chip_text):
         """选择筹码，并更新筹码的高亮状态"""
@@ -2913,8 +2679,8 @@ class BlackjackGUI(tk.Tk):
             if len(self.game.dealer_hand) >= 2:
                 dealer_second_card = self.game.dealer_hand[1]
                 if dealer_second_card.rank in ['J', 'Q', 'K']:
-                    # 保险获胜：按 2:1 支付（此处我们把“本金+净赢”一起返回）
-                    insurance_win = self.game.insurance_bet * 3
+                    # 保险获胜：按 5:2 支付（此处我们把“本金+净赢”一起返回）
+                    insurance_win = self.game.insurance_bet * 3.5
                     if insurance_win:
                         self.balance += insurance_win
                         self.update_balance()
@@ -2927,7 +2693,10 @@ class BlackjackGUI(tk.Tk):
                             self.last_win_label.config(text=f"上局获胜: ${self.last_win:.2f}")
                         except Exception:
                             pass
-                        self.insurance_var.set(str(int(insurance_win)))
+                        if insurance_win == int(insurance_win):
+                                self.insurance_var.set(str(int(insurance_win)))
+                        else:
+                            self.insurance_var.set(f"{insurance_win:.2f}")
                         self.insurance_display.config(bg='gold')
 
                     # 清除保险投注，避免重复发放
@@ -3355,9 +3124,12 @@ class BlackjackGUI(tk.Tk):
         # 保险（insurance）
         if self.game.insurance_bet > 0:
             if self.game.dealer_blackjack and not self.game.player_blackjack:
-                insurance_win = self.game.insurance_bet * 3  # 2:1 赔付（返回为净赢+本金）
+                insurance_win = self.game.insurance_bet * 3.5  # 5:2 赔付（返回为净赢+本金）
                 details["insurance"] = insurance_win
-                self.insurance_var.set(str(int(insurance_win)))
+                if insurance_win == int(insurance_win):
+                        self.insurance_var.set(str(int(insurance_win)))
+                else:
+                    self.insurance_var.set(f"{insurance_win:.2f}")
                 self.insurance_display.config(bg='gold')
             else:
                 details["insurance"] = 0

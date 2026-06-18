@@ -1,15 +1,15 @@
 [
     {
         "Games": "UTH_&_UOH_&_CHE_&_HUH",
-        "jackpot": 91502.26000000015
+        "jackpot": 93218.19000000022
     },
     {
         "Games": "3CP",
-        "jackpot": 783944.350000001
+        "jackpot": 790021.3000000016
     },
     {
         "Games": "CSP",
-        "jackpot": 425991.40999999986
+        "jackpot": 469508.0400000002
     },
     {
         "Games": "LetItRide",
@@ -29,7 +29,7 @@
     },
     {
         "Games": "BCT",
-        "jackpot": 10575591.457
+        "jackpot": 11919705.127
     },
     {
         "Games": "BCT-DDC",
@@ -38,5 +38,9 @@
     {
         "Games": "MississippiStud",
         "jackpot": 158850.66
+    },
+    {
+        "Games": "3UP",
+        "jackpot": 214437.84999999992
     }
 ]

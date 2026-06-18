@@ -126,28 +126,26 @@ class BlackjackGame:
         self.main_bet = 0
         self.perfect_pair_bet = 0
         self.twenty_one_plus_three_bet = 0
-        self.royal_match_bet = 0
-        self.bust_bet = 0
-        self.hot_3_bet = 0
-        self.lucky_queen_bet = 0
+        self.sixteen_bet = 0          # 16点边注
+        self.double_up_bet = 0        # 加倍UP下注金额
         self.stage = "betting"
         self.player_done = False
         self.insurance_bet = 0
         self.insurance_taken = False
         self.player_blackjack = False
         self.dealer_blackjack = False
-        self.double_extra = 0          # 额外加倍金额（用于庄家Blackjack时退还）
-        self.dealer_second_dealt = False  # 是否已发庄家第二张牌
+        self.double_extra = 0          # 传统加倍额外金额（用于庄家Blackjack时退还）
+        self.dealer_second_dealt = False
+        self.dealer_sixteen_push = False  # 庄家是否因16点停牌导致主注Push
     
     def deal_initial_cards(self):
-        # 发牌顺序：玩家第一张 -> 庄家一张 -> 玩家第二张
         self.player_hand = [self.deck.deal_card()]   # 玩家第一张
         self.dealer_hand = [self.deck.deal_card()]   # 庄家明牌
         self.player_hand.append(self.deck.deal_card())  # 玩家第二张
         self.dealer_second_dealt = False
+        self.dealer_sixteen_push = False
     
     def add_dealer_second_card(self):
-        """需要时给庄家补发第二张牌（暗牌）"""
         if not self.dealer_second_dealt:
             self.dealer_hand.append(self.deck.deal_card())
             self.dealer_second_dealt = True
@@ -159,6 +157,17 @@ class BlackjackGame:
             value -= 10
             num_aces -= 1
         return value
+    
+    def is_soft_hand(self, hand):
+        """判断手牌是否为软手（包含A且A计11时不爆）"""
+        value = sum(card.get_value() for card in hand)
+        num_aces = sum(1 for card in hand if card.rank == 'A')
+        if num_aces == 0:
+            return False
+        # 如果按A=11计算不超过21，且手牌总数>=2（避免单张A）
+        if value <= 21:
+            return True
+        return False
     
     def player_hit(self):
         self.player_hand.append(self.deck.deal_card())
@@ -223,95 +232,11 @@ class BlackjackGame:
         if len(set(suits)) == 1:
             return "flush"
         return None
-    
-    def check_royal_match(self):
-        if len(self.player_hand) < 2:
-            return False
-        card1, card2 = self.player_hand[0], self.player_hand[1]
-        if card1.suit != card2.suit:
-            return False
-        if (card1.rank == 'Q' and card2.rank == 'K') or (card1.rank == 'K' and card2.rank == 'Q'):
-            return "royal"
-        else:
-            return "suited"
-    
-    def check_hot_3(self):
-        if len(self.player_hand) < 2 or len(self.dealer_hand) < 1:
-            return None
-        player_card1 = self.player_hand[0]
-        player_card2 = self.player_hand[1]
-        dealer_card = self.dealer_hand[0]
-        
-        def get_dynamic_value(card, other_cards):
-            if card.rank != 'A':
-                return card.get_value()
-            other_total = 0
-            for other_card in other_cards:
-                if other_card.rank == 'A':
-                    other_total += 11
-                else:
-                    other_total += other_card.get_value()
-            if other_total + 11 > 21:
-                return 1
-            else:
-                return 11
-        
-        total_value = 0
-        cards = [player_card1, player_card2, dealer_card]
-        for i, card in enumerate(cards):
-            other_cards = [c for j, c in enumerate(cards) if j != i]
-            total_value += get_dynamic_value(card, other_cards)
-        
-        all_sevens = (player_card1.rank == '7' and player_card2.rank == '7' and dealer_card.rank == '7')
-        same_suit = (player_card1.suit == player_card2.suit == dealer_card.suit)
-        
-        if all_sevens:
-            if same_suit:
-                return "three_seven_same_suit"
-            else:
-                return "three_seven_mixed"
-        elif total_value == 21:
-            if same_suit:
-                return "twenty_one_same_suit"
-            else:
-                return "twenty_one_mixed"
-        elif total_value == 20:
-            return "twenty"
-        elif total_value == 19:
-            return "nineteen"
-        else:
-            return None
-
-    def check_lucky_queen(self):
-        if len(self.player_hand) < 2:
-            return None
-        player_card1 = self.player_hand[0]
-        player_card2 = self.player_hand[1]
-        total_value = player_card1.get_value() + player_card2.get_value()
-        if total_value != 20:
-            return None
-        
-        both_queens = (player_card1.rank == 'Q' and player_card2.rank == 'Q')
-        same_suit = (player_card1.suit == player_card2.suit)
-        same_rank = (player_card1.rank == player_card2.rank)
-        dealer_blackjack = self.check_blackjack(self.dealer_hand)
-        
-        if both_queens and same_suit:
-            if dealer_blackjack:
-                return "queens_same_suit_dealer_bj"
-            else:
-                return "queens_same_suit"
-        elif same_rank and same_suit:
-            return "same_rank_same_suit"
-        elif same_suit:
-            return "same_suit"
-        else:
-            return "mixed"
 
 class BlackjackGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
-        self.title("经典21点")
+        self.title("免牌加倍21点")
         self.geometry("1150x650+50+10")
         self.resizable(0,0)
         self.configure(bg='#35654d')
@@ -325,17 +250,14 @@ class BlackjackGUI(tk.Tk):
         self.selected_chip = None
         self.chip_buttons = []
         self.last_win = 0
-        self.last_bet = None
         self.auto_reset_timer = None
         self.buttons_disabled = False
         self.win_details = {
             "main": 0,
             "perfect_pair": 0,
             "twenty_one_plus_three": 0,
-            "royal_match": 0,
-            "bust": 0,
-            "hot_3": 0,
-            "lucky_queen": 0,
+            "sixteen": 0,
+            "double_up": 0,
             "insurance": 0
         }
         self.bet_widgets = {}
@@ -444,91 +366,30 @@ class BlackjackGUI(tk.Tk):
                 new_value = 2500
                 messagebox.showwarning("下注限制", f"21+3上限为2500，已自动调整")
             self.twenty_one_plus_three_var.set(str(int(new_value)))
-        elif bet_type == "royal_match":
-            current = int(self.royal_match_var.get())
+        elif bet_type == "sixteen":
+            current = int(self.sixteen_var.get())
             new_value = current + chip_value
             if new_value > 2500:
                 new_value = 2500
-                messagebox.showwarning("下注限制", f"皇家同花上限为2500，已自动调整")
-            self.royal_match_var.set(str(int(new_value)))
-        elif bet_type == "bust":
-            current = int(self.bust_var.get())
-            new_value = current + chip_value
-            if new_value > 2500:
-                new_value = 2500
-                messagebox.showwarning("下注限制", f"爆！上限为2500，已自动调整")
-            self.bust_var.set(str(int(new_value)))
-        elif bet_type == "hot_3":
-            current = int(self.hot_3_var.get())
-            new_value = current + chip_value
-            if new_value > 2500:
-                new_value = 2500
-                messagebox.showwarning("下注限制", f"热门3上限为2500，已自动调整")
-            self.hot_3_var.set(str(int(new_value)))
-        elif bet_type == "lucky_queen":
-            current = int(self.lucky_queen_var.get())
-            new_value = current + chip_value
-            if new_value > 2500:
-                new_value = 2500
-                messagebox.showwarning("下注限制", f"幸运女王上限为2500，已自动调整")
-            self.lucky_queen_var.set(str(int(new_value)))
+                messagebox.showwarning("下注限制", f"16点上限于2500，已自动调整")
+            self.sixteen_var.set(str(int(new_value)))
+        # 保险和加倍UP的格子不可通过点击添加筹码
 
-
-    def _build_action_buttons(self):
-        """创建或重建开始游戏区域的三按钮：重置金额、重复上局下注、开始游戏"""
-        # 清空原有按钮（如果有）
-        for widget in self.action_frame.winfo_children():
-            widget.destroy()
-
-        start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=5)
-
-        # 重置金额按钮
-        self.reset_bets_button = tk.Button(
-            start_button_frame, text="重置金额", 
-            command=self.reset_bets, font=('Arial', 14),
-            bg='#F44336', fg='white', width=10
-        )
-        self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
-
-        # 重复上局下注按钮
-        self.repeat_bet_btn = tk.Button(
-            start_button_frame, text="重复上局下注", 
-            command=self.apply_last_bet, font=('Arial', 14),
-            bg='#4A90E2', fg='white', activebackground='#3A7BC8', width=12,
-            state=tk.NORMAL if self.last_bet is not None else tk.DISABLED
-        )
-        self.repeat_bet_btn.pack(side=tk.LEFT, padx=(0, 10))
-
-        # 开始游戏按钮
-        self.start_button = tk.Button(
-            start_button_frame, text="开始游戏", 
-            command=self.start_game, font=('Arial', 14),
-            bg='#4CAF50', fg='white', width=10
-        )
-        self.start_button.pack(side=tk.LEFT)
+    def _toggle_double_up_visibility(self, show_double_up):
+        """控制加倍UP和边注全下按钮的显示/隐藏"""
+        if show_double_up:
+            # 显示加倍UP相关组件
+            self.double_up_label.pack(side=tk.LEFT, padx=15)
+            self.double_up_display.pack(side=tk.LEFT, padx=2)
+            # 隐藏边注全下按钮
+            self.side_bet_all_in_frame.pack_forget()
+        else:
+            # 隐藏加倍UP相关组件
+            self.double_up_label.pack_forget()
+            self.double_up_display.pack_forget()
+            # 显示边注全下按钮
+            self.side_bet_all_in_frame.pack(side=tk.LEFT, padx=15)
     
-    def apply_last_bet(self):
-        """将上一次开始游戏时的下注金额重新填充到各个下注输入框"""
-        if self.last_bet is None:
-            self.repeat_bet_btn.config(state=tk.DISABLED)
-            return
-
-        # 恢复主注及各边注
-        self.main_bet_var.set(str(self.last_bet.get("main", 0)))
-        self.perfect_pair_var.set(str(self.last_bet.get("perfect_pair", 0)))
-        self.twenty_one_plus_three_var.set(str(self.last_bet.get("twenty_one_plus_three", 0)))
-        self.royal_match_var.set(str(self.last_bet.get("royal_match", 0)))
-        self.bust_var.set(str(self.last_bet.get("bust", 0)))
-        self.hot_3_var.set(str(self.last_bet.get("hot_3", 0)))
-        self.lucky_queen_var.set(str(self.last_bet.get("lucky_queen", 0)))
-
-        # 闪烁一下提示已填充
-        for widget in self.bet_widgets.values():
-            original_color = widget.cget('bg')
-            widget.config(bg='#C8E6C9')
-            self.after(300, lambda w=widget, c=original_color: w.config(bg=c))
-
     def _create_widgets(self):
         main_frame = tk.Frame(self, bg='#35654d')
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -543,7 +404,7 @@ class BlackjackGUI(tk.Tk):
         self.dealer_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         self.info_label = tk.Label(
             table_canvas, 
-            text="庄家手牌16点必须要牌 任何17点停牌\n玩家黑杰克支付3:2 保险支付2:1 允许投降输一半", 
+            text="庄家软17点必须补牌 & 庄家16点,主注平局\n玩家21点打败庄家 & 玩家可不拿第三张牌加倍",
             font=('Arial', 22), 
             bg='#35654d', 
             fg='#FFD700'
@@ -560,25 +421,32 @@ class BlackjackGUI(tk.Tk):
         self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.player_cards_frame = tk.Frame(player_frame, bg='#2a4a3c')
         self.player_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=250, padx=10, pady=5)
+
+        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=460, padx=8, pady=5)
         control_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        control_frame.pack_propagate(False)
+
         info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
         info_frame.pack(fill=tk.X, pady=5)
+
         self.balance_label = tk.Label(
-            info_frame, 
+            info_frame,
             text=f"余额: ${self.balance:.2f}",
             font=('Arial', 18),
             bg='#2a4a3c',
             fg='white'
         )
-        self.balance_label.pack(side=tk.LEFT, padx=20, pady=5)
+        self.balance_label.pack(side=tk.LEFT, padx=10, pady=5)
+
         self.stage_label = tk.Label(
-            info_frame, 
+            info_frame,
             text="下注阶段",
             font=('Arial', 18, 'bold'),
             bg='#2a4a3c',
             fg='#FFD700'
         )
+        self.stage_label.pack(side=tk.RIGHT, padx=10, pady=5)
+
         self.stage_label.pack(side=tk.RIGHT, padx=20, pady=5)
         chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
         chips_frame.pack(fill=tk.X, pady=5)
@@ -623,125 +491,126 @@ class BlackjackGUI(tk.Tk):
                 bg='#2a4a3c', fg='#FFD700', width=7).pack(side=tk.LEFT, expand=True)
         tk.Label(value_frame, text="$2,500", font=('Arial', 12, 'bold'), 
                 bg='#2a4a3c', fg='#FFD700', width=7).pack(side=tk.LEFT, expand=True)
+
         bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_frame.pack(fill=tk.X, pady=10)
+        bet_frame.pack(fill=tk.X, pady=8)
+
         first_row_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        first_row_frame.pack(fill=tk.X, padx=10, pady=3)
-        perfect_pair_label = tk.Label(first_row_frame, text="完美对子:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        first_row_frame.pack(fill=tk.X, padx=8, pady=3)
+        perfect_pair_label = tk.Label(first_row_frame, text="完美对子:", font=('Arial', 14),
+                                      bg='#2a4a3c', fg='white')
         perfect_pair_label.pack(side=tk.LEFT, padx=1)
         self.perfect_pair_var = tk.StringVar(value="0")
-        self.perfect_pair_display = tk.Label(first_row_frame, textvariable=self.perfect_pair_var, font=('Arial', 14), 
-                                            bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
-        self.perfect_pair_display.pack(side=tk.LEFT, padx=5)
+        self.perfect_pair_display = tk.Label(first_row_frame, textvariable=self.perfect_pair_var,
+                                             font=('Arial', 14), bg='white', fg='black',
+                                             width=5, relief=tk.SUNKEN, padx=4)
+        self.perfect_pair_display.pack(side=tk.LEFT, padx=4)
         self.perfect_pair_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("perfect_pair"))
         self.perfect_pair_display.bind("<Button-3>", lambda e: self.clear_bet("perfect_pair"))
         self.bet_widgets["perfect_pair"] = self.perfect_pair_display
         self.side_bet_check_vars["perfect_pair"] = tk.BooleanVar(value=True)
-        perfect_pair_check = tk.Checkbutton(first_row_frame, variable=self.side_bet_check_vars["perfect_pair"], 
-                                          bg='#2a4a3c', activebackground='#2a4a3c')
-        perfect_pair_check.pack(side=tk.LEFT, padx=2)
-        tk.Label(first_row_frame, text=" ", bg='#2a4a3c').pack(side=tk.LEFT, padx=11)
-        twenty_one_plus_three_label = tk.Label(first_row_frame, text="21+3:", font=('Arial', 14), bg='#2a4a3c', fg='white')
+        perfect_pair_check = tk.Checkbutton(first_row_frame, variable=self.side_bet_check_vars["perfect_pair"],
+                                            bg='#2a4a3c', activebackground='#2a4a3c')
+        perfect_pair_check.pack(side=tk.LEFT, padx=1)
+
+        tk.Label(first_row_frame, text=" ", bg='#2a4a3c').pack(side=tk.LEFT, padx=6)
+
+        twenty_one_plus_three_label = tk.Label(first_row_frame, text="21+3:", font=('Arial', 14),
+                                               bg='#2a4a3c', fg='white')
         twenty_one_plus_three_label.pack(side=tk.LEFT)
         self.twenty_one_plus_three_var = tk.StringVar(value="0")
-        self.twenty_one_plus_three_display = tk.Label(first_row_frame, textvariable=self.twenty_one_plus_three_var, font=('Arial', 14), 
-                                                    bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
-        self.twenty_one_plus_three_display.pack(side=tk.LEFT, padx=5)
+        self.twenty_one_plus_three_display = tk.Label(first_row_frame, textvariable=self.twenty_one_plus_three_var,
+                                                      font=('Arial', 14), bg='white', fg='black',
+                                                      width=5, relief=tk.SUNKEN, padx=4)
+        self.twenty_one_plus_three_display.pack(side=tk.LEFT, padx=4)
         self.twenty_one_plus_three_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("twenty_one_plus_three"))
         self.twenty_one_plus_three_display.bind("<Button-3>", lambda e: self.clear_bet("twenty_one_plus_three"))
         self.bet_widgets["twenty_one_plus_three"] = self.twenty_one_plus_three_display
         self.side_bet_check_vars["twenty_one_plus_three"] = tk.BooleanVar(value=True)
-        twenty_one_plus_three_check = tk.Checkbutton(first_row_frame, variable=self.side_bet_check_vars["twenty_one_plus_three"], 
-                                                   bg='#2a4a3c', activebackground='#2a4a3c')
-        twenty_one_plus_three_check.pack(side=tk.LEFT, padx=2)
+        twenty_one_plus_three_check = tk.Checkbutton(first_row_frame, variable=self.side_bet_check_vars["twenty_one_plus_three"],
+                                                     bg='#2a4a3c', activebackground='#2a4a3c')
+        twenty_one_plus_three_check.pack(side=tk.LEFT, padx=1)
+
         second_row_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        second_row_frame.pack(fill=tk.X, padx=10, pady=3)
-        royal_match_label = tk.Label(second_row_frame, text="皇家同花:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        royal_match_label.pack(side=tk.LEFT)
-        self.royal_match_var = tk.StringVar(value="0")
-        self.royal_match_display = tk.Label(second_row_frame, textvariable=self.royal_match_var, font=('Arial', 14), 
-                                        bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
-        self.royal_match_display.pack(side=tk.LEFT, padx=5)
-        self.royal_match_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("royal_match"))
-        self.royal_match_display.bind("<Button-3>", lambda e: self.clear_bet("royal_match"))
-        self.bet_widgets["royal_match"] = self.royal_match_display
-        self.side_bet_check_vars["royal_match"] = tk.BooleanVar(value=True)
-        royal_match_check = tk.Checkbutton(second_row_frame, variable=self.side_bet_check_vars["royal_match"], 
-                                         bg='#2a4a3c', activebackground='#2a4a3c')
-        royal_match_check.pack(side=tk.LEFT, padx=2)
-        tk.Label(second_row_frame, text=" ", bg='#2a4a3c').pack(side=tk.LEFT, padx=11)
-        bust_label = tk.Label(second_row_frame, text="爆！:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        bust_label.pack(side=tk.LEFT, padx=2)
-        self.bust_var = tk.StringVar(value="0")
-        self.bust_display = tk.Label(second_row_frame, textvariable=self.bust_var, font=('Arial', 14), 
-                                bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
-        self.bust_display.pack(side=tk.LEFT, padx=5)
-        self.bust_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("bust"))
-        self.bust_display.bind("<Button-3>", lambda e: self.clear_bet("bust"))
-        self.bet_widgets["bust"] = self.bust_display
-        self.side_bet_check_vars["bust"] = tk.BooleanVar(value=True)
-        bust_check = tk.Checkbutton(second_row_frame, variable=self.side_bet_check_vars["bust"], 
-                                  bg='#2a4a3c', activebackground='#2a4a3c')
-        bust_check.pack(side=tk.LEFT, padx=2)
+        second_row_frame.pack(fill=tk.X, padx=50, pady=3)
+        insurance_label = tk.Label(second_row_frame, text="保险:", font=('Arial', 14),
+                                   bg='#2a4a3c', fg='white')
+        insurance_label.pack(side=tk.LEFT)
+        self.insurance_var = tk.StringVar(value="0")
+        self.insurance_display = tk.Label(second_row_frame, textvariable=self.insurance_var,
+                                          font=('Arial', 14), bg='white', fg='black',
+                                          width=5, relief=tk.SUNKEN, padx=4)
+        self.insurance_display.pack(side=tk.LEFT, padx=4)
+        self.bet_widgets["insurance"] = self.insurance_display
+
+        tk.Label(second_row_frame, text=" ", bg='#2a4a3c').pack(side=tk.LEFT, padx=22)
+
+        sixteen_label = tk.Label(second_row_frame, text="16点:", font=('Arial', 14),
+                                 bg='#2a4a3c', fg='white')
+        sixteen_label.pack(side=tk.LEFT)
+        self.sixteen_var = tk.StringVar(value="0")
+        self.sixteen_display = tk.Label(second_row_frame, textvariable=self.sixteen_var,
+                                        font=('Arial', 14), bg='white', fg='black',
+                                        width=5, relief=tk.SUNKEN, padx=4)
+        self.sixteen_display.pack(side=tk.LEFT, padx=4)
+        self.sixteen_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("sixteen"))
+        self.sixteen_display.bind("<Button-3>", lambda e: self.clear_bet("sixteen"))
+        self.bet_widgets["sixteen"] = self.sixteen_display
+        self.side_bet_check_vars["sixteen"] = tk.BooleanVar(value=True)
+        sixteen_check = tk.Checkbutton(second_row_frame, variable=self.side_bet_check_vars["sixteen"],
+                                       bg='#2a4a3c', activebackground='#2a4a3c')
+        sixteen_check.pack(side=tk.LEFT, padx=1)
+
         third_row_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        third_row_frame.pack(fill=tk.X, padx=10, pady=3)
-        lucky_queen_label = tk.Label(third_row_frame, text="幸运女王:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        lucky_queen_label.pack(side=tk.LEFT)
-        self.lucky_queen_var = tk.StringVar(value="0")
-        self.lucky_queen_display = tk.Label(third_row_frame, textvariable=self.lucky_queen_var, font=('Arial', 14), 
-                                        bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
-        self.lucky_queen_display.pack(side=tk.LEFT, padx=5)
-        self.lucky_queen_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("lucky_queen"))
-        self.lucky_queen_display.bind("<Button-3>", lambda e: self.clear_bet("lucky_queen"))
-        self.bet_widgets["lucky_queen"] = self.lucky_queen_display
-        self.side_bet_check_vars["lucky_queen"] = tk.BooleanVar(value=True)
-        lucky_queen_check = tk.Checkbutton(third_row_frame, variable=self.side_bet_check_vars["lucky_queen"], 
-                                         bg='#2a4a3c', activebackground='#2a4a3c')
-        lucky_queen_check.pack(side=tk.LEFT, padx=2)
-        tk.Label(third_row_frame, text=" ", bg='#2a4a3c').pack(side=tk.LEFT, padx=8)
-        hot_3_label = tk.Label(third_row_frame, text="热门3:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        hot_3_label.pack(side=tk.LEFT)
-        self.hot_3_var = tk.StringVar(value="0")
-        self.hot_3_display = tk.Label(third_row_frame, textvariable=self.hot_3_var, font=('Arial', 14), 
-                                    bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=5)
-        self.hot_3_display.pack(side=tk.LEFT, padx=5)
-        self.hot_3_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("hot_3"))
-        self.hot_3_display.bind("<Button-3>", lambda e: self.clear_bet("hot_3"))
-        self.bet_widgets["hot_3"] = self.hot_3_display
-        self.side_bet_check_vars["hot_3"] = tk.BooleanVar(value=True)
-        hot_3_check = tk.Checkbutton(third_row_frame, variable=self.side_bet_check_vars["hot_3"], 
-                                   bg='#2a4a3c', activebackground='#2a4a3c')
-        hot_3_check.pack(side=tk.LEFT, padx=2)
-        fourth_row_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        fourth_row_frame.pack(fill=tk.X, padx=10, pady=3)
-        main_bet_label = tk.Label(fourth_row_frame, text="主注:", font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='white')
-        main_bet_label.pack(side=tk.LEFT, padx=2)
+        third_row_frame.pack(fill=tk.X, padx=8, pady=3)
+
+        main_bet_label = tk.Label(third_row_frame, text="主注:", font=('Arial', 18, 'bold'),
+                                  bg='#2a4a3c', fg='white')
+        main_bet_label.pack(side=tk.LEFT, padx=6)
         self.main_bet_var = tk.StringVar(value="0")
-        self.main_bet_display = tk.Label(fourth_row_frame, textvariable=self.main_bet_var, font=('Arial', 18, 'bold'), 
-                                    bg='white', fg='black', width=8, relief=tk.SUNKEN, padx=5)
+        self.main_bet_display = tk.Label(third_row_frame, textvariable=self.main_bet_var,
+                                         font=('Arial', 18, 'bold'), bg='white', fg='black',
+                                         width=6, relief=tk.SUNKEN, padx=4)
         self.main_bet_display.pack(side=tk.LEFT, padx=2)
         self.main_bet_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("main"))
         self.main_bet_display.bind("<Button-3>", lambda e: self.clear_bet("main"))
         self.bet_widgets["main"] = self.main_bet_display
-        self.side_bet_all_in_frame = tk.Frame(fourth_row_frame, bg='#2a4a3c')
-        self.side_bet_all_in_frame.pack(side=tk.LEFT, padx=15)
+
+        self.double_up_label = tk.Label(third_row_frame, text="加倍UP:", font=('Arial', 18, 'bold'),
+                                        bg='#2a4a3c', fg='white')
+        self.double_up_var = tk.StringVar(value="0")
+        self.double_up_display = tk.Label(third_row_frame, textvariable=self.double_up_var,
+                                          font=('Arial', 18, 'bold'), bg='white', fg='black',
+                                          width=6, relief=tk.SUNKEN)
+        self.bet_widgets["double_up"] = self.double_up_display
+
+        self.side_bet_all_in_frame = tk.Frame(third_row_frame, bg='#2a4a3c')
         self.side_bet_all_in_btn = tk.Button(
-            self.side_bet_all_in_frame, text="边注全下", 
+            self.side_bet_all_in_frame, text="边注全下",
             command=self.side_bet_all_in, font=('Arial', 13, 'bold'),
-            bg="#00DDFF", fg='black', width=13
+            bg="#00DDFF", fg='black', width=15
         )
-        self.side_bet_all_in_btn.pack(side=tk.LEFT, padx=5)
-        self.insurance_label = tk.Label(self.side_bet_all_in_frame, text="保险:", font=('Arial', 18), bg='#2a4a3c', fg='white')
-        self.insurance_var = tk.StringVar(value="0")
-        self.insurance_display = tk.Label(self.side_bet_all_in_frame, textvariable=self.insurance_var, font=('Arial', 18), 
-                                     bg='white', fg='black', width=5, relief=tk.SUNKEN, padx=3)
-        self.side_bet_all_in_btn.pack(side=tk.LEFT, padx=5)
-        self.insurance_label.pack_forget()
-        self.insurance_display.pack_forget()
+        self.side_bet_all_in_btn.pack(side=tk.LEFT, padx=8)
+        self.side_bet_all_in_frame.pack(side=tk.LEFT, padx=8)
+
+        self._toggle_double_up_visibility(False)
+
         self.action_frame = tk.Frame(control_frame, bg='#2a4a3c')
         self.action_frame.pack(fill=tk.X)
-        self._build_action_buttons() 
-
+        start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
+        start_button_frame.pack(pady=5)
+        self.reset_bets_button = tk.Button(
+            start_button_frame, text="重置金额", 
+            command=self.reset_bets, font=('Arial', 14),
+            bg='#F44336', fg='white', width=10
+        )
+        self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
+        self.reset_bets_button.config(state=tk.NORMAL)
+        self.start_button = tk.Button(
+            start_button_frame, text="开始游戏", 
+            command=self.start_game, font=('Arial', 14),
+            bg='#4CAF50', fg='white', width=10
+        )
         self.start_button.pack(side=tk.LEFT)
         self.start_button.config(state=tk.NORMAL)
         self.status_label = tk.Label(
@@ -778,7 +647,7 @@ class BlackjackGUI(tk.Tk):
             chip_value = float(chip_text.replace('K', '')) * 1000
         else:
             chip_value = float(chip_text)
-        for bet_type in ["perfect_pair", "twenty_one_plus_three", "royal_match", "bust", "hot_3", "lucky_queen"]:
+        for bet_type in ["perfect_pair", "twenty_one_plus_three", "sixteen"]:
             if self.side_bet_check_vars[bet_type].get():
                 current = int(getattr(self, f"{bet_type}_var").get())
                 new_value = current + chip_value
@@ -786,7 +655,7 @@ class BlackjackGUI(tk.Tk):
                     new_value = 2500
                     messagebox.showwarning("下注限制", f"{bet_type}上限为2500，已自动调整")
                 getattr(self, f"{bet_type}_var").set(str(int(new_value)))
-        for bet_type in ["perfect_pair", "twenty_one_plus_three", "royal_match", "bust", "hot_3", "lucky_queen"]:
+        for bet_type in ["perfect_pair", "twenty_one_plus_three", "sixteen"]:
             if self.side_bet_check_vars[bet_type].get():
                 widget = self.bet_widgets[bet_type]
                 original_color = widget.cget('bg')
@@ -944,14 +813,8 @@ class BlackjackGUI(tk.Tk):
             self.perfect_pair_var.set("0")
         elif bet_type == "twenty_one_plus_three":
             self.twenty_one_plus_three_var.set("0")
-        elif bet_type == "royal_match":
-            self.royal_match_var.set("0")
-        elif bet_type == "bust":
-            self.bust_var.set("0")
-        elif bet_type == "hot_3":
-            self.hot_3_var.set("0")
-        elif bet_type == "lucky_queen":
-            self.lucky_queen_var.set("0")
+        elif bet_type == "sixteen":
+            self.sixteen_var.set("0")
         widget = self.bet_widgets[bet_type]
         original_color = widget.cget('bg')
         widget.config(bg='#FFCDD2')
@@ -959,7 +822,7 @@ class BlackjackGUI(tk.Tk):
     
     def show_game_instructions(self):
         win = tk.Toplevel(self)
-        win.title("21点游戏规则")
+        win.title("免牌加倍21点 游戏规则")
         win.geometry("900x700")
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
@@ -977,7 +840,7 @@ class BlackjackGUI(tk.Tk):
         content_frame = tk.Frame(canvas, bg='#F0F0F0')
         canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
 
-        # 规则文字部分
+        # 规则文字（边注具体赔率改用表格展示）
         rules_text = """
         21点游戏规则
 
@@ -993,7 +856,7 @@ class BlackjackGUI(tk.Tk):
         3. 游戏流程:
         a. 下注阶段:
             - 玩家下注主注
-            - 可选择下注边注：完美对子、21+3、皇家同花、爆！
+            - 可选择下注边注：完美对子、21+3、16点
 
         b. 发牌:
             - 玩家发两张牌
@@ -1003,22 +866,30 @@ class BlackjackGUI(tk.Tk):
             - 要牌: 获得一张新牌
             - 停牌: 不再要牌
             - 加倍: 双倍下注，只能再要一张牌
-            - 投降: 输掉一半下注（仅在初始两张牌时可用）
+            - 加倍UP: 再付一倍主注，立即停牌（不能要牌）
 
         d. 庄家回合:
-            - 庄家必须要牌直到手牌点数达到17点或更高
+            - 庄家软17必须继续要牌
+            - 庄家16点（无论软硬）立即停牌，主注视为平局
 
         4. 结算规则:
         - 玩家黑杰克（A+10/J/Q/K）: 支付1.5倍
+        - 玩家21点（非黑杰克）: 支付1倍
         - 玩家点数更高: 支付1倍
         - 庄家点数更高: 玩家输掉下注
         - 平局: 退还下注
+
+        5. 边注及特殊玩法:
+        - 完美对子、21+3、16点的赔付详见下方表格
+        - 保险：庄家明牌为A时可购买，金额为主注一半，若庄家最终为黑杰克，保险赔付2:1
+        - 加倍UP：玩家两张牌且点数≤20时可选择，支付等额额外赌注并立即停牌；
+            若主注获胜，加倍UP获得1:1赔付，否则输掉加倍UP
         """
 
         tk.Label(content_frame, text=rules_text, font=('微软雅黑', 11),
                 bg='#F0F0F0', justify=tk.LEFT, padx=10, pady=10).pack(fill=tk.X)
 
-        # 辅助函数：创建一个带表头的简单表格
+        # 辅助函数：创建支付表
         def create_table(parent, title, headers, data):
             tk.Label(parent, text=title, font=('微软雅黑', 12, 'bold'),
                     bg='#F0F0F0').pack(anchor='w', padx=10, pady=(10, 0))
@@ -1060,57 +931,18 @@ class BlackjackGUI(tk.Tk):
         create_table(content_frame, "21+3 支付表",
                     ["牌型", "赔率"], tw_one_three_data)
 
-        # 皇家同花支付表
-        royal_match_data = [
-            ("皇家同花（同花Q和K）", "25:1"),
-            ("同花", "5:2"),
+        # 16点支付表
+        sixteen_data = [
+            ("2张牌", "3:1"),
+            ("3张牌", "5:1"),
+            ("4张牌", "10:1"),
+            ("5张牌", "50:1"),
+            ("6张或更多", "100:1"),
         ]
-        create_table(content_frame, "皇家同花支付表",
-                    ["牌型", "赔率"], royal_match_data)
+        create_table(content_frame, "16点支付表（庄家以16点结束时）",
+                    ["庄家手牌张数", "赔率"], sixteen_data)
 
-        # 爆！支付表
-        bust_data = [
-            ("3张", "1:1"),
-            ("4张", "2:1"),
-            ("5张", "9:1"),
-            ("6张", "50:1"),
-            ("7张", "100:1"),
-            ("8张或更多", "250:1"),
-        ]
-        create_table(content_frame, "爆！支付表（庄家爆牌时）",
-                    ["爆牌张数", "赔率"], bust_data)
-
-        # 热门3 支付表
-        hot_three_data = [
-            ("刚好19点", "1:1"),
-            ("刚好20点", "2:1"),
-            ("刚好21点，花色不一", "4:1"),
-            ("刚好21点，花色相同", "20:1"),
-            ("点数都是7，花色不一", "100:1"),
-            ("点数都是7，花色相同", "500:1"),
-        ]
-        create_table(content_frame, "热门3 支付表（玩家前两张+庄家第一张）",
-                    ["牌型", "赔率"], hot_three_data)
-
-        # 幸运女王支付表
-        lucky_queen_data = [
-            ("刚好20点，花色不一", "4:1"),
-            ("刚好20点，花色相同", "10:1"),
-            ("刚好20点，花色相同且点数相同", "30:1"),
-            ("花色相同且两张都是Q", "100:1"),
-            ("两张Q同花，且庄家黑杰克", "1000:1"),
-        ]
-        create_table(content_frame, "幸运女王支付表（玩家前两张20点）",
-                    ["牌型", "赔率"], lucky_queen_data)
-
-        # 添加幸运女王备注
-        note_text = ("* 幸运女王中“点数相同”指 10-10 / J-J / K-K，\n"
-                    "  10-J 等虽同为10点，但不计为点数相同。")
-        tk.Label(content_frame, text=note_text, font=('微软雅黑', 9),
-                bg='#F0F0F0', fg='#555555', justify=tk.LEFT,
-                padx=20, pady=0).pack(anchor='w')
-
-        # 刷新 canvas 滚动区域
+        # 刷新滚动区域
         content_frame.update_idletasks()
         canvas.config(scrollregion=canvas.bbox("all"))
 
@@ -1162,7 +994,7 @@ class BlackjackGUI(tk.Tk):
         if self.game.dealer_hand:
             dealer_value = self.game.get_hand_value(self.game.dealer_hand)
             dealer_text = "庄家"
-            if self.game.stage == "showdown" or self.game.player_done:
+            if self.game.stage in ("showdown", "dealer_turn", "player_21") or self.game.player_done:
                 if self.game.check_blackjack(self.game.dealer_hand):
                     dealer_text = "庄家 - 黑杰克"
                 elif dealer_value > 21:
@@ -1178,8 +1010,8 @@ class BlackjackGUI(tk.Tk):
     def disable_action_buttons(self):
         self.hit_button.config(state=tk.DISABLED)
         self.stand_button.config(state=tk.DISABLED)
-        self.surrender_button.config(state=tk.DISABLED)
         self.double_button.config(state=tk.DISABLED)
+        self.double_up_button.config(state=tk.DISABLED)
         
     def enable_action_buttons(self):
         self.buttons_disabled = False
@@ -1412,10 +1244,8 @@ class BlackjackGUI(tk.Tk):
             self.game.main_bet = int(self.main_bet_var.get())
             self.game.perfect_pair_bet = int(self.perfect_pair_var.get())
             self.game.twenty_one_plus_three_bet = int(self.twenty_one_plus_three_var.get())
-            self.game.royal_match_bet = int(self.royal_match_var.get())
-            self.game.bust_bet = int(self.bust_var.get())
-            self.game.hot_3_bet = int(self.hot_3_var.get())
-            self.game.lucky_queen_bet = int(self.lucky_queen_var.get())
+            self.game.sixteen_bet = int(self.sixteen_var.get())
+            self.game.double_up_bet = 0
         except ValueError:
             messagebox.showerror("错误", "请输入有效的下注金额")
             return
@@ -1423,34 +1253,19 @@ class BlackjackGUI(tk.Tk):
             messagebox.showerror("错误", "主注至少需要10块")
             return
         total_bet = (self.game.main_bet + self.game.perfect_pair_bet +
-                    self.game.twenty_one_plus_three_bet + self.game.royal_match_bet +
-                    self.game.bust_bet + self.game.hot_3_bet + self.game.lucky_queen_bet)
+                    self.game.twenty_one_plus_three_bet + self.game.sixteen_bet +
+                    self.game.insurance_bet + self.game.double_up_bet)
         if self.balance < total_bet:
             messagebox.showerror("错误", "余额不足以支付所有下注！")
             return
-
-        # ============ 新增：保存本次下注金额（用于重复上局） ============
-        self.last_bet = {
-            "main": self.game.main_bet,
-            "perfect_pair": self.game.perfect_pair_bet,
-            "twenty_one_plus_three": self.game.twenty_one_plus_three_bet,
-            "royal_match": self.game.royal_match_bet,
-            "bust": self.game.bust_bet,
-            "hot_3": self.game.hot_3_bet,
-            "lucky_queen": self.game.lucky_queen_bet
-        }
-        self.repeat_bet_btn.config(state=tk.DISABLED)
-        # ============================================================
-
-        # 以下为原有代码：禁用下注区、扣款、洗牌发牌等...
         self.disable_betting_area()
         self.last_win_label.config(text="上局获胜: $0.00")
         self.start_button.config(state=tk.DISABLED)
         self.reset_bets_button.config(state=tk.DISABLED)
-        self.side_bet_all_in_btn.pack_forget()
-        self.insurance_label.pack(side=tk.LEFT, padx=5)
-        self.insurance_display.pack(side=tk.LEFT, padx=1)
-        self.insurance_var.set("0")
+        
+        # 切换UI：隐藏边注全下，显示加倍UP
+        self._toggle_double_up_visibility(True)
+        
         self.balance -= total_bet
         self.update_balance()
         self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
@@ -1473,6 +1288,8 @@ class BlackjackGUI(tk.Tk):
             self.game.dealer_blackjack = False
             self.game.double_extra = 0
             self.game.dealer_second_dealt = False
+            self.game.double_up_bet = 0
+            self.game.dealer_sixteen_push = False
             for widget in self.dealer_cards_frame.winfo_children():
                 widget.destroy()
             for widget in self.player_cards_frame.winfo_children():
@@ -1497,6 +1314,8 @@ class BlackjackGUI(tk.Tk):
             self.game.dealer_blackjack = False
             self.game.double_extra = 0
             self.game.dealer_second_dealt = False
+            self.game.double_up_bet = 0
+            self.game.dealer_sixteen_push = False
             for widget in self.dealer_cards_frame.winfo_children():
                 widget.destroy()
             for widget in self.player_cards_frame.winfo_children():
@@ -1517,14 +1336,16 @@ class BlackjackGUI(tk.Tk):
     
     def disable_betting_area(self):
         for bet_type, widget in self.bet_widgets.items():
-            widget.unbind("<Button-1>")
-            widget.unbind("<Button-3>")
+            if bet_type not in ("insurance", "double_up"):  # 保险和加倍UP本来就不绑定事件
+                widget.unbind("<Button-1>")
+                widget.unbind("<Button-3>")
         
     def enable_betting_area(self):
         for bet_type, widget in self.bet_widgets.items():
-            widget.bind("<Button-1>", lambda e, bt=bet_type: self.add_chip_to_bet(bt))
-            widget.bind("<Button-3>", lambda e, bt=bet_type: self.clear_bet(bt))
-            widget.config(bg='white', fg='black')
+            if bet_type not in ("insurance", "double_up"):
+                widget.bind("<Button-1>", lambda e, bt=bet_type: self.add_chip_to_bet(bt))
+                widget.bind("<Button-3>", lambda e, bt=bet_type: self.clear_bet(bt))
+                widget.config(bg='white', fg='black')
         
     def deal_card_sequence(self):
         self.status_label.config(text="发玩家第一张牌")
@@ -1555,8 +1376,18 @@ class BlackjackGUI(tk.Tk):
         if upcard.rank == 'A':
             self.offer_insurance()
         else:
-            # 不提供保险时，直接检查Blackjack并继续
-            self.check_blackjack_and_continue()
+            # 不提供保险时，直接检查玩家是否21点（黑杰克或21点）
+            self.check_player_21_after_initial()
+    
+    def check_player_21_after_initial(self):
+        """初始两张牌后检查玩家是否为21点（黑杰克或普通21）"""
+        player_value = self.game.get_hand_value(self.game.player_hand)
+        if player_value == 21:
+            self.handle_player_21()
+        else:
+            self.game.stage = "player_turn"
+            self.stage_label.config(text="玩家回合")
+            self.show_player_actions()
     
     def offer_insurance(self):
         self.game.stage = "insurance"
@@ -1592,11 +1423,11 @@ class BlackjackGUI(tk.Tk):
             self.update_balance()
             self.insurance_var.set(str(int(insurance_amount)))
             total_bet = (self.game.main_bet + self.game.perfect_pair_bet +
-                    self.game.twenty_one_plus_three_bet + self.game.royal_match_bet +
-                    self.game.bust_bet + self.game.hot_3_bet + self.game.lucky_queen_bet + self.game.insurance_bet)
+                    self.game.twenty_one_plus_three_bet + self.game.sixteen_bet +
+                    self.game.insurance_bet + self.game.double_up_bet)
             self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
             self.status_label.config(text=f"已购买保险 ${self.game.insurance_bet}")
-            self.after(1000, self.check_blackjack_and_continue)
+            self.after(1000, self.check_player_21_after_initial)
         else:
             messagebox.showerror("错误", "余额不足以购买保险")
             self.decline_insurance()
@@ -1608,125 +1439,224 @@ class BlackjackGUI(tk.Tk):
             self.no_insurance_btn.config(state=tk.DISABLED)
         self.game.insurance_taken = False
         self.status_label.config(text="未购买保险")
-        self.after(1000, self.check_blackjack_and_continue)
+        self.after(1000, self.check_player_21_after_initial)
     
-    def check_blackjack_and_continue(self):
-        """检查玩家Blackjack并决定后续流程"""
-        if self.game.check_blackjack(self.game.player_hand):
-            self.game.player_blackjack = True
-            self.status_label.config(text="玩家有黑杰克！")
-            upcard = self.game.dealer_hand[0]
-            upcard_value = upcard.get_value()
-            # 情况1：庄家明牌不是10也不是A → 直接结算，玩家获胜
-            if upcard_value not in (10, 11):
-                self.after(1000, self.show_showdown)
-                return
-            # 情况2：庄家明牌是10点 → 摸第二张牌判断是否庄家Blackjack
-            elif upcard_value == 10:
-                self.game.stage = "dealer_turn"
-                self.stage_label.config(text="庄家回合")
-                self.game.add_dealer_second_card()
-                second_card = self.game.dealer_hand[1]
-                second_card_label = self.add_card_to_frame(self.dealer_cards_frame, second_card,
-                                                        show_front=False, position=1)
-                self.dealer_hidden_card_label = second_card_label
-
-                def after_reveal():
-                    if self.game.check_blackjack(self.game.dealer_hand):
-                        self.game.dealer_blackjack = True
-                        self.update_hand_labels()
-                        self.status_label.config(text="双方黑杰克，平局")
-                    else:
-                        self.game.dealer_blackjack = False
-                        self.status_label.config(text="玩家黑杰克获胜！")
-                    self.after(1000, self.show_showdown)
-
-                self.flip_card_animation(second_card_label, second_card, callback=after_reveal)
-                return
-            # 情况3：庄家明牌是A → 走保险流程，然后摸第二张牌
-            elif upcard_value == 11:
-                self.offer_insurance_for_blackjack()
-                return
-        else:
-            # 玩家无Blackjack，正常进入玩家回合
-            self.game.stage = "player_turn"
-            self.stage_label.config(text="玩家回合")
-            self.show_player_actions()
-
-    def offer_insurance_for_blackjack(self):
-        """玩家Blackjack且庄家明牌为A时提供保险"""
-        self.game.stage = "insurance"
-        self.stage_label.config(text="保险选项")
-        self.status_label.config(text="庄家明牌是A，是否购买保险？")
-        for widget in self.action_frame.winfo_children():
-            widget.destroy()
-        insurance_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        insurance_frame.pack(pady=5)
-        self.insurance_btn = tk.Button(
-            insurance_frame, text="购买保险",
-            command=self.take_insurance_for_blackjack,
-            font=('Arial', 14), bg='#4CAF50', fg='white', width=10
-        )
-        self.insurance_btn.pack(side=tk.LEFT, padx=5)
-        self.no_insurance_btn = tk.Button(
-            insurance_frame, text="不购买",
-            command=self.decline_insurance_for_blackjack,
-            font=('Arial', 14), bg='#F44336', fg='white', width=10
-        )
-        self.no_insurance_btn.pack(side=tk.LEFT, padx=5)
-
-    def take_insurance_for_blackjack(self):
-        if hasattr(self, 'insurance_btn'):
-            self.insurance_btn.config(state=tk.DISABLED)
-        if hasattr(self, 'no_insurance_btn'):
-            self.no_insurance_btn.config(state=tk.DISABLED)
-        insurance_amount = self.game.main_bet / 2
-        if self.balance >= insurance_amount:
-            self.balance -= insurance_amount
-            self.game.insurance_bet = insurance_amount
-            self.game.insurance_taken = True
-            self.update_balance()
-            self.insurance_var.set(str(int(insurance_amount)))
-            total_bet = (self.game.main_bet + self.game.perfect_pair_bet +
-                        self.game.twenty_one_plus_three_bet + self.game.royal_match_bet +
-                        self.game.bust_bet + self.game.hot_3_bet + self.game.lucky_queen_bet +
-                        self.game.insurance_bet)
-            self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
-            self.status_label.config(text=f"已购买保险 ${self.game.insurance_bet}")
-            self.after(1000, self.continue_after_insurance_for_blackjack)
-        else:
-            messagebox.showerror("错误", "余额不足以购买保险")
-            self.decline_insurance_for_blackjack()
-
-    def decline_insurance_for_blackjack(self):
-        if hasattr(self, 'insurance_btn'):
-            self.insurance_btn.config(state=tk.DISABLED)
-        if hasattr(self, 'no_insurance_btn'):
-            self.no_insurance_btn.config(state=tk.DISABLED)
-        self.game.insurance_taken = False
-        self.status_label.config(text="未购买保险")
-        self.after(1000, self.continue_after_insurance_for_blackjack)
-
-    def continue_after_insurance_for_blackjack(self):
-        """保险决策后，摸庄家第二张牌并结算"""
-        self.game.add_dealer_second_card()
-        second_card = self.game.dealer_hand[1]
-        second_card_label = self.add_card_to_frame(self.dealer_cards_frame, second_card,
-                                                show_front=False, position=1)
-        self.dealer_hidden_card_label = second_card_label
-
-        def after_reveal():
-            if self.game.check_blackjack(self.game.dealer_hand):
-                self.game.dealer_blackjack = True
-                self.update_hand_labels()
-                self.status_label.config(text="庄家黑杰克，双方平局")
+    # ========== 新增辅助函数：结算完美对子和21+3 ==========
+    def _settle_perfect_pair_and_21plus3(self):
+        """结算完美对子和21+3边注（仅在玩家21点分支调用）"""
+        # 完美对子
+        if self.game.perfect_pair_bet > 0:
+            pair_result = self.game.check_perfect_pair()
+            if pair_result == "perfect":
+                win_amount = self.game.perfect_pair_bet * 25
+                total_return = win_amount + self.game.perfect_pair_bet
+                self.balance += total_return
+                self.perfect_pair_var.set(str(int(total_return)))
+                self.bet_widgets["perfect_pair"].config(bg='gold')
+                self.win_details["perfect_pair"] = total_return
+            elif pair_result == "colored":
+                win_amount = self.game.perfect_pair_bet * 12
+                total_return = win_amount + self.game.perfect_pair_bet
+                self.balance += total_return
+                self.perfect_pair_var.set(str(int(total_return)))
+                self.bet_widgets["perfect_pair"].config(bg='gold')
+                self.win_details["perfect_pair"] = total_return
+            elif pair_result == "mixed":
+                win_amount = self.game.perfect_pair_bet * 6
+                total_return = win_amount + self.game.perfect_pair_bet
+                self.balance += total_return
+                self.perfect_pair_var.set(str(int(total_return)))
+                self.bet_widgets["perfect_pair"].config(bg='gold')
+                self.win_details["perfect_pair"] = total_return
             else:
-                self.game.dealer_blackjack = False
-                self.status_label.config(text="玩家黑杰克获胜！")
-            self.after(1000, self.show_showdown)
+                # 输掉边注：显示归零，背景重置
+                self.perfect_pair_var.set("0")
+                self.bet_widgets["perfect_pair"].config(bg='white')
+                self.win_details["perfect_pair"] = 0
+        # 21+3
+        if self.game.twenty_one_plus_three_bet > 0:
+            twenty_one_result = self.game.check_twenty_one_plus_three()
+            if twenty_one_result == "straight_three_of_a_kind":
+                win_amount = self.game.twenty_one_plus_three_bet * 100
+                total_return = win_amount + self.game.twenty_one_plus_three_bet
+                self.balance += total_return
+                self.twenty_one_plus_three_var.set(str(int(total_return)))
+                self.bet_widgets["twenty_one_plus_three"].config(bg='gold')
+                self.win_details["twenty_one_plus_three"] = total_return
+            elif twenty_one_result == "straight_flush":
+                win_amount = self.game.twenty_one_plus_three_bet * 40
+                total_return = win_amount + self.game.twenty_one_plus_three_bet
+                self.balance += total_return
+                self.twenty_one_plus_three_var.set(str(int(total_return)))
+                self.bet_widgets["twenty_one_plus_three"].config(bg='gold')
+                self.win_details["twenty_one_plus_three"] = total_return
+            elif twenty_one_result == "three_of_a_kind":
+                win_amount = self.game.twenty_one_plus_three_bet * 30
+                total_return = win_amount + self.game.twenty_one_plus_three_bet
+                self.balance += total_return
+                self.twenty_one_plus_three_var.set(str(int(total_return)))
+                self.bet_widgets["twenty_one_plus_three"].config(bg='gold')
+                self.win_details["twenty_one_plus_three"] = total_return
+            elif twenty_one_result == "straight":
+                win_amount = self.game.twenty_one_plus_three_bet * 10
+                total_return = win_amount + self.game.twenty_one_plus_three_bet
+                self.balance += total_return
+                self.twenty_one_plus_three_var.set(str(int(total_return)))
+                self.bet_widgets["twenty_one_plus_three"].config(bg='gold')
+                self.win_details["twenty_one_plus_three"] = total_return
+            elif twenty_one_result == "flush":
+                win_amount = self.game.twenty_one_plus_three_bet * 5
+                total_return = win_amount + self.game.twenty_one_plus_three_bet
+                self.balance += total_return
+                self.twenty_one_plus_three_var.set(str(int(total_return)))
+                self.bet_widgets["twenty_one_plus_three"].config(bg='gold')
+                self.win_details["twenty_one_plus_three"] = total_return
+            else:
+                # 输掉边注：显示归零，背景重置
+                self.twenty_one_plus_three_var.set("0")
+                self.bet_widgets["twenty_one_plus_three"].config(bg='white')
+                self.win_details["twenty_one_plus_three"] = 0
+        self.update_balance()
 
-        self.flip_card_animation(second_card_label, second_card, callback=after_reveal)
+    def handle_player_21(self):
+        """玩家当前手牌为21点时的处理（主注立即结算，然后根据边注决定庄家是否补牌）"""
+        self.game.stage = "player_21"
+        self.stage_label.config(text="玩家21点")
+        # 结算主注
+        player_value = self.game.get_hand_value(self.game.player_hand)
+        is_blackjack = self.game.check_blackjack(self.game.player_hand)
+        if is_blackjack:
+            main_win = self.game.main_bet * 2.5  # 黑杰克3:2
+            self.status_label.config(text="玩家黑杰克！主注获得3:2")
+        else:
+            main_win = self.game.main_bet * 2   # 普通21点1:1
+            self.status_label.config(text="玩家21点！主注获得1:1")
+        self.balance += main_win
+        self.update_balance()
+        self.win_details["main"] = main_win
+        self.main_bet_var.set(str(int(main_win)))
+        self.bet_widgets["main"].config(bg='gold')
 
+        # 结算完美对子和21+3边注
+        self._settle_perfect_pair_and_21plus3()
+
+        # 判断是否有保险或16点边注需要庄家补牌
+        has_insurance = self.game.insurance_bet > 0
+        has_sixteen = self.game.sixteen_bet > 0
+
+        if has_insurance or has_sixteen:
+            # 先添加庄家第二张牌（如果还没加）
+            self.game.add_dealer_second_card()
+            second_card = self.game.dealer_hand[1]
+            second_card_label = self.add_card_to_frame(self.dealer_cards_frame, second_card,
+                                                    show_front=False, position=1)
+            self.dealer_hidden_card_label = second_card_label
+            self.update_hand_labels()
+            def after_reveal():
+                self.update_hand_labels()
+                if has_insurance and not has_sixteen:
+                    self.check_insurance_single_card()
+                else:
+                    self.dealer_hit_loop_for_sixteen()
+            self.flip_card_animation(second_card_label, second_card, callback=after_reveal)
+        else:
+            # 无任何需要补牌的边注：将保险和16点边注显示归零（如果有下注但未赢）
+            if self.game.insurance_bet > 0:
+                self.insurance_var.set("0")
+                self.insurance_display.config(bg='white')
+                self.win_details["insurance"] = 0
+            if self.game.sixteen_bet > 0:
+                self.sixteen_var.set("0")
+                self.bet_widgets["sixteen"].config(bg='white')
+                self.win_details["sixteen"] = 0
+            self.show_restart_button()
+            self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
+    
+    def check_insurance_single_card(self):
+        """保险单独补一张牌后检查是否为10点"""
+        second_card_value = self.game.dealer_hand[1].get_value()
+        if second_card_value == 10:
+            insurance_win = self.game.insurance_bet * 3
+            self.balance += insurance_win
+            self.update_balance()
+            self.insurance_var.set(str(int(insurance_win)))
+            self.insurance_display.config(bg='gold')
+            self.status_label.config(text=f"保险获胜！获得${insurance_win:.2f}")
+            self.win_details["insurance"] = insurance_win
+        else:
+            # 保险输掉：显示归零，背景重置
+            self.insurance_var.set("0")
+            self.insurance_display.config(bg='white')
+            self.status_label.config(text="保险失败")
+            self.win_details["insurance"] = 0
+        self.show_restart_button()
+        self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
+    
+    def dealer_hit_loop_for_sixteen(self):
+        """专门用于有16点边注时的庄家补牌流程（遵循新规则：软17要牌，16点停牌）"""
+        self.update_hand_labels()   # 确保每次补牌后更新
+        dealer_value = self.game.get_hand_value(self.game.dealer_hand)
+        # 检查庄家是否为16点（硬或软）
+        if dealer_value == 16:
+            self.game.dealer_sixteen_push = True
+            self.status_label.config(text="庄家16点，停牌，主注平局")
+            # 主注已结算为玩家21点获胜，此处只影响16点边注结算
+            self.settle_sixteen_bet()
+            return
+        # 检查是否需要补牌：软17或低于17且不为16
+        if dealer_value < 17 or (dealer_value == 17 and self.game.is_soft_hand(self.game.dealer_hand)):
+            self.status_label.config(text="庄家要牌")
+            new_value = self.game.dealer_hit()
+            self.update_hand_labels()   # 确保每次补牌后更新
+            new_card = self.game.dealer_hand[-1]
+            position = len(self.game.dealer_hand) - 1
+            new_card_label = self.add_card_to_frame(self.dealer_cards_frame, new_card, show_front=False, position=position)
+            self.flip_card_animation(new_card_label, new_card, callback=lambda: self.after_dealer_hit_for_sixteen(new_value))
+        else:
+            # 庄家停牌，结算16点边注
+            self.update_hand_labels()   # 确保每次补牌后更新
+            self.settle_sixteen_bet()
+    
+    def after_dealer_hit_for_sixteen(self, new_value):
+        self.update_hand_labels()
+        self.after(100, self.dealer_hit_loop_for_sixteen)
+    
+    def settle_sixteen_bet(self):
+        """结算16点边注（基于庄家最终手牌）"""
+        if self.game.sixteen_bet == 0:
+            self.show_restart_button()
+            self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
+            return
+        dealer_value = self.game.get_hand_value(self.game.dealer_hand)
+        if dealer_value == 16:
+            card_count = len(self.game.dealer_hand)
+            if card_count >= 6:
+                multiplier = 100
+            elif card_count == 5:
+                multiplier = 50
+            elif card_count == 4:
+                multiplier = 10
+            elif card_count == 3:
+                multiplier = 5
+            else:  # 2张
+                multiplier = 3
+            win_amount = self.game.sixteen_bet * multiplier
+            total_return = win_amount + self.game.sixteen_bet
+            self.balance += total_return
+            self.update_balance()
+            self.sixteen_var.set(str(int(total_return)))
+            self.bet_widgets["sixteen"].config(bg='gold')
+            self.win_details["sixteen"] = total_return
+        else:
+            # 输掉边注：显示归零，背景重置
+            self.sixteen_var.set("0")
+            self.bet_widgets["sixteen"].config(bg='white')
+            self.win_details["sixteen"] = 0
+        # 防止常规流程中再次结算
+        self.game.sixteen_bet = 0
+        self.show_restart_button()
+        self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
+    
     def show_player_actions(self):
         for widget in self.action_frame.winfo_children():
             widget.destroy()
@@ -1752,21 +1682,24 @@ class BlackjackGUI(tk.Tk):
             state=tk.NORMAL if can_double else tk.DISABLED
         )
         self.double_button.pack(side=tk.LEFT, padx=5)
-        can_surrender = len(self.game.player_hand) == 2
-        self.surrender_button = tk.Button(
-            action_frame, text="投降",
-            command=self.surrender_action,
-            font=('Arial', 14), bg='#F44336', fg='white', width=7,
-            state=tk.NORMAL if can_surrender else tk.DISABLED
+        # 加倍UP按钮：仅在两张牌且点数≤20且未加倍UP时可用
+        player_value = self.game.get_hand_value(self.game.player_hand)
+        can_double_up = (self.balance >= self.game.main_bet and len(self.game.player_hand) == 2 
+                         and player_value <= 20 and self.game.double_up_bet == 0)
+        self.double_up_button = tk.Button(
+            action_frame, text="加倍UP",
+            command=self.double_up_action,
+            font=('Arial', 14), bg='#9C27B0', fg='white', width=7,
+            state=tk.NORMAL if can_double_up else tk.DISABLED
         )
-        self.surrender_button.pack(side=tk.LEFT, padx=5)
+        self.double_up_button.pack(side=tk.LEFT, padx=5)
         self.status_label.config(text="请选择您的操作")
     
     def hit_action(self):
         self.hit_button.config(state=tk.DISABLED)
         self.stand_button.config(state=tk.DISABLED)
-        self.surrender_button.config(state=tk.DISABLED)
         self.double_button.config(state=tk.DISABLED)
+        self.double_up_button.config(state=tk.DISABLED)
         new_value = self.game.player_hit()
         new_card = self.game.player_hand[-1]
         position = len(self.game.player_hand) - 1
@@ -1778,18 +1711,17 @@ class BlackjackGUI(tk.Tk):
         if new_value > 21:
             self.game.player_done = True
             self.status_label.config(text="玩家爆牌！")
-            # 不再立即继续，而是直接触发庄家回合（由 dealer_turn 根据条件决定是否发牌）
             self.after(800, self.dealer_turn)
             return
         if new_value == 21:
-            self.game.player_done = True
-            self.status_label.config(text="玩家达到21点，自动停牌")
-            self.after(600, self.dealer_turn)
+            # 玩家达到21点，直接进入玩家21点处理（主注结算）
+            self.handle_player_21()
             return
+        # 未爆牌且非21，继续显示操作按钮（可继续要牌）
         self.hit_button.config(state=tk.NORMAL)
         self.stand_button.config(state=tk.NORMAL)
-        self.surrender_button.config(state=tk.DISABLED)
-        self.double_button.config(state=tk.DISABLED)
+        self.double_button.config(state=tk.DISABLED)  # 加倍只能初始两张牌
+        self.double_up_button.config(state=tk.DISABLED)
         self.status_label.config(text="请选择您的操作")
     
     def stand_action(self):
@@ -1820,8 +1752,8 @@ class BlackjackGUI(tk.Tk):
         self.main_bet_var.set(self.game.main_bet)
         self.update_balance()
         total_bet = (self.game.main_bet + self.game.perfect_pair_bet +
-                self.game.twenty_one_plus_three_bet + self.game.royal_match_bet +
-                self.game.bust_bet + self.game.hot_3_bet + self.game.lucky_queen_bet + self.game.insurance_bet)
+                self.game.twenty_one_plus_three_bet + self.game.sixteen_bet +
+                self.game.insurance_bet + self.game.double_up_bet)
         self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
         new_value = self.game.player_hit()
         new_card = self.game.player_hand[-1]
@@ -1834,78 +1766,73 @@ class BlackjackGUI(tk.Tk):
         self.game.player_done = True
         if new_value > 21:
             self.status_label.config(text="玩家爆牌（加倍）！")
+        elif new_value == 21:
+            # 加倍后达到21点，同样需要按玩家21点处理
+            self.handle_player_21()
+            return
         else:
             self.status_label.config(text="玩家加倍完成")
         self.after(800, self.dealer_turn)
     
-    def surrender_action(self):
+    def double_up_action(self):
+        """加倍UP：支付额外主注金额，立即停牌，不再要牌"""
+        if self.game.double_up_bet > 0:
+            messagebox.showerror("错误", "已经使用过加倍UP")
+            return
+        if self.balance < self.game.main_bet:
+            messagebox.showerror("错误", "余额不足以加倍UP")
+            return
+        self.balance -= self.game.main_bet
+        self.game.double_up_bet = self.game.main_bet
+        self.double_up_var.set(str(int(self.game.double_up_bet)))
+        self.update_balance()
+        total_bet = (self.game.main_bet + self.game.perfect_pair_bet +
+                self.game.twenty_one_plus_three_bet + self.game.sixteen_bet +
+                self.game.insurance_bet + self.game.double_up_bet)
+        self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
+        # 禁用按钮
         try:
             self.disable_action_buttons()
-        except Exception:
+        except:
             pass
-        surrender_amount = 0
-        try:
-            surrender_amount = self.game.main_bet / 2
-        except Exception:
-            surrender_amount = 0
-        self.balance += surrender_amount
-        self.game.main_bet = 0
-        try:
-            self.main_bet_var.set("投降")
-        except Exception:
-            pass
-        self.update_balance()
         self.game.player_done = True
-        self.status_label.config(text="玩家投降，退还一半主注")
-        self.after(800, self.show_showdown)
+        self.status_label.config(text="玩家选择加倍UP，立即停牌")
+        self.after(600, self.dealer_turn)
     
     def dealer_turn(self):
-        """庄家回合 - 根据玩家爆牌及边注情况决定是否发庄家第二张牌及后续动作"""
+        """庄家回合 - 根据新规则：软17要牌，16点停牌并标记Push"""
         self.game.stage = "dealer_turn"
         self.stage_label.config(text="庄家回合")
-
+        
+        # 玩家已爆牌且没有保险和16点边注时，不需要庄家补牌，直接结算
         player_value = self.game.get_hand_value(self.game.player_hand)
-        player_busted = player_value > 21
-        has_bust_bet = self.game.bust_bet > 0
-        has_insurance = self.game.insurance_bet > 0
-
-        # 情形1：玩家爆牌 且 无“爆!”边注 且 无“保险”边注 → 不摸庄家第二张牌，直接结算
-        if player_busted and not has_bust_bet and not has_insurance:
-            self.show_showdown()
+        if player_value > 21 and self.game.insurance_bet == 0 and self.game.sixteen_bet == 0:
+            self.game.stage = "showdown"
+            self.stage_label.config(text="结算")
+            self._do_showdown()
             return
 
-        # 其他情况都需要给庄家补发第二张牌
+        # 给庄家补第二张牌（如果还没补）
         self.game.add_dealer_second_card()
         second_card = self.game.dealer_hand[1]
-
-        # 在UI上添加第二张牌（背面，位置1）
         second_card_label = self.add_card_to_frame(self.dealer_cards_frame, second_card,
-                                                   show_front=False, position=1)
+                                                show_front=False, position=1)
         self.dealer_hidden_card_label = second_card_label
-
         def after_reveal():
-            # 判断庄家是否为Blackjack
-            if self.game.check_blackjack(self.game.dealer_hand):
-                self.game.dealer_blackjack = True
-                self.update_hand_labels()
-                # 庄家Blackjack直接结算，不再继续补牌
-                self.after(1000, self.show_showdown)
-            else:
-                self.game.dealer_blackjack = False
-                # 情形2：玩家爆牌 + 只有保险（无爆!） → 只摸第二张牌，不继续补牌
-                if player_busted and has_insurance and not has_bust_bet:
-                    self.after(1000, self.show_showdown)
-                else:
-                    # 其他情况：正常补牌（玩家未爆牌 或 有爆!边注）
-                    self.dealer_hit_loop()
-
-        # 启动翻牌动画
+            self.dealer_hit_loop()
         self.flip_card_animation(second_card_label, second_card, callback=after_reveal)
     
     def dealer_hit_loop(self):
         dealer_value = self.game.get_hand_value(self.game.dealer_hand)
         self.update_hand_labels()
-        if dealer_value < 17:
+        # 先检查16点停牌规则（无论软硬）
+        if dealer_value == 16:
+            self.game.dealer_sixteen_push = True
+            self.status_label.config(text="庄家16点，停牌，主注平局")
+            self.after(1000, self.show_showdown)
+            return
+        # 正常补牌规则：软17也要牌，低于17要牌
+        if dealer_value < 17 or (dealer_value == 17 and self.game.is_soft_hand(self.game.dealer_hand)):
             self.status_label.config(text="庄家要牌")
             new_value = self.game.dealer_hit()
             new_card = self.game.dealer_hand[-1]
@@ -1923,46 +1850,53 @@ class BlackjackGUI(tk.Tk):
     def show_showdown(self):
         self.game.stage = "showdown"
         self.stage_label.config(text="结算")
-        # 确保庄家所有牌已经翻开（如果之前没翻，可能因条件判断直接过来，需要再检查）
+        # 确保庄家所有牌已经翻开
         for w in self.dealer_cards_frame.winfo_children():
             if isinstance(w, tk.Label) and hasattr(w, 'card') and not w.is_face_up:
-                # 这种情况极少发生，但为防万一，直接翻牌（无动画）
                 w.config(image=self.card_images.get((w.card.suit, w.card.rank), self.back_image))
                 w.is_face_up = True
         self._do_showdown()
         
     def _do_showdown(self):
+        self.update_hand_labels()
         winnings, details = self.calculate_winnings()
         self.balance += winnings
         self.update_balance()
-
+        # 更新各边注显示颜色
         for bet_type, widget in self.bet_widgets.items():
-            win_amount = details.get(bet_type, 0)
-            original_bet = getattr(self.game, f"{bet_type}_bet", 0)
-            if win_amount == 0:
-                display_text = "0"
-                widget.config(bg='white')
-            elif win_amount == original_bet:
-                display_text = str(int(original_bet))
-                widget.config(bg='light blue')
-            else:
-                display_text = str(int(win_amount))
-                widget.config(bg='gold')
-            if bet_type == "main":
-                self.main_bet_var.set(display_text)
-            elif bet_type == "perfect_pair":
-                self.perfect_pair_var.set(display_text)
-            elif bet_type == "twenty_one_plus_three":
-                self.twenty_one_plus_three_var.set(display_text)
-            elif bet_type == "royal_match":
-                self.royal_match_var.set(display_text)
-            elif bet_type == "bust":
-                self.bust_var.set(display_text)
-            elif bet_type == "hot_3":
-                self.hot_3_var.set(display_text)
-            elif bet_type == "lucky_queen":
-                self.lucky_queen_var.set(display_text)
-
+            if bet_type in details:
+                win_amount = details.get(bet_type, 0)
+                original_bet = 0
+                if bet_type == "main":
+                    original_bet = self.game.main_bet
+                elif bet_type == "perfect_pair":
+                    original_bet = self.game.perfect_pair_bet
+                elif bet_type == "twenty_one_plus_three":
+                    original_bet = self.game.twenty_one_plus_three_bet
+                elif bet_type == "sixteen":
+                    original_bet = self.game.sixteen_bet
+                elif bet_type == "double_up":
+                    original_bet = self.game.double_up_bet
+                elif bet_type == "insurance":
+                    original_bet = self.game.insurance_bet
+                if win_amount == 0:
+                    widget.config(bg='white')
+                elif win_amount == original_bet:
+                    widget.config(bg='light blue')
+                else:
+                    widget.config(bg='gold')
+                if bet_type == "main":
+                    self.main_bet_var.set(str(int(win_amount)) if win_amount else "0")
+                elif bet_type == "perfect_pair":
+                    self.perfect_pair_var.set(str(int(win_amount)) if win_amount else "0")
+                elif bet_type == "twenty_one_plus_three":
+                    self.twenty_one_plus_three_var.set(str(int(win_amount)) if win_amount else "0")
+                elif bet_type == "sixteen":
+                    self.sixteen_var.set(str(int(win_amount)) if win_amount else "0")
+                elif bet_type == "double_up":
+                    self.double_up_var.set(str(int(win_amount)) if win_amount else "0")
+                elif bet_type == "insurance":
+                    self.insurance_var.set(str(int(win_amount)) if win_amount else "0")
         player_value = self.game.get_hand_value(self.game.player_hand)
         dealer_value = self.game.get_hand_value(self.game.dealer_hand)
         status_text = ""
@@ -1980,6 +1914,8 @@ class BlackjackGUI(tk.Tk):
             status_text = "玩家爆牌，庄家胜利"
         elif dealer_value > 21:
             status_text = "庄家爆牌，玩家胜利"
+        elif self.game.dealer_sixteen_push:
+            status_text = "庄家16点，主注平局"
         elif player_value > dealer_value:
             status_text = "玩家胜利"
         elif player_value < dealer_value:
@@ -1993,74 +1929,66 @@ class BlackjackGUI(tk.Tk):
         self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
     
     def calculate_winnings(self):
-        """计算赢得的金额（包含加倍退还）"""
         winnings = 0
         details = {
             "main": 0,
             "perfect_pair": 0,
             "twenty_one_plus_three": 0,
-            "royal_match": 0,
-            "bust": 0,
-            "hot_3": 0,
-            "lucky_queen": 0,
+            "sixteen": 0,
+            "double_up": 0,
             "insurance": 0
         }
-        
         player_value = self.game.get_hand_value(self.game.player_hand)
         dealer_value = self.game.get_hand_value(self.game.dealer_hand)
-        
-        # 1. 结算主注 + 加倍退还处理
+        player_blackjack = self.game.check_blackjack(self.game.player_hand)
+        dealer_blackjack = self.game.check_blackjack(self.game.dealer_hand)
+
+        # ------------------- 主注结算 -------------------
         main_result = 0
-        double_refund = 0
-        
-        # 庄家 Blackjack 且玩家不是 Blackjack 且玩家曾加倍 → 退还加倍金额
-        if (self.game.dealer_blackjack and not self.game.player_blackjack 
-                and self.game.double_extra > 0):
-            double_refund = self.game.double_extra
-        
-        if self.game.main_bet == 0:  # 投降情况
+        double_up_result = 0
+
+        # 玩家爆牌：直接输，不退还任何主注，且不因庄家16点而改变
+        if player_value > 21:
             main_result = 0
             details["main"] = 0
-        elif player_value == 21 and dealer_value == 21:
-            player_card_count = len(self.game.player_hand)
-            dealer_card_count = len(self.game.dealer_hand)
-            if player_card_count == 2 and dealer_card_count == 2:
-                main_result = self.game.main_bet
-                details["main"] = self.game.main_bet
-            elif player_card_count == 2 and dealer_card_count >= 3:
-                main_result = self.game.main_bet * 2.5
+            if self.game.double_up_bet > 0:
+                double_up_result = 0
+        else:
+            # 庄家16点Push（仅当玩家未爆牌时生效）
+            if self.game.dealer_sixteen_push:
+                main_result = self.game.main_bet   # 退还本金
                 details["main"] = main_result
-            elif player_card_count >= 3 and dealer_card_count == 2:
-                main_result = 0
-                details["main"] = 0
+                double_up_result = 0
             else:
-                main_result = self.game.main_bet
-                details["main"] = self.game.main_bet
-        elif self.game.player_blackjack and not self.game.dealer_blackjack:
-            main_result = self.game.main_bet * 2.5
-            details["main"] = main_result
-        elif self.game.dealer_blackjack and not self.game.player_blackjack:
-            main_result = 0
-            details["main"] = 0
-        elif player_value > 21:
-            main_result = 0
-            details["main"] = 0
-        elif dealer_value > 21:
-            main_result = self.game.main_bet * 2
-            details["main"] = main_result
-        elif player_value > dealer_value:
-            main_result = self.game.main_bet * 2
-            details["main"] = main_result
-        elif player_value < dealer_value:
-            main_result = 0
-            details["main"] = 0
-        else:  # 和局
-            main_result = self.game.main_bet
-            details["main"] = self.game.main_bet
-        
-        winnings += main_result + double_refund
-        
-        # 2. 结算完美对子
+                if self.game.main_bet == 0:
+                    main_result = 0
+                elif player_value == 21 and dealer_value == 21:
+                    main_result = self.game.main_bet
+                elif player_blackjack and not dealer_blackjack:
+                    main_result = self.game.main_bet * 2.5
+                elif dealer_blackjack and not player_blackjack:
+                    main_result = 0
+                elif dealer_value > 21:
+                    main_result = self.game.main_bet * 2
+                elif player_value > dealer_value:
+                    main_result = self.game.main_bet * 2
+                elif player_value < dealer_value:
+                    main_result = 0
+                else:   # 和局
+                    main_result = self.game.main_bet
+                details["main"] = main_result
+
+                # 加倍UP结算：主注有净赢利（>本金）时赔付1:1
+                if self.game.double_up_bet > 0:
+                    if main_result > self.game.main_bet:
+                        double_up_result = self.game.double_up_bet * 2
+                    else:
+                        double_up_result = 0
+                    details["double_up"] = double_up_result
+
+        winnings += main_result + double_up_result
+
+        # ------------------- 完美对子 -------------------
         if self.game.perfect_pair_bet > 0:
             pair_result = self.game.check_perfect_pair()
             if pair_result == "perfect":
@@ -2075,8 +2003,8 @@ class BlackjackGUI(tk.Tk):
             else:
                 details["perfect_pair"] = 0
             winnings += details["perfect_pair"]
-        
-        # 3. 结算21+3
+
+        # ------------------- 21+3 -------------------
         if self.game.twenty_one_plus_three_bet > 0:
             twenty_one_result = self.game.check_twenty_one_plus_three()
             if twenty_one_result == "straight_three_of_a_kind":
@@ -2097,108 +2025,47 @@ class BlackjackGUI(tk.Tk):
             else:
                 details["twenty_one_plus_three"] = 0
             winnings += details["twenty_one_plus_three"]
-        
-        # 4. 结算皇家同花
-        if self.game.royal_match_bet > 0:
-            royal_result = self.game.check_royal_match()
-            if royal_result == "royal":
-                win_amount = self.game.royal_match_bet * 25
-                details["royal_match"] = win_amount + self.game.royal_match_bet
-            elif royal_result == "suited":
-                win_amount = self.game.royal_match_bet * 2.5
-                details["royal_match"] = win_amount + self.game.royal_match_bet
+
+        # ------------------- 16点边注 -------------------
+        if self.game.sixteen_bet > 0:
+            if dealer_value == 16:
+                card_count = len(self.game.dealer_hand)
+                if card_count >= 6:
+                    multiplier = 100
+                elif card_count == 5:
+                    multiplier = 50
+                elif card_count == 4:
+                    multiplier = 10
+                elif card_count == 3:
+                    multiplier = 5
+                else:
+                    multiplier = 3
+                win_amount = self.game.sixteen_bet * multiplier
+                total_return = win_amount + self.game.sixteen_bet
+                details["sixteen"] = total_return
+                winnings += total_return
             else:
-                details["royal_match"] = 0
-            winnings += details["royal_match"]
-        
-        # 5. 结算爆！（玩家 Blackjack 时退还本金）
-        if self.game.bust_bet > 0:
-            if self.game.player_blackjack:
-                details["bust"] = self.game.bust_bet  # Push
-            elif dealer_value > 21:
-                dealer_card_count = len(self.game.dealer_hand)
-                multiplier = {
-                    3: 1,
-                    4: 2,
-                    5: 9,
-                    6: 50,
-                    7: 100
-                }.get(dealer_card_count, 250)
-                win_amount = self.game.bust_bet * multiplier
-                details["bust"] = win_amount + self.game.bust_bet
-            else:
-                details["bust"] = 0
-            winnings += details["bust"]
-        
-        # 6. 结算热门3
-        if self.game.hot_3_bet > 0:
-            hot_3_result = self.game.check_hot_3()
-            if hot_3_result == "three_seven_same_suit":
-                win_amount = self.game.hot_3_bet * 500
-                details["hot_3"] = win_amount + self.game.hot_3_bet
-            elif hot_3_result == "three_seven_mixed":
-                win_amount = self.game.hot_3_bet * 100
-                details["hot_3"] = win_amount + self.game.hot_3_bet
-            elif hot_3_result == "twenty_one_same_suit":
-                win_amount = self.game.hot_3_bet * 20
-                details["hot_3"] = win_amount + self.game.hot_3_bet
-            elif hot_3_result == "twenty_one_mixed":
-                win_amount = self.game.hot_3_bet * 4
-                details["hot_3"] = win_amount + self.game.hot_3_bet
-            elif hot_3_result == "twenty":
-                win_amount = self.game.hot_3_bet * 2
-                details["hot_3"] = win_amount + self.game.hot_3_bet
-            elif hot_3_result == "nineteen":
-                win_amount = self.game.hot_3_bet * 1
-                details["hot_3"] = win_amount + self.game.hot_3_bet
-            else:
-                details["hot_3"] = 0
-            winnings += details["hot_3"]
-        
-        # 7. 结算幸运女王
-        if self.game.lucky_queen_bet > 0:
-            lucky_queen_result = self.game.check_lucky_queen()
-            if lucky_queen_result == "queens_same_suit_dealer_bj":
-                win_amount = self.game.lucky_queen_bet * 1000
-                details["lucky_queen"] = win_amount + self.game.lucky_queen_bet
-            elif lucky_queen_result == "queens_same_suit":
-                win_amount = self.game.lucky_queen_bet * 100
-                details["lucky_queen"] = win_amount + self.game.lucky_queen_bet
-            elif lucky_queen_result == "same_rank_same_suit":
-                win_amount = self.game.lucky_queen_bet * 30
-                details["lucky_queen"] = win_amount + self.game.lucky_queen_bet
-            elif lucky_queen_result == "same_suit":
-                win_amount = self.game.lucky_queen_bet * 10
-                details["lucky_queen"] = win_amount + self.game.lucky_queen_bet
-            elif lucky_queen_result == "mixed":
-                win_amount = self.game.lucky_queen_bet * 4
-                details["lucky_queen"] = win_amount + self.game.lucky_queen_bet
-            else:
-                details["lucky_queen"] = 0
-            winnings += details["lucky_queen"]
-        
-        # 8. 结算保险
-        if self.game.insurance_bet > 0:
-            if self.game.dealer_blackjack and not self.game.player_blackjack:
+                details["sixteen"] = 0
+            self.game.sixteen_bet = 0
+
+        # ------------------- 保险边注 -------------------
+        if self.game.insurance_bet > 0 and not (player_value == 21 and self.game.insurance_taken):
+            if dealer_blackjack and not player_blackjack:
                 insurance_win = self.game.insurance_bet * 3
                 details["insurance"] = insurance_win
-                self.insurance_var.set(str(int(insurance_win)))
-                self.insurance_display.config(bg='gold')
+                winnings += insurance_win
             else:
                 details["insurance"] = 0
-                self.insurance_var.set("0")
-            winnings += details["insurance"]
-        
+
         return winnings, details
 
     def reset_bets(self):
         self.main_bet_var.set("0")
         self.perfect_pair_var.set("0")
         self.twenty_one_plus_three_var.set("0")
-        self.royal_match_var.set("0")
-        self.bust_var.set("0")
-        self.hot_3_var.set("0")
-        self.lucky_queen_var.set("0")
+        self.sixteen_var.set("0")
+        self.insurance_var.set("0")
+        self.double_up_var.set("0")
         self.status_label.config(text="已重置所有下注金额")
         for widget in self.bet_widgets.values():
             widget.config(bg='white')
@@ -2270,27 +2137,41 @@ class BlackjackGUI(tk.Tk):
             self.main_bet_var.set("0")
             self.perfect_pair_var.set("0")
             self.twenty_one_plus_three_var.set("0")
-            self.royal_match_var.set("0")
-            self.bust_var.set("0")
-            self.hot_3_var.set("0")
-            self.lucky_queen_var.set("0")
-            self.insurance_label.pack_forget()
-            self.insurance_display.pack_forget()
+            self.sixteen_var.set("0")
             self.insurance_var.set("0")
-            self.side_bet_all_in_btn.pack(side=tk.LEFT, padx=5)
+            self.double_up_var.set("0")
+            
+            # 恢复边注全下，隐藏加倍UP
+            self._toggle_double_up_visibility(False)
+            self.side_bet_all_in_btn.config(state=tk.NORMAL)   # 确保按钮可用
+            
             for widget in self.bet_widgets.values():
                 widget.config(bg='white')
             self.insurance_display.config(bg='white')
+            self.double_up_display.config(bg='white')
             self.active_card_labels = []
             self.dealer_hidden_card_label = None
             self.flipping_cards = []
             self.flip_step = 0
             self.enable_betting_area()
-            # 重新创建操作按钮（重置金额、重复上局、开始游戏）
-            self._build_action_buttons()
-            # 如果 last_bet 不为空，则启用重复按钮，否则禁用
-            if hasattr(self, 'repeat_bet_btn'):
-                self.repeat_bet_btn.config(state=tk.NORMAL if self.last_bet is not None else tk.DISABLED)
+            for widget in self.action_frame.winfo_children():
+                widget.destroy()
+            start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
+            start_button_frame.pack(pady=5)
+            self.reset_bets_button = tk.Button(
+                start_button_frame, text="重置金额", 
+                command=self.reset_bets, font=('Arial', 14),
+                bg='#F44336', fg='white', width=10
+            )
+            self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
+            self.reset_bets_button.config(state=tk.NORMAL)
+            self.start_button = tk.Button(
+                start_button_frame, text="开始游戏", 
+                command=self.start_game, font=('Arial', 14),
+                bg='#4CAF50', fg='white', width=10
+            )
+            self.start_button.pack(side=tk.LEFT)
+            self.start_button.config(state=tk.NORMAL)
             self.current_bet_label.config(text="本局下注: $0.00")
             self._resetting = False
             if auto_reset:

@@ -444,6 +444,7 @@ class WildFivePokerGUI(tk.Tk):
 
         self.username = username
         self.balance = initial_balance
+        self.last_bet = None
         self.game = Wild_Five_Poker()
 
         self.card_images = {}
@@ -707,6 +708,11 @@ class WildFivePokerGUI(tk.Tk):
         self.reset_bets_button = tk.Button(start_frame, text="重置金额", command=self.reset_bets,
                                            font=('Arial', 14), bg='#F44336', fg='white', width=10)
         self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
+        self.repeat_bet_btn = tk.Button(start_frame, text="重复上局下注", command=self.apply_last_bet,
+                                        font=('Arial', 14), bg='#4A90E2', fg='white',
+                                        activebackground='#3A7BC8', width=12,
+                                        state=tk.NORMAL if self.last_bet is not None else tk.DISABLED)
+        self.repeat_bet_btn.pack(side=tk.LEFT, padx=(0, 10))
         self.start_button = tk.Button(start_frame, text="开始游戏", command=self.start_game,
                                       font=('Arial', 14), bg='#4CAF50', fg='white', width=10)
         self.start_button.pack(side=tk.LEFT)
@@ -1737,12 +1743,20 @@ class WildFivePokerGUI(tk.Tk):
         for w in self.action_frame.winfo_children():
             w.destroy()
 
+        # 重建 start_frame 和按钮
         start_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
         start_frame.pack(pady=5)
 
         self.reset_bets_button = tk.Button(start_frame, text="重置金额", command=self.reset_bets,
                                         font=('Arial', 14), bg='#F44336', fg='white', width=10)
         self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
+
+        # 重复上局下注按钮（根据是否有历史下注决定启用状态）
+        self.repeat_bet_btn = tk.Button(start_frame, text="重复上局下注", command=self.apply_last_bet,
+                                        font=('Arial', 14), bg='#4A90E2', fg='white',
+                                        activebackground='#3A7BC8', width=12,
+                                        state=tk.NORMAL if self.last_bet is not None else tk.DISABLED)
+        self.repeat_bet_btn.pack(side=tk.LEFT, padx=(0, 10))
 
         self.start_button = tk.Button(start_frame, text="开始游戏", command=self.start_game,
                                     font=('Arial', 14), bg='#4CAF50', fg='white', width=10)
@@ -1848,6 +1862,17 @@ class WildFivePokerGUI(tk.Tk):
         if self.username != 'Guest':
             update_balance_in_json(self.username, self.balance)
 
+    def apply_last_bet(self):
+        """重复上一次的下注金额（底注、原始五、公共对子）"""
+        if self.last_bet is None:
+            return
+        self.ante_var.set(str(self.last_bet['ante']))
+        self.original_five_var.set(str(self.last_bet['original_five']))
+        self.public_pair_var.set(str(self.last_bet['public_pair']))
+        # 盲注会自动同步（因为底注改变时 blind_var 被同步更新，但这里直接调用一次同步逻辑）
+        self.blind_var.set(str(self.last_bet['ante']))
+        self.status_label.config(text="已加载上次下注金额")
+
     def start_game(self):
         try:
             ante = int(float(self.ante_var.get()))
@@ -1879,6 +1904,21 @@ class WildFivePokerGUI(tk.Tk):
         if total_bet > self.balance:
             messagebox.showerror("错误", "余额不足")
             return
+        
+        total_bet = ante + blind + original_five + public_pair
+        if (total_bet+ante) > self.balance:
+            messagebox.showerror("错误", "不余额足以下注【加注】！")
+            return
+        
+        # 保存本次下注金额（用于重复下注）
+        self.last_bet = {
+            'ante': ante,
+            'original_five': original_five,
+            'public_pair': public_pair
+        }
+        # 如果有重复下注按钮，则启用它
+        if hasattr(self, 'repeat_bet_btn') and self.repeat_bet_btn.winfo_exists():
+            self.repeat_bet_btn.config(state=tk.NORMAL)
 
         self.balance -= total_bet
         self.update_balance()

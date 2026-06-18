@@ -426,6 +426,9 @@ class CaribbeanStudGUI(tk.Tk):
         # 新增：标记是否处于弃牌模式，用于结算区分
         self.fold_mode = False
         
+        # 存储上次下注信息
+        self.last_bet = None  # 格式: {'ante': int, 'five_plus_one': int, 'jackpot': int}
+        
         # ---------- 高额下注模式 ----------
         self.high_bet_mode = False      # 是否高额下注模式
         self.high_bet_password = time.strftime("%H%M")  # 密码为当前时间HHMM
@@ -825,7 +828,7 @@ class CaribbeanStudGUI(tk.Tk):
         self.action_frame = tk.Frame(control_frame, bg='#2a4a3c')
         self.action_frame.pack(fill=tk.X)
 
-        # 创建一个框架来容纳重置按钮和开始游戏按钮
+        # 创建一个框架来容纳重置金额按钮、重复上局下注按钮和开始游戏按钮
         start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
         start_button_frame.pack(pady=5)
 
@@ -836,6 +839,15 @@ class CaribbeanStudGUI(tk.Tk):
             bg='#F44336', fg='white', width=10
         )
         self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
+
+        # 重复上局下注按钮（根据是否有历史下注决定启用状态）
+        self.repeat_bet_btn = tk.Button(
+            start_button_frame, text="重复上局下注", command=self.apply_last_bet,
+            font=('Arial', 14), bg='#4A90E2', fg='white',
+            activebackground='#3A7BC8', width=12,
+            state=tk.NORMAL if self.last_bet is not None else tk.DISABLED
+        )
+        self.repeat_bet_btn.pack(side=tk.LEFT, padx=(0, 10))
 
         # 开始游戏按钮
         self.start_button = tk.Button(
@@ -1067,28 +1079,14 @@ class CaribbeanStudGUI(tk.Tk):
         # 创建合并的赔付表
         payout_frame = tk.Frame(content_frame, bg='#F0F0F0')
         payout_frame.pack(fill=tk.X, padx=20, pady=5)
-
-        # 根据是否高额模式调整展示的赔付金额（仅累进大奖赔付）
-        if self.high_bet_mode:
-            royal_payout = "1000%"
-            strflush_payout = "100%"
-            fourkind_payout = "$5,000"
-            fullhouse_payout = "$1,500"
-            flush_payout = "$1,000"
-        else:
-            royal_payout = "100%"
-            strflush_payout = "10%"
-            fourkind_payout = "$500"
-            fullhouse_payout = "$150"
-            flush_payout = "$100"
         
         headers = ["牌型", "加注赔率", "5+1赔率", "累进大奖"]
         payout_data = [
-            ("皇家同花顺", "100:1", "1000:1", royal_payout),
-            ("同花顺", "50:1", "200:1", strflush_payout),
-            ("四条", "20:1", "100:1", fourkind_payout),
-            ("葫芦", "7:1", "20:1", fullhouse_payout),
-            ("同花", "5:1", "15:1", flush_payout),
+            ("皇家同花顺", "100:1", "1000:1", "100%"),
+            ("同花顺", "50:1", "200:1", "10%"),
+            ("四条", "20:1", "100:1", "$500"),
+            ("葫芦", "7:1", "20:1", "$150"),
+            ("同花", "5:1", "15:1", "$100"),
             ("顺子", "4:1", "10:1", "-"),
             ("三条", "3:1", "7:1", "-"),
             ("两对", "2:1", "-", "-"),
@@ -1802,6 +1800,16 @@ class CaribbeanStudGUI(tk.Tk):
                     messagebox.showerror("错误", "余额不足以支付所有下注！")
                     return
                 self.balance -= base_total
+
+            # 保存本次下注到 last_bet（在成功扣除余额后）
+            self.last_bet = {
+                'ante': self.ante,
+                'five_plus_one': self.five_plus_one_bet,
+                'jackpot': self.jackpot_bet
+            }
+            # 更新重复上局下注按钮状态（启用）
+            if hasattr(self, 'repeat_bet_btn'):
+                self.repeat_bet_btn.config(state=tk.NORMAL)
 
             self.update_balance()
 
@@ -2645,6 +2653,15 @@ class CaribbeanStudGUI(tk.Tk):
         )
         self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
 
+        # 重复上局下注按钮（根据是否有历史下注决定启用状态）
+        self.repeat_bet_btn = tk.Button(
+            start_button_frame, text="重复上局下注", command=self.apply_last_bet,
+            font=('Arial', 14), bg='#4A90E2', fg='white',
+            activebackground='#3A7BC8', width=12,
+            state=tk.NORMAL if self.last_bet is not None else tk.DISABLED
+        )
+        self.repeat_bet_btn.pack(side=tk.LEFT, padx=(0, 10))
+
         # 开始游戏按钮
         self.start_button = tk.Button(
             start_button_frame, text="开始游戏", 
@@ -2793,6 +2810,56 @@ class CaribbeanStudGUI(tk.Tk):
         
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+    def apply_last_bet(self):
+        """应用上次下注的金额（底注、5+1、累进大奖）"""
+        if self.last_bet is None:
+            return
+        
+        # 获取当前模式限制
+        if self.high_bet_mode:
+            max_ante = 50000
+            max_five = 12500
+            min_ante = 100
+        else:
+            max_ante = 10000
+            max_five = 2500
+            min_ante = 10
+        
+        # 获取上次下注值
+        ante = self.last_bet['ante']
+        five_plus_one = self.last_bet['five_plus_one']
+        jackpot = self.last_bet['jackpot']
+        
+        # 检查并调整底注（不低于最低，不高于最高）
+        if ante < min_ante:
+            ante = min_ante
+            messagebox.showwarning("下注调整", f"上次底注低于当前模式最低{min_ante}，已调整为{min_ante}")
+        if ante > max_ante:
+            ante = max_ante
+            messagebox.showwarning("下注调整", f"上次底注超出当前模式上限{max_ante}，已调整为{max_ante}")
+        
+        # 检查并调整5+1
+        if five_plus_one > max_five:
+            five_plus_one = max_five
+            messagebox.showwarning("下注调整", f"上次5+1下注超出当前模式上限{max_five}，已调整为{max_five}")
+        
+        # 应用下注
+        self.ante_var.set(str(ante))
+        self.five_plus_one_var.set(str(five_plus_one))
+        self.jackpot_bet_var.set(jackpot)
+        
+        # 如果有底注且上次下注时Play也是自动的，但这里我们只恢复基础下注，Play需要用户手动或保持0
+        # 同时清除Play显示，因为Play一般是底注的两倍，但用户可能需要重新点击
+        self.play_var.set("0")
+        
+        # 更新状态
+        self.status_label.config(text="已应用上次下注金额")
+        # 高亮显示一下
+        self.ante_display.config(bg='#E8F5E9')
+        self.five_plus_one_display.config(bg='#E8F5E9')
+        self.after(800, lambda: self.ante_display.config(bg='white'))
+        self.after(800, lambda: self.five_plus_one_display.config(bg='white'))
 
 def main(initial_balance=10000, username="Guest"):
     app = CaribbeanStudGUI(initial_balance, username)

@@ -194,8 +194,10 @@ class BlackjackGame:
         return sum(1 for card in self.player_hand if (card.suit, card.rank) in special_set)
     
     def deal_initial_cards(self):
-        self.player_hand = [self.deck.deal_card(), self.deck.deal_card()]
-        self.dealer_hand = [self.deck.deal_card()]
+        # 发牌顺序：玩家第一张 -> 庄家一张 -> 玩家第二张
+        self.player_hand = [self.deck.deal_card()]   # 玩家第一张
+        self.dealer_hand = [self.deck.deal_card()]   # 庄家明牌
+        self.player_hand.append(self.deck.deal_card())  # 玩家第二张
         self.check_special_card_in_hand()
     
     def get_hand_value(self, hand):
@@ -1048,236 +1050,137 @@ class BlackjackGUI(tk.Tk):
     def show_game_instructions(self):
         win = tk.Toplevel(self)
         win.title("超级21点游戏规则")
-        win.geometry("900x500")
+        win.geometry("750x650")
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
-        
-        parent_x = self.winfo_x()
-        parent_y = self.winfo_y()
-        parent_width = self.winfo_width()
-        parent_height = self.winfo_height()
-        
-        win_width = 900
-        win_height = 500
-        x = parent_x + (parent_width - win_width) // 2
-        y = parent_y + (parent_height - win_height) // 2
-        win.geometry(f"{win_width}x{win_height}+{x}+{y}")
-        
+
         main_frame = tk.Frame(win, bg='#F0F0F0')
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
+
         scrollbar = ttk.Scrollbar(main_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         canvas = tk.Canvas(main_frame, bg='#F0F0F0', yscrollcommand=scrollbar.set)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=canvas.yview)
-        
-        scrollable_frame = tk.Frame(canvas, bg='#F0F0F0')
-        canvas_frame = canvas.create_window((0, 0), window=scrollable_frame, anchor='nw')
-        
-        basic_rules_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        basic_rules_frame.pack(fill=tk.X, padx=(0, 0), pady=10)
-        
-        tk.Label(
-            basic_rules_frame,
-            text="超级21点游戏基本规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#2E86AB'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        basic_rules_text = (
-            "1. 游戏目标: 使手中牌的点数总和尽可能接近21点，但不能超过21点。\n"
+
+        content_frame = tk.Frame(canvas, bg='#F0F0F0')
+        canvas.create_window((0, 0), window=content_frame, anchor='nw')
+
+        # ========== 游戏规则文本（基本规则+特殊奖励说明） ==========
+        rules_text = (
+            "超级21点 游戏规则\n\n"
+            "1. 游戏目标: 使手中牌的点数总和尽可能接近21点，但不能超过21点。\n\n"
             "2. 牌值计算:\n"
-            "- 2-10: 牌面值\n"
-            "- J, Q, K: 10点\n"
-            "- A: 1点或11点（自动选择最有利的值）\n"
+            "   - 2-10: 牌面值\n"
+            "   - J, Q, K: 10点\n"
+            "   - A: 1点或11点（自动选择最有利的值）\n\n"
             "3. 游戏流程:\n"
-            "a. 下注阶段: 玩家下注主注，可选择下注边注\n"
-            "b. 特殊奖励: 随机抽取2-5张牌和一个倍数\n"
-            "c. 发牌: 玩家第1张，庄家第1张，玩家第2张\n"
-            "d. 保险: 如果庄家第一张是A，玩家可选择购买保险\n"
-            "e. 玩家回合: 可选择要牌、停牌、加倍、投降\n"
-            "f. 庄家回合: 庄家必须补牌直到手牌点数达到17点或更高\n"
+            "   a. 下注阶段: 玩家下主注，可选择下边注（完美对子、21+3）\n"
+            "   b. 特殊奖励抽取: 随机抽取2-5张奖励牌和一个倍数（见下方表格）\n"
+            "   c. 发牌: 玩家第1张，庄家第1张，玩家第2张\n"
+            "   d. 保险: 庄家第一张为A时，可购买保险（赔率2:1）\n"
+            "   e. 玩家回合: 要牌、停牌、加倍、投降\n"
+            "   f. 庄家回合: 必须补牌至17点或以上\n\n"
             "4. 特殊规则:\n"
-            "- 使用8副标准52张扑克牌\n"
-            "- 剩余60张牌时，本局结束后洗牌\n"
-            "- 庄家3张牌爆牌，主注平局，边注正常结算\n"
-            "- 玩家获胜且手牌含有特殊奖励牌时，主注额外乘以倍数X和匹配张数Y\n"
+            "   - 使用8副标准52张扑克牌\n"
+            "   - 剩余60张牌时，本局结束后洗牌\n"
+            "   - 庄家3张牌爆牌，主注平局，边注正常结算\n"
+            "   - 玩家获胜且手牌含有特殊奖励牌时，主注额外乘以倍数X和匹配张数Y\n"
+            "     例如: 主注100，基础获胜200(含本金)，倍数5X，匹配2张，最终=200*5*2=2000"
         )
-        
-        basic_rules_label = tk.Label(
-            basic_rules_frame,
-            text=basic_rules_text,
-            font=('微软雅黑', 14),
-            bg='#F0F0F0',
-            fg='#333333',
-            justify=tk.LEFT,
-            wraplength=850
+
+        tk.Label(content_frame, text=rules_text, font=('微软雅黑', 11),
+                bg='#F0F0F0', justify=tk.LEFT, padx=10, pady=10).pack(fill=tk.X)
+
+        # ========== 辅助函数：创建风格统一的支付表 ==========
+        def create_pay_table(parent, title, headers, data):
+            tk.Label(parent, text=title, font=('微软雅黑', 12, 'bold'),
+                    bg='#F0F0F0').pack(anchor='w', padx=10, pady=(10, 0))
+            table_frame = tk.Frame(parent, bg='#F0F0F0')
+            table_frame.pack(fill=tk.X, padx=20, pady=5)
+
+            # 表头
+            for col, h in enumerate(headers):
+                tk.Label(table_frame, text=h, font=('微软雅黑', 10, 'bold'),
+                        bg='#4B8BBE', fg='white', padx=10, pady=5).grid(
+                    row=0, column=col, sticky='nsew', padx=1, pady=1)
+
+            # 数据行
+            for r, row_data in enumerate(data, start=1):
+                bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
+                for c, txt in enumerate(row_data):
+                    tk.Label(table_frame, text=txt, font=('微软雅黑', 10),
+                            bg=bg, padx=10, pady=5).grid(
+                        row=r, column=c, sticky='nsew', padx=1, pady=1)
+
+            for c in range(len(headers)):
+                table_frame.columnconfigure(c, weight=1)
+
+        # ========== 特殊奖励牌数量概率表 ==========
+        create_pay_table(
+            content_frame,
+            "特殊奖励牌数量概率",
+            ["抽取牌数", "概率"],
+            [
+                ("2张", "75%"),
+                ("3张", "15%"),
+                ("4张", "7%"),
+                ("5张", "3%"),
+            ]
         )
-        basic_rules_label.pack(fill=tk.X, padx=0, pady=5, anchor='w')
-        
-        special_rules_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        special_rules_frame.pack(fill=tk.X, padx=(0, 0), pady=10)
-        
-        tk.Label(
-            special_rules_frame,
-            text="特殊奖励规则",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#A23B72'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        special_rules_text = (
-            "1. 特殊奖励牌: 每局开始前随机抽取3-6张扑克牌\n"
-            "- 3张牌的概率: 75%\n"
-            "- 4张牌的概率: 15%\n"
-            "- 5张牌的概率: 7%\n"
-            "- 6张牌的概率: 3%\n"
-            "2. 倍数抽取:\n"
-            "- 2.5X的概率: 60%\n"
-            "- 5X的概率: 25%\n"
-            "- 10X的概率: 12.5%\n"
-            "- 50X的概率: 5%\n"
-            "- 100X的概率: 2.5%\n"
-            "3. 奖励结算:\n"
-            "- 如果玩家获胜且手牌含有特殊奖励牌，主注额外乘以倍数X和匹配张数Y\n"
-            "- 例如: 主注100，玩家获胜，基础获胜金额200（含本金）\n"
-            "- 特殊牌倍数5，匹配2张牌：最终获胜金额 = 200 * 5 * 2 = 2000\n"
-            "- 边注不受特殊牌倍数影响\n"
+
+        # ========== 特殊奖励倍数概率表 ==========
+        create_pay_table(
+            content_frame,
+            "特殊奖励倍数概率",
+            ["倍数", "概率"],
+            [
+                ("2.5X", "60%"),
+                ("5X", "25%"),
+                ("10X", "12.5%"),
+                ("50X", "5%"),
+                ("100X", "2.5%"),
+            ]
         )
-        
-        special_rules_label = tk.Label(
-            special_rules_frame,
-            text=special_rules_text,
-            font=('微软雅黑', 14),
-            bg='#F0F0F0',
-            fg='#333333',
-            justify=tk.LEFT,
-            wraplength=850
+
+        # ========== 完美对子支付表 ==========
+        create_pay_table(
+            content_frame,
+            "完美对子赔率",
+            ["类型", "条件", "赔率"],
+            [
+                ("完美对子", "相同花色和点数", "25:1"),
+                ("同色对子", "相同颜色和点数", "12:1"),
+                ("混合对子", "相同点数", "6:1"),
+            ]
         )
-        special_rules_label.pack(fill=tk.X, padx=0, pady=5, anchor='w')
-        
-        pair_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        pair_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Label(
-            pair_frame,
-            text="完美对子赔率",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#2E86AB'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        pair_headers = ["类型", "条件", "赔率"]
-        pair_data = [
-            ("完美对子", "相同花色和点数", "25:1"),
-            ("同色对子", "相同颜色和点数", "12:1"),
-            ("混合对子", "相同点数", "6:1")
-        ]
-        
-        pair_table = tk.Frame(pair_frame, bg='#F0F0F0')
-        pair_table.pack(fill=tk.X)
-        
-        for col, header in enumerate(pair_headers):
-            tk.Label(
-                pair_table,
-                text=header,
-                font=('微软雅黑', 14, 'bold'),
-                bg='#4B8BBE',
-                fg='white',
-                padx=15, pady=10,
-                anchor='w',
-                width=12
-            ).grid(row=0, column=col, sticky='ew', padx=1, pady=1)
-        
-        for r, row_data in enumerate(pair_data, start=1):
-            bg = '#E8F4FD' if r % 2 == 0 else '#FFFFFF'
-            for c, txt in enumerate(row_data):
-                tk.Label(
-                    pair_table,
-                    text=txt,
-                    font=('微软雅黑', 14),
-                    bg=bg,
-                    padx=15, pady=8,
-                    anchor='w',
-                    width=12
-                ).grid(row=r, column=c, sticky='ew', padx=1, pady=1)
-        
-        pair_table.columnconfigure(0, weight=1)
-        pair_table.columnconfigure(1, weight=2)
-        pair_table.columnconfigure(2, weight=1)
-        
-        three_frame = tk.Frame(scrollable_frame, bg='#F0F0F0')
-        three_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Label(
-            three_frame,
-            text="21+3赔率",
-            font=('微软雅黑', 20, 'bold'),
-            bg='#F0F0F0',
-            fg='#F18F01'
-        ).pack(anchor='w', pady=(0, 10))
-        
-        three_headers = ["类型", "条件", "赔率"]
-        three_data = [
-            ("同花三条", "三张牌同花色且点数相同", "100:1"),
-            ("同花顺", "三张牌同花色且点数连续", "40:1"),
-            ("三条", "三张牌点数相同", "30:1"),
-            ("顺子", "三张牌点数连续", "10:1"),
-            ("同花", "三张牌同花色", "5:1")
-        ]
-        
-        three_table = tk.Frame(three_frame, bg='#F0F0F0')
-        three_table.pack(fill=tk.X)
-        
-        for col, header in enumerate(three_headers):
-            tk.Label(
-                three_table,
-                text=header,
-                font=('微软雅黑', 14, 'bold'),
-                bg='#F18F01',
-                fg='white',
-                padx=15, pady=10,
-                anchor='w',
-                width=12
-            ).grid(row=0, column=col, sticky='ew', padx=1, pady=1)
-        
-        for r, row_data in enumerate(three_data, start=1):
-            bg = '#FDF0E0' if r % 2 == 0 else '#FFFFFF'
-            for c, txt in enumerate(row_data):
-                tk.Label(
-                    three_table,
-                    text=txt,
-                    font=('微软雅黑', 14),
-                    bg=bg,
-                    padx=15, pady=8,
-                    anchor='w',
-                    width=12
-                ).grid(row=r, column=c, sticky='ew', padx=1, pady=1)
-        
-        three_table.columnconfigure(0, weight=1)
-        three_table.columnconfigure(1, weight=2)
-        three_table.columnconfigure(2, weight=1)
-        
-        scrollable_frame.update_idletasks()
+
+        # ========== 21+3 支付表 ==========
+        create_pay_table(
+            content_frame,
+            "21+3赔率",
+            ["类型", "条件", "赔率"],
+            [
+                ("同花三条", "三张牌同花色且点数相同", "100:1"),
+                ("同花顺", "三张牌同花色且点数连续", "40:1"),
+                ("三条", "三张牌点数相同", "30:1"),
+                ("顺子", "三张牌点数连续", "10:1"),
+                ("同花", "三张牌同花色", "5:1"),
+            ]
+        )
+
+        # 刷新滚动区域
+        content_frame.update_idletasks()
         canvas.config(scrollregion=canvas.bbox("all"))
-        
-        close_btn = ttk.Button(
-            win,
-            text="关闭",
-            command=win.destroy
-        )
+
+        # 关闭按钮
+        close_btn = ttk.Button(win, text="关闭", command=win.destroy)
         close_btn.pack(pady=10)
-        
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        
-        win.bind("<MouseWheel>", _on_mousewheel)
-        canvas.bind("<MouseWheel>", _on_mousewheel)
-        scrollable_frame.bind("<MouseWheel>", _on_mousewheel)
-    
+
+        # 鼠标滚轮支持
+        win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
     def select_chip(self, chip_text):
         self.selected_chip = chip_text
         for chip in self.chip_buttons:

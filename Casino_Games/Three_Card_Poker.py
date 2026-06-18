@@ -321,6 +321,8 @@ class ThreeCardPokerGUI(tk.Tk):
         self.selected_chip = None  # 当前选中的筹码
         self.chip_buttons = []  # 筹码按钮列表
         self.last_win = 0
+        self.last_bet = None
+        self.repeat_bet_btn = None
         self.auto_reset_timer = None
         self.buttons_disabled = False  # 跟踪按钮是否被禁用
         self.last_progressive_state = 0  # 保存上局Progressive状态
@@ -523,7 +525,7 @@ class ThreeCardPokerGUI(tk.Tk):
         
         # 庄家区域 - 固定高度200
         dealer_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        dealer_frame.place(x=50, y=50, width=400, height=230)
+        dealer_frame.place(x=50, y=30, width=400, height=230)
         self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.dealer_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.dealer_cards_frame = tk.Frame(dealer_frame, bg='#2a4a3c')
@@ -532,7 +534,7 @@ class ThreeCardPokerGUI(tk.Tk):
         # 在庄家和玩家区域之间添加提示文字
         self.ante_info_label = tk.Label(
             table_canvas, 
-            text="庄家玩高牌Q或以上", 
+            text="庄家持高牌Q或以上牌型合格\n不合格的，加注退还", 
             font=('Arial', 26), 
             bg='#35654d', 
             fg='#FFD700'
@@ -548,18 +550,18 @@ class ThreeCardPokerGUI(tk.Tk):
 
         # 居中放置在庄家和玩家区域之间
         center_x = (canvas_width - label_width) // 2
-        self.ante_info_label.place(relx=0.5, y=290, anchor='n')
+        self.ante_info_label.place(relx=0.5, y=265, anchor='n')
         
         # 玩家区域 - 固定高度200
         player_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        player_frame.place(x=50, y=350, width=400, height=230)
+        player_frame.place(x=50, y=350, width=400, height=240)
         self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 18), bg='#2a4a3c', fg='white')
         self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.player_cards_frame = tk.Frame(player_frame, bg='#2a4a3c')
         self.player_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=5)
         
         # 右侧控制面板
-        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=250, padx=10, pady=5)
+        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=240, padx=10, pady=5)
         control_frame.pack(side=tk.RIGHT, fill=tk.Y)
         
         # 顶部信息栏
@@ -762,6 +764,14 @@ class ThreeCardPokerGUI(tk.Tk):
             bg='#F44336', fg='white', width=10
         )
         self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))  # 右侧留出10像素间距
+
+        self.repeat_bet_btn = tk.Button(
+            start_button_frame, text="重复上局下注", 
+            command=self.apply_last_bet, font=('Arial', 14),
+            bg='#4A90E2', fg='white', activebackground='#3A7BC8', width=12,
+            state=tk.NORMAL if self.last_bet is not None else tk.DISABLED
+        )
+        self.repeat_bet_btn.pack(side=tk.LEFT, padx=5)
 
         # 开始游戏按钮
         self.start_button = tk.Button(
@@ -1134,8 +1144,19 @@ class ThreeCardPokerGUI(tk.Tk):
             total_bet = self.ante + self.pair_plus + self.progressive_bet + self.six_card_bet
                 
             if self.balance < total_bet + self.ante:
-                messagebox.showwarning("警告", "余额不足以支付Bet")
+                messagebox.showwarning("警告", "余额不足以支付【加注】!")
                 return
+            
+            # 保存当前下注信息（成功开始游戏前）
+            self.last_bet = {
+                "ante": self.ante,
+                "pair_plus": self.pair_plus,
+                "six_card": self.six_card_bet,
+                "progressive": 1 if self.progressive_bet else 0
+            }
+            # 更新重复下注按钮状态（如果存在）
+            if self.repeat_bet_btn:
+                self.repeat_bet_btn.config(state=tk.NORMAL)
                 
             self.balance -= total_bet
             self.update_balance()
@@ -1241,6 +1262,22 @@ class ThreeCardPokerGUI(tk.Tk):
             
         except ValueError:
             messagebox.showerror("错误", "请输入有效的下注金额")
+
+    def apply_last_bet(self):
+        """重复上一局的下注金额"""
+        if self.last_bet is None:
+            return
+        
+        # 恢复下注
+        self.ante_var.set(str(self.last_bet["ante"]))
+        self.pair_plus_var.set(str(self.last_bet["pair_plus"]))
+        self.six_card_var.set(str(self.last_bet["six_card"]))
+        self.progressive_var.set(self.last_bet["progressive"])
+        
+        # 重置背景色为白色（清除上次结算的颜色）
+        for widget in self.bet_widgets.values():
+            widget.config(bg='white')
+        self.status_label.config(text="已应用上局下注金额")
     
     def animate_deal(self):
         if not self.animation_queue:
@@ -2075,6 +2112,14 @@ class ThreeCardPokerGUI(tk.Tk):
             bg='#F44336', fg='white', width=10
         )
         self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))  # 右侧留出10像素间距
+
+        self.repeat_bet_btn = tk.Button(
+            start_button_frame, text="重复上局下注", 
+            command=self.apply_last_bet, font=('Arial', 14),
+            bg='#4A90E2', fg='white', activebackground='#3A7BC8', width=12,
+            state=tk.NORMAL if self.last_bet is not None else tk.DISABLED
+        )
+        self.repeat_bet_btn.pack(side=tk.LEFT, padx=5)
 
         # 开始游戏按钮
         self.start_button = tk.Button(

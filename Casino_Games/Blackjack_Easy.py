@@ -20,11 +20,11 @@ DECKS = 8  # 使用8副牌
 
 # 下注赔率
 BET_ODDS = {
-    '16': 2.45,
-    '17': 1.93,
-    '18': 0.95,
-    '19': 0.48,
-    '20': 0.13,
+    '16': 2.6,
+    '17': 2.1,
+    '18': 1.5,
+    '19': 1,
+    '20': 0.25,
     'pair': {  # 对子赔率根据类型不同而不同
         'same_suit_AA': 60,   # AA同花
         'same_suit_other': 30,  # 其他同花对子
@@ -753,15 +753,15 @@ class Simple21GUI(tk.Tk):
         # 下注类型和赔率（两行五列）
         bet_types = [
             # 第一行 - 点数区域，颜色 #b2b6b6
-            ('16点', '16', '#b2b6b6', "2.45:1"),
-            ('17点', '17', '#b2b6b6', "1.93:1"),
-            ('18点', '18', '#b2b6b6', "0.95:1"),
-            ('19点', '19', '#b2b6b6', "0.48:1"),
-            ('20点', '20', '#b2b6b6', "0.13:1"),
+            ('16点', '16', '#b2b6b6', "2.6:1"),
+            ('17点', '17', '#b2b6b6', "2.1:1"),
+            ('18点', '18', '#b2b6b6', "3:2"),
+            ('19点', '19', '#b2b6b6', "1:1"),
+            ('20点', '20', '#b2b6b6', "0.25:1"),
             # 第二行 - 特殊下注区域，颜色 #ff7f50
             ('小', 'small', '#ff7f50', "1.75:1"),
             ('对子', 'pair', '#ff7f50', "最高60:1"),  # 修改为"最高60:1"
-            ('BJ', 'bj', '#ff7f50', "最高50:1"),
+            ('黑杰克', 'bj', '#ff7f50', "最高50:1"),
             ('22点', 'twenty_two', '#ff7f50', "最高50:1"),
             ('大', 'big', '#ff7f50', "3.5:1")
         ]
@@ -1003,94 +1003,61 @@ class Simple21GUI(tk.Tk):
         win.geometry("600x500")
         win.resizable(False, False)
         win.configure(bg='#F0F0F0')
-        
+
         # 创建主框架
         main_frame = tk.Frame(win, bg='#F0F0F0')
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
+
         # 添加滚动条
         scrollbar = ttk.Scrollbar(main_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         # 创建画布用于滚动
         canvas = tk.Canvas(main_frame, bg='#F0F0F0', yscrollcommand=scrollbar.set)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=canvas.yview)
-        
+
         # 创建内部框架放置所有内容
         content_frame = tk.Frame(canvas, bg='#F0F0F0')
         canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
-        
-        # 游戏规则文本
+
+        # 游戏规则文本（流程说明，赔率改用表格）
         rules_text = """
         简单21点游戏规则
 
         1. 游戏开始前下注:
-           - 玩家可以在10个下注区域下注: 
-             第一行: 16点, 17点, 18点, 19点, 20点
-             第二行: 小, 对子, BJ, 22点, 大
-           - 每个下注区域有不同赔率:
-             * 16点: 2.45:1
-             * 17点: 1.93:1
-             * 18点: 0.95:1
-             * 19点: 0.48:1
-             * 20点: 0.13:1
-             * 对子: 
-                 - AA同花: 60:1
-                 - 其他同花对子: 30:1
-                 - 同色非同花: 15:1
-                 - 杂色对子: 7:1
-             * 小: 1.75:1
-             * 大: 3.5:1
-             * BJ: 最高50:1 (同花50:1, 同色25:1, 杂色11:1)
-             * 22点: 最高50:1 (同花50:1, 同色20:1, 杂花8:1)
+        - 玩家可在以下区域下注（赔率详见下方表格）:
+            第一行: 16点, 17点, 18点, 19点, 20点
+            第二行: 小, 对子, 黑杰克, 22点, 大
 
         2. 游戏流程:
-           a. 下注阶段:
-               - 玩家选择一个或多个下注区域下注
-               - 点击"开始游戏"按钮开始
-
-           b. 发牌:
-               - 庄家发两张牌(一张明, 一张暗)
-               - 玩家没有手牌
-
-           c. 庄家回合:
-               - 庄家按照标准规则补牌: 
-                 * 16点及以下必须补牌
-                 * 17点及以上停牌(包括Soft 17)
-               - 庄家补牌直到停牌或爆牌
-
-           d. 结算:
-               - 根据庄家最终点数结算每个下注区域
-               - 对子下注只取决于庄家头两张牌
-               - BJ下注只取决于庄家头两张牌是否为21点
-               - 22点下注取决于庄家最终点数为22点
-               - 小/大下注取决于庄家停牌时的牌张数
+        a. 下注阶段:
+            - 玩家选择一个或多个下注区域下注
+            - 点击"开始游戏"按钮开始
+        b. 发牌:
+            - 庄家发两张牌(一张明, 一张暗)
+            - 玩家没有手牌
+        c. 庄家回合:
+            - 庄家按照标准规则补牌: 
+                * 16点及以下必须补牌
+                * 17点及以上停牌(包括Soft 17)
+            - 庄家补牌直到停牌或爆牌
+        d. 结算:
+            - 根据庄家最终点数结算每个下注区域
+            - 对子下注只看庄家头两张牌
+            - 黑杰克下注只看庄家头两张牌是否为21点
+            - 22点下注需庄家最终点数为22点
+            - 小/大下注取决于庄家停牌时的牌张数
 
         3. 特殊规则:
-           a. 庄家22点:
-               - 点数下注(16-20点)平局退还
-               - 22点下注获胜，赔率根据花色组合:
-                 * 同花: 所有牌同一花色 (50:1)
-                 * 同色: 所有牌同一颜色 (20:1)
-                 * 杂色: 混合花色 (8:1)
-               - 其他下注正常结算
-
-           b. 庄家Blackjack(头两张牌21点):
-               - 点数下注(16-20点)输
-               - BJ下注获胜，赔率根据花色组合:
-                 * 同花: 两张牌同一花色 (50:1)
-                 * 同色: 两张牌同一颜色 (25:1)
-                 * 杂色: 混合花色 (11:1)
-               - 小下注获胜(赔率1.75:1)
-
-           c. 小/大下注:
-               - 小: 庄家刚好2张牌停牌(包括Soft17和庄家BJ)，赔率1.75:1
-               - 大: 庄家4张牌或以上停牌，赔率3.5:1
+        - 庄家22点: 点数下注(16-20)平局退还; 22点下注获胜
+        - 庄家黑杰克(首两张牌21点): 点数下注输; 黑杰克下注获胜; 小下注获胜(1.75:1)
+        - 小: 庄家刚好2张牌停牌(包括Soft17和庄家黑杰克)
+        - 大: 庄家4张牌或以上停牌
         """
-        
+
         rules_label = tk.Label(
-            content_frame, 
+            content_frame,
             text=rules_text,
             font=('微软雅黑', 11),
             bg='#F0F0F0',
@@ -1099,19 +1066,84 @@ class Simple21GUI(tk.Tk):
             pady=10
         )
         rules_label.pack(fill=tk.X, padx=10, pady=5)
-        
+
+        # 辅助函数：创建支付表
+        def create_table(parent, title, headers, data):
+            tk.Label(parent, text=title, font=('微软雅黑', 12, 'bold'),
+                    bg='#F0F0F0').pack(anchor='w', padx=10, pady=(10, 0))
+            table_frame = tk.Frame(parent, bg='#F0F0F0')
+            table_frame.pack(fill=tk.X, padx=20, pady=5)
+
+            for col, h in enumerate(headers):
+                tk.Label(table_frame, text=h, font=('微软雅黑', 10, 'bold'),
+                        bg='#4B8BBE', fg='white', padx=10, pady=5).grid(
+                    row=0, column=col, sticky='nsew', padx=1, pady=1)
+
+            for r, row_data in enumerate(data, start=1):
+                bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
+                for c, txt in enumerate(row_data):
+                    tk.Label(table_frame, text=txt, font=('微软雅黑', 10),
+                            bg=bg, padx=10, pady=5).grid(
+                        row=r, column=c, sticky='nsew', padx=1, pady=1)
+
+            for c in range(len(headers)):
+                table_frame.columnconfigure(c, weight=1)
+
+        # 点数下注赔率表
+        point_data = [
+            ("16点", "2.6:1"),
+            ("17点", "2.1:1"),
+            ("18点", "3:2"),
+            ("19点", "1:1"),
+            ("20点", "0.25:1"),
+        ]
+        create_table(content_frame, "点数下注赔率",
+                    ["点数", "赔率"], point_data)
+
+        # 对子下注赔率表
+        pair_data = [
+            ("AA同花", "60:1"),
+            ("其他同花对子", "30:1"),
+            ("同色非同花", "15:1"),
+            ("杂色对子", "7:1"),
+        ]
+        create_table(content_frame, "对子下注赔率（只看庄家头两张牌）",
+                    ["对子类型", "赔率"], pair_data)
+
+        # BJ下注赔率表
+        bj_data = [
+            ("同花（两张牌同一花色）", "50:1"),
+            ("同色（同一颜色）", "25:1"),
+            ("杂色（不同花色）", "11:1"),
+        ]
+        create_table(content_frame, "黑杰克下注赔率（庄家首两张21点）",
+                    ["花色组合", "赔率"], bj_data)
+
+        # 22点下注赔率表
+        bust22_data = [
+            ("同花（所有牌同一花色）", "50:1"),
+            ("同色（所有牌同一颜色）", "20:1"),
+            ("杂色（混合花色）", "8:1"),
+        ]
+        create_table(content_frame, "22点下注赔率（庄家最终22点）",
+                    ["花色组合", "赔率"], bust22_data)
+
+        # 小/大下注赔率表
+        size_data = [
+            ("小（庄家2张停牌）", "1.75:1"),
+            ("大（庄家4张或以上停牌）", "3.5:1"),
+        ]
+        create_table(content_frame, "小/大下注赔率",
+                    ["条件", "赔率"], size_data)
+
         # 更新滚动区域
         content_frame.update_idletasks()
         canvas.config(scrollregion=canvas.bbox("all"))
-        
+
         # 添加关闭按钮
-        close_btn = ttk.Button(
-            win,
-            text="关闭",
-            command=win.destroy
-        )
+        close_btn = ttk.Button(win, text="关闭", command=win.destroy)
         close_btn.pack(pady=10)
-        
+
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
     
@@ -1345,7 +1377,7 @@ class Simple21GUI(tk.Tk):
         """统一更新庄家标签显示"""
         dealer_value = self.game.calculate_hand_value(self.game.dealer_hand)
         if self.game.dealer_blackjack:
-            self.dealer_label.config(text="庄家 - BJ")
+            self.dealer_label.config(text="庄家 - 黑杰克")
         elif self.game.dealer_twenty_two:
             hand_type = self.game.get_hand_type(self.game.dealer_hand)
             type_text = {
