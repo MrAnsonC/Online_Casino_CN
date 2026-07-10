@@ -29,7 +29,9 @@ from Small_Games import Thimbles
 from Small_Games import lucky_num
 from Small_Games import stock_market
 from Small_Games import Shoot_Poker
-from Small_Games import deal_or_no_deal
+from Small_Games import Deal_Or_No_Deal
+from Small_Games import pocket_rain
+from Small_Games import Football_Match
 
 def get_data_file_path():
     # 用于获取保存数据的文件路径
@@ -191,7 +193,8 @@ def main(balance, user):
         ("运气&博弈", [
             ["小钢珠跌落", "幸运数字", "猜颜色"],
             ["数字老虎机", "三杯球", "猜数字"],
-            ["基诺", "剪刀石头布"]
+            ["基诺", "剪刀石头布", "红包雨"],
+            ["足球弹珠"]
         ]),
         ("模拟&策略", [
             ["股市大风云", "扑克足球", "成交与否"]
@@ -217,7 +220,9 @@ def main(balance, user):
         "剪刀石头布": ("12", RPS.main),
         "股市大风云": ("13", stock_market.main),
         "扑克足球": ("14", Shoot_Poker.main),
-        "成交与否": ("15", deal_or_no_deal.main),
+        "成交与否": ("15", Deal_Or_No_Deal.main),
+        "红包雨": ("16", pocket_rain.main),
+        "足球弹珠": ("17", Football_Match.main),
         "Esc 返回主目录": ("return", None)
     }
 

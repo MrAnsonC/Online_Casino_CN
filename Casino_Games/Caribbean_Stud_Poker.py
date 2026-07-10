@@ -5,69 +5,82 @@ import random
 import json
 import os
 import math
-import hashlib
-import time
 import secrets
 import subprocess, sys
-from itertools import combinations  # 新增导入
+import time
+from collections import Counter
+from itertools import combinations
 
-# 扑克牌花色和点数
+# =========================================================
+# 仿轮盘 UI 颜色（取自 Three_Card_Poker）
+# =========================================================
+ROOT_BG = "#1B3D31"
+CYAN = "#007502"
+TEXT = "#ffffff"
+RED = "#ff2a23"
+BLACK = "#050505"
+DARK_BLUE = "#173f66"
+GOLD = "#D4AF37"
+PANEL_BG = "#F2E6C9"
+HEADER_BG = "#D8B46A"
+TITLE_FG = "#2A1B08"
+
 SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 RANK_VALUES = {r: i for i, r in enumerate(RANKS, start=2)}
 HAND_RANK_NAMES = {
-    9: '皇家同花顺', 
-    8: '同花顺', 
-    7: '四条', 
-    6: '葫芦', 
-    5: '同花', 
-    4: '顺子', 
-    3: '三条', 
-    2: '两对', 
-    1: '对子', 
+    9: '皇家同花顺',
+    8: '同花顺',
+    7: '四条',
+    6: '葫芦',
+    5: '同花',
+    4: '顺子',
+    3: '三条',
+    2: '两对',
+    1: '对子',
     0: '高牌'
 }
 
-# 加勒比扑克赔付表
 CARIBBEAN_STUD_PAYOUT = {
-    9: 100,  # 皇家同花顺 100:1
-    8: 50,   # 同花顺 50:1
-    7: 20,   # 四条 20:1
-    6: 7,    # 葫芦 7:1
-    5: 5,    # 同花 5:1
-    4: 4,    # 顺子 4:1
-    3: 3,    # 三条 3:1
-    2: 2,    # 两对 2:1
-    1: 1,    # 对子 1:1
-    0: 1     # 高牌 1:1
+    9: 100,  # 皇家同花顺
+    8: 50,
+    7: 20,
+    6: 7,
+    5: 5,
+    4: 4,
+    3: 3,
+    2: 2,
+    1: 1,
+    0: 1
 }
 
-# 5+1 Side Bet赔付表
 FIVE_PLUS_ONE_PAYOUT = {
-    9: 1001,  # 皇家同花顺 1000:1
-    8: 201,   # 同花顺 200:1
-    7: 101,   # 四条 100:1
-    6: 21,    # 葫芦 20:1
-    5: 16,    # 同花 15:1
-    4: 11,    # 顺子 10:1
-    3: 8,     # 三条 7:1
+    9: 1001,
+    8: 201,
+    7: 101,
+    6: 21,
+    5: 16,
+    4: 11,
+    3: 8,
 }
 
+# =========================================================
+# 文件操作（用户余额）
+# =========================================================
 def get_data_file_path():
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(parent_dir, 'saving_data.json')
 
 def save_user_data(users):
-    file_path = get_data_file_path()
-    with open(file_path, 'w', encoding='utf-8') as f:
+    with open(get_data_file_path(), 'w', encoding='utf-8') as f:
         json.dump(users, f, ensure_ascii=False, indent=4)
 
 def load_user_data():
-    file_path = get_data_file_path()
-    if not os.path.exists(file_path):
+    path = get_data_file_path()
+    if not os.path.exists(path):
         return []
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     except:
         return []
@@ -80,49 +93,140 @@ def update_balance_in_json(username, new_balance):
             break
     save_user_data(users)
 
-# Jackpot 文件加载与保存
+# =========================================================
+# Progressive 文件加载与保存 (Key: 'CSP')
+# =========================================================
 def load_jackpot():
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
-    default_jackpot = 41066.87
-    # 文件不存在时使用默认奖池
+    default_jackpot = 271288.59
     if not os.path.exists(path):
         return True, default_jackpot
     try:
         with open(path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             for item in data:
-                if item.get('Games') == 'CSP':
+                if item.get('Games') == 'Progressive_2.50':
                     return False, float(item.get('jackpot', default_jackpot))
     except Exception:
         return True, default_jackpot
-    # 未找到 CSP 条目时也使用默认
     return True, default_jackpot
 
 def save_jackpot(jackpot):
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
     data = []
-    # 如果文件存在，读取原有数据
     if os.path.exists(path):
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
         except:
             data = []
-    
-    # 查找是否已有CSP的记录
     found = False
     for item in data:
-        if item.get('Games') == 'CSP':
+        if item.get('Games') == 'Progressive_2.50':
             item['jackpot'] = jackpot
             found = True
             break
-    
     if not found:
-        data.append({"Games": "CSP", "jackpot": jackpot})
-    
+        data.append({"Games": "Progressive_2.50", "jackpot": jackpot})
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=4)
 
+# =========================================================
+# 牌局历史日志（加勒比扑克）
+# =========================================================
+def caribbean_log_path() -> str:
+    log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "A_Logs", "Json")
+    os.makedirs(log_dir, exist_ok=True)
+    return os.path.join(log_dir, "Caribbean_Stud_Poker.json")
+
+def save_caribbean_history(deck, player_cards, dealer_cards, result_info=None):
+    log_path = caribbean_log_path()
+    data = {
+        "history_record": {
+            "player_win": 0,
+            "dealer_win": 0,
+            "push": 0,
+            "fold": 0,
+            "game": 0
+        },
+        "history": []
+    }
+    if os.path.exists(log_path):
+        try:
+            with open(log_path, 'r', encoding='utf-8') as f:
+                loaded = json.load(f)
+                if isinstance(loaded, dict) and "history_record" in loaded:
+                    for key in data["history_record"]:
+                        if key not in loaded["history_record"]:
+                            loaded["history_record"][key] = 0
+                    data["history_record"] = loaded["history_record"]
+                    if "history" in loaded:
+                        data["history"] = loaded["history"]
+                elif isinstance(loaded, list):
+                    # 旧格式迁移
+                    data["history"] = loaded
+                    stats = {"player_win": 0, "dealer_win": 0, "fold": 0, "push": 0, "game": len(loaded)}
+                    for rec in loaded:
+                        if "result" in rec and "winner" in rec["result"]:
+                            winner = rec["result"]["winner"]
+                            if winner == "player":
+                                stats["player_win"] += 1
+                            elif winner == "dealer":
+                                stats["dealer_win"] += 1
+                            elif winner == "fold":
+                                stats["fold"] += 1
+                            elif winner == "push":
+                                stats["push"] += 1
+                    data["history_record"] = stats
+        except Exception as e:
+            print(f"读取历史文件出错: {e}")
+
+    max_id = 0
+    for rec in data["history"]:
+        if "game_id" in rec and isinstance(rec["game_id"], int):
+            if rec["game_id"] > max_id:
+                max_id = rec["game_id"]
+    new_game_id = max_id + 1
+
+    stats = data["history_record"]
+    stats["game"] += 1
+
+    winner = None
+    if result_info:
+        if result_info.get("fold", False):
+            winner = "fold"
+            stats["fold"] += 1
+        elif "winner" in result_info:
+            winner = result_info["winner"]
+            if winner == "player":
+                stats["player_win"] += 1
+            elif winner == "dealer":
+                stats["dealer_win"] += 1
+            elif winner == "push":
+                stats["push"] += 1
+
+    record = {
+        "game_id": new_game_id,
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "deck_order": [str(c) for c in deck.full_deck],
+        "cut_position": deck.cut_position,
+        "player_cards": [str(c) for c in player_cards],
+        "dealer_cards": [str(c) for c in dealer_cards],
+        "result": result_info if result_info else {}
+    }
+    if winner is not None:
+        record["result"]["winner"] = winner
+    data["history"].append(record)
+
+    if len(data["history"]) > 50:
+        data["history"] = data["history"][-50:]
+
+    with open(log_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# =========================================================
+# 扑克牌类与牌堆（与 Three_Card_Poker 一致）
+# =========================================================
 class Card:
     def __init__(self, suit, rank):
         self.suit = suit
@@ -133,20 +237,14 @@ class Card:
 
 class Deck:
     def __init__(self):
-        # 获取当前脚本所在目录的上一级目录
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        # 新的Card文件夹路径
         card_dir = os.path.join(parent_dir, 'A_Tools', 'Card')
         shuffle_script = os.path.join(card_dir, 'shuffle.py')
-        
-        # 保证 Python 输出为 UTF-8
         env = os.environ.copy()
         env['PYTHONIOENCODING'] = 'utf-8'
-        
         try:
-            # 调用外部 shuffle.py，超时 30 秒
             result = subprocess.run(
-                [sys.executable, shuffle_script],
+                [sys.executable, shuffle_script, "false", "1"],
                 capture_output=True,
                 text=True,
                 encoding='utf-8',
@@ -155,36 +253,28 @@ class Deck:
                 timeout=30
             )
             shuffle_data = json.loads(result.stdout)
-            
             if "deck" not in shuffle_data or "cut_position" not in shuffle_data:
                 raise ValueError("Invalid shuffle data format")
-            
-            # 用本模块的 Card 类实例化
             self.full_deck = [
                 Card(d["suit"], d["rank"])
                 for d in shuffle_data["deck"]
             ]
             self.cut_position = shuffle_data["cut_position"]
-        
         except (subprocess.CalledProcessError,
                 subprocess.TimeoutExpired,
                 json.JSONDecodeError,
                 ValueError,
                 KeyError) as e:
             print(f"Error calling shuffle.py: {e}. Using fallback shuffle.")
-            # fallback：标准顺序+安全乱序
             self.full_deck = [Card(s, r) for s in SUITS for r in RANKS]
             self._secure_shuffle()
             self.cut_position = secrets.randbelow(52)
-        
-        # 通用的洗牌后索引 & 发牌序列逻辑
         self.start_pos = self.cut_position
         self.indexes = [(self.start_pos + i) % 52 for i in range(52)]
         self.pointer = 0
         self.card_sequence = [self.full_deck[i] for i in self.indexes]
-    
+
     def _secure_shuffle(self):
-        """Fisher–Yates 洗牌，用 secrets 保证随机性"""
         for i in range(len(self.full_deck) - 1, 0, -1):
             j = secrets.randbelow(i + 1)
             self.full_deck[i], self.full_deck[j] = self.full_deck[j], self.full_deck[i]
@@ -194,736 +284,598 @@ class Deck:
         self.pointer += n
         return dealt
 
-# ==================== 新增：按牌型排序函数（与 auto_stud.py 一致） ====================
-def sort_hand_for_display(hand, hand_eval):
-    """
-    根据牌型对手牌进行排序，返回排序后的牌列表
-    hand: 5张牌的列表
-    hand_eval: evaluate_five_card_hand返回的元组 (rank, values)
-    """
-    rank = hand_eval[0]  # 牌型等级
-    # 顺子类（包括同花顺、皇家同花顺）需要按点数升序排列
-    if rank in [4, 8, 9]:  # 顺子、同花顺、皇家同花顺
-        values = [c.value for c in hand]
-        # 检查是否为A-2-3-4-5低顺
-        if 14 in values and 2 in values and len(set(values)) == 5:
-            # 低顺：将A视为1进行升序排序
-            sorted_hand = sorted(hand, key=lambda c: 1 if c.value == 14 else c.value)
-        else:
-            # 普通顺子：按点数升序
-            sorted_hand = sorted(hand, key=lambda c: c.value)
-        return sorted_hand
-    else:
-        # 非顺子类：统计点数出现次数
-        from collections import Counter
-        counts = Counter(c.value for c in hand)
-        # 排序键：先按出现次数降序，再按点数降序
-        sorted_hand = sorted(hand, key=lambda c: (counts[c.value], c.value), reverse=True)
-        return sorted_hand
-# =================================================================================
-
+# =========================================================
+# 五张牌评估与比较（保留原逻辑）
+# =========================================================
 def evaluate_five_card_hand(cards):
-    """评估五张牌的手牌"""
-    if not cards or len(cards) < 5:  # 确保手牌完整
+    if not cards or len(cards) < 5:
         return (0, [])
-    
-    # 按牌面值排序（从大到小）
     values = sorted([c.value for c in cards], reverse=True)
     suits = [c.suit for c in cards]
-    
-    # 检查同花
     is_flush = len(set(suits)) == 1
-    
-    # 检查顺子
-    values_sorted_asc = sorted([c.value for c in cards])  # 升序排序
+
+    values_asc = sorted([c.value for c in cards])
     is_straight = False
     straight_values = None
-    
-    # 检查普通顺子
-    if len(set(values_sorted_asc)) == 5:
-        # 检查最大减最小是否为4
-        if values_sorted_asc[-1] - values_sorted_asc[0] == 4:
+    if len(set(values_asc)) == 5:
+        if values_asc[-1] - values_asc[0] == 4:
             is_straight = True
-            straight_values = sorted(values, reverse=True)  # 降序排列
-        # 检查特殊顺子 A-2-3-4-5
-        elif values_sorted_asc == [2, 3, 4, 5, 14]:
+            straight_values = sorted(values, reverse=True)
+        elif values_asc == [2,3,4,5,14]:
             is_straight = True
-            straight_values = [5, 4, 3, 2, 1]  # 作为5-high顺子
-    
-    # 检查皇家同花顺（A,K,Q,J,10 同花）
+            straight_values = [5,4,3,2,1]
+
     is_royal = is_straight and is_flush and values[0] == 14 and values[4] == 10
-    
-    # 同花顺（包括皇家同花顺）
     if is_straight and is_flush:
         return (9 if is_royal else 8, straight_values)
-    
-    # 计算每种点数的出现次数
+
     value_count = {}
     for v in values:
         value_count[v] = value_count.get(v, 0) + 1
-    
-    # 按出现次数和点数排序
     sorted_counts = sorted(value_count.items(), key=lambda x: (x[1], x[0]), reverse=True)
     sorted_values = [item[0] for item in sorted_counts]
-    
-    # 检查四条
+
     if sorted_counts[0][1] == 4:
         return (7, sorted_values)
-    
-    # 检查葫芦（三条+一对）
     if sorted_counts[0][1] == 3 and sorted_counts[1][1] == 2:
         return (6, sorted_values)
-    
-    # 同花
     if is_flush:
         return (5, values)
-    
-    # 顺子
     if is_straight:
         return (4, straight_values)
-    
-    # 三条
     if sorted_counts[0][1] == 3:
         return (3, sorted_values)
-    
-    # 两对
     if sorted_counts[0][1] == 2 and sorted_counts[1][1] == 2:
         return (2, sorted_values)
-    
-    # 一对
     if sorted_counts[0][1] == 2:
         return (1, sorted_values)
-    
-    # 高牌
     return (0, values)
 
 def compare_hands(hand1, hand2):
-    """比较两手牌，返回1表示hand1赢，0表示平局，-1表示hand2赢"""
-    # 确保两手牌完整
-    if not hand1 or len(hand1) < 5 or not hand2 or len(hand2) < 5:
-        return 0
-        
     rank1, values1 = evaluate_five_card_hand(hand1)
     rank2, values2 = evaluate_five_card_hand(hand2)
-    
     if rank1 > rank2:
         return 1
     elif rank1 < rank2:
         return -1
     else:
-        # 相同牌型，比较点数
-        # 对于对子、两对等牌型，values列表长度可能不同
-        min_len = min(len(values1), len(values2))
-        for i in range(min_len):
-            if values1[i] > values2[i]:
+        for v1, v2 in zip(values1, values2):
+            if v1 > v2:
                 return 1
-            elif values1[i] < values2[i]:
+            elif v1 < v2:
                 return -1
-        
-        # 如果前min_len个值相同，比较原始牌值
-        values1_full = sorted([c.value for c in hand1], reverse=True)
-        values2_full = sorted([c.value for c in hand2], reverse=True)
-        for i in range(len(values1_full)):
-            if values1_full[i] > values2_full[i]:
+        v1_full = sorted([c.value for c in hand1], reverse=True)
+        v2_full = sorted([c.value for c in hand2], reverse=True)
+        for i in range(len(v1_full)):
+            if v1_full[i] > v2_full[i]:
                 return 1
-            elif values1_full[i] < values2_full[i]:
+            elif v1_full[i] < v2_full[i]:
                 return -1
         return 0
 
+def sort_hand_for_display(hand, hand_eval):
+    rank = hand_eval[0]
+    if rank in [4,8,9]:  # 顺子类
+        values = [c.value for c in hand]
+        if 14 in values and 2 in values and len(set(values)) == 5:
+            return sorted(hand, key=lambda c: 1 if c.value == 14 else c.value)
+        else:
+            return sorted(hand, key=lambda c: c.value)
+    else:
+        counts = Counter(c.value for c in hand)
+        return sorted(hand, key=lambda c: (counts[c.value], c.value), reverse=True)
+
+# =========================================================
+# 游戏逻辑类（加勒比扑克）
+# =========================================================
 class CaribbeanStudGame:
     def __init__(self):
         self.reset_game()
-        # 初始化Jackpot
         self.progressive_amount = load_jackpot()[1]
-        self.initial_jackpot = self.progressive_amount  # 保存初始值用于重置
-        # 添加牌序记录
-        self.card_sequence = []  # 记录整副牌的序列
-        self.cut_position = 0    # 切牌位置
-    
+        self.min_progressive = 271288.59
+
     def reset_game(self):
         self.deck = Deck()
         self.player_hand = []
         self.dealer_hand = []
         self.ante = 0
         self.jackpot_bet = 0
-        self.five_plus_one_bet = 0  # 新增5+1下注
+        self.five_plus_one_bet = 0
         self.play_bet = 0
-        self.stage = "pre_flop"  # pre_flop, decision, showdown
+        self.stage = "pre_flop"
         self.folded = False
         self.cards_revealed = {
-            "player": [False, False, False, False, False],
-            "dealer": [False, False, False, False, False]
+            "player": [False]*5,
+            "dealer": [False]*5
         }
-        # 记录牌序和切牌位置
-        self.card_sequence = self.deck.full_deck.copy()
-        self.cut_position = self.deck.cut_position
-    
+
     def deal_initial(self):
-        """发初始牌：玩家5张，庄家5张"""
         self.player_hand = self.deck.deal(5)
         self.dealer_hand = self.deck.deal(5)
-    
+
     def dealer_qualifies(self):
-        """庄家是否合格（高牌且同时包含A和K）"""
-        # 确保手牌完整
         if not self.dealer_hand or len(self.dealer_hand) < 5:
             return False
-            
-        # 评估庄家手牌牌型
         rank, _ = evaluate_five_card_hand(self.dealer_hand)
-        
-        # 如果牌型高于高牌（即至少是对子），则合格
         if rank >= 1:
             return True
-        
-        # 如果是高牌，检查是否同时包含A和K
-        has_ace = any(card.rank == 'A' for card in self.dealer_hand)
-        has_king = any(card.rank == 'K' for card in self.dealer_hand)
-        
-        # 只有同时有A和K才算合格
+        has_ace = any(c.rank == 'A' for c in self.dealer_hand)
+        has_king = any(c.rank == 'K' for c in self.dealer_hand)
         return has_ace and has_king
 
+# =========================================================
+# 主GUI类（仿 Three_Card_Poker 风格）
+# =========================================================
 class CaribbeanStudGUI(tk.Tk):
     def __init__(self, initial_balance, username):
         super().__init__()
         self.title("加勒⽐梭哈扑克")
-        self.geometry("1150x650+50+10")  # 增加窗口尺寸以适应更大的卡片
+        self.geometry("1150x750+50+10")
         self.resizable(0,0)
-        self.configure(bg='#35654d')
-        
+        self.configure(bg=ROOT_BG)
+
         self.username = username
         self.balance = initial_balance
         self.game = CaribbeanStudGame()
         self.card_images = {}
+        self.original_images = {}
         self.animation_queue = []
         self.animation_in_progress = False
         self.card_positions = {}
-        self.active_card_labels = []  # 跟踪所有活动中的卡片标签
-        self.selected_chip = None  # 当前选中的筹码
-        self.chip_buttons = []  # 筹码按钮列表
+        self.active_card_labels = []
+        self.selected_chip = None
+        self.chip_buttons = []
+        self.chip_texts = {}
         self.last_win = 0
+        self.last_bet = None
+        self.repeat_bet_btn = None
         self.auto_reset_timer = None
-        self.buttons_disabled = False  # 跟踪按钮是否被禁用
-        self.five_plus_one_win = 0
+        self.buttons_disabled = False
         self.last_jackpot_state = 0
         self.win_details = {
             "ante": 0,
             "play": 0,
             "bonus": 0,
-            "five_plus_one": 0  # 新增5+1赢钱详情
+            "five_plus_one": 0
         }
-        self.bet_widgets = {}  # 存储下注显示控件
-        self.jackpot_bet_var = tk.IntVar(value=0)  # Jackpot下注变量
-        self.five_plus_one_bet_var = tk.StringVar(value="0")  # 新增5+1下注变量
-        self.flipping_cards = []  # 存储正在翻转的卡片
-        self.flip_step = 0  # 翻转动画的当前步骤
-        self.moved_cards = []  # 存储下移的卡片
-        self.ak_moved = False  # 标记是否移动了AK牌
-        self.fold_button = None  # 弃牌按钮引用
-        self.play_button = None  # 下注按钮引用
-        self.ak_animation_active = False  # 标记AK动画是否进行中
-        self._resetting = False
-        # 新增：标记是否处于弃牌模式，用于结算区分
-        self.fold_mode = False
-        
-        # 存储上次下注信息
-        self.last_bet = None  # 格式: {'ante': int, 'five_plus_one': int, 'jackpot': int}
-        
-        # ---------- 高额下注模式 ----------
-        self.high_bet_mode = False      # 是否高额下注模式
-        self.high_bet_password = time.strftime("%H%M")  # 密码为当前时间HHMM
+        self.bet_widgets = {}
+        self.jackpot_bet_var = tk.IntVar(value=0)
+        self.five_plus_one_var = tk.StringVar(value="0")
+        self.last_game_bet = None
+
+        # 高额模式
+        self.high_bet_mode = False
+        # 移除固定密码，每次认证时动态生成
+        self.game_in_progress = False
 
         self._load_assets()
         self._create_widgets()
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    def cancel_auto_reset_timer(self):
-        """安全地取消自动重置计时器"""
-        if self.auto_reset_timer:
-            try:
-                self.after_cancel(self.auto_reset_timer)
-            except:
-                # 忽略任何异常，确保计时器被标记为已取消
-                pass
-            finally:
-                self.auto_reset_timer = None
-    
+        # 添加底注监听，联动更新加注
+        self.ante_var.trace_add('write', self.on_ante_changed)
+
     def on_close(self):
-        # 取消自动重置计时器
         if self.auto_reset_timer:
             self.after_cancel(self.auto_reset_timer)
         self.destroy()
         self.quit()
-        
+
+    # ---------- 加载扑克牌（交替 Poker1/Poker2） ----------
     def _load_assets(self):
-        card_size = (100, 150)
+        card_size = (100, 140)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        # 使用实例变量来跟踪当前使用的扑克牌文件夹
         if not hasattr(self, 'current_poker_folder'):
-            # 第一次加载时随机选择
             self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
         else:
-            # 交替使用 Poker1 和 Poker2
             self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
-        
         card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
-        
-        # 花色映射：将符号映射为英文名称
-        suit_mapping = {
-            '♠': 'Spade',
-            '♥': 'Heart',
-            '♦': 'Diamond',
-            '♣': 'Club'
-        }
-
+        suit_mapping = {'♠':'Spade','♥':'Heart','♦':'Diamond','♣':'Club'}
         self.original_images = {}
-        
-        # 加载背面图片
         back_path = os.path.join(card_dir, 'Background.png')
         try:
-            back_img_orig = Image.open(back_path)  # 原始尺寸
-            self.original_images["back"] = back_img_orig  # 保存原始图像
-            back_img = back_img_orig.resize(card_size)  # 缩放
+            back_img_orig = Image.open(back_path)
+            self.original_images["back"] = back_img_orig
+            back_img = back_img_orig.resize(card_size)
             self.back_image = ImageTk.PhotoImage(back_img)
-        except Exception as e:
-            print(f"Error loading back image: {e}")
-            # 创建黑色背景
+        except:
             img_orig = Image.new('RGB', card_size, 'black')
             self.original_images["back"] = img_orig
             self.back_image = ImageTk.PhotoImage(img_orig)
-        
-        # 加载扑克牌图片
         for suit in SUITS:
             for rank in RANKS:
-                # 获取映射后的文件名
                 suit_name = suit_mapping.get(suit, suit)
-                if suit == 'JOKER':
-                    filename = f"JOKER-A.png"  # 鬼牌文件名
-                else:
-                    filename = f"{suit_name}{rank}.png"
+                filename = f"{suit_name}{rank}.png"
                 path = os.path.join(card_dir, filename)
-                
                 try:
                     if os.path.exists(path):
                         img = Image.open(path)
-                        # 保存原始图像
                         self.original_images[(suit, rank)] = img
-                        # 创建缩放后的图像用于显示
                         img_resized = img.resize(card_size)
                         self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_resized)
                     else:
-                        # 创建占位图片
                         img_orig = Image.new('RGB', card_size, 'blue')
                         draw = ImageDraw.Draw(img_orig)
-                        # 绘制卡片文本
-                        if suit == 'JOKER':
-                            text = "JOKER"
-                        else:
-                            text = f"{rank}{suit}"
                         try:
                             font = ImageFont.truetype("arial.ttf", 20)
                         except:
                             font = ImageFont.load_default()
-                        text_width, text_height = draw.textsize(text, font=font)
-                        x = (card_size[0] - text_width) / 2
-                        y = (card_size[1] - text_height) / 2
-                        draw.text((x, y), text, fill="white", font=font)
-                        
-                        # 保存原始图像
+                        text = f"{rank}{suit}"
+                        tw, th = draw.textsize(text, font=font)
+                        draw.text(((card_size[0]-tw)//2, (card_size[1]-th)//2), text, fill="white", font=font)
                         self.original_images[(suit, rank)] = img_orig
-                        # 创建缩放后的图像用于显示
                         self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
-                except Exception as e:
-                    print(f"Error loading card image {path}: {e}")
-                    # 创建占位图片
+                except:
                     img_orig = Image.new('RGB', card_size, 'red')
                     draw = ImageDraw.Draw(img_orig)
-                    text = "Error"
                     try:
                         font = ImageFont.truetype("arial.ttf", 20)
                     except:
                         font = ImageFont.load_default()
-                    text_width, text_height = draw.textsize(text, font=font)
-                    x = (card_size[0] - text_width) / 2
-                    y = (card_size[1] - text_height) / 2
-                    draw.text((x, y), text, fill="white", font=font)
-                    
-                    # 保存原始图像
+                    draw.text((10,10), "Error", fill="white", font=font)
                     self.original_images[(suit, rank)] = img_orig
-                    # 创建缩放后的图像用于显示
                     self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
 
+    # ---------- 筹码选择 ----------
+    def select_chip(self, chip_text):
+        self.selected_chip = chip_text
+        for chip in self.chip_buttons:
+            chip.delete("highlight")
+            for item_id in chip.find_all():
+                if chip.type(item_id) == 'oval':
+                    x1,y1,x2,y2 = chip.coords(item_id)
+                    chip.create_oval(x1,y1,x2,y2, outline='black', width=2)
+                    break
+        for chip in self.chip_buttons:
+            text_id = None
+            oval_id = None
+            for item_id in chip.find_all():
+                t = chip.type(item_id)
+                if t == 'text':
+                    text_id = item_id
+                elif t == 'oval':
+                    oval_id = item_id
+            if text_id and chip.itemcget(text_id, 'text') == chip_text:
+                x1,y1,x2,y2 = chip.coords(oval_id)
+                chip.create_oval(x1,y1,x2,y2, outline='#2f00ff', width=3, tags="highlight")
+                break
+
+    # ---------- 添加筹码到下注区域 ----------
     def add_chip_to_bet(self, bet_type):
-        """添加筹码到下注区域"""
         if not self.selected_chip:
             return
-            
-        # 获取筹码金额
         chip_text = self.selected_chip.replace('$', '')
         if 'K' in chip_text:
-            # 处理带K的筹码，如1K或2.5K
-            chip_value = float(chip_text.replace('K', '')) * 1000
+            chip_value = float(chip_text.replace('K','')) * 1000
         else:
             chip_value = float(chip_text)
-        
-        # 更新对应的下注变量
+
+        limits = {
+            "ante": (50000 if self.high_bet_mode else 10000),
+            "five_plus_one": (12500 if self.high_bet_mode else 2500)
+        }
+        if bet_type in limits:
+            current = float(self.__getattribute__(f"{bet_type}_var").get())
+            limit = limits[bet_type]
+            if current >= limit:
+                # 如果已经达到上限，始终提示
+                names = {"ante":"底注","five_plus_one":"5+1"}
+                messagebox.showwarning("下注限制", f"{names[bet_type]}已满，不能再下注！")
+                return
+            new_amount = current + chip_value
+            if new_amount > limit:
+                new_amount = limit
+                # 仅当原始金额 > 0 时才弹窗提示，否则静默截断
+                if current > 0:
+                    names = {"ante":"底注","five_plus_one":"5+1"}
+                    messagebox.showwarning("下注限制", f"{names[bet_type]}已达上限，自动调整为 {int(new_amount)}")
+            self.__getattribute__(f"{bet_type}_var").set(str(int(new_amount)))
+
+    # ---------- 重置单个下注（右键） ----------
+    def reset_single_bet(self, bet_type, event):
         if bet_type == "ante":
-            current = float(self.ante_var.get())
-            new_value = current + chip_value
-            # 检查上限
-            max_ante = 50000 if self.high_bet_mode else 10000
-            if new_value > max_ante:
-                new_value = max_ante
-                messagebox.showwarning("下注限制", f"底注上限为{max_ante}，已自动调整")
-            self.ante_var.set(str(int(new_value)))
-            # 如果Play已经有值，则更新Play为Ante的2倍
-            if int(self.play_var.get()) > 0:
-                self.play_var.set(str(int(new_value * 2)))
+            self.ante_var.set("0")
         elif bet_type == "five_plus_one":
-            current = float(self.five_plus_one_var.get())
-            new_value = current + chip_value
-            max_five = 12500 if self.high_bet_mode else 2500
-            if new_value > max_five:
-                if new_value != 50000:
-                    messagebox.showwarning("下注限制", f"5+1上限为{max_five}，已自动调整")
-                new_value = max_five
-            self.five_plus_one_var.set(str(int(new_value)))
-    
-    def toggle_play_bet(self, event):
-        """切换Play下注状态"""
-        # 如果游戏已经开始，则忽略点击
-        if self.game.stage != "pre_flop":
-            return
-            
-        try:
-            ante_value = int(self.ante_var.get())
-        except:
-            ante_value = 0
-            
-        current_play = self.play_var.get()
-        try:
-            current_play_value = int(current_play)
-        except:
-            current_play_value = 0
-            
-        # 如果Ante为0，不做任何操作
-        if ante_value == 0:
-            return
-            
-        # 如果Play当前为0，则设置为Ante的2倍
-        if current_play_value == 0:
-            self.play_var.set(str(ante_value * 2))
-        # 如果Play已有值，则重置为0
-        else:
-            self.play_var.set("0")
-    
+            self.five_plus_one_var.set("0")
+        if bet_type in self.bet_widgets:
+            widget = self.bet_widgets[bet_type]
+            original_bg = widget.cget('bg')
+            widget.config(bg='#FFCDD2')
+            self.after(500, lambda: widget.config(bg=original_bg))
+
+    def clear_btn_frame(self):
+        for widget in self.btn_frame.winfo_children():
+            widget.destroy()
+
+    def add_main_buttons(self):
+        self.clear_btn_frame()
+        self.reset_bets_button = tk.Button(
+            self.btn_frame, text="重设金额", command=self.reset_bets,
+            font=('Arial',12,'bold'), bg='#F44336', fg='white',
+            relief=tk.RAISED, bd=2, cursor="hand2", width=10
+        )
+        self.reset_bets_button.pack(side=tk.LEFT, padx=5)
+
+        self.repeat_bet_btn = tk.Button(
+            self.btn_frame, text="重复上局下注", command=self.apply_last_bet,
+            font=('Arial',12,'bold'), bg='#FFC107', fg='black',
+            relief=tk.RAISED, bd=2, cursor="hand2", width=12,
+            state=tk.NORMAL if self.last_bet is not None else tk.DISABLED
+        )
+        self.repeat_bet_btn.pack(side=tk.LEFT, padx=5)
+
+        self.start_button = tk.Button(
+            self.btn_frame, text="开始游戏", command=self.start_game,
+            font=('Arial',12,'bold'), bg='#4CAF50', fg='white',
+            relief=tk.RAISED, bd=2, cursor="hand2", width=10
+        )
+        self.start_button.pack(side=tk.LEFT, padx=5)
+
+    # ---------- 创建主界面 ----------
     def _create_widgets(self):
-        # 主框架 - 左右布局
-        main_frame = tk.Frame(self, bg='#35654d')
+        main_frame = tk.Frame(self, bg=ROOT_BG)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # 左侧牌桌区域 - 使用Canvas提供更好的控制
-        table_canvas = tk.Canvas(main_frame, bg='#35654d', highlightthickness=0)
+
+        # 左侧牌桌
+        table_canvas = tk.Canvas(main_frame, bg=ROOT_BG, highlightthickness=0)
         table_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        
-        # 牌桌背景
-        table_bg = table_canvas.create_rectangle(0, 0, 800, 600, fill='#35654d', outline='')
-        
-        # 庄家区域 - 增加高度以适应更大的卡片
+        table_canvas.create_rectangle(0,0,725,720, fill=ROOT_BG, outline=GOLD, width=5)
+
+        # 庄家区域
         dealer_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        dealer_frame.place(x=50, y=20, width=600, height=250)  # 加宽以适应5张更大的牌
-        self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial', 18), bg='#2a4a3c', fg='white')
+        dealer_frame.place(x=60, y=60, width=600, height=230)
+        self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial',18), bg='#2a4a3c', fg='white')
         self.dealer_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.dealer_cards_frame = tk.Frame(dealer_frame, bg='#2a4a3c')
         self.dealer_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-        
-        # 在庄家和玩家区域之间添加提示文字
+
+        # 中间提示
         self.ante_info_label = tk.Label(
-            table_canvas, 
-            text="庄家必须持有高牌A/K或以上牌型才合格\n庄家不合格的 底注获胜 加注平局", 
-            font=('Arial', 22), 
-            bg='#35654d', 
+            table_canvas,
+            text="庄家须持有高牌A/K或以上牌型才合格\n庄家不合格的 底注无条件获胜 加注平局",
+            font=('Arial',26),
+            bg=ROOT_BG,
             fg='#FFD700'
         )
-
-        # 更新以获取宽度
         self.ante_info_label.update_idletasks()
         label_width = self.ante_info_label.winfo_width()
-
-        # 获取 canvas 宽度
         table_canvas.update_idletasks()
         canvas_width = table_canvas.winfo_width()
+        center_x = (canvas_width - label_width)//2
+        self.ante_info_label.place(x=center_x+360, y=330, anchor='n')
 
-        # 居中放置在庄家和玩家区域之间（然后向左偏移50像素）
-        center_x = (canvas_width - label_width) // 2
-        self.ante_info_label.place(x=center_x + 355, y=280, anchor='n')  # 调整Y位置以适应更大的卡片
-        
-        # 玩家区域 - 增加高度以适应更大的卡片
+        # 玩家区域
         player_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        player_frame.place(x=50, y=365, width=600, height=250)  # 加宽以适应5张更大的牌
-        self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 18), bg='#2a4a3c', fg='white')
+        player_frame.place(x=60, y=450, width=600, height=230)
+        self.player_label = tk.Label(player_frame, text="玩家", font=('Arial',18), bg='#2a4a3c', fg='white')
         self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
         self.player_cards_frame = tk.Frame(player_frame, bg='#2a4a3c')
         self.player_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-        
+
         # 右侧控制面板
-        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=250, padx=10, pady=5)
-        control_frame.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # 顶部信息栏
-        info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        info_frame.pack(fill=tk.X, pady=5)
-        
-        self.balance_label = tk.Label(
-            info_frame, 
-            text=f"余额: ${self.balance:.2f}",
-            font=('Arial', 18),
-            bg='#2a4a3c',
-            fg='white'
-        )
-        self.balance_label.pack(side=tk.LEFT, padx=20, pady=5)
-        
-        self.stage_label = tk.Label(
-            info_frame, 
-            text="翻牌前",
-            font=('Arial', 18, 'bold'),
-            bg='#2a4a3c',
-            fg='#FFD700'
-        )
-        self.stage_label.pack(side=tk.RIGHT, padx=20, pady=5)
-        
-        # Progressive显示区域 - 修改后的代码
-        progressive_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        progressive_frame.pack(fill=tk.X, pady=5)
+        right_panel = tk.Frame(main_frame, bg=ROOT_BG, width=400)
+        right_panel.pack(side=tk.RIGHT, fill=tk.Y)
+        right_panel.pack_propagate(False)
 
-        # 使用网格布局确保标签在左边，金额在中间
-        progressive_frame.columnconfigure(0, weight=1)  # 标签列
-        progressive_frame.columnconfigure(1, weight=2)  # 金额列（更宽）
-        progressive_frame.columnconfigure(2, weight=1)  # 空白列（平衡布局）
+        # 信息卡片
+        info_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        info_card.pack(fill=tk.X, pady=3)
+        header_info = tk.Frame(info_card, bg=HEADER_BG)
+        header_info.pack(fill=tk.X)
+        body_info = tk.Frame(info_card, bg=PANEL_BG)
+        body_info.pack(fill=tk.X, padx=10, pady=8)
 
-        # 标签放在左边
-        progressive_label = tk.Label(progressive_frame, text="累进大奖:", 
-                                font=('Arial', 18), bg='#2a4a3c', fg='gold')
-        progressive_label.grid(row=0, column=0, sticky='w', padx=(10, 0), pady=5)
+        self.balance_label = tk.Label(body_info, text=f"余额: ${self.balance:,.2f}", font=('Arial',16,'bold'),
+                                      bg=PANEL_BG, fg='black')
+        self.balance_label.pack(side=tk.LEFT)
+        self.stage_label = tk.Label(body_info, text="翻牌前", font=('Arial',16,'bold'),
+                                    bg=PANEL_BG, fg='#A88100')
+        self.stage_label.pack(side=tk.RIGHT)
 
-        # 金额放在中间 - 使用StringVar
+        # 累进大奖卡片
+        progressive_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        progressive_card.pack(fill=tk.X, pady=3)
+        header_prog = tk.Frame(progressive_card, bg=HEADER_BG)
+        header_prog.pack(fill=tk.X)
+        tk.Label(header_prog, text="累进大奖", font=('Arial',13,'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=4)
+        body_prog = tk.Frame(progressive_card, bg=PANEL_BG)
+        body_prog.pack(fill=tk.X, padx=10, pady=8)
         self.progressive_amount_var = tk.StringVar()
-        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
-        self.progressive_display = tk.Label(progressive_frame, textvariable=self.progressive_amount_var, 
-                                    font=('Arial', 22, 'bold'), bg='#2a4a3c', fg='gold')
-        self.progressive_display.grid(row=0, column=1, sticky='w', pady=3)
-        
-        # 筹码区域（稍后重建，现在先创建空容器）
-        chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        chips_frame.pack(fill=tk.X, pady=5)
-        
-        self.chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        self.chips_label.pack(anchor='w', padx=10, pady=5)
-        
-        self.chip_container = tk.Frame(chips_frame, bg='#2a4a3c')  # 用于放置筹码按钮的容器
-        self.chip_container.pack(fill=tk.X, pady=5, padx=5)
-        
-        # ---------- 每注限制区域（可点击切换高额模式） ----------
-        minmax_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        minmax_frame.pack(fill=tk.X, pady=5)
-        
-        # 标题行
-        header_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
-        header_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
-        
-        tk.Label(header_frame, text="底注最低", font=('Arial', 12, 'bold'), 
-                bg='#2a4a3c', fg='white', width=7).pack(side=tk.LEFT, expand=True)
-        tk.Label(header_frame, text="底注最高", font=('Arial', 12, 'bold'), 
-                bg='#2a4a3c', fg='white', width=7).pack(side=tk.LEFT, expand=True)
-        tk.Label(header_frame, text="边注最高", font=('Arial', 12, 'bold'), 
-                bg='#2a4a3c', fg='white', width=7).pack(side=tk.LEFT, expand=True)
-        
-        # 数值行
-        self.minmax_value_frame = tk.Frame(minmax_frame, bg='#2a4a3c')
-        self.minmax_value_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
-        
-        self.min_ante_label = tk.Label(self.minmax_value_frame, text="$10", font=('Arial', 12, 'bold'), 
-                bg='#2a4a3c', fg='#FFD700', width=7)
-        self.min_ante_label.pack(side=tk.LEFT, expand=True)
-        self.max_ante_label = tk.Label(self.minmax_value_frame, text="$10,000", font=('Arial', 12, 'bold'), 
-                bg='#2a4a3c', fg='#FFD700', width=7)
-        self.max_ante_label.pack(side=tk.LEFT, expand=True)
-        self.max_side_label = tk.Label(self.minmax_value_frame, text="$2,500", font=('Arial', 12, 'bold'), 
-                bg='#2a4a3c', fg='#FFD700', width=7)
-        self.max_side_label.pack(side=tk.LEFT, expand=True)
-        
-        # 将整个限制区域变为可点击（切换高额模式）
-        clickable_widgets = [minmax_frame, header_frame, self.minmax_value_frame,
-                            self.min_ante_label, self.max_ante_label, self.max_side_label]
-        for w in clickable_widgets:
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
+        self.progressive_display = tk.Label(body_prog, textvariable=self.progressive_amount_var,
+                                            font=('Arial',20,'bold'), bg=PANEL_BG, fg='#A88100')
+        self.progressive_display.pack(anchor='center')
+
+        # 限红信息卡片（可点击切换高额模式）
+        limit_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        limit_card.pack(fill=tk.X, pady=3)
+        header_limit = tk.Frame(limit_card, bg=HEADER_BG)
+        header_limit.pack(fill=tk.X)
+        tk.Label(header_limit, text="下注上限", font=('Arial',13,'bold'),
+                 bg=HEADER_BG, fg=TITLE_FG).pack(pady=4)
+        body_limit = tk.Frame(limit_card, bg=PANEL_BG)
+        body_limit.pack(fill=tk.X, padx=10, pady=8)
+
+        table_frame = tk.Frame(body_limit, bg=PANEL_BG, bd=2, relief=tk.SOLID)
+        table_frame.pack(fill=tk.X)
+        titles = ["底注最低","底注最高","边注最高"]
+        for col,title in enumerate(titles):
+            lbl = tk.Label(table_frame, text=title, font=('Arial',11,'bold'),
+                           bg=PANEL_BG, fg='#2A1B08', borderwidth=1, relief=tk.SOLID, padx=5, pady=5)
+            lbl.grid(row=0, column=col, sticky="nsew", padx=0, pady=0)
+        self.min_ante_label = tk.Label(table_frame, text="$10", font=('Arial',12,'bold'),
+                                       bg=PANEL_BG, fg="#A88100", borderwidth=1, relief=tk.SOLID, padx=5, pady=5)
+        self.min_ante_label.grid(row=1, column=0, sticky="nsew")
+        self.max_ante_label = tk.Label(table_frame, text="$10,000", font=('Arial',12,'bold'),
+                                       bg=PANEL_BG, fg="#A88100", borderwidth=1, relief=tk.SOLID, padx=5, pady=5)
+        self.max_ante_label.grid(row=1, column=1, sticky="nsew")
+        self.max_side_label = tk.Label(table_frame, text="$2,500", font=('Arial',12,'bold'),
+                                       bg=PANEL_BG, fg="#A88100", borderwidth=1, relief=tk.SOLID, padx=5, pady=5)
+        self.max_side_label.grid(row=1, column=2, sticky="nsew")
+        for col in range(3):
+            table_frame.columnconfigure(col, weight=1)
+        # 点击切换高额模式
+        for w in [limit_card, header_limit, body_limit, table_frame,
+                  self.min_ante_label, self.max_ante_label, self.max_side_label]:
             w.bind("<Button-1>", self.toggle_high_bet_limits)
-        
-        # 下注区域
-        bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_frame.pack(fill=tk.X, pady=10)
-        
-        # Jackpot下注区域
-        bonus_bet_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        bonus_bet_frame.pack(fill=tk.X, padx=40, pady=5)
-        
-        # Jackpot下注（文本稍后根据模式调整）
+
+        # 筹码与下注卡片
+        combined_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        combined_card.pack(fill=tk.X, pady=3)
+        header_combined = tk.Frame(combined_card, bg=HEADER_BG)
+        header_combined.pack(fill=tk.X)
+        tk.Label(header_combined, text="筹码与下注", font=('Arial',13,'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=4)
+        body_combined = tk.Frame(combined_card, bg=PANEL_BG)
+        body_combined.pack(fill=tk.X, padx=10, pady=8)
+        body_combined.columnconfigure(0, weight=1)
+        body_combined.columnconfigure(1, weight=1)
+        body_combined.columnconfigure(2, weight=1)
+
+        # 筹码按钮行
+        chip_row = tk.Frame(body_combined, bg=PANEL_BG)
+        chip_row.grid(row=0, column=0, columnspan=3, pady=(0,8), sticky='ew')
+        for i in range(6):
+            chip_row.columnconfigure(i, weight=1)
+        self.chip_container = chip_row   # 保存引用，供 _rebuild_chips 使用
+
+        chip_configs = [
+            ('$10','#ffa500','black'),
+            ("$25",'#00ff00','black'),
+            ("$100",'#000000','white'),
+            ("$500","#FF7DDA",'black'),
+            ("$1K",'#ffffff','black'),
+            ("$2.5K",'#ff0000','white'),
+        ]
+        self.chip_buttons = []
+        self.chip_texts = {}
+        for i,(text,bg_color,fg_color) in enumerate(chip_configs):
+            cell = tk.Frame(chip_row, bg=PANEL_BG)
+            cell.grid(row=0, column=i, padx=2, pady=2, sticky='nsew')
+            chip_canvas = tk.Canvas(cell, width=50, height=50, bg=PANEL_BG, highlightthickness=0)
+            chip_canvas.pack(anchor='center')
+            chip_canvas.create_oval(2,2,49,49, fill=bg_color, outline='black')
+            chip_canvas.create_text(25.5,25.5, text=text, fill=fg_color, font=('Arial',12,'bold'))
+            chip_canvas.bind("<Button-1>", lambda e,t=text: self.select_chip(t))
+            self.chip_buttons.append(chip_canvas)
+            self.chip_texts[chip_canvas] = text
+        self.select_chip("$10")
+
+        # 下注行：底注、5+1、累进大奖
+        # 第一行：累进大奖复选框
+        row0 = tk.Frame(body_combined, bg=PANEL_BG)
+        row0.grid(row=1, column=0, columnspan=3, sticky='ew', padx= 40, pady=2)
         self.jackpot_check = tk.Checkbutton(
-            bonus_bet_frame, 
-            text="累进大奖 ($1)", 
-            variable=self.jackpot_bet_var,
-            font=('Arial', 14), 
-            bg='#2a4a3c', 
-            fg='white', 
-            selectcolor='black'
+            row0, text="累进大奖 ($2.50)", variable=self.jackpot_bet_var,
+            font=('Arial',12,"bold"), bg=PANEL_BG, fg='black', selectcolor=PANEL_BG
         )
         self.jackpot_check.pack(side=tk.LEFT)
-        
-        # Ante 和 5+1 在同一行（第一行）
-        ante_five_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        ante_five_frame.pack(fill=tk.X, padx=40, pady=3)
 
-        # Ante 部分
-        ante_label = tk.Label(ante_five_frame, text="底注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        ante_label.pack(side=tk.LEFT)
-
+        # 第二行：底注 和 5+1 并排
+        row1 = tk.Frame(body_combined, bg=PANEL_BG)
+        row1.grid(row=2, column=0, columnspan=3, sticky='ew', pady=4)
+        tk.Label(row1, text="           底注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT)
         self.ante_var = tk.StringVar(value="0")
-        self.ante_display = tk.Label(ante_five_frame, textvariable=self.ante_var, font=('Arial', 14), 
-                                    bg='white', fg='black', width=7, relief=tk.SUNKEN, padx=5)
+        self.ante_display = tk.Label(row1, textvariable=self.ante_var, font=('Arial',12),
+                                     bg='white', fg='black', width=8, relief=tk.SUNKEN)
         self.ante_display.pack(side=tk.LEFT, padx=5)
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
+        self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante", e))
         self.bet_widgets["ante"] = self.ante_display
 
-        # 添加间距
-        tk.Label(ante_five_frame, text=" ", bg='#2a4a3c').pack(side=tk.LEFT, padx=10)
-
-        # 5+1 部分
-        five_plus_one_label = tk.Label(ante_five_frame, text="5+1:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        five_plus_one_label.pack(side=tk.LEFT)
-
-        self.five_plus_one_var = tk.StringVar(value="0")
-        self.five_plus_one_display = tk.Label(ante_five_frame, textvariable=self.five_plus_one_var, font=('Arial', 14), 
-                                            bg='white', fg='black', width=7, relief=tk.SUNKEN, padx=5)
+        tk.Label(row1, text="5+1:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(25,5))
+        self.five_plus_one_display = tk.Label(row1, textvariable=self.five_plus_one_var, font=('Arial',12),
+                                              bg='white', fg='black', width=8, relief=tk.SUNKEN)
         self.five_plus_one_display.pack(side=tk.LEFT, padx=5)
         self.five_plus_one_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("five_plus_one"))
+        self.five_plus_one_display.bind("<Button-3>", lambda e: self.reset_single_bet("five_plus_one", e))
         self.bet_widgets["five_plus_one"] = self.five_plus_one_display
 
-        # Play 在第二行
-        play_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        play_frame.pack(fill=tk.X, padx=40, pady=3)
-
-        # Play 部分
-        self.play_label = tk.Label(play_frame, text="加注:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        self.play_label.pack(side=tk.LEFT)
-
+        # 第三行：加注（可点击切换预下注）
+        row2 = tk.Frame(body_combined, bg=PANEL_BG)
+        row2.grid(row=3, column=0, columnspan=3, sticky='ew', pady=4)
+        tk.Label(row2, text="           加注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT)
         self.play_var = tk.StringVar(value="0")
-        self.play_display = tk.Label(play_frame, textvariable=self.play_var, font=('Arial', 14), 
-                                    bg='white', fg='black', width=7, relief=tk.SUNKEN, padx=5)
+        self.play_display = tk.Label(row2, textvariable=self.play_var, font=('Arial',12),
+                                     bg='white', fg='black', width=8, relief=tk.SUNKEN)
         self.play_display.pack(side=tk.LEFT, padx=5)
-        # Play Bet 点击事件
-        self.play_display.bind("<Button-1>", self.toggle_play_bet)
+        self.play_display.bind("<Button-1>", self.toggle_play_bet)   # 点击切换预下注
         self.bet_widgets["play"] = self.play_display
-        
-        # 游戏操作按钮框架 - 用于放置所有操作按钮
-        self.action_frame = tk.Frame(control_frame, bg='#2a4a3c')
-        self.action_frame.pack(fill=tk.X)
 
-        # 创建一个框架来容纳重置金额按钮、重复上局下注按钮和开始游戏按钮
-        start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=5)
+        # 操作卡片
+        action_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        action_card.pack(fill=tk.X, pady=3)
+        header_action = tk.Frame(action_card, bg=HEADER_BG)
+        header_action.pack(fill=tk.X)
+        tk.Label(header_action, text="操作", font=('Arial',13,'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=4)
+        body_action = tk.Frame(action_card, bg=PANEL_BG)
+        body_action.pack(fill=tk.X, padx=10, pady=8)
 
-        # 添加"重置金额"按钮
-        self.reset_bets_button = tk.Button(
-            start_button_frame, text="重置金额", 
-            command=self.reset_bets, font=('Arial', 14),
-            bg='#F44336', fg='white', width=10
-        )
-        self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
-
-        # 重复上局下注按钮（根据是否有历史下注决定启用状态）
-        self.repeat_bet_btn = tk.Button(
-            start_button_frame, text="重复上局下注", command=self.apply_last_bet,
-            font=('Arial', 14), bg='#4A90E2', fg='white',
-            activebackground='#3A7BC8', width=12,
-            state=tk.NORMAL if self.last_bet is not None else tk.DISABLED
-        )
-        self.repeat_bet_btn.pack(side=tk.LEFT, padx=(0, 10))
-
-        # 开始游戏按钮
-        self.start_button = tk.Button(
-            start_button_frame, text="开始游戏", 
-            command=self.start_game, font=('Arial', 14),
-            bg='#4CAF50', fg='white', width=10
-        )
-        self.start_button.pack(side=tk.LEFT)
-        
-        # 状态信息
         self.status_label = tk.Label(
-            control_frame, text="设置下注金额并开始游戏", 
-            font=('Arial', 14), bg='#2a4a3c', fg='white'
+            body_action, text="设置下注金额并开始游戏", font=('Arial',12,'bold'),
+            bg=PANEL_BG, fg='#2A1B08', height=1
         )
-        self.status_label.pack(pady=5, fill=tk.X)
-        
-        # 本局下注和上局获胜金额显示
-        bet_info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_info_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        
-        # 本局下注金额
+        self.status_label.pack(fill=tk.X, pady=4)
+
+        self.btn_frame = tk.Frame(body_action, bg=PANEL_BG)
+        self.btn_frame.pack(fill=tk.X, pady=5)
+        self.add_main_buttons()
+
+        # 底部信息卡片
+        info_bottom_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        info_bottom_card.pack(fill=tk.X, pady=3)
+        body_bottom = tk.Frame(info_bottom_card, bg=PANEL_BG)
+        body_bottom.pack(fill=tk.X, padx=10, pady=8)
+
         self.current_bet_label = tk.Label(
-            bet_info_frame, text="本局下注: $0.00", 
-            font=('Arial', 12), bg='#2a4a3c', fg='white'
+            body_bottom, text="本局下注: $0.00", font=('Arial',12), bg=PANEL_BG, fg='black'
         )
-        self.current_bet_label.pack(pady=5, padx=10, anchor='w')
-        
-        # 上局获胜金额
+        self.current_bet_label.pack(anchor='w')
+        row_last = tk.Frame(body_bottom, bg=PANEL_BG)
+        row_last.pack(fill=tk.X, pady=2)
         self.last_win_label = tk.Label(
-            bet_info_frame, text="上局获胜: $0.00", 
-            font=('Arial', 12), bg='#2a4a3c', fg='#FFD700'
+            row_last, text="上局获胜: $0.00", font=('Arial',12), bg=PANEL_BG, fg='black'
         )
-        self.last_win_label.pack(pady=5, padx=10, anchor='w', side=tk.LEFT)
-        
-        # 添加游戏规则按钮到上局获胜的右下角
-        rules_btn = tk.Button(
-            bet_info_frame, text="ℹ️", 
-            command=self.show_game_instructions, 
-            font=('Arial', 8), bg='#4B8BBE', fg='white', width=2, height=1
+        self.last_win_label.pack(side=tk.LEFT)
+        self.info_button = tk.Button(
+            row_last, text="ℹ️", command=self.show_game_instructions,
+            bg='#4B8BBE', fg='white', font=('Arial',12), width=2, relief=tk.FLAT
         )
-        rules_btn.pack(side=tk.RIGHT, padx=10, pady=5)
-        
-        # 初始化筹码（根据当前模式）
-        self._rebuild_chips()
-        self._update_limits_display()
-        self._update_jackpot_check_text()
-    
-    def _get_high_bet_password(self):
-        return time.strftime("%H%M")
-    
+        self.info_button.pack(side=tk.RIGHT)
+
+    # ---------- 底注联动：更新加注 ----------
+    def on_ante_changed(self, *args):
+        """当底注变化时，如果当前加注不为0，则更新为底注×2"""
+        try:
+            ante = int(self.ante_var.get())
+        except ValueError:
+            ante = 0
+        current_play = self.play_var.get()
+        # 如果当前加注不是"0"或"0.0"，则更新为 ante*2
+        if current_play not in ("0", "0.0"):
+            self.play_var.set(str(ante * 2))
+
+    # ---------- 高额模式切换 ----------
     def toggle_high_bet_limits(self, event=None):
+        if self.game_in_progress:
+            return
+        # 动态获取当前时间的四位数字作为密码
+        current_password = time.strftime("%H%M")
         if not self.high_bet_mode:
-            password = simpledialog.askstring(
-                "高额下注",
-                "请输入密码：",
-                parent=self
-            )
-            if password is None:
+            pwd = simpledialog.askstring("高额下注", "请输入密码：", parent=self)
+            if pwd is None:
                 return
-            if password.strip() != self._get_high_bet_password():
-                messagebox.showerror("错误", "密码错误")
+            if pwd.strip() != current_password:
+                messagebox.showerror("错误","密码错误")
                 return
             self.high_bet_mode = True
             self.reset_bets()
         else:
             self.high_bet_mode = False
             self.reset_bets()
-        
-        # 更新UI
         self._update_limits_display()
-        self._update_jackpot_check_text()
         self._rebuild_chips()
-        self.status_label.config(text="下注限制已更新")
-    
+
     def _update_limits_display(self):
-        """更新底注最低/最高、边注最高标签"""
         if self.high_bet_mode:
             self.min_ante_label.config(text="$100")
             self.max_ante_label.config(text="$50,000")
@@ -932,94 +884,99 @@ class CaribbeanStudGUI(tk.Tk):
             self.min_ante_label.config(text="$10")
             self.max_ante_label.config(text="$10,000")
             self.max_side_label.config(text="$2,500")
-    
-    def _update_jackpot_check_text(self):
-        """更新累进大奖复选框文本（统一为 $1）"""
-        self.jackpot_check.config(text="累进大奖 ($1)")
-    
+
     def _rebuild_chips(self):
-        """根据当前模式重建筹码区域"""
-        # 清空容器
+        # 清空现有筹码
         for widget in self.chip_container.winfo_children():
             widget.destroy()
         self.chip_buttons = []
+        self.chip_texts = {}
         self.selected_chip = None
-        
-        # 定义筹码配置
+
         if self.high_bet_mode:
             chip_configs = [
-                ("$100", '#000000', 'white'),   # 黑色背景，白色文字
-                ("$500", "#FF7DDA", 'black'),   # 粉色背景，黑色文字
-                ("$1K", '#ffffff', 'black'),    # 白色背景，黑色文字
-                ("$5K", '#ff0000', 'white'),    # 红色背景，白色文字
-                ("$10K", '#00fbff', 'black'),   # 青色背景，黑色文字
-                ("$50K", '#00ffae', 'black')    # 绿色背景，黑色文字
+                ("$100", '#000000', 'white'),
+                ("$500", "#FF7DDA", 'black'),
+                ("$1K", '#ffffff', 'black'),
+                ("$5K", '#ff0000', 'white'),
+                ("$10K", '#00fbff', 'black'),
+                ("$50K", '#00ffae', 'black')
             ]
-            default_chip = "$100"
+            default = "$100"
         else:
             chip_configs = [
-                ('$10', '#ffa500', 'black'),   # 橙色背景，黑色文字
-                ("$25", '#00ff00', 'black'),   # 绿色背景，黑色文字
-                ("$100", '#000000', 'white'),  # 黑色背景，白色文字
-                ("$500", "#FF7DDA", 'black'),  # 粉色背景，黑色文字
-                ("$1K", '#ffffff', 'black'),   # 白色背景，黑色文字
-                ("$2.5K", '#ff0000', 'white')  # 红色背景，白色文字
+                ('$10', '#ffa500', 'black'),
+                ("$25", '#00ff00', 'black'),
+                ("$100", '#000000', 'white'),
+                ("$500", "#FF7DDA", 'black'),
+                ("$1K", '#ffffff', 'black'),
+                ("$2.5K", '#ff0000', 'white')
             ]
-            default_chip = "$10"
-        
-        self.chip_texts = {}
-        for text, bg_color, fg_color in chip_configs:
-            chip_canvas = tk.Canvas(self.chip_container, width=57, height=57, bg='#2a4a3c', highlightthickness=0)
-            chip_canvas.create_oval(2, 2, 55, 55, fill=bg_color, outline='black')
-            chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 14, 'bold'))
+            default = "$10"
+
+        for i, (text, bg_color, fg_color) in enumerate(chip_configs):
+            cell = tk.Frame(self.chip_container, bg=PANEL_BG)
+            cell.grid(row=0, column=i, padx=2, pady=2, sticky='nsew')
+            chip_canvas = tk.Canvas(cell, width=50, height=50, bg=PANEL_BG, highlightthickness=0)
+            chip_canvas.pack(anchor='center')
+            chip_canvas.create_oval(2, 2, 49, 49, fill=bg_color, outline='black')
+            chip_canvas.create_text(25.5, 25.5, text=text, fill=fg_color, font=('Arial', 12, 'bold'))
             chip_canvas.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
-            chip_canvas.pack(side=tk.LEFT, padx=5)
             self.chip_buttons.append(chip_canvas)
             self.chip_texts[chip_canvas] = text
-        
-        # 默认选中第一个筹码
-        self.select_chip(default_chip)
-    
+
+        self.select_chip(default)
+
+    # ---------- 预下注切换 ----------
+    def toggle_play_bet(self, event=None):
+        """点击加注格子，在0和底注×2之间循环"""
+        try:
+            ante = int(self.ante_var.get())
+        except ValueError:
+            ante = 0
+        if ante <= 0:
+            messagebox.showwarning("提示", "请先设置底注金额")
+            return
+        current_play = self.play_var.get()
+        # 如果当前是 "0" 或 "0.0"，则设为底注*2，否则设为0
+        if current_play in ("0", "0.0"):
+            new_play = ante * 2
+            self.play_var.set(str(new_play))
+        else:
+            self.play_var.set("0")
+
+    # ---------- 游戏规则说明 ----------
     def show_game_instructions(self):
-        """显示游戏规则说明"""
-        # 创建自定义弹窗
         win = tk.Toplevel(self)
         win.title("加勒比扑克游戏规则")
-        win.geometry("900x700")  # 增加窗口宽度以适应合并的表格
-        win.resizable(False, False)
+        win.geometry("800x700")
+        win.resizable(False,False)
         win.configure(bg='#F0F0F0')
-        
-        # 创建主框架
         main_frame = tk.Frame(win, bg='#F0F0F0')
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # 添加滚动条
         scrollbar = ttk.Scrollbar(main_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # 创建画布用于滚动
         canvas = tk.Canvas(main_frame, bg='#F0F0F0', yscrollcommand=scrollbar.set)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=canvas.yview)
-        
-        # 创建内部框架放置所有内容
         content_frame = tk.Frame(canvas, bg='#F0F0F0')
-        canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
-        
-        # 游戏规则文本
+        canvas_frame = canvas.create_window((0,0), window=content_frame, anchor='nw')
+
         rules_text = """
         加勒⽐梭哈扑克 游戏规则
 
         1. 游戏开始前下注:
            - 底注: 基础下注（必须）
-           - 累进大奖: 可选$1下注（高额模式$10）
+           - 累进大奖: 可选$1下注
            - 5+1: 可选下注（使用庄家第一张明牌和玩家五张牌，共6张牌选出最佳5张牌型）
+           - 加注: 点击可在0和底注×2之间切换，若预下注>0则自动进入摊牌（盲注模式）
 
         2. 游戏流程:
            a. 下注阶段:
                - 玩家下注底注
-               - 可选择下注$1（或$10）参与累进大奖
+               - 可选择下注$1参与累进大奖
                - 可选择下注5+1
+               - 可选预下注（底注×2）
                - 点击"开始游戏"按钮开始
 
            b. 发牌:
@@ -1027,7 +984,7 @@ class CaribbeanStudGUI(tk.Tk):
                - 玩家牌面朝上，庄家牌面朝下（只显示第一张）
                - 立刻结算5+1
 
-           c. 决策阶段:
+           c. 决策阶段（仅当未预下注时）:
                - 玩家查看自己的五张牌后选择:
                  * 弃牌: 输掉底注下注，但累进大奖可能赢
                  * 下注2倍: 下注金额等于底注*2
@@ -1047,1193 +1004,378 @@ class CaribbeanStudGUI(tk.Tk):
                    - 玩家赢: 底注支付1:1，加注根据玩家牌型支付（见赔率表）
                    - 平局: 底注和加注都退还
                    - 玩家输: 输掉底注和加注
-                   
+
            - 累进大奖:
              * 只根据玩家手牌支付
              * 赔付表见下方（高额模式基本赔付×10）
-             
+
            - 5+1 (需下注5+1):
              * 使用庄家第一张明牌和玩家五张牌，共6张牌选出最佳5张牌型
              * 赔付表见下方
         """
-        
-        rules_label = tk.Label(
-            content_frame, 
-            text=rules_text,
-            font=('微软雅黑', 11),
-            bg='#F0F0F0',
-            justify=tk.LEFT,
-            padx=10,
-            pady=10
-        )
-        rules_label.pack(fill=tk.X, padx=10, pady=5)
-        
-        # 合并赔付表
-        tk.Label(
-            content_frame, 
-            text="赔付表汇总",
-            font=('微软雅黑', 14, 'bold'),
-            bg='#F0F0F0'
-        ).pack(fill=tk.X, padx=10, pady=(20, 10), anchor='center')
-        
-        # 创建合并的赔付表
+        tk.Label(content_frame, text=rules_text, font=('微软雅黑',11),
+                 bg='#F0F0F0', justify=tk.LEFT, padx=10, pady=10).pack(fill=tk.X, padx=10, pady=5)
+
+        tk.Label(content_frame, text="赔付表汇总", font=('微软雅黑',14,'bold'),
+                 bg='#F0F0F0').pack(fill=tk.X, padx=10, pady=(20,10), anchor='center')
+
         payout_frame = tk.Frame(content_frame, bg='#F0F0F0')
         payout_frame.pack(fill=tk.X, padx=20, pady=5)
-        
-        headers = ["牌型", "加注赔率", "5+1赔率", "累进大奖"]
-        payout_data = [
-            ("皇家同花顺", "100:1", "1000:1", "100%"),
-            ("同花顺", "50:1", "200:1", "10%"),
-            ("四条", "20:1", "100:1", "$500"),
-            ("葫芦", "7:1", "20:1", "$150"),
-            ("同花", "5:1", "15:1", "$100"),
-            ("顺子", "4:1", "10:1", "-"),
-            ("三条", "3:1", "7:1", "-"),
-            ("两对", "2:1", "-", "-"),
-            ("对子", "1:1", "-", "-"),
-            ("高牌", "1:1", "-", "-")
+        headers = ["牌型","加注赔率","5+1赔率","累进大奖"]
+        data = [
+            ("皇家同花顺","100:1","1000:1","100%"),
+            ("同花顺","50:1","200:1","10%"),
+            ("四条","20:1","100:1","$1,250"),
+            ("葫芦","7:1","20:1","$375"),
+            ("同花","5:1","15:1","$250"),
+            ("顺子","4:1","10:1","-"),
+            ("三条","3:1","7:1","-"),
+            ("两对","2:1","-","-"),
+            ("对子","1:1","-","-"),
+            ("高牌","1:1","-","-")
         ]
-
-        # 表头
-        for col, h in enumerate(headers):
-            tk.Label(
-                payout_frame,
-                text=h,
-                font=('微软雅黑', 10, 'bold'),
-                bg='#4B8BBE',
-                fg='white',
-                padx=10, pady=5,
-                anchor='center',
-                justify='center'
-            ).grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
-
-        # 表格内容
-        for r, row_data in enumerate(payout_data, start=1):
-            bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
-            for c, txt in enumerate(row_data):
-                tk.Label(
-                    payout_frame,
-                    text=txt,
-                    font=('微软雅黑', 10),
-                    bg=bg,
-                    padx=10, pady=5,
-                    anchor='center',
-                    justify='center'
-                ).grid(row=r, column=c, sticky='nsew', padx=1, pady=1)
-
-        # 平均分配每列宽度
+        for col,h in enumerate(headers):
+            tk.Label(payout_frame, text=h, font=('微软雅黑',10,'bold'),
+                     bg='#4B8BBE', fg='white', padx=10, pady=5,
+                     anchor='center').grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
+        for r,row_data in enumerate(data, start=1):
+            bg = '#E0E0E0' if r%2==0 else '#F0F0F0'
+            for c,txt in enumerate(row_data):
+                tk.Label(payout_frame, text=txt, font=('微软雅黑',10),
+                         bg=bg, padx=10, pady=5, anchor='center'
+                         ).grid(row=r, column=c, sticky='nsew', padx=1, pady=1)
         for c in range(len(headers)):
             payout_frame.columnconfigure(c, weight=1)
-            
-        # 注释
+
         notes = """
-        注: 
+        注:
         * 庄家必须至少有一张A和K才合格
         * 下注金额等于底注*2的下注金额
         * 高额模式下累进大奖赔付×10，且奖池贡献率提升至8%
+        * 加注栏点击切换0/底注×2，预下注后开始游戏直接摊牌
         """
-        
-        notes_label = tk.Label(
-            content_frame, 
-            text=notes,
-            font=('微软雅黑', 10),
-            bg='#F0F0F0',
-            justify=tk.LEFT,
-            padx=10,
-            pady=10
-        )
-        notes_label.pack(fill=tk.X, padx=10, pady=5)
-        
-        # 更新滚动区域
+        tk.Label(content_frame, text=notes, font=('微软雅黑',10),
+                 bg='#F0F0F0', justify=tk.LEFT, padx=10, pady=10).pack(fill=tk.X, padx=10, pady=5)
+
         content_frame.update_idletasks()
         canvas.config(scrollregion=canvas.bbox("all"))
-        
-        # 添加关闭按钮
-        close_btn = ttk.Button(
-            win,
-            text="关闭",
-            command=win.destroy
-        )
-        close_btn.pack(pady=10)
-        
-        # 绑定鼠标滚轮滚动
+        ttk.Button(win, text="关闭", command=win.destroy).pack(pady=10)
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
-    
-    def select_chip(self, chip_text):
-        """选择筹码，并更新筹码的高亮状态"""
-        self.selected_chip = chip_text
-        # 1. 重置所有筹码的边框
-        for chip in self.chip_buttons:
-            # 删除之前的高亮
-            chip.delete("highlight")
-            # 找到 oval 的 id，重画默认黑色边框
-            for item_id in chip.find_all():
-                if chip.type(item_id) == 'oval':
-                    x1, y1, x2, y2 = chip.coords(item_id)
-                    chip.create_oval(x1, y1, x2, y2, outline='black', width=2)
-                    break
 
-        # 2. 给选中的筹码加金色高亮
-        for chip in self.chip_buttons:
-            text_id = None
-            oval_id = None
-            # 先分别找到 text 和 oval 的 id
-            for item_id in chip.find_all():
-                t = chip.type(item_id)
-                if t == 'text':
-                    text_id = item_id
-                elif t == 'oval':
-                    oval_id = item_id
-            # 如果找到了文字项，并且内容匹配
-            if text_id and chip.itemcget(text_id, 'text') == chip_text:
-                # 拿到对应的 oval 坐标
-                x1, y1, x2, y2 = chip.coords(oval_id)
-                chip.create_oval(x1, y1, x2, y2, outline='gold', width=3, tags="highlight")
-                break
-    
+    # ---------- 更新余额 ----------
     def update_balance(self):
-        self.balance_label.config(text=f"余额: ${self.balance:.2f}")
+        self.balance_label.config(text=f"余额: ${self.balance:,.2f}")
         if self.username != 'Guest':
             update_balance_in_json(self.username, self.balance)
-    
+
+    # ---------- 更新手牌标签 ----------
     def update_hand_labels(self):
-        """更新玩家和庄家的手牌标签显示牌型"""
-        # 计算玩家当前牌型
-        if self.game.player_hand and len(self.game.player_hand) == 5:
-            player_eval = evaluate_five_card_hand(self.game.player_hand)
-            player_rank = player_eval[0] if player_eval else 0
-            
-            # 检查是否高牌且同时有A和K
-            player_hand_name = HAND_RANK_NAMES[player_rank] if player_eval else "高牌"
-            if player_rank == 0:  # 高牌
-                has_ace = any(card.rank == 'A' for card in self.game.player_hand)
-                has_king = any(card.rank == 'K' for card in self.game.player_hand)
-                if has_ace and has_king:
-                    player_hand_name = "高牌(ACE和KING)"
-            
-            self.player_label.config(text=f"玩家 - {player_hand_name}" if player_hand_name else "玩家")
-        
-        # 计算庄家当前牌型（只有在摊牌时或弃牌后）
-        if (self.game.stage == "showdown" or self.game.folded) and self.game.dealer_hand and len(self.game.dealer_hand) == 5:
-            dealer_eval = evaluate_five_card_hand(self.game.dealer_hand)
-            dealer_rank = dealer_eval[0] if dealer_eval else 0
-            
-            # 检查是否高牌且同时有A和K
-            dealer_hand_name = HAND_RANK_NAMES[dealer_rank] if dealer_eval else "高牌"
-            if dealer_rank == 0:  # 高牌
-                has_ace = any(card.rank == 'A' for card in self.game.dealer_hand)
-                has_king = any(card.rank == 'K' for card in self.game.dealer_hand)
-                if has_ace and has_king:
-                    dealer_hand_name = "高牌(ACE和KING)"
-            
-            self.dealer_label.config(text=f"庄家 - {dealer_hand_name}" if dealer_hand_name else "庄家")
-    
-    def disable_action_buttons(self):
-        """禁用所有操作按钮"""
-        self.buttons_disabled = True
-        for widget in self.action_frame.winfo_children():
-            # 只对按钮控件禁用
-            if isinstance(widget, tk.Button):
-                widget.config(state=tk.DISABLED)
-        
-    def enable_action_buttons(self):
-        """启用所有操作按钮"""
-        self.buttons_disabled = False
-        for widget in self.action_frame.winfo_children():
-            # 只对按钮控件启用
-            if isinstance(widget, tk.Button):
-                widget.config(state=tk.NORMAL)
-    
-    # ==================== 新增：排序动画相关方法 ====================
-    def start_both_sort_animation(self):
-        """开始双方手牌的排序动画（翻开庄家牌后调用）"""
-        if self._resetting:
-            return
-
-        # 获取双方手牌评估结果
-        player_eval = evaluate_five_card_hand(self.game.player_hand)
-        dealer_eval = evaluate_five_card_hand(self.game.dealer_hand)
-
-        # 按新规则排序双方手牌
-        sorted_player = sort_hand_for_display(self.game.player_hand, player_eval)
-        sorted_dealer = sort_hand_for_display(self.game.dealer_hand, dealer_eval)
-
-        # 保存排序后的手牌到游戏对象（不影响结算）
-        self.game.player_hand = sorted_player
-        self.game.dealer_hand = sorted_dealer
-
-        # 获取所有卡片标签
-        player_labels = self.player_cards_frame.winfo_children()
-        dealer_labels = self.dealer_cards_frame.winfo_children()
-
-        # 记录起始位置和目标位置
-        start_positions = {}
-        for label in player_labels + dealer_labels:
-            if label.winfo_exists():
-                info = label.place_info()
-                start_positions[label] = float(info['x'])
-
-        target_positions = {}
-        # 玩家卡目标位置
-        for idx, card in enumerate(sorted_player):
-            for label in player_labels:
-                if hasattr(label, 'card') and label.card == card:
-                    target_positions[label] = idx * 110  # 卡片宽度
-                    break
-        # 庄家卡目标位置
-        for idx, card in enumerate(sorted_dealer):
-            for label in dealer_labels:
-                if hasattr(label, 'card') and label.card == card:
-                    target_positions[label] = idx * 110
-                    break
-
-        # 动画参数
-        duration = 1500  # 1.5秒
-        steps = 30
-        interval = duration // steps
-
-        anim_data = []
-        for label in start_positions:
-            start_x = start_positions[label]
-            target_x = target_positions[label]
-            dx = (target_x - start_x) / steps
-            anim_data.append((label, start_x, dx))
-
-        def animate_step(step):
-            if step > steps or self._resetting:
-                # 动画结束，确保所有卡到达目标位置
-                for label, _, _ in anim_data:
-                    if label.winfo_exists():
-                        target_x = target_positions[label]
-                        label.place(x=target_x)
-                # 更新牌型标签
-                self.update_hand_labels()
-                # 结算
-                self.settle_game()
-                return
-            for label, start_x, dx in anim_data:
-                if label.winfo_exists():
-                    new_x = start_x + dx * step
-                    label.place(x=new_x)
-            self.after(interval, lambda: animate_step(step + 1))
-
-        animate_step(1)
-
-    def settle_game(self):
-        """统一结算方法（动画结束后调用）"""
-        if self.game.folded:
-            self.settle_fold()
-        else:
-            self.settle_showdown()
-
-    def settle_fold(self):
-        """弃牌后的结算（排序动画结束后调用）"""
-        # 计算Jackpot (如果下注了Jackpot)
-        bonus_win = 0
-        if self.game.jackpot_bet:
-            bonus_win = self.calculate_bonus()
-            if bonus_win > 0:
-                self.balance += bonus_win
-                self.update_balance()
-                player_eval = evaluate_five_card_hand(self.game.player_hand)
-                player_hand_type = HAND_RANK_NAMES.get(player_eval[0], "高牌")
-                messagebox.showinfo("恭喜您获得累进大奖！", 
-                                f"牌型为{player_hand_type}! 赢得奖金${bonus_win:.2f}")
-
-        # 更新Jackpot奖池
-        self.update_jackpot()
-
-        # 设置底注背景色为白色（输）
-        self.ante_display.config(bg='white')
-
-        # 计算总赢得金额（仅Jackpot）
-        total_win = bonus_win
-        self.last_win = total_win
-        self.last_win_label.config(text=f"上局获胜: ${total_win:.2f}")
-
-        # 移除原有按钮并显示可用的“再来一局”按钮
-        for widget in self.action_frame.winfo_children():
-            widget.destroy()
-
-        self.restart_btn = tk.Button(
-            self.action_frame, text="再来一局", 
-            command=self.reset_game, 
-            font=('Arial', 14), bg='#2196F3', fg='white', width=15,
-            state=tk.NORMAL  # 直接启用
-        )
-        self.restart_btn.pack(pady=5)
-        self.restart_btn.bind("<Button-3>", self.show_card_sequence)
-
-        # 设置30秒自动重置计时器
-        self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
-
-    def settle_showdown(self):
-        """正常摊牌后的结算（原 show_showdown 中的结算部分）"""
-        # 结算（内部已调用 calculate_bonus 并扣除奖池）
-        winnings, details = self.calculate_winnings()
-        
-        # 添加5+1赢钱到总赢钱中
-        winnings += self.five_plus_one_win
-        self.last_win = winnings
-        
-        # 更新余额（包括5+1赢钱）
-        self.balance += winnings
-        self.update_balance()
-        
-        # 更新下注显示金额
-        self.ante_var.set(str(int(details["ante"])))
-        self.play_var.set(str(int(details["play"])))
-        
-        # 设置背景色：赢为金色，平局为浅蓝色，输为白色
-        for bet_type in ["ante", "play"]:
-            widget = self.bet_widgets.get(bet_type)
-            if not widget:
-                continue
-
-            # 对应的下注金额
-            if bet_type == "ante":
-                bet_amount = self.game.ante
-            else:  # "play"
-                bet_amount = self.game.play_bet
-                
-            win_amount = details[bet_type]
-
-            # 赢（任何注项赢都染金色）
-            if win_amount > bet_amount:  # 赢
-                widget.config(bg='gold')
-            # 平局并且确实有下注（注金>0）
-            elif win_amount == bet_amount and bet_amount > 0:
-                widget.config(bg='light blue')
-            # 其他情况（输了，或根本没下注）保持白色
-            else:
-                widget.config(bg='white')
-        
-        # 构建主消息
-        dealer_qualifies = self.game.dealer_qualifies()
-        comparison = compare_hands(self.game.player_hand, self.game.dealer_hand)
-        
-        if not dealer_qualifies:
-            status_label = "庄家不合格，底注无条件获胜，加注退还"
-        else:
-            if comparison > 0:  # 玩家赢
-                status_label = "本局您赢了"
-            elif comparison < 0:  # 玩家输
-                status_label = "本局您输了"
-            else:  # 平局
-                status_label = "本局Push"
-        
-        # 显示累进大奖中奖消息（奖金已在 calculate_winnings 中加到余额）
-        if self.game.jackpot_bet and details["bonus"] > 0:
-            player_eval = evaluate_five_card_hand(self.game.player_hand)
-            player_hand_type = HAND_RANK_NAMES.get(player_eval[0], "高牌")
-            messagebox.showinfo("恭喜您获得累进大奖！", 
-                            f"牌型为{player_hand_type}! 赢得奖金${details['bonus']:.2f}")
-        
-        self.status_label.config(text=status_label)
-        
-        # 更新上局赢得金额（包含5+1赢钱）
-        self.last_win_label.config(text=f"上局获胜: ${winnings:.2f}")
-        
-        # 添加重新开始按钮
-        for widget in self.action_frame.winfo_children():
-            widget.destroy()
-            
-        self.restart_btn = tk.Button(
-            self.action_frame, text="再来一局", 
-            command=self.reset_game, 
-            font=('Arial', 14), bg='#2196F3', fg='white', width=15
-        )
-        self.restart_btn.pack(pady=5)
-        self.restart_btn.bind("<Button-3>", self.show_card_sequence)
-        
-        # 设置30秒后自动重置
-        self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
-    
-    def sort_player_hand(self):
-        """根据牌型对玩家手牌进行排序并更新显示"""
-        # 排序玩家手牌
-        sorted_hand = sort_hand_for_display(self.game.player_hand, evaluate_five_card_hand(self.game.player_hand))
-        self.game.player_hand = sorted_hand
-        
-        # 清除玩家区域的卡片
-        for widget in self.player_cards_frame.winfo_children():
-            widget.destroy()
-        
-        # 重新放置玩家卡片（按新顺序），确保完整显示
-        for i, card in enumerate(sorted_hand):
-            # 确保卡片标签有足够的空间显示
-            card_label = tk.Label(
-                self.player_cards_frame, 
-                image=self.back_image,  # 先显示背面
-                bg='#2a4a3c',
-                width=110,  # 增加宽度确保完整显示
-                height=180  # 增加高度确保完整显示
-            )
-            # 使用place布局并设置合适的偏移量
-            card_label.place(x=i*110, y=0, width=110, height=180)
-            card_label.card = card
-            card_label.is_face_up = False
-            # 添加到活动卡片列表
-            self.active_card_labels.append(card_label)
-        
-        # 更新玩家牌型标签
-        self.update_hand_labels()
-        
-        # 将所有玩家牌翻到正面
-        self.flip_all_player_cards_to_front()
-    
-    def flip_all_player_cards_to_front(self):
-        """将所有玩家牌翻转到正面"""
-        # 收集所有玩家牌
-        self.flipping_cards = []
-        for card_label in self.player_cards_frame.winfo_children():
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flipping_cards.append(card_label)
-        
-        # 如果没有需要翻转的卡片，直接返回
-        if not self.flipping_cards:
-            # 动画完成，结算5+1 Side Bet
-            self.after(500, self.settle_five_plus_one_bet)
-            return
-            
-        # 开始翻转动画
-        self.flip_step = 0
-        self.animate_flip_to_front_step()
-    
-    def animate_flip_to_front_step(self):
-        """执行翻转动画的每一步（翻到正面）"""
-        if self._resetting:  # 如果正在重置，停止动画
-            return
-    
-        if self.flip_step > 10:  # 假设10步完成
-            # 翻转完成，将所有正在翻转的卡片设为正面
-            for card_label in self.flipping_cards:
-                if hasattr(card_label, "card"):
-                    card = card_label.card
-                    front_img = self.card_images.get((card.suit, card.rank), self.back_image)
-                    card_label.config(image=front_img)
-                    card_label.is_face_up = True
-                    # 重置宽度为正常值 - 关键修复
-                    card_label.place(width=120, height=180)
-                    
-            # 动画完成，结算5+1 Side Bet
-            self.after(500, self.settle_five_plus_one_bet)
-            return
-
-        # 模拟翻转效果
-        width = 120 - (self.flip_step * 12) if self.flip_step < 5 else (self.flip_step - 5) * 12
-        if width <= 0:
-            width = 1
-
-        for card_label in self.flipping_cards:
-            if card_label.winfo_exists():  # 确保组件还存在
-                card_label.place(width=width)
-
-        self.flip_step += 1
-        self.after(50, self.animate_flip_to_front_step)
-    
-    def settle_five_plus_one_bet(self):
-        """结算5+1 Side Bet"""
-        self.five_plus_one_win = 0  # 重置5+1赢钱
-        
-        if self.game.five_plus_one_bet > 0:
-            # 获取庄家第一张明牌和玩家五张牌
-            dealer_first_card = self.game.dealer_hand[0] if self.game.dealer_hand else None
-            player_cards = self.game.player_hand
-            
-            if dealer_first_card and player_cards and len(player_cards) == 5:
-                # 组合6张牌
-                six_cards = player_cards + [dealer_first_card]
-                
-                # 找出最佳5张牌组合
-                best_hand_rank = 0
-                best_payout = 0
-                
-                # 尝试所有可能的5张牌组合
-                from itertools import combinations
-                for combo in combinations(six_cards, 5):
-                    rank, _ = evaluate_five_card_hand(list(combo))
-                    if rank in FIVE_PLUS_ONE_PAYOUT and FIVE_PLUS_ONE_PAYOUT[rank] > best_payout:
-                        best_hand_rank = rank
-                        best_payout = FIVE_PLUS_ONE_PAYOUT[rank]
-                
-                # 计算赢得的金额
-                if best_payout > 0:
-                    self.five_plus_one_win = self.game.five_plus_one_bet * best_payout
-                    
-                    # 更新5+1显示为金色并显示赢得的金额
-                    self.five_plus_one_display.config(bg='gold')
-                    self.five_plus_one_var.set(f"{int(self.five_plus_one_win)}")
-                    
-                    # 显示获胜消息
-                    hand_name = HAND_RANK_NAMES.get(best_hand_rank, "")
+        if self.game.player_hand and len(self.game.player_hand)==5:
+            rank, values = evaluate_five_card_hand(self.game.player_hand)
+            name = HAND_RANK_NAMES.get(rank, "")
+            if rank == 0:  # 高牌
+                if len(values) >= 2 and values[0] == 14 and values[1] == 13:
+                    name = "高牌ACE+KING"
                 else:
-                    # 没有赢，显示"未赢"
-                    self.five_plus_one_var.set("未赢")
-    
-    def flip_all_player_cards_to_back(self):
-        """将所有玩家牌翻转到背面"""
-        # 收集所有玩家牌
-        self.flipping_cards = []
-        for card_label in self.player_cards_frame.winfo_children():
-            if hasattr(card_label, "card") and card_label.is_face_up:
-                self.flipping_cards.append(card_label)
-        
-        # 如果没有需要翻转的卡片，直接返回
-        if not self.flipping_cards:
-            self.after(100, self.sort_player_hand)
-            return
-            
-        # 开始翻转动画
-        self.flip_step = 0
-        self.animate_flip_to_back_step()
-    
-    def animate_flip_to_back_step(self):
-        """执行翻转动画的每一步（翻到背面）"""
-        if self.flip_step > 10:  # 假设10步完成
-            # 翻转完成，将所有正在翻转的卡片设为背面
-            for card_label in self.flipping_cards:
-                if hasattr(card_label, "card") and card_label.winfo_exists():
-                    card_label.config(image=self.back_image)
-                    card_label.is_face_up = False
-                    # 重置宽度为正常值
-                    card_label.place(width=120, height=180)
-            
-            # 根据当前是否在处理庄家，调用不同的排序方法
-            if getattr(self, '_flipping_dealer', False):
-                # 清除标记，避免影响后续操作
-                self._flipping_dealer = False
-                # 庄家翻背后排序
-                self.after(100, self.sort_dealer_hand)
-            else:
-                # 玩家翻背后排序
-                self.after(100, self.sort_player_hand)
-            return
+                    name = "高牌"
+            self.player_label.config(text=f"玩家 - {name}" if name else "玩家")
+        if (self.game.stage=="showdown" or self.game.folded) and self.game.dealer_hand and len(self.game.dealer_hand)==5:
+            rank, values = evaluate_five_card_hand(self.game.dealer_hand)
+            name = HAND_RANK_NAMES.get(rank, "")
+            if rank == 0:
+                if len(values) >= 2 and values[0] == 14 and values[1] == 13:
+                    name = "高牌ACE+KING"
+                else:
+                    name = "高牌"
+            self.dealer_label.config(text=f"庄家 - {name}" if name else "庄家")
 
-        # 模拟翻转效果
-        width = 120 - (self.flip_step * 12) if self.flip_step < 5 else (self.flip_step - 5) * 12
-        if width <= 0:
-            width = 1
-
-        for card_label in self.flipping_cards:
-            if card_label.winfo_exists():
-                card_label.place(width=width)
-
-        self.flip_step += 1
-        self.after(50, self.animate_flip_to_back_step)
-    
-    def flip_all_dealer_cards_to_back(self):
-        """将所有庄家牌翻转到背面"""
-        # 标记当前为庄家翻转
-        self._flipping_dealer = True
-        self.flipping_cards = []
-        for lbl in self.dealer_cards_frame.winfo_children():
-            if hasattr(lbl, 'card') and lbl.is_face_up:
-                self.flipping_cards.append(lbl)
-
-        if not self.flipping_cards:
-            # 如果没有牌需要翻背，直接调用庄家排序
-            self.after(100, self.sort_dealer_hand)
-            return
-
-        self.flip_step = 0
-        self.animate_flip_to_back_step()
-    
-    def flip_all_dealer_cards_to_front(self, callback=None):
-        """将所有庄家牌翻转到正面，完成后调用回调"""
-        # 收集所有未翻面的庄家牌
-        self.flipping_cards = []
-        for card_label in self.dealer_cards_frame.winfo_children():
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flipping_cards.append(card_label)
-
-        # 如果没有需要翻转的卡片
-        if not self.flipping_cards:
-            # 全部翻开后再调用回调
-            if callback:
-                callback()
-            return
-
-        # 开始翻转动画（动画完成后会调用 animate_flip_to_front_step）
-        self.flip_step = 0
-        self.callback_after_flip = callback
-        self.animate_flip_to_front_step_for_dealer()
-    
-    def animate_flip_to_front_step_for_dealer(self):
-        """庄家牌翻转动画的每一步（翻到正面）"""
-        if self.flip_step > 10:  # 假设10步完成
-            # 翻转完成，将所有正在翻转的卡片设为正面
-            for card_label in self.flipping_cards:
-                if hasattr(card_label, "card") and card_label.winfo_exists():
-                    card = card_label.card
-                    front_img = self.card_images.get((card.suit, card.rank), self.back_image)
-                    card_label.config(image=front_img)
-                    card_label.is_face_up = True
-                    # 重置宽度为正常值
-                    card_label.place(width=120, height=180)
-            
-            # 动画完成，调用回调函数
-            if hasattr(self, 'callback_after_flip') and self.callback_after_flip:
-                self.callback_after_flip()
-            return
-
-        # 模拟翻转效果
-        width = 120 - (self.flip_step * 12) if self.flip_step < 5 else (self.flip_step - 5) * 12
-        if width <= 0:
-            width = 1
-
-        for card_label in self.flipping_cards:
-            if card_label.winfo_exists():  # 确保组件还存在
-                card_label.place(width=width)
-
-        self.flip_step += 1
-        self.after(50, self.animate_flip_to_front_step_for_dealer)
-    
-    def sort_dealer_hand(self):
-        """根据牌型对庄家手牌进行排序并更新显示"""
-        # 排序庄家手牌
-        sorted_hand = sort_hand_for_display(self.game.dealer_hand, evaluate_five_card_hand(self.game.dealer_hand))
-        self.game.dealer_hand = sorted_hand
-        
-        # 清除庄家区域的卡片
-        for widget in self.dealer_cards_frame.winfo_children():
-            widget.destroy()
-        
-        # 重新放置庄家卡片（按新顺序），确保完整显示
-        for i, card in enumerate(sorted_hand):
-            # 确保卡片标签有足够的空间显示
-            card_label = tk.Label(
-                self.dealer_cards_frame, 
-                image=self.back_image,  # 先显示背面
-                bg='#2a4a3c',
-                width=110,  # 增加宽度确保完整显示
-                height=180  # 增加高度确保完整显示
-            )
-            # 使用place布局并设置合适的偏移量
-            card_label.place(x=i*110, y=0, width=110, height=180)
-            card_label.card = card
-            card_label.is_face_up = False
-            # 添加到活动卡片列表
-            self.active_card_labels.append(card_label)
-        
-        # 更新庄家牌型标签
-        self.update_hand_labels()
-        
-        # 将所有庄家牌翻到正面（二次开牌）
-        self.flip_all_dealer_cards_to_front(self.after_dealer_flip)
-    
-    def after_dealer_flip(self):
-        """庄家牌翻开后的回调函数"""
-        # 检查庄家是否高牌且同时有A和K
-        if (self.game.dealer_hand and len(self.game.dealer_hand) == 5 and
-            not self.ak_animation_active):  # 确保没有正在进行的动画
-            
-            dealer_rank, _ = evaluate_five_card_hand(self.game.dealer_hand)
-            if dealer_rank == 0:  # 高牌
-                has_ace = any(card.rank == 'A' for card in self.game.dealer_hand)
-                has_king = any(card.rank == 'K' for card in self.game.dealer_hand)
-                
-                if has_ace and has_king:
-                    # 等待1秒后移动AK牌
-                    self.after(1000, self.move_ak_cards)
-                    return
-        
-        # 如果不需要移动AK牌，直接显示重新开始按钮
-        self.show_restart_button()
-        
+    # ---------- 开始游戏 ----------
     def start_game(self):
         try:
             self.ante = int(self.ante_var.get())
-            self.jackpot_bet = self.jackpot_bet_var.get()  # 0 或 1
+            self.jackpot_bet = self.jackpot_bet_var.get()
             self.five_plus_one_bet = int(self.five_plus_one_var.get())
             self.last_jackpot_state = self.jackpot_bet_var.get()
 
-            # 累进大奖下注成本统一为 $1
-            jackpot_cost = 1 if self.jackpot_bet else 0
+            # 获取预下注金额（可能是0或ante*2）
+            play_bet = int(self.play_var.get()) if self.play_var.get().lstrip('$').isdigit() else 0
 
-            # 根据模式获取下注限制
+            jackpot_cost = 2.5 if self.jackpot_bet else 0
             if self.high_bet_mode:
-                min_ante = 100
-                max_ante = 50000
-                max_five = 12500
+                min_ante, max_ante, max_five = 100, 50000, 12500
             else:
-                min_ante = 10
-                max_ante = 10000
-                max_five = 2500
+                min_ante, max_ante, max_five = 10, 10000, 2500
 
             if self.ante < min_ante:
                 messagebox.showerror("错误", f"底注至少需要{min_ante}块")
                 return
-
             if self.ante > max_ante:
                 self.ante = max_ante
                 self.ante_var.set(str(max_ante))
                 messagebox.showwarning("下注限制", f"底注上限为{max_ante}，已自动调整")
-
             if self.five_plus_one_bet > max_five:
                 self.five_plus_one_bet = max_five
                 self.five_plus_one_var.set(str(max_five))
-                # 不再弹出警告，静默调整
 
-            # 获取Play下注
-            play_bet = 0
-            try:
-                play_bet = int(self.play_var.get())
-            except:
-                play_bet = 0
-
-            # 计算基础下注（不包含Play）
+            # 总下注 = 底注 + 累进大奖(1) + 5+1 + 预加注(如果有)
             base_total = self.ante + jackpot_cost + self.five_plus_one_bet
-
-            # 检查余额
-            if play_bet > 0:
-                # 自动下注 / 盲注模式：需要立即扣除Play
-                total_bet = base_total + play_bet
+            total_bet = base_total + play_bet
+            if play_bet != 0:
                 if self.balance < total_bet:
                     messagebox.showerror("错误", "余额不足以支付所有下注！")
                     return
-                self.balance -= total_bet
-            else:
-                # 手动下注模式：只需检查余额足够支付基础下注 + 潜在Play（Ante*2）
-                required_for_play = self.ante * 2
-                if self.balance < base_total + required_for_play:
+            else: 
+                if self.balance < total_bet + self.ante*2:
                     messagebox.showerror("错误", "余额不足以支付所有下注！")
                     return
-                self.balance -= base_total
+            self.balance -= total_bet
+            self.game_in_progress = True
 
-            # 保存本次下注到 last_bet（在成功扣除余额后）
+            # 记录下注信息（用于重复）
             self.last_bet = {
                 'ante': self.ante,
                 'five_plus_one': self.five_plus_one_bet,
-                'jackpot': self.jackpot_bet
+                'jackpot': self.jackpot_bet,
+                'play': play_bet
             }
-            # 更新重复上局下注按钮状态（启用）
-            if hasattr(self, 'repeat_bet_btn'):
+            if self.repeat_bet_btn:
                 self.repeat_bet_btn.config(state=tk.NORMAL)
-
             self.update_balance()
 
-            # 更新本局下注显示（包含所有已扣除的下注）
-            total_bet_display = base_total + play_bet
-            self.current_bet_label.config(text=f"本局下注: ${total_bet_display:.2f}")
+            self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
             self.last_win_label.config(text="上局获胜: $0.00")
 
-            # 重新开局：重置游戏状态与新牌堆
             self.game.reset_game()
             self.game.deal_initial()
             self.game.ante = self.ante
             self.game.jackpot_bet = self.jackpot_bet
             self.game.five_plus_one_bet = self.five_plus_one_bet
-
-            # 关键修复：reset_game() 会把 play_bet 清成 0，
-            # 所以必须在 reset_game() 之后重新写回去
             self.game.play_bet = play_bet
 
-            # 清除所有卡片
             for widget in self.dealer_cards_frame.winfo_children():
                 widget.destroy()
             for widget in self.player_cards_frame.winfo_children():
                 widget.destroy()
 
-            # 重置动画状态
             self.animation_queue = []
             self.animation_in_progress = False
             self.active_card_labels = []
-            self.moved_cards = []
-            self.ak_moved = False
-            self.ak_animation_active = False
-            self.fold_mode = False
-
-            # 初始化卡片位置
             self.card_positions = {}
             for i in range(5):
                 card_id = f"player_{i}"
-                self.card_positions[card_id] = {"current": (50, 50), "target": (i * 110, 0)}
+                self.card_positions[card_id] = {"current": (50,50), "target": (i*110,0)}
                 self.animation_queue.append(card_id)
             for i in range(5):
                 card_id = f"dealer_{i}"
-                self.card_positions[card_id] = {"current": (50, 50), "target": (i * 110, 0)}
+                self.card_positions[card_id] = {"current": (50,50), "target": (i*110,0)}
                 self.animation_queue.append(card_id)
 
-            # 创建操作按钮区域
-            for widget in self.action_frame.winfo_children():
+            for widget in self.btn_frame.winfo_children():
                 widget.destroy()
 
             if play_bet > 0:
-                # 盲注模式：不显示决策按钮，后续由排序动画自动进入摊牌
-                self.stage_label.config(text="派牌")
-                self.status_label.config(text="本次选择盲注 等待结算")
+                # 预下注模式，直接摊牌
+                self.stage_label.config(text="盲注模式")
+                self.status_label.config(text="预下注已设，自动进入摊牌")
             else:
-                # 手动下注模式：显示决策按钮
                 self.stage_label.config(text="决策")
                 self.status_label.config(text="做出决策: 弃牌或下注2倍")
-                action_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-                action_button_frame.pack(pady=5)
+                action_frame = tk.Frame(self.btn_frame, bg=PANEL_BG)
+                action_frame.pack()
                 self.fold_button = tk.Button(
-                    action_button_frame, text="弃牌",
-                    command=self.fold_action,
-                    state=tk.DISABLED,
-                    font=('Arial', 14), bg='#F44336', fg='white', width=10
+                    action_frame, text="弃牌", command=self.fold_action,
+                    state=tk.DISABLED, font=('Arial',12,'bold'), bg='#F44336', fg='white', width=10
                 )
-                self.fold_button.pack(side=tk.LEFT, padx=(0, 10))
+                self.fold_button.pack(side=tk.LEFT, padx=(0,10))
                 self.play_button = tk.Button(
-                    action_button_frame, text="下注2倍",
-                    command=self.play_action,
-                    state=tk.DISABLED,
-                    font=('Arial', 14), bg='#4CAF50', fg='white', width=10
+                    action_frame, text="下注2倍", command=self.play_action,
+                    state=tk.DISABLED, font=('Arial',12,'bold'), bg='#4CAF50', fg='white', width=10
                 )
                 self.play_button.pack(side=tk.LEFT)
 
-            # 禁用下注区域
+            # 禁用下注控件
             self.ante_display.unbind("<Button-1>")
-            self.play_display.unbind("<Button-1>")
             self.five_plus_one_display.unbind("<Button-1>")
+            self.play_display.unbind("<Button-1>")
             for chip in self.chip_buttons:
                 chip.unbind("<Button-1>")
             self.jackpot_check.config(state=tk.DISABLED)
 
-            # 开始发牌动画
             self.animate_deal()
 
         except ValueError:
             messagebox.showerror("错误", "请输入有效的下注金额")
-        
+
+    # ---------- 动画发牌 ----------
     def animate_deal(self):
         if not self.animation_queue:
             self.animation_in_progress = False
-            # 发牌动画完成后翻开玩家牌
             self.after(500, self.reveal_player_cards)
             return
-            
         self.animation_in_progress = True
         card_id = self.animation_queue.pop(0)
-        
-        # 创建卡片标签
         if card_id.startswith("player"):
             frame = self.player_cards_frame
             idx = int(card_id.split("_")[1])
             card = self.game.player_hand[idx] if idx < len(self.game.player_hand) else None
-        elif card_id.startswith("dealer"):
+        else:
             frame = self.dealer_cards_frame
             idx = int(card_id.split("_")[1])
             card = self.game.dealer_hand[idx] if idx < len(self.game.dealer_hand) else None
-        
-        # 创建卡片标签 - 确保设置正确的宽度和高度 - 关键修复
+
         card_label = tk.Label(frame, image=self.back_image, bg='#2a4a3c')
-        card_label.place(
-            x=self.card_positions[card_id]["current"][0],
-            y=self.card_positions[card_id]["current"][1] + 20,
-            width=120,
-            height=180
-        )
-        
-        # 存储卡片信息
+        card_label.place(x=self.card_positions[card_id]["current"][0],
+                         y=self.card_positions[card_id]["current"][1]+20,
+                         width=110, height=140)
         card_label.card_id = card_id
         card_label.card = card
         card_label.is_face_up = False
         card_label.is_moving = True
         card_label.target_pos = self.card_positions[card_id]["target"]
-        
-        # 添加到活动卡片列表
         self.active_card_labels.append(card_label)
-        
-        # 开始移动动画
         self.animate_card_move(card_label)
 
     def animate_card_move(self, card_label):
-        # 检查卡片是否仍然存在
         if not hasattr(card_label, "target_pos") or card_label not in self.active_card_labels:
             return
-            
         try:
-            current_x, current_y = card_label.winfo_x(), card_label.winfo_y()
-            target_x, target_y = card_label.target_pos
-            
-            # 计算移动方向向量
-            dx = target_x - current_x
-            dy = target_y - current_y
-            distance = math.sqrt(dx**2 + dy**2)
-            
-            # 如果已经到达目标位置
-            if distance < 5:
-                # 确保设置正确的宽度和高度
-                card_label.place(x=target_x, y=target_y, width=120, height=180)
+            cx, cy = card_label.winfo_x(), card_label.winfo_y()
+            tx, ty = card_label.target_pos
+            dx, dy = tx-cx, ty-cy
+            dist = math.hypot(dx,dy)
+            if dist < 5:
+                card_label.place(x=tx, y=ty, width=110, height=140)
                 card_label.is_moving = False
-                
-                # 如果是回收动画且到达左上角，销毁卡片
-                if card_label.target_pos == (50, 50):
+                if card_label.target_pos == (50,50):
                     if card_label in self.active_card_labels:
                         self.active_card_labels.remove(card_label)
                     card_label.destroy()
-                    
                 self.after(20, self.animate_deal)
                 return
-            
-            # 计算移动步长
-            step_x = dx * 0.2
-            step_y = dy * 0.2
-            
-            # 更新位置 - 确保保持宽度和高度
-            new_x = current_x + step_x
-            new_y = current_y + step_y
-            card_label.place(x=new_x, y=new_y, width=120, height=180)
-            
-            # 继续动画
+            step_x, step_y = dx*0.2, dy*0.2
+            card_label.place(x=cx+step_x, y=cy+step_y, width=110, height=140)
             self.after(20, lambda: self.animate_card_move(card_label))
-            
         except tk.TclError:
-            # 卡片已被销毁，停止动画
             if card_label in self.active_card_labels:
                 self.active_card_labels.remove(card_label)
-            return
-    
+
+    # ---------- 翻开玩家牌（带翻转动画） ----------
     def reveal_player_cards(self):
-        """翻开玩家牌（带动画），之后1秒后结算5+1，然后进行排序动画"""
-        if self.animation_in_progress:
-            return
-
-        # 翻开庄家第一张牌
+        # 翻开庄家第一张
         self.reveal_dealer_first_card()
-
-        # 翻开所有玩家牌
-        for i, card_label in enumerate(self.player_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                card_label.place(width=110, height=180)
-                self.flip_card_animation(card_label)
+        for i, lbl in enumerate(self.player_cards_frame.winfo_children()):
+            if hasattr(lbl, "card") and not lbl.is_face_up:
+                self.flip_card_animation(lbl)
                 self.game.cards_revealed["player"][i] = True
-
-        # 更新玩家牌型标签
         self.update_hand_labels()
+        self.after(1000, self.after_player_reveal)
 
-        # 等待所有玩家牌翻牌动画完成（约1秒），然后结算5+1并执行排序
-        self.after(1000, self.after_player_cards_revealed)
-
-
-    def after_player_cards_revealed(self):
-        """玩家牌全部翻开后的后续处理：结算5+1，然后执行排序动画"""
-        if self._resetting:
-            return
-
-        # 结算5+1 Side Bet
+    def after_player_reveal(self):
+        # 结算5+1
         self.settle_five_plus_one_bet()
+        # 排序玩家手牌（无翻转，移动动画）
+        self.sort_player_hand_no_flip()
 
-        # 执行玩家手牌排序动画（延迟1.5秒，注意不要加括号）
-        self.after(1500, self.sort_player_hand_after_reveal)
-
-    def sort_player_hand_after_reveal(self):
-        """玩家手牌翻开后立即进行排序动画（无翻转，仅移动）"""
-        if self._resetting:
+    def sort_player_hand_no_flip(self):
+        if not self.game.player_hand:
             return
-
-        # 禁用决策按钮（如果有）
-        if self.fold_button and self.fold_button.winfo_exists():
-            self.fold_button.config(state=tk.DISABLED)
-        if self.play_button and self.play_button.winfo_exists():
-            self.play_button.config(state=tk.DISABLED)
-
-        # 获取当前玩家手牌评估结果
-        player_eval = evaluate_five_card_hand(self.game.player_hand)
-        sorted_hand = sort_hand_for_display(self.game.player_hand, player_eval)
-
-        # 获取玩家区域的卡片标签
-        player_labels = list(self.player_cards_frame.winfo_children())
-
-        # 记录起始位置
-        start_positions = {}
-        for label in player_labels:
-            if label.winfo_exists():
-                info = label.place_info()
-                start_positions[label] = float(info['x'])
-
-        # 目标位置：排序后索引 * 110
-        target_positions = {}
+        eval_ = evaluate_five_card_hand(self.game.player_hand)
+        sorted_hand = sort_hand_for_display(self.game.player_hand, eval_)
+        labels = list(self.player_cards_frame.winfo_children())
+        start_pos = {l: float(l.place_info()['x']) for l in labels if l.winfo_exists()}
+        target = {}
         for idx, card in enumerate(sorted_hand):
-            for label in player_labels:
-                if hasattr(label, 'card') and label.card == card:
-                    target_positions[label] = idx * 110
+            for l in labels:
+                if hasattr(l, 'card') and l.card == card:
+                    target[l] = idx*110
                     break
-
-        # 动画参数：1秒，15步
-        duration = 1000
+        # 动画移动
         steps = 15
-        interval = duration // steps
-
-        anim_data = []
-        for label in start_positions:
-            start_x = start_positions[label]
-            target_x = target_positions[label]
-            dx = (target_x - start_x) / steps
-            anim_data.append((label, start_x, dx))
-
-        def animate_step(step):
-            if step > steps or self._resetting:
-                # 动画结束，确保所有卡到达目标位置
-                for label, _, _ in anim_data:
-                    if label.winfo_exists():
-                        target_x = target_positions[label]
-                        label.place(x=target_x)
-
-                # 更新游戏对象中的手牌顺序
+        interval = 50
+        data = []
+        for l in start_pos:
+            dx = (target[l] - start_pos[l]) / steps
+            data.append((l, start_pos[l], dx))
+        def step(step_count):
+            if step_count > steps:
+                for l,_,_ in data:
+                    if l.winfo_exists():
+                        l.place(x=target[l])
                 self.game.player_hand = sorted_hand
-
-                # 手动下注模式：恢复决策按钮
-                if (
-                    self.game.play_bet == 0
-                    and self.game.stage == "pre_flop"
-                    and self.fold_button
-                    and self.play_button
-                ):
-                    try:
-                        if self.fold_button.winfo_exists():
-                            self.fold_button.config(state=tk.NORMAL)
-
-                        if self.play_button.winfo_exists():
-                            self.play_button.config(state=tk.NORMAL)
-
-                    except tk.TclError:
-                        pass
-
-                # 盲注模式：排序结束后自动进入摊牌
-                elif self.game.play_bet > 0:
-                    self.after(1200, self.show_showdown)
-
+                # 如果预下注>0，直接进入摊牌
+                if self.game.play_bet > 0:
+                    self.after(1000, self.show_showdown)
+                else:
+                    # 启用决策按钮
+                    if hasattr(self, 'fold_button') and self.fold_button:
+                        try: self.fold_button.config(state=tk.NORMAL)
+                        except: pass
+                    if hasattr(self, 'play_button') and self.play_button:
+                        try: self.play_button.config(state=tk.NORMAL)
+                        except: pass
                 return
+            for l,start_x,dx in data:
+                if l.winfo_exists():
+                    l.place(x=start_x + dx*step_count)
+            self.after(interval, lambda: step(step_count+1))
+        step(1)
 
-            for label, start_x, dx in anim_data:
-                if label.winfo_exists():
-                    new_x = start_x + dx * step
-                    label.place(x=new_x)
-
-            self.after(interval, lambda: animate_step(step + 1))
-
-        animate_step(1)
-        
-    def start_player_sort_animation(self):
-        """开始玩家手牌排序动画"""
-        # 禁用决策按钮
-        if self.fold_button and self.fold_button.winfo_exists():
-            self.fold_button.config(state=tk.DISABLED)
-        if self.play_button and self.play_button.winfo_exists():
-            self.play_button.config(state=tk.DISABLED)
-        
-        # 先将所有玩家牌翻到背面
-        self.flip_all_player_cards_to_back()
-    
     def reveal_dealer_first_card(self):
-        """只翻开庄家第一张牌"""
-        # 确保没有动画在进行
-        if self.animation_in_progress:
-            return
-        
-        dealer_cards = self.dealer_cards_frame.winfo_children()
-        if dealer_cards:
-            first_card = dealer_cards[0]
-            if hasattr(first_card, "card") and not first_card.is_face_up:
-                # 设置动画标志
+        dealer_children = self.dealer_cards_frame.winfo_children()
+        if dealer_children:
+            first = dealer_children[0]
+            if hasattr(first, "card") and not first.is_face_up:
                 self.animation_in_progress = True
-                self.flip_card_animation(first_card)
-    
-    def reveal_dealer_cards_for_autobet(self):
-        """自动下注模式：直接进入摊牌阶段，翻开所有庄家牌，2秒后结算"""
-        # 切换到摊牌阶段
-        self.game.stage = "showdown"
-        self.stage_label.config(text="摊牌")
-        self.status_label.config(text="摊牌中…")
-        
-        # 翻开庄家所有牌（带动画）
-        self.after(2000, self.reveal_dealer_cards_with_animation)
-    
-    def reveal_dealer_cards_with_animation(self):
-        """翻开庄家牌并带动画"""
-        # 禁用再来一局按钮
-        self.disable_action_buttons()
-        
-        # 翻开庄家所有牌（带动画）
-        self.reveal_dealer_cards()
-        
-        # 更新标签显示玩家和庄家牌型
-        self.update_hand_labels()
-        
-        # 等待2秒再进行结算（这里改为等待1秒后排序动画）
-        # self.after(2000, self.show_showdown)
+                self.flip_card_animation(first)
 
-    def reveal_dealer_cards(self):
-        """翻开庄家所有牌（带动画）"""
-        for i, card_label in enumerate(self.dealer_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                # 在摊牌阶段翻开所有牌
-                if self.game.stage == "showdown" or self.game.folded:
-                    self.flip_card_animation(card_label)
-                # 标记庄家牌已翻开
-                self.game.cards_revealed["dealer"][i] = True
-        
-        # 更新庄家牌型
-        self.update_hand_labels()
-        
-        # 等待2秒后开始庄家手牌排序动画（修改为1秒后启动双方排序动画）
-        self.after(1000, self.start_both_sort_animation)
-    
-    def start_dealer_sort_animation(self):
-        """开始庄家手牌排序动画"""
-        # 先将所有庄家牌翻到背面
-        self.flip_all_dealer_cards_to_back()
-        
+    # ---------- 翻转动画 ----------
     def flip_card_animation(self, card_label):
-        """卡片翻转动画"""
-        # 获取卡片正面图像
         card = card_label.card
         front_img = self.card_images.get((card.suit, card.rank), self.back_image)
-        
-        # 创建动画序列
         self.animate_flip(card_label, front_img, 0)
-    
+
     def animate_flip(self, card_label, front_img, step):
-        """执行翻转动画"""
-        steps = 10  # 动画总步数
-        
+        steps = 10
         if step > steps:
-            # 动画结束 - 关键修复：确保设置正确的宽度和高度
             card_label.config(image=front_img)
             card_label.is_face_up = True
-            self.animation_in_progress = False  # 清除动画标志
-            # 确保设置正确的宽度和高度 - 关键修复
-            card_label.place(width=120, height=180)
+            self.animation_in_progress = False
+            card_label.place(width=110, height=140)
             return
-            
-        if step <= steps / 2:
-            # 第一阶段：从背面翻转到侧面（宽度减小）
-            width = 120 - (step * 12)
-            if width <= 0:
-                width = 1
-            # 使用背面图像
+        if step <= steps//2:
+            width = 110 - step*11
+            if width <=0: width=1
             card_label.config(image=self.back_image)
         else:
-            # 第二阶段：从侧面翻转到正面（宽度增加）
-            width = (step - steps / 2) * 12
-            if width <= 0:
-                width = 1
-            # 使用正面图像
+            width = (step - steps//2)*11
+            if width<=0: width=1
             card_label.config(image=front_img)
-        
-        # 更新卡片显示 - 确保保持高度不变
-        card_label.place(width=width, height=180)
-        
-        # 下一步
-        step += 1
-        self.after(50, lambda: self.animate_flip(card_label, front_img, step))
-        
+        card_label.place(width=width, height=140)
+        self.after(50, lambda: self.animate_flip(card_label, front_img, step+1))
+
+    # ---------- 5+1 结算 ----------
+    def settle_five_plus_one_bet(self):
+        self.five_plus_one_win = 0
+        if self.game.five_plus_one_bet > 0 and self.game.dealer_hand:
+            dealer_first = self.game.dealer_hand[0]
+            six_cards = self.game.player_hand + [dealer_first]
+            best_payout = 0
+            for combo in combinations(six_cards, 5):
+                rank,_ = evaluate_five_card_hand(list(combo))
+                payout = FIVE_PLUS_ONE_PAYOUT.get(rank, 0)
+                if payout > best_payout:
+                    best_payout = payout
+            if best_payout > 0:
+                self.five_plus_one_win = self.game.five_plus_one_bet * best_payout
+                self.five_plus_one_display.config(bg='gold')
+                self.five_plus_one_var.set(str(int(self.five_plus_one_win)))
+            else:
+                self.five_plus_one_var.set("未赢")
+
+    # ---------- 决策动作 ----------
     def play_action(self):
-        """玩家选择下注2倍（手动下注模式）"""
-        # 立即禁用决策按钮
-        if self.fold_button and self.fold_button.winfo_exists():
-            self.fold_button.config(state=tk.DISABLED)
-        if self.play_button and self.play_button.winfo_exists():
-            self.play_button.config(state=tk.DISABLED)
-            
-        # 注意：此方法仅在手动下注模式下被调用（自动下注模式不会进入这里）
-        # 因为自动下注模式在 start_game 中已经扣除了 play_bet，且不创建这些按钮
-        
-        # 手动下注模式：扣除 play_bet
+        if hasattr(self, 'fold_button'): self.fold_button.config(state=tk.DISABLED)
+        if hasattr(self, 'play_button'): self.play_button.config(state=tk.DISABLED)
         play_bet = self.game.ante * 2
         if play_bet > self.balance:
             messagebox.showerror("错误", "余额不足")
@@ -2241,632 +1383,467 @@ class CaribbeanStudGUI(tk.Tk):
         self.balance -= play_bet
         self.update_balance()
         self.game.play_bet = play_bet
-
-        # 更新Play Bet显示
         self.play_var.set(str(play_bet))
-        
-        # 计算累进大奖实际成本（统一为 $1）
-        jackpot_cost = 1 if self.game.jackpot_bet else 0
-        
-        # 更新本局下注显示（包含所有下注）
-        total_bet = self.game.ante + self.game.play_bet + jackpot_cost + self.game.five_plus_one_bet
-        self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
-        
-        # 进入摊牌阶段
+        jackpot_cost = 2.5 if self.game.jackpot_bet else 0
+        total = self.game.ante + self.game.play_bet + jackpot_cost + self.game.five_plus_one_bet
+        self.current_bet_label.config(text=f"本局下注: ${total:.2f}")
         self.game.stage = "showdown"
         self.stage_label.config(text="摊牌")
         self.status_label.config(text="摊牌中...")
         self.after(1000, self.show_showdown)
-    
-    def fold_action(self):
-        self.fold_button.config(state=tk.DISABLED)
-        self.play_button.config(state=tk.DISABLED)
-        self.game.folded = True
-        self.fold_mode = True  # 设置弃牌标志
-        self.status_label.config(text="您已弃牌 ~ 游戏结束")
 
-        # 保存下注金额用于结算
-        ante_bet = int(self.ante_var.get())
-        
-        # 重置显示金额为0
+    def fold_action(self):
+        if hasattr(self, 'fold_button'): self.fold_button.config(state=tk.DISABLED)
+        if hasattr(self, 'play_button'): self.play_button.config(state=tk.DISABLED)
+        self.game.folded = True
+        self.status_label.config(text="您已弃牌 ~ 游戏结束")
         self.ante_var.set("0")
         self.play_var.set("0")
-        
-        # 翻开庄家牌
         self.reveal_dealer_cards()
-        
-        # 注意：结算将在动画结束后进行，不再在这里计算
-        # 更新庄家牌型
-        # self.update_hand_labels()  # reveal_dealer_cards 中已调用
-    
-    def show_showdown(self):
-        """翻开庄家牌并启动排序动画"""
-        if self._resetting:
-            return
 
-        # 关键修复：进入摊牌前明确切换阶段
+    # ---------- 摊牌 ----------
+    def show_showdown(self):
         self.game.stage = "showdown"
         self.stage_label.config(text="摊牌")
         self.status_label.config(text="摊牌中...")
-
-        # 防止按钮状态混乱
-        self.disable_action_buttons()
-
-        # 翻开庄家牌
         self.reveal_dealer_cards()
-    
-    def move_ak_cards(self):
-        """将庄家手牌中的A和K牌向下移动20px"""
-        self.ak_animation_active = True
-        self.moved_cards = []
-        self.ak_moved = True
-        
-        # 遍历庄家的牌
-        for card_label in self.dealer_cards_frame.winfo_children():
-            if hasattr(card_label, 'card'):
-                card = card_label.card
-                if card.rank in ['A', 'K']:
-                    # 记录原始位置
-                    original_y = card_label.winfo_y()
-                    # 添加移动动画到队列
-                    self.moved_cards.append((card_label, original_y))
-        
-        # 如果没有符合条件的牌，直接返回
-        if not self.moved_cards:
-            self.ak_animation_active = False
-            self.show_restart_button()
-            return
-        
-        # 开始移动动画
-        self.animate_move_down_step(0)
-    
-    def animate_move_down_step(self, step):
-        """执行向下移动动画的每一步"""
-        if step > 5:  # 5步完成移动 (0.5秒)
-            # 移动完成，显示重新开始按钮并启用
-            self.ak_animation_active = False
-            self.show_restart_button_and_enable()  # 使用新方法
-            return
-        
-        # 移动所有符合条件的牌
-        for card_label, original_y in self.moved_cards:
-            if card_label.winfo_exists():  # 确保组件还存在
-                current_y = card_label.winfo_y()
-                new_y = current_y + 2  # 每步移动2px
-                card_label.place(y=new_y)
-        
-        # 下一步
-        step += 1
-        self.after(100, lambda: self.animate_move_down_step(step))
-    
-    def show_restart_button(self):
-        """显示重新开始按钮（用于非弃牌情况）"""
-        # 添加重新开始按钮
-        for widget in self.action_frame.winfo_children():
-            widget.destroy()
-            
-        restart_btn = tk.Button(
-            self.action_frame, text="再来一局", 
-            command=self.reset_game, 
-            font=('Arial', 14), bg='#2196F3', fg='white', width=15
-        )
-        restart_btn.pack(pady=5)
-        restart_btn.bind("<Button-3>", self.show_card_sequence)
-        
-        # 设置30秒后自动重置
-        self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
-    
-    def calculate_winnings(self):
-        """计算赢得的金额"""
-        winnings = 0
-        details = {
-            "ante": 0,
-            "play": 0,
-            "bonus": 0,
-            "five_plus_one": 0
-        }
+
+    def reveal_dealer_cards(self):
+        for i, lbl in enumerate(self.dealer_cards_frame.winfo_children()):
+            if hasattr(lbl, "card") and not lbl.is_face_up:
+                self.flip_card_animation(lbl)
+                self.game.cards_revealed["dealer"][i] = True
+        self.update_hand_labels()
+        self.after(1000, self.start_both_sort_animation)
+
+    def start_both_sort_animation(self):
+        # 排序双方手牌
+        player_eval = evaluate_five_card_hand(self.game.player_hand)
+        dealer_eval = evaluate_five_card_hand(self.game.dealer_hand)
+        sorted_p = sort_hand_for_display(self.game.player_hand, player_eval)
+        sorted_d = sort_hand_for_display(self.game.dealer_hand, dealer_eval)
+        self.game.player_hand = sorted_p
+        self.game.dealer_hand = sorted_d
+
+        p_labels = list(self.player_cards_frame.winfo_children())
+        d_labels = list(self.dealer_cards_frame.winfo_children())
+        # 计算目标位置
+        p_target = {}
+        for idx, card in enumerate(sorted_p):
+            for l in p_labels:
+                if hasattr(l, 'card') and l.card == card:
+                    p_target[l] = idx*110
+                    break
+        d_target = {}
+        for idx, card in enumerate(sorted_d):
+            for l in d_labels:
+                if hasattr(l, 'card') and l.card == card:
+                    d_target[l] = idx*110
+                    break
+
+        all_labels = p_labels + d_labels
+        start = {l: float(l.place_info()['x']) for l in all_labels if l.winfo_exists()}
+        target = {**p_target, **d_target}
+        steps = 20
+        interval = 30
+        data = []
+        for l in start:
+            dx = (target[l] - start[l]) / steps
+            data.append((l, start[l], dx))
+        def step(cnt):
+            if cnt > steps:
+                for l,_,_ in data:
+                    if l.winfo_exists():
+                        l.place(x=target[l])
+                self.update_hand_labels()
+                # 结算
+                if self.game.folded:
+                    self.settle_fold()
+                else:
+                    self.settle_showdown()
+                return
+            for l,start_x,dx in data:
+                if l.winfo_exists():
+                    l.place(x=start_x + dx*cnt)
+            self.after(interval, lambda: step(cnt+1))
+        step(1)
+
+    # ---------- 结算 ----------
+    def settle_fold(self):
         bonus_win = 0
-        
-        # 1. 结算Ante和Bet
-        dealer_qualifies = self.game.dealer_qualifies()
-        comparison = compare_hands(self.game.player_hand, self.game.dealer_hand)
-        
-        ante_result = 0
-        play_result = 0
-        
-        if not dealer_qualifies:
-            # 庄家不合格：Ante支付1:1（即赢Ante下注额），Play退还
-            ante_result = self.game.ante * 2   # 赢1倍，加上本金共2倍
-            play_result = self.game.play_bet   # 退还Play下注额（即1倍，因为已经扣除，所以加回1倍即可）
+        if self.game.jackpot_bet:
+            bonus_win = self.calculate_bonus()
+            if bonus_win > 0:
+                self.balance += bonus_win
+                self.update_balance()
+                rank,_ = evaluate_five_card_hand(self.game.player_hand)
+                msg = f"牌型为{HAND_RANK_NAMES.get(rank,'')}! 赢得奖金${bonus_win:.2f}"
+                messagebox.showinfo("恭喜您获得累进大奖！", msg)
+                self.progressive_display.config(bg='gold')
+        self.update_jackpot()
+        self.ante_display.config(bg='white')
+        total_win = bonus_win
+        self.last_win = total_win
+        self.last_win_label.config(text=f"上局获胜: ${total_win:.2f}")
+        self.show_restart_button()
+        self._save_history({"fold":True, "total_winnings": total_win})
+
+    def settle_showdown(self):
+        winnings, details = self.calculate_winnings()
+        winnings += self.five_plus_one_win
+        self.last_win = winnings
+        self.balance += winnings
+        self.update_balance()
+
+        self.ante_var.set(str(int(details["ante"])))
+        self.play_var.set(str(int(details["play"])))
+        # 着色
+        for bet_type in ["ante","play"]:
+            widget = self.bet_widgets.get(bet_type)
+            if not widget: continue
+            if bet_type == "ante":
+                bet_amt = self.game.ante
+                win_amt = details["ante"]
+            else:
+                bet_amt = self.game.play_bet
+                win_amt = details["play"]
+            if win_amt > bet_amt:
+                widget.config(bg='gold')
+            elif win_amt == bet_amt and bet_amt > 0:
+                widget.config(bg='light blue')
+            else:
+                widget.config(bg='white')
+
+        dealer_qual = self.game.dealer_qualifies()
+        comp = compare_hands(self.game.player_hand, self.game.dealer_hand)
+        if not dealer_qual:
+            msg = "庄家不合格，底注获胜，加注退还"
+            winner = "player"   # 庄家不合格视为玩家赢（底注）
+        elif comp > 0:
+            msg = "本局您赢了"
+            winner = "player"
+        elif comp < 0:
+            msg = "本局您输了"
+            winner = "dealer"
         else:
-            if comparison > 0:  # 玩家赢
+            msg = "本局Push"
+            winner = "push"
+        if self.game.jackpot_bet and details["bonus"] > 0:
+            rank,_ = evaluate_five_card_hand(self.game.player_hand)
+            msg2 = f"牌型为{HAND_RANK_NAMES.get(rank,'')}! 赢得奖金${details['bonus']:.2f}"
+            messagebox.showinfo("恭喜您获得累进大奖！", msg2)
+            self.progressive_display.config(bg='gold')
+        self.status_label.config(text=msg)
+        self.last_win_label.config(text=f"上局获胜: ${winnings:.2f}")
+        self.show_restart_button()
+        self._save_history({"winner": winner, "winnings": winnings})
+
+    # ---------- 累进大奖计算 ----------
+    def calculate_bonus(self):
+        if not self.game.player_hand or len(self.game.player_hand) < 5:
+            return 0
+        rank, _ = evaluate_five_card_hand(self.game.player_hand)
+        jackpot = self.game.progressive_amount
+        bonus = 0
+        if rank == 9:          # 皇家同花顺 → 奖池的100%
+            bonus = jackpot
+            self.game.progressive_amount -= bonus
+        elif rank == 8:        # 同花顺 → 奖池的10%
+            bonus = jackpot * 0.1
+            self.game.progressive_amount -= bonus
+        elif rank == 7:        # 四条 → $1250
+            bonus = 1250.0
+            self.game.progressive_amount -= bonus
+        elif rank == 6:        # 葫芦 → $375
+            bonus = 375.0
+            self.game.progressive_amount -= bonus
+        elif rank == 5:        # 同花 → $250
+            bonus = 250.0
+            self.game.progressive_amount -= bonus
+        # 其他牌型无累进奖励
+
+        # 保证奖池不低于最低值
+        if self.game.progressive_amount < 271288.59:
+            self.game.progressive_amount = 271288.59
+
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
+        save_jackpot(self.game.progressive_amount)
+        return bonus
+
+    def update_jackpot(self):
+        jackpot_cost = 2.5 if self.game.jackpot_bet else 0
+        total = self.game.ante + self.game.play_bet + self.game.five_plus_one_bet
+        rate = 0.001
+        self.game.progressive_amount += total * rate + jackpot_cost*0.95
+        if self.game.progressive_amount < 271288.59:
+            self.game.progressive_amount = 271288.59
+        self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
+        save_jackpot(self.game.progressive_amount)
+
+    def calculate_winnings(self):
+        winnings = 0
+        details = {"ante":0,"play":0,"bonus":0,"five_plus_one":0}
+        dealer_qual = self.game.dealer_qualifies()
+        comp = compare_hands(self.game.player_hand, self.game.dealer_hand)
+        if not dealer_qual:
+            ante_result = self.game.ante * 2
+            play_result = self.game.play_bet
+        else:
+            if comp > 0:
                 ante_result = self.game.ante * 2
-                # Bet根据玩家牌型支付
-                player_rank, _ = evaluate_five_card_hand(self.game.player_hand)
-                payout = CARIBBEAN_STUD_PAYOUT.get(player_rank, 1)
+                rank,_ = evaluate_five_card_hand(self.game.player_hand)
+                payout = CARIBBEAN_STUD_PAYOUT.get(rank, 1)
                 play_result = self.game.play_bet * (payout + 1)
-            elif comparison == 0:  # 平局
+            elif comp == 0:
                 ante_result = self.game.ante
                 play_result = self.game.play_bet
-            else:  # 玩家输
+            else:
                 ante_result = 0
                 play_result = 0
-        
         winnings += ante_result + play_result
         details["ante"] = ante_result
         details["play"] = play_result
-        
-        # 2. 结算Jackpot (如果下注了)
+
         if self.game.jackpot_bet:
-            bonus_win = self.calculate_bonus()
-            winnings += bonus_win
-            details["bonus"] = bonus_win
-        
-        # 3. 更新Jackpot奖池
+            bonus = self.calculate_bonus()
+            winnings += bonus
+            details["bonus"] = bonus
         self.update_jackpot()
-        
         return winnings, details
-    
-    def update_jackpot(self):
-        """更新Jackpot奖池金额"""
-        # 累进大奖下注成本统一为 $1
-        jackpot_cost = 1 if self.game.jackpot_bet else 0
-        total_bet = self.game.ante + self.game.play_bet + self.game.five_plus_one_bet + jackpot_cost
-        
-        # 根据模式决定贡献率
-        if self.high_bet_mode:
-            jackpot_contribution = total_bet * 0.01
-        else:
-            jackpot_contribution = total_bet * 0.02
-        
-        # 更新Jackpot金额
-        self.game.progressive_amount += jackpot_contribution
-        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
-        
-        # 保存到文件
-        save_jackpot(self.game.progressive_amount)
-    
-    def calculate_bonus(self):
-        """计算Jackpot奖金（统一赔率，下注1元）"""
-        if not self.game.player_hand or len(self.game.player_hand) < 5:
-            return 0
-            
-        cards = self.game.player_hand
-        hand_rank, _ = evaluate_five_card_hand(cards)
-        
-        bonus = 0
-        jackpot = self.game.progressive_amount
-        
-        if hand_rank == 9:  # 皇家同花顺：100%奖池 或 $40,000（取较高者）
-            bonus = max(jackpot, 40000.0)
-            self.game.progressive_amount -= bonus
-        elif hand_rank == 8:  # 同花顺：10%奖池 或 $4,000（取较高者）
-            bonus = max(jackpot * 0.1, 4000.0)
-            self.game.progressive_amount -= bonus
-        elif hand_rank == 7:  # 四条：$750
-            bonus = 750.0
-            self.game.progressive_amount -= bonus
-        elif hand_rank == 6:  # 葫芦：$200
-            bonus = 200.0
-            self.game.progressive_amount -= bonus
-        elif hand_rank == 5:  # 同花：$125
-            bonus = 125.0
-            self.game.progressive_amount -= bonus
-        
-        # 确保奖池不低于最低值 $41,066.87
-        if self.game.progressive_amount < 41066.87:
-            self.game.progressive_amount = 41066.87
-        
-        # 更新显示和保存
-        self.progressive_amount_var.set(f"${self.game.progressive_amount:.2f}")
-        save_jackpot(self.game.progressive_amount)
-        
-        return bonus
 
-    def animate_collect_cards(self, auto_reset):
-        """执行收牌动画：先翻转所有牌为背面，然后向右收起"""
-        # 如果有下移的AK牌，先复位
-        if self.ak_moved and self.moved_cards:
-            self.animate_move_up_step(0, auto_reset)
-            return
-        
-        # 否则直接开始收牌
-        self.animate_move_cards_out(auto_reset)
-    
-    def animate_move_up_step(self, step, auto_reset):
-        """执行向上移动动画的每一步（复位AK牌）"""
-        if step > 5:  # 5步完成移动 (0.5秒)
-            # 复位完成，开始收牌
-            self.animate_move_cards_out(auto_reset)
-            return
-        
-        # 移动所有之前下移的牌
-        for card_label, original_y in self.moved_cards:
-            if card_label.winfo_exists():  # 确保组件还存在
-                current_y = card_label.winfo_y()
-                new_y = current_y - 2  # 每步向上移动4px
-                card_label.place(y=new_y)
-        
-        # 下一步
-        step += 1
-        self.after(100, lambda: self.animate_move_up_step(step, auto_reset))
-    
-    def animate_move_cards_out(self, auto_reset):
-        """将所有牌向右移出屏幕"""
-        # 过滤掉已经不存在的卡片
-        self.active_card_labels = [label for label in self.active_card_labels if label.winfo_exists()]
-        
-        if not self.active_card_labels:
-            # 没有牌，直接重置
-            self._do_reset(auto_reset)
-            return
+    # ---------- 历史记录 ----------
+    def _save_history(self, result_info=None):
+        try:
+            deck = self.game.deck
+            if deck is None: return
+            save_caribbean_history(deck, self.game.player_hand, self.game.dealer_hand, result_info)
+        except Exception as e:
+            print(f"保存历史记录出错: {e}")
 
-        # 设置所有牌的目标位置为屏幕右侧外
-        for card_label in self.active_card_labels:
-            card_label.target_pos = (1200, card_label.winfo_y())  # 目标x为窗口右侧外
-
-        # 开始移动
-        self.animate_card_out_step(auto_reset)
-
-    def animate_card_out_step(self, auto_reset):
-        """移动卡片出屏幕的每一步"""
-        all_done = True
-        for card_label in self.active_card_labels[:]:  # 遍历副本
-            if not hasattr(card_label, 'target_pos') or not card_label.winfo_exists():
-                if card_label in self.active_card_labels:
-                    self.active_card_labels.remove(card_label)
-                continue
-
-            current_x = card_label.winfo_x()
-            target_x, target_y = card_label.target_pos
-
-            # 计算新位置
-            dx = target_x - current_x
-            if abs(dx) < 5:
-                card_label.place(x=target_x, y=target_y)
-                # 移除此卡片
-                card_label.destroy()
-                if card_label in self.active_card_labels:
-                    self.active_card_labels.remove(card_label)
-                continue
-
-            new_x = current_x + dx * 0.2
-            card_label.place(x=new_x)
-            all_done = False
-
-        if not all_done:
-            self.after(20, lambda: self.animate_card_out_step(auto_reset))
-        else:
-            # 所有动画完成，重置游戏
-            self._do_reset(auto_reset)
-
-    def reset_game(self, auto_reset=False):
-        # 安全地取消自动重置计时器
-        self.cancel_auto_reset_timer()
-        
-        # 设置重置标志，停止所有动画
-        self._resetting = True
-        
-        # 清除所有挂起的after事件
-        for after_id in self.tk.eval('after info').split():
-            self.after_cancel(after_id)
-        
-        # 如果当前有牌在桌上，先执行收牌动画
-        if self.active_card_labels:
-            self.disable_action_buttons()  # 禁用按钮
-            self.animate_collect_cards(auto_reset)  # 开始收牌动画，动画完成后会调用真正的重置
-            return
-
-        # 否则直接重置
-        self._do_reset(auto_reset)
-    
+    # ---------- 重置相关 ----------
     def reset_bets(self):
-        """重置下注金额为0"""
         self.ante_var.set("0")
-        self.play_var.set("0")
         self.five_plus_one_var.set("0")
-        
-        # 更新显示
+        self.play_var.set("0")
         self.status_label.config(text="已重置所有下注金额")
-        
-        # 重置背景色为白色
         for widget in self.bet_widgets.values():
             widget.config(bg='white')
-        
-        # 短暂高亮显示重置效果
-        self.ante_display.config(bg='#FFCDD2')  # 浅红色
-        self.play_display.config(bg='#FFCDD2')  # 浅红色
-        self.five_plus_one_display.config(bg='#FFCDD2')  # 浅红色
+        self.ante_display.config(bg='#FFCDD2')
+        self.five_plus_one_display.config(bg='#FFCDD2')
         self.after(500, lambda: self.ante_display.config(bg='white'))
-        self.after(500, lambda: self.play_display.config(bg='white'))
         self.after(500, lambda: self.five_plus_one_display.config(bg='white'))
-    
-    def _do_reset(self, auto_reset=False):
-        """真正的重置游戏界面：确保所有牌被移除，弃牌区标题被重建，状态复位。"""
-        # 重新加载资源（切换扑克牌图片）
-        self._load_assets()
-        
-        # 取消自动重置计时器（保险）
-        if self.auto_reset_timer:
-            try:
-                self.after_cancel(self.auto_reset_timer)
-            except:
-                pass
-            self.auto_reset_timer = None
-        
-        # 清除所有挂起的after事件
-        for after_id in self.tk.eval('after info').split():
-            self.after_cancel(after_id)
-
-        # 重置游戏状态
-        self.game.reset_game()
-        self.stage_label.config(text="翻牌前")
-        self.status_label.config(text="设置下注金额并开始游戏")
-        
-        # 重置标签显示
-        self.player_label.config(text="玩家")
-        self.dealer_label.config(text="庄家")
-        
-        # 重置下注金额为0
-        self.ante_var.set("0")
-        self.play_var.set("0")
-        self.five_plus_one_var.set("0")
-        self.jackpot_bet_var.set(self.last_jackpot_state)
-        
-        # 重置背景色为白色
-        for widget in self.bet_widgets.values():
-            widget.config(bg='white')
-        
-        # 清空活动卡片列表（在收牌动画后已清空）
-        self.active_card_labels = []
-        self.moved_cards = []
-        self.ak_moved = False
-        self.ak_animation_active = False
-        
-        # 清除所有动画状态
-        self.animation_queue = []
-        self.animation_in_progress = False
-        self.flipping_cards = []
-        self.flip_step = 0
-        
-        # 恢复下注区域
-        self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
-        self.play_display.bind("<Button-1>", self.toggle_play_bet)
-        self.five_plus_one_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("five_plus_one"))
-        for chip in self.chip_buttons:
-            # 使用存储的文本重新绑定事件
-            text = self.chip_texts[chip]
-            chip.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
-        
-        # 恢复操作按钮区域
-        for widget in self.action_frame.winfo_children():
-            widget.destroy()
-        
-        start_button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_button_frame.pack(pady=5)
-
-        # 添加"重置金额"按钮
-        self.reset_bets_button = tk.Button(
-            start_button_frame, text="重置金额", 
-            command=self.reset_bets, font=('Arial', 14),
-            bg='#F44336', fg='white', width=10
-        )
-        self.reset_bets_button.pack(side=tk.LEFT, padx=(0, 10))
-
-        # 重复上局下注按钮（根据是否有历史下注决定启用状态）
-        self.repeat_bet_btn = tk.Button(
-            start_button_frame, text="重复上局下注", command=self.apply_last_bet,
-            font=('Arial', 14), bg='#4A90E2', fg='white',
-            activebackground='#3A7BC8', width=12,
-            state=tk.NORMAL if self.last_bet is not None else tk.DISABLED
-        )
-        self.repeat_bet_btn.pack(side=tk.LEFT, padx=(0, 10))
-
-        # 开始游戏按钮
-        self.start_button = tk.Button(
-            start_button_frame, text="开始游戏", 
-            command=self.start_game, font=('Arial', 14),
-            bg='#4CAF50', fg='white', width=10
-        )
-        self.start_button.pack(side=tk.LEFT)
-        
-        # 启用Jackpot的Checkbutton
-        self.jackpot_check.config(state=tk.NORMAL)
-        
-        # 重置本局下注显示
-        self.current_bet_label.config(text="本局下注: $0.00")
-        
-        # 重置标志
-        self._resetting = False
-        self.fold_mode = False  # 重置弃牌标志
-        
-        # 如果是自动重置，显示消息
-        if auto_reset:
-            self.status_label.config(text="30秒已到，自动开始新游戏")
-            self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
-        else:
-            self.status_label.config(text="设置下注金额并开始游戏")
-
-    def show_card_sequence(self, event):
-        """显示本局牌序窗口 - 右键点击时取消30秒计时"""
-        # 取消30秒自动重置计时器
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-            self.auto_reset_timer = None
-        
-        win = tk.Toplevel(self)
-        win.title("本局牌序")
-        win.geometry("650x600")  # 固定窗口大小
-        win.resizable(0,0)
-        win.configure(bg='#f0f0f0')
-        
-        # 显示切牌位置
-        cut_pos = self.game.cut_position
-        cut_label = tk.Label(
-            win, 
-            text=f"本局切牌位置: {cut_pos + 1}", 
-            font=('Arial', 14, 'bold'),
-            bg='#f0f0f0'
-        )
-        cut_label.pack(pady=(10, 5))
-        
-        # 创建主框架
-        main_frame = tk.Frame(win, bg='#f0f0f0')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # 添加滚动条
-        scrollbar = ttk.Scrollbar(main_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # 创建画布用于滚动
-        canvas = tk.Canvas(main_frame, bg='#f0f0f0', yscrollcommand=scrollbar.set)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=canvas.yview)
-        
-        # 创建内部框架放置所有内容
-        content_frame = tk.Frame(canvas, bg='#f0f0f0')
-        canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
-        
-        # 创建卡片框架
-        card_frame = tk.Frame(content_frame, bg='#f0f0f0')
-        card_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-        
-        # 创建缩小版卡片图像
-        small_size = (60, 90)  # 卡片尺寸
-        small_images = {}  # 存储缩小后的卡片图像
-        
-        for i, card in enumerate(self.game.card_sequence):
-            key = (card.suit, card.rank)
-            if key in self.original_images:
-                orig_img = self.original_images[key]
-                # 使用新的图像缩放方法
-                small_img = orig_img.resize(small_size, Image.LANCZOS)
-                small_images[i] = ImageTk.PhotoImage(small_img)
-            else:
-                # 如果没有找到原始图像，使用背面图像
-                back_img = self.original_images.get("back", None)
-                if back_img:
-                    # 使用新的图像缩放方法
-                    small_img = back_img.resize(small_size, Image.LANCZOS)
-                    small_images[i] = ImageTk.PhotoImage(small_img)
-        
-        # 创建表格显示牌序 - 每行8张，共7行
-        for row in range(7):  # 7行
-            row_frame = tk.Frame(card_frame, bg='#f0f0f0')
-            row_frame.pack(fill=tk.X, pady=5)
-            
-            # 计算该行卡片数量 (前6行8张，最后一行4张)
-            cards_in_row = 8 if row < 6 else 4
-            
-            for col in range(cards_in_row):
-                card_index = row * 8 + col
-                if card_index >= 52:  # 确保不超过52张
-                    break
-                    
-                # 创建卡片容器
-                card_container = tk.Frame(row_frame, bg='#f0f0f0')
-                card_container.grid(row=0, column=col, padx=5, pady=5)
-                
-                # 标记切牌位置
-                bg_color = 'light blue' if card_index == self.game.cut_position else '#f0f0f0'
-                
-                # 显示卡片
-                if card_index in small_images:
-                    card_label = tk.Label(
-                        card_container, 
-                        image=small_images[card_index], 
-                        bg=bg_color,
-                        borderwidth=1,
-                        relief="solid"
-                    )
-                    card_label.image = small_images[card_index]  # 保持引用
-                    card_label.pack()
-                else:
-                    # 如果无法创建图像，显示文字表示
-                    card = self.game.card_sequence[card_index]
-                    card_label = tk.Label(
-                        card_container, 
-                        text=f"{card.rank}{card.suit}",
-                        bg=bg_color,
-                        width=6,
-                        height=3,
-                        borderwidth=1,
-                        relief="solid"
-                    )
-                    card_label.pack()
-                
-                # 显示牌位置编号
-                pos_label = tk.Label(
-                    card_container, 
-                    text=str(card_index+1), 
-                    bg=bg_color,
-                    font=('Arial', 9)
-                )
-                pos_label.pack()
-        
-        # 更新滚动区域
-        content_frame.update_idletasks()
-        canvas.config(scrollregion=canvas.bbox("all"))
-        
-        # 绑定鼠标滚轮滚动
-        win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
     def apply_last_bet(self):
-        """应用上次下注的金额（底注、5+1、累进大奖）"""
         if self.last_bet is None:
             return
-        
-        # 获取当前模式限制
+        ante = self.last_bet['ante']
+        five = self.last_bet['five_plus_one']
+        jack = self.last_bet['jackpot']
+        # 我们先设置 play_var 为上次的值，再设置 ante_var，trace 会检查 play_var 是否为0，如果是0则不变，如果不是0则更新为 ante*2。
+        self.play_var.set(str(self.last_bet.get('play', 0)))
+
         if self.high_bet_mode:
-            max_ante = 50000
-            max_five = 12500
+            max_ante, max_five = 50000, 12500
             min_ante = 100
         else:
-            max_ante = 10000
-            max_five = 2500
+            max_ante, max_five = 10000, 2500
             min_ante = 10
-        
-        # 获取上次下注值
-        ante = self.last_bet['ante']
-        five_plus_one = self.last_bet['five_plus_one']
-        jackpot = self.last_bet['jackpot']
-        
-        # 检查并调整底注（不低于最低，不高于最高）
-        if ante < min_ante:
-            ante = min_ante
-            messagebox.showwarning("下注调整", f"上次底注低于当前模式最低{min_ante}，已调整为{min_ante}")
-        if ante > max_ante:
-            ante = max_ante
-            messagebox.showwarning("下注调整", f"上次底注超出当前模式上限{max_ante}，已调整为{max_ante}")
-        
-        # 检查并调整5+1
-        if five_plus_one > max_five:
-            five_plus_one = max_five
-            messagebox.showwarning("下注调整", f"上次5+1下注超出当前模式上限{max_five}，已调整为{max_five}")
-        
-        # 应用下注
+        if ante < min_ante: ante = min_ante
+        if ante > max_ante: ante = max_ante
+        if five > max_five: five = max_five
         self.ante_var.set(str(ante))
-        self.five_plus_one_var.set(str(five_plus_one))
-        self.jackpot_bet_var.set(jackpot)
-        
-        # 如果有底注且上次下注时Play也是自动的，但这里我们只恢复基础下注，Play需要用户手动或保持0
-        # 同时清除Play显示，因为Play一般是底注的两倍，但用户可能需要重新点击
-        self.play_var.set("0")
-        
-        # 更新状态
+        self.five_plus_one_var.set(str(five))
+        self.jackpot_bet_var.set(jack)
+
         self.status_label.config(text="已应用上次下注金额")
-        # 高亮显示一下
         self.ante_display.config(bg='#E8F5E9')
         self.five_plus_one_display.config(bg='#E8F5E9')
         self.after(800, lambda: self.ante_display.config(bg='white'))
         self.after(800, lambda: self.five_plus_one_display.config(bg='white'))
 
+    def show_restart_button(self):
+        self.clear_btn_frame()
+        restart_btn = tk.Button(
+            self.btn_frame, text="再来一局",
+            command=lambda: self._on_restart(restart_btn),
+            font=('Arial',12,'bold'), bg='#2196F3', fg='white', width=10
+        )
+        restart_btn.pack()
+        restart_btn.bind("<Button-3>", self.show_card_sequence)
+        self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
+
+    def _on_restart(self, btn):
+        btn.config(state=tk.DISABLED)
+        self.reset_game()
+
+    def reset_game(self, auto_reset=False):
+        if self.auto_reset_timer:
+            self.after_cancel(self.auto_reset_timer)
+            self.auto_reset_timer = None
+        if self.active_card_labels:
+            self.disable_action_buttons()
+            self.animate_collect_cards(auto_reset)
+            return
+        self._do_reset(auto_reset)
+
+    def _do_reset(self, auto_reset=False):
+        self._load_assets()
+        self.game.reset_game()
+        self.stage_label.config(text="翻牌前")
+        self.player_label.config(text="玩家")
+        self.dealer_label.config(text="庄家")
+        self.ante_var.set("0")
+        self.five_plus_one_var.set("0")
+        self.play_var.set("0")
+        self.jackpot_bet_var.set(self.last_jackpot_state)
+        for widget in self.bet_widgets.values():
+            widget.config(bg='white')
+        self.progressive_display.config(bg=PANEL_BG)
+        self.active_card_labels = []
+
+        self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
+        self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante", e))
+        self.five_plus_one_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("five_plus_one"))
+        self.five_plus_one_display.bind("<Button-3>", lambda e: self.reset_single_bet("five_plus_one", e))
+        self.play_display.bind("<Button-1>", self.toggle_play_bet)   # 重新绑定
+        self.jackpot_check.config(state=tk.NORMAL)
+        for chip in self.chip_buttons:
+            text = self.chip_texts[chip]
+            chip.bind("<Button-1>", lambda e,t=text: self.select_chip(t))
+
+        self.clear_btn_frame()
+        self.add_main_buttons()
+        self.current_bet_label.config(text="本局下注: $0.00")
+        if auto_reset:
+            self.status_label.config(text="30秒已到，自动开始新游戏")
+            self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
+        else:
+            self.status_label.config(text="设置下注金额并开始游戏")
+        self.game_in_progress = False
+
+    def animate_collect_cards(self, auto_reset):
+        self.disable_action_buttons()
+        self.animate_move_cards_out(auto_reset)
+
+    def animate_move_cards_out(self, auto_reset):
+        if not self.active_card_labels:
+            self._do_reset(auto_reset)
+            return
+        for lbl in self.active_card_labels:
+            lbl.target_pos = (1200, lbl.winfo_y())
+        self.animate_card_out_step(auto_reset)
+
+    def animate_card_out_step(self, auto_reset):
+        all_done = True
+        for lbl in self.active_card_labels[:]:
+            if not hasattr(lbl, 'target_pos') or not lbl.winfo_exists():
+                if lbl in self.active_card_labels:
+                    self.active_card_labels.remove(lbl)
+                continue
+            cx = lbl.winfo_x()
+            tx, ty = lbl.target_pos
+            dx = tx - cx
+            if abs(dx) < 5:
+                lbl.place(x=tx, y=ty)
+                lbl.destroy()
+                if lbl in self.active_card_labels:
+                    self.active_card_labels.remove(lbl)
+                continue
+            new_x = cx + dx*0.2
+            lbl.place(x=new_x)
+            all_done = False
+        if not all_done:
+            self.after(20, lambda: self.animate_card_out_step(auto_reset))
+        else:
+            self._do_reset(auto_reset)
+
+    def disable_action_buttons(self):
+        self.buttons_disabled = True
+        for widget in self.btn_frame.winfo_children():
+            if isinstance(widget, tk.Button):
+                widget.config(state=tk.DISABLED)
+
+    def enable_action_buttons(self):
+        self.buttons_disabled = False
+        for widget in self.btn_frame.winfo_children():
+            if isinstance(widget, tk.Button):
+                widget.config(state=tk.NORMAL)
+
+    # ---------- 显示牌序 ----------
+    def show_card_sequence(self, event):
+        if self.auto_reset_timer:
+            self.after_cancel(self.auto_reset_timer)
+            self.auto_reset_timer = None
+        if not hasattr(self.game, 'deck') or not self.game.deck:
+            messagebox.showinfo("提示","没有牌序信息")
+            return
+        win = tk.Toplevel(self)
+        win.title("本局牌序")
+        win.geometry("730x750")
+        win.resizable(0,0)
+        win.configure(bg='#f0f0f0')
+        cut_pos = self.game.deck.start_pos
+        tk.Label(win, text=f"本局切牌位置: {cut_pos+1}", font=('Arial',14,'bold'), bg='#f0f0f0').pack(pady=10)
+        main_frame = tk.Frame(win, bg='#f0f0f0')
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        scrollbar = ttk.Scrollbar(main_frame)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas = tk.Canvas(main_frame, bg='#f0f0f0', yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.config(command=canvas.yview)
+        content_frame = tk.Frame(canvas, bg='#f0f0f0')
+        canvas_frame = canvas.create_window((0,0), window=content_frame, anchor='nw')
+
+        card_frame = tk.Frame(content_frame, bg='#f0f0f0')
+        card_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=5)
+
+        small_size = (60,90)
+        small_images = {}
+        for i, card in enumerate(self.game.deck.full_deck):
+            key = (card.suit, card.rank)
+            if key in self.original_images:
+                orig = self.original_images[key]
+                small = orig.resize(small_size, Image.LANCZOS)
+                small_images[i] = ImageTk.PhotoImage(small)
+            else:
+                img = Image.new('RGB', small_size, 'blue')
+                draw = ImageDraw.Draw(img)
+                try:
+                    font = ImageFont.truetype("arial.ttf", 12)
+                except:
+                    font = ImageFont.load_default()
+                text = f"{card.rank}{card.suit}"
+                tw, th = draw.textsize(text, font=font)
+                draw.text(((small_size[0]-tw)//2, (small_size[1]-th)//2), text, fill="white", font=font)
+                small_images[i] = ImageTk.PhotoImage(img)
+
+        for row in range(6):
+            row_frame = tk.Frame(card_frame, bg='#f0f0f0')
+            row_frame.pack(fill=tk.X)
+            cards_in_row = 9 if row<5 else 7
+            for col in range(cards_in_row):
+                idx = row*9+col
+                if idx>=52: break
+                container = tk.Frame(row_frame, bg='#f0f0f0')
+                container.grid(row=0, column=col, padx=5)
+                is_cut = idx == self.game.deck.start_pos
+                bg = 'light blue' if is_cut else '#f0f0f0'
+                lbl = tk.Label(container, image=small_images[idx], bg=bg, borderwidth=1, relief="solid")
+                lbl.image = small_images[idx]
+                lbl.pack()
+                pos = tk.Label(container, text=str(idx+1), bg=bg, font=('Arial',9))
+                pos.pack()
+        content_frame.update_idletasks()
+        canvas.config(scrollregion=canvas.bbox("all"))
+
+# =========================================================
+# 主入口
+# =========================================================
 def main(initial_balance=10000, username="Guest"):
     app = CaribbeanStudGUI(initial_balance, username)
     app.mainloop()
     return app.balance
 
 if __name__ == "__main__":
-    # 独立运行时的示例调用
     final_balance = main()
     print(f"Final balance: {final_balance}")

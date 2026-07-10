@@ -1618,7 +1618,7 @@ class PaiGowPokerGUI(tk.Tk):
 
         self._load_assets()
         self._create_widgets()
-        self.after(100, self._show_startup_warning)
+        ## self.after(100, self._show_startup_warning)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # ------------------------- 生命周期 -------------------------

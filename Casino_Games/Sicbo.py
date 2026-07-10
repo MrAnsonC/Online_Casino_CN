@@ -319,7 +319,7 @@ class SicboGame:
 
         # 历史记录文件
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        logs_dir = os.path.join(parent_dir, 'A_Logs')
+        logs_dir = os.path.join(parent_dir, 'A_Logs', 'Json')
         if not os.path.exists(logs_dir):
             os.makedirs(logs_dir)
         self.history_file = os.path.join(logs_dir, 'Sicbo.json')

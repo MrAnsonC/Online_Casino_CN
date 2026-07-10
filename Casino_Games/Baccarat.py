@@ -148,7 +148,7 @@ class BaccaratGUI(tk.Tk):
         self.resizable(0,0)
         self.configure(bg='#35654d')
 
-        self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../', 'A_Logs')
+        self.data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../', 'A_Logs', 'Json')
         self.data_file = os.path.join(self.data_dir, 'Baccarant.json')
         self._ensure_data_file()
         

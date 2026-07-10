@@ -359,8 +359,8 @@ class BlackjackGUI(tk.Tk):
         card_size = (100, 150)
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
-        self.current_poker_folder = 'Poker1'
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
+        normal_card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
+        special_card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1', 'Golden')
         
         suit_mapping = {
             '♠': 'Spade',
@@ -369,9 +369,15 @@ class BlackjackGUI(tk.Tk):
             '♣': 'Club'
         }
 
-        self.original_images = {}
-        
-        back_path = os.path.join(card_dir, 'Background.png')
+        # 初始化图片字典
+        self.original_images = {}          # 普通牌原图（用于缩放）
+        self.card_images = {}              # 普通牌大图 (100x150)
+        self.special_card_images_large = {} # 特殊牌大图 (100x150)
+        self.special_card_images = {}      # 特殊牌小图 (60x90)
+        self.special_card_size = (60, 90)
+
+        # ---------- 1. 加载普通牌（大图及背图） ----------
+        back_path = os.path.join(normal_card_dir, 'Background.png')
         try:
             back_img_orig = Image.open(back_path)
             self.original_images["back"] = back_img_orig
@@ -382,13 +388,12 @@ class BlackjackGUI(tk.Tk):
             img_orig = Image.new('RGB', card_size, 'black')
             self.original_images["back"] = img_orig
             self.back_image = ImageTk.PhotoImage(img_orig)
-        
+
         for suit in SUITS:
             for rank in RANKS:
                 suit_name = suit_mapping.get(suit, suit)
                 filename = f"{suit_name}{rank}.png"
-                path = os.path.join(card_dir, filename)
-                
+                path = os.path.join(normal_card_dir, filename)
                 try:
                     if os.path.exists(path):
                         img = Image.open(path)
@@ -396,6 +401,7 @@ class BlackjackGUI(tk.Tk):
                         img_resized = img.resize(card_size)
                         self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_resized)
                     else:
+                        # 占位图
                         img_orig = Image.new('RGB', card_size, 'blue')
                         draw = ImageDraw.Draw(img_orig)
                         text = f"{rank}{suit}"
@@ -407,7 +413,6 @@ class BlackjackGUI(tk.Tk):
                         x = (card_size[0] - text_width) / 2
                         y = (card_size[1] - text_height) / 2
                         draw.text((x, y), text, fill="white", font=font)
-                        
                         self.original_images[(suit, rank)] = img_orig
                         self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
                 except Exception as e:
@@ -423,37 +428,103 @@ class BlackjackGUI(tk.Tk):
                     x = (card_size[0] - text_width) / 2
                     y = (card_size[1] - text_height) / 2
                     draw.text((x, y), text, fill="white", font=font)
-                    
                     self.original_images[(suit, rank)] = img_orig
                     self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
-        
-        self.special_card_images = {}
-        small_size = self.special_card_size
-        
+
+        # ---------- 2. 加载特殊牌大图（用于玩家手牌中的特殊牌） ----------
+        special_back_path = os.path.join(special_card_dir, 'Background.png')
         try:
-            back_img_small = back_img_orig.copy().resize(small_size, Image.LANCZOS)
-            self.special_card_images["back"] = ImageTk.PhotoImage(back_img_small)
+            special_back_img_orig = Image.open(special_back_path)
+            self.special_back_image_large = ImageTk.PhotoImage(special_back_img_orig.resize(card_size))
         except:
-            self.special_card_images["back"] = ImageTk.PhotoImage(Image.new('RGB', small_size, 'black'))
-        
+            # 若不存在，使用普通牌背
+            if "back" in self.original_images:
+                self.special_back_image_large = ImageTk.PhotoImage(self.original_images["back"].resize(card_size))
+            else:
+                self.special_back_image_large = self.back_image
+
         for suit in SUITS:
             for rank in RANKS:
-                if (suit, rank) in self.original_images:
-                    try:
+                suit_name = suit_mapping.get(suit, suit)
+                filename = f"{suit_name}{rank}.png"
+                path = os.path.join(special_card_dir, filename)
+                try:
+                    if os.path.exists(path):
+                        img = Image.open(path)
+                        img_resized = img.resize(card_size)
+                        self.special_card_images_large[(suit, rank)] = ImageTk.PhotoImage(img_resized)
+                    else:
+                        # 回退：使用普通牌的大图
+                        if (suit, rank) in self.card_images:
+                            self.special_card_images_large[(suit, rank)] = self.card_images[(suit, rank)]
+                        else:
+                            img_orig = Image.new('RGB', card_size, 'yellow')
+                            draw = ImageDraw.Draw(img_orig)
+                            text = f"{rank}{suit}"
+                            try:
+                                font = ImageFont.truetype("arial.ttf", 20)
+                            except:
+                                font = ImageFont.load_default()
+                            draw.text((10, 10), text, fill="black", font=font)
+                            self.special_card_images_large[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                except Exception as e:
+                    print(f"Error loading special large card {path}: {e}")
+                    if (suit, rank) in self.card_images:
+                        self.special_card_images_large[(suit, rank)] = self.card_images[(suit, rank)]
+                    else:
+                        img_orig = Image.new('RGB', card_size, 'purple')
+                        draw = ImageDraw.Draw(img_orig)
+                        draw.text((10, 10), "ERR", fill="white", font=ImageFont.load_default())
+                        self.special_card_images_large[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+
+        # ---------- 3. 加载特殊牌小图（用于下注区上方显示） ----------
+        small_size = self.special_card_size
+        # 牌背小图
+        try:
+            if os.path.exists(special_back_path):
+                back_img_special = Image.open(special_back_path).resize(small_size, Image.LANCZOS)
+                self.special_card_images["back"] = ImageTk.PhotoImage(back_img_special)
+            else:
+                if "back" in self.original_images:
+                    back_img_special = self.original_images["back"].copy().resize(small_size, Image.LANCZOS)
+                    self.special_card_images["back"] = ImageTk.PhotoImage(back_img_special)
+                else:
+                    self.special_card_images["back"] = ImageTk.PhotoImage(Image.new('RGB', small_size, 'black'))
+        except:
+            self.special_card_images["back"] = ImageTk.PhotoImage(Image.new('RGB', small_size, 'black'))
+
+        for suit in SUITS:
+            for rank in RANKS:
+                suit_name = suit_mapping.get(suit, suit)
+                filename = f"{suit_name}{rank}.png"
+                path = os.path.join(special_card_dir, filename)
+                try:
+                    if os.path.exists(path):
+                        img = Image.open(path).resize(small_size, Image.LANCZOS)
+                        self.special_card_images[(suit, rank)] = ImageTk.PhotoImage(img)
+                    else:
+                        if (suit, rank) in self.original_images:
+                            img_small = self.original_images[(suit, rank)].copy().resize(small_size, Image.LANCZOS)
+                            self.special_card_images[(suit, rank)] = ImageTk.PhotoImage(img_small)
+                        else:
+                            img_orig = Image.new('RGB', small_size, 'blue')
+                            draw = ImageDraw.Draw(img_orig)
+                            text = f"{rank}{suit}"
+                            try:
+                                font = ImageFont.truetype("arial.ttf", 10)
+                            except:
+                                font = ImageFont.load_default()
+                            draw.text((5, 5), text, fill="white", font=font)
+                            self.special_card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                except Exception as e:
+                    print(f"Error loading special small card {path}: {e}")
+                    if (suit, rank) in self.original_images:
                         img_small = self.original_images[(suit, rank)].copy().resize(small_size, Image.LANCZOS)
                         self.special_card_images[(suit, rank)] = ImageTk.PhotoImage(img_small)
-                    except:
-                        img_orig = Image.new('RGB', small_size, 'blue')
+                    else:
+                        img_orig = Image.new('RGB', small_size, 'red')
                         draw = ImageDraw.Draw(img_orig)
-                        text = f"{rank}{suit}"
-                        try:
-                            font = ImageFont.truetype("arial.ttf", 10)
-                        except:
-                            font = ImageFont.load_default()
-                        text_width, text_height = draw.textsize(text, font=font)
-                        x = (small_size[0] - text_width) / 2
-                        y = (small_size[1] - text_height) / 2
-                        draw.text((x, y), text, fill="white", font=font)
+                        draw.text((5, 5), "Err", fill="white", font=ImageFont.load_default())
                         self.special_card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
     
     def add_chip_to_bet(self, bet_type):
@@ -1252,12 +1323,24 @@ class BlackjackGUI(tk.Tk):
             if isinstance(widget, tk.Button):
                 widget.config(state=tk.NORMAL)
     
-    def _create_scaled_image(self, card, width, height, use_back=False):
+    def _create_scaled_image(self, card, width, height, use_back=False, use_special=False):
         if use_back:
-            img = self.original_images["back"].copy()
+            if use_special:
+                # 特殊牌背（大图）没有原图，我们直接使用特殊背图缩放（但这里我们只能从大图缩放，用现有图片）
+                # 为简化，直接使用普通背图，或者也可以加载特殊背图，这里使用普通背图（或特殊背图若存在）
+                # 用 self.special_back_image_large 缩放？但为了保持一致性，我们使用 self.original_images 中的背图（普通）
+                # 但我们也可以将特殊背图原图存储，这里略，使用普通背图。
+                img = self.original_images["back"].copy()
+            else:
+                img = self.original_images["back"].copy()
         else:
-            img = self.original_images[(card.suit, card.rank)].copy()
-        
+            if use_special:
+                if (card.suit, card.rank) in self.original_images:
+                    img = self.original_images[(card.suit, card.rank)].copy()
+                else:
+                    img = self.original_images["back"].copy()  # 回退
+            else:
+                img = self.original_images[(card.suit, card.rank)].copy()
         img = img.resize((width, height), Image.LANCZOS)
         return ImageTk.PhotoImage(img)
     
@@ -1268,7 +1351,18 @@ class BlackjackGUI(tk.Tk):
 
             steps = 12
             if step > steps:
-                card_label.config(image=self.card_images.get((card.suit, card.rank), self.back_image))
+                # 判断是否特殊牌（使用与 add_card_to_frame 相同的逻辑）
+                use_special = False
+                if hasattr(self.game, 'special_cards') and self.game.special_cards:
+                    for sc in self.game.special_cards:
+                        if sc.suit == card.suit and sc.rank == card.rank:
+                            use_special = True
+                            break
+                if use_special:
+                    final_img = self.special_card_images_large.get((card.suit, card.rank), self.back_image)
+                else:
+                    final_img = self.card_images.get((card.suit, card.rank), self.back_image)
+                card_label.config(image=final_img)
                 if callback:
                     callback()
                 return
@@ -1284,21 +1378,43 @@ class BlackjackGUI(tk.Tk):
             full_w, full_h = 100, 150
             w = max(1, int(full_w * ratio))
 
-            img = self._create_scaled_image(card, w, full_h, use_back=use_back)
+            # 决定使用哪套图片
+            use_special = False
+            if hasattr(self.game, 'special_cards') and self.game.special_cards:
+                for sc in self.game.special_cards:
+                    if sc.suit == card.suit and sc.rank == card.rank:
+                        use_special = True
+                        break
+
+            img = self._create_scaled_image(card, w, full_h, use_back=use_back, use_special=use_special)
             if not hasattr(self, '_temp_flip_images'):
                 self._temp_flip_images = {}
             self._temp_flip_images[id(card_label)] = img
-
             card_label.config(image=img)
             self.after(20, lambda: flip_step(step + 1))
 
         flip_step()
     
     def add_card_to_frame(self, frame, card, show_front=True, position=None):
+        use_special = False
+        if frame == self.player_cards_frame:
+            # 检查该 card 是否在特殊奖励牌列表中
+            if hasattr(self.game, 'special_cards') and self.game.special_cards:
+                for sc in self.game.special_cards:
+                    if sc.suit == card.suit and sc.rank == card.rank:
+                        use_special = True
+                        break
+
         if show_front:
-            card_img = self.card_images.get((card.suit, card.rank), self.back_image)
+            if use_special:
+                card_img = self.special_card_images_large.get((card.suit, card.rank), self.back_image)
+            else:
+                card_img = self.card_images.get((card.suit, card.rank), self.back_image)
         else:
-            card_img = self.back_image
+            if use_special:
+                card_img = self.special_back_image_large
+            else:
+                card_img = self.back_image
 
         card_label = tk.Label(frame, image=card_img, bg='#2a4a3c')
 
@@ -1313,7 +1429,6 @@ class BlackjackGUI(tk.Tk):
 
         card_label.card = card
         card_label.is_face_up = show_front
-
         self.active_card_labels.append(card_label)
 
         try:

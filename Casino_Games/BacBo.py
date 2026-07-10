@@ -130,7 +130,7 @@ class BacboGUI(tk.Tk):
         # 历史记录文件路径
         self.history_file_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-            'A_Logs', 'Baccarat_Dice.json'
+            'A_Logs', 'Json', 'Json','Baccarat_Dice.json'
         )
         
         # 加载历史记录

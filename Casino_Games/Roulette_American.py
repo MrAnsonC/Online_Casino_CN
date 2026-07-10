@@ -41,7 +41,7 @@ def user_data_path() -> str:
 
 
 def roulette_log_path() -> str:
-    log_dir = os.path.join(project_root(), "A_Logs")
+    log_dir = os.path.join(project_root(), "A_Logs", "Json")
     os.makedirs(log_dir, exist_ok=True)
     return os.path.join(log_dir, "Roulette_American.json")
 
