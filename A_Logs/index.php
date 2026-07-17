@@ -1,7 +1,7 @@
 <?php
 // 获取当前页面参数，默认为 welcome
 $page = isset($_GET['page']) ? $_GET['page'] : 'welcome';
-$allowed = ['welcome','csp', 'casino_holdem', 'djw', '3cp', 'fcp', 'huh', 'lir', 'msp', 'uth', 'u3p', 'uoh', 'sicbo', 'vdp', 'baccarat', 'roulette_europe', 'roulette_american', 'roulette_bigsix', 'wfp'];
+$allowed = ['welcome','csp', 'csw',  'casino_holdem', 'djw', '3cp', 'fcp', 'huh', 'ilf', 'lir', 'ioo', 'msp', 'uth', 'u3p', 'uoh', 'sicbo', 'vdp', 'baccarat', 'roulette_europe', 'roulette_american', 'roulette_bigsix', 'wfp'];
 if (!in_array($page, $allowed)) {
     $page = 'welcome';
 }
@@ -268,11 +268,14 @@ if (!in_array($page, $allowed)) {
                 <div class="dropdown">
                     <a href="?page=csp">🂡 加勒比梭哈扑克</a>
                     <a href="?page=djw">🂡 DJ Wild梭哈扑克</a>
+                    <a href="?page=csw">🂡 赌场战争</a>
                     <a href="?page=casino_holdem">🂡 赌场扑克</a>
                     <a href="?page=huh">🂡 单挑扑克</a>
                     <a href="?page=3cp">🂡 三张牌扑克</a>
                     <a href="?page=fcp">🂡 四张牌扑克</a>
+                    <a href="?page=ilf">🂡 我爱同花撲克</a>
                     <a href="?page=lir">🂡 任逍遥撲克</a>
+                    <a href="?page=ioo">🂡 内还是外</a>
                     <a href="?page=msp">🂡 密⻄⻄⽐梭哈撲克</a>
                     <a href="?page=uth">🂡 终极德州扑克</a>
                     <a href="?page=u3p">🂡 终极三张牌扑克</a>
@@ -336,6 +339,8 @@ if (!in_array($page, $allowed)) {
             include 'Casino_Holdem.php';
         } elseif ($page === 'csp') {
             include 'Caribbean_Stud_Poker.php';
+        } elseif ($page === 'csw') {
+            include 'Casino_War.php';
         } elseif ($page === 'djw') {
             include 'DJ_Wild.php';
         } elseif ($page === 'fcp') {
@@ -346,6 +351,10 @@ if (!in_array($page, $allowed)) {
             include 'Heads_Up_Holdem.php';
         } elseif ($page === 'lir') {
             include 'Let_It_Ride.php';
+        } elseif ($page === 'ilf') {
+            include 'I_Love_Flush.php';
+        } elseif ($page === 'ioo') {
+            include 'In_Or_Out.php';
         } elseif ($page === 'msp') {
             include 'Mississippi_Stud_Poker.php';
         } elseif ($page === 'uth') {

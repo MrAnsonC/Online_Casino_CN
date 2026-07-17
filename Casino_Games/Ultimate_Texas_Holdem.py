@@ -2086,6 +2086,7 @@ class UTHGUI(tk.Tk):
         self.progressive_var.set(1 if self.last_game_bet['progressive'] else 0)
         self.status_label.config(text="已重复上局下注")
 
+    # ---------- 显示牌序 ----------
     def show_card_sequence(self, event):
         if self.auto_reset_timer:
             self.after_cancel(self.auto_reset_timer)
@@ -2095,14 +2096,14 @@ class UTHGUI(tk.Tk):
             return
         win = tk.Toplevel(self)
         win.title("本局牌序")
-        win.geometry("650x600")
-        win.resizable(0,0)
+        win.geometry("730x750")
+        win.resizable(0, 0)
         win.configure(bg='#f0f0f0')
         cut_pos = self.game.deck.start_pos
         cut_label = tk.Label(win, text=f"本局切牌位置: {cut_pos + 1}", font=('Arial', 14, 'bold'), bg='#f0f0f0')
-        cut_label.pack(pady=(10, 5))
+        cut_label.pack(pady=10)
         main_frame = tk.Frame(win, bg='#f0f0f0')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         scrollbar = ttk.Scrollbar(main_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         canvas = tk.Canvas(main_frame, bg='#f0f0f0', yscrollcommand=scrollbar.set)
@@ -2111,9 +2112,8 @@ class UTHGUI(tk.Tk):
         content_frame = tk.Frame(canvas, bg='#f0f0f0')
         canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
 
-        # 创建卡片框架
         card_frame = tk.Frame(content_frame, bg='#f0f0f0')
-        card_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        card_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=5)
 
         small_size = (60, 90)
         small_images = {}
@@ -2131,21 +2131,21 @@ class UTHGUI(tk.Tk):
                     font = ImageFont.truetype("arial.ttf", 12)
                 except:
                     font = ImageFont.load_default()
-                text_width, text_height = draw.textsize(text, font=font)
-                x = (small_size[0] - text_width) / 2
-                y = (small_size[1] - text_height) / 2
-                draw.text((x, y), text, fill="white", font=font)
+                bbox = draw.textbbox((0, 0), text, font=font)
+                tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
+                draw.text(((small_size[0]-tw)//2, (small_size[1]-th)//2), text, fill="white", font=font)
                 small_images[i] = ImageTk.PhotoImage(img)
-        for row in range(7):
+
+        for row in range(6):
             row_frame = tk.Frame(card_frame, bg='#f0f0f0')
-            row_frame.pack(fill=tk.X, pady=5)
-            cards_in_row = 8 if row < 6 else 4
+            row_frame.pack(fill=tk.X)
+            cards_in_row = 9 if row < 5 else 7
             for col in range(cards_in_row):
-                card_index = row * 8 + col
+                card_index = row * 9 + col
                 if card_index >= 52:
                     break
                 card_container = tk.Frame(row_frame, bg='#f0f0f0')
-                card_container.grid(row=0, column=col, padx=5, pady=5)
+                card_container.grid(row=0, column=col, padx=5)
                 is_cut_position = card_index == self.game.deck.start_pos
                 bg_color = 'light blue' if is_cut_position else '#f0f0f0'
                 card = self.game.deck.full_deck[card_index]
@@ -2154,10 +2154,9 @@ class UTHGUI(tk.Tk):
                 card_label.pack()
                 pos_label = tk.Label(card_container, text=str(card_index+1), bg=bg_color, font=('Arial', 9))
                 pos_label.pack()
+
         content_frame.update_idletasks()
         canvas.config(scrollregion=canvas.bbox("all"))
-        win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
-
 
 def main(initial_balance=10000, username="Guest"):
     app = UTHGUI(initial_balance, username)

@@ -1,0 +1,714 @@
+{
+    "history_record": {
+        "player_win": 786,
+        "dealer_win": 778,
+        "war": 141,
+        "war_fail": 62,
+        "war_success": 66,
+        "war_push": 13,
+        "surrender": 0,
+        "game": 1705
+    },
+    "history": [
+        {
+            "game_id": 1656,
+            "timestamp": "2026-07-17 21:43:15",
+            "player_card": "10♣",
+            "dealer_card": "7♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1657,
+            "timestamp": "2026-07-17 21:43:30",
+            "player_card": "7♦",
+            "dealer_card": "7♥",
+            "war_cards": {
+                "player_war_card": "5♥",
+                "dealer_war_card": "Q♣"
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1658,
+            "timestamp": "2026-07-17 21:43:38",
+            "player_card": "6♣",
+            "dealer_card": "5♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1659,
+            "timestamp": "2026-07-17 21:43:47",
+            "player_card": "9♠",
+            "dealer_card": "Q♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1660,
+            "timestamp": "2026-07-17 21:43:56",
+            "player_card": "3♥",
+            "dealer_card": "7♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1661,
+            "timestamp": "2026-07-17 21:44:05",
+            "player_card": "3♦",
+            "dealer_card": "4♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1662,
+            "timestamp": "2026-07-17 21:44:20",
+            "player_card": "8♦",
+            "dealer_card": "8♦",
+            "war_cards": {
+                "player_war_card": "8♠",
+                "dealer_war_card": "A♣"
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1663,
+            "timestamp": "2026-07-17 21:44:28",
+            "player_card": "4♥",
+            "dealer_card": "2♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1664,
+            "timestamp": "2026-07-17 21:44:37",
+            "player_card": "K♦",
+            "dealer_card": "10♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1665,
+            "timestamp": "2026-07-17 21:44:53",
+            "player_card": "10♦",
+            "dealer_card": "10♥",
+            "war_cards": {
+                "player_war_card": "4♠",
+                "dealer_war_card": "4♠"
+            },
+            "result": {
+                "winner": "war_push",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1666,
+            "timestamp": "2026-07-17 21:45:00",
+            "player_card": "A♦",
+            "dealer_card": "3♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1667,
+            "timestamp": "2026-07-17 21:45:16",
+            "player_card": "10♠",
+            "dealer_card": "10♥",
+            "war_cards": {
+                "player_war_card": "10♣",
+                "dealer_war_card": "K♠"
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1668,
+            "timestamp": "2026-07-17 21:45:23",
+            "player_card": "7♥",
+            "dealer_card": "A♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1669,
+            "timestamp": "2026-07-17 21:45:32",
+            "player_card": "4♥",
+            "dealer_card": "A♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1670,
+            "timestamp": "2026-07-17 21:45:41",
+            "player_card": "A♦",
+            "dealer_card": "8♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1671,
+            "timestamp": "2026-07-17 21:45:50",
+            "player_card": "Q♦",
+            "dealer_card": "3♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1672,
+            "timestamp": "2026-07-17 21:45:59",
+            "player_card": "Q♠",
+            "dealer_card": "3♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1673,
+            "timestamp": "2026-07-17 21:46:08",
+            "player_card": "8♦",
+            "dealer_card": "9♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1674,
+            "timestamp": "2026-07-17 21:46:17",
+            "player_card": "2♦",
+            "dealer_card": "8♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1675,
+            "timestamp": "2026-07-17 21:46:26",
+            "player_card": "K♠",
+            "dealer_card": "2♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1676,
+            "timestamp": "2026-07-17 21:46:35",
+            "player_card": "4♦",
+            "dealer_card": "3♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1677,
+            "timestamp": "2026-07-17 21:46:44",
+            "player_card": "8♣",
+            "dealer_card": "7♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1678,
+            "timestamp": "2026-07-17 21:46:59",
+            "player_card": "2♥",
+            "dealer_card": "2♥",
+            "war_cards": {
+                "player_war_card": "K♥",
+                "dealer_war_card": "5♣"
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1679,
+            "timestamp": "2026-07-17 21:47:07",
+            "player_card": "5♥",
+            "dealer_card": "4♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1680,
+            "timestamp": "2026-07-17 21:47:23",
+            "player_card": "Q♥",
+            "dealer_card": "Q♥",
+            "war_cards": {
+                "player_war_card": "2♠",
+                "dealer_war_card": "10♠"
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1681,
+            "timestamp": "2026-07-17 21:47:30",
+            "player_card": "K♦",
+            "dealer_card": "8♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1682,
+            "timestamp": "2026-07-17 21:47:39",
+            "player_card": "8♠",
+            "dealer_card": "4♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1683,
+            "timestamp": "2026-07-17 21:47:48",
+            "player_card": "3♣",
+            "dealer_card": "10♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1684,
+            "timestamp": "2026-07-17 21:47:57",
+            "player_card": "8♥",
+            "dealer_card": "3♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1685,
+            "timestamp": "2026-07-17 21:48:06",
+            "player_card": "8♣",
+            "dealer_card": "2♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1686,
+            "timestamp": "2026-07-17 21:48:15",
+            "player_card": "J♠",
+            "dealer_card": "2♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1687,
+            "timestamp": "2026-07-17 21:48:24",
+            "player_card": "4♣",
+            "dealer_card": "10♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1688,
+            "timestamp": "2026-07-17 21:48:33",
+            "player_card": "4♣",
+            "dealer_card": "J♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1689,
+            "timestamp": "2026-07-17 21:48:48",
+            "player_card": "9♥",
+            "dealer_card": "9♠",
+            "war_cards": {
+                "player_war_card": "7♦",
+                "dealer_war_card": "7♥"
+            },
+            "result": {
+                "winner": "war_push",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1690,
+            "timestamp": "2026-07-17 21:48:56",
+            "player_card": "10♥",
+            "dealer_card": "A♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1691,
+            "timestamp": "2026-07-17 21:49:05",
+            "player_card": "10♦",
+            "dealer_card": "Q♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1692,
+            "timestamp": "2026-07-17 21:49:14",
+            "player_card": "A♦",
+            "dealer_card": "5♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1693,
+            "timestamp": "2026-07-17 21:49:23",
+            "player_card": "2♣",
+            "dealer_card": "Q♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1694,
+            "timestamp": "2026-07-17 21:49:32",
+            "player_card": "Q♠",
+            "dealer_card": "2♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1695,
+            "timestamp": "2026-07-17 21:49:41",
+            "player_card": "7♦",
+            "dealer_card": "10♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1696,
+            "timestamp": "2026-07-17 21:49:50",
+            "player_card": "4♥",
+            "dealer_card": "K♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1697,
+            "timestamp": "2026-07-17 21:49:59",
+            "player_card": "J♣",
+            "dealer_card": "A♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1698,
+            "timestamp": "2026-07-17 21:50:08",
+            "player_card": "5♦",
+            "dealer_card": "Q♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1699,
+            "timestamp": "2026-07-17 21:50:17",
+            "player_card": "Q♠",
+            "dealer_card": "7♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1700,
+            "timestamp": "2026-07-17 21:50:26",
+            "player_card": "Q♣",
+            "dealer_card": "4♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1701,
+            "timestamp": "2026-07-17 21:50:35",
+            "player_card": "10♣",
+            "dealer_card": "3♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1702,
+            "timestamp": "2026-07-17 21:50:44",
+            "player_card": "7♠",
+            "dealer_card": "8♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1703,
+            "timestamp": "2026-07-17 21:50:53",
+            "player_card": "2♥",
+            "dealer_card": "Q♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1704,
+            "timestamp": "2026-07-17 21:51:02",
+            "player_card": "A♠",
+            "dealer_card": "10♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1705,
+            "timestamp": "2026-07-17 21:51:10",
+            "player_card": "J♠",
+            "dealer_card": "6♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "surrender": false
+            }
+        }
+    ]
+}

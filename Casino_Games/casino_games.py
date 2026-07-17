@@ -22,7 +22,7 @@ from Casino_Games import Let_It_Ride
 from Casino_Games import Lunar_Poker
 from Casino_Games import Mississippi_Stud_Poker
 from Casino_Games import Pai_Gow_Poker
-from Casino_Games import Super_In_Or_Out
+from Casino_Games import In_Or_Out
 from Casino_Games import Three_Card_Poker
 from Casino_Games import Video_Poker
 from Casino_Games import Ultimate_Texas_Holdem
@@ -224,7 +224,7 @@ def main(balance, user):
             ["三张牌扑克", "视频扑克", "加勒比梭哈扑克", "月亮梭哈扑克"],
             ["四张牌扑克", "赌场扑克", "DJ Wild梭哈扑克", "密⻄⻄⽐梭哈撲克"],
             ["任逍遥扑克", "单挑扑克", "终极德州扑克", "终极奥马哈扑克"],
-            ["超级内外住", "牌九扑克", "⺩牌五張撲克", "终极三张牌扑克"],
+            ["内外注", "牌九扑克", "⺩牌五張撲克", "终极三张牌扑克"],
             ["赌场战争", "我爱同花"]
         ]),
         ("百家乐", [
@@ -250,7 +250,7 @@ def main(balance, user):
 
     # 构建游戏名称到 (ID, 函数) 的映射
     game_config = {
-        "超级内外住": ("1", Super_In_Or_Out.main),
+        "内外注": ("1", In_Or_Out.main),
         "我爱同花": ("2", I_Love_Flush.main),
         "加勒比梭哈扑克": ("3", Caribbean_Stud_Poker.main),
         "三张牌扑克": ("4", Three_Card_Poker.main),
