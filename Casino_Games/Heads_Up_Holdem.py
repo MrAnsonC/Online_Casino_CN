@@ -450,12 +450,11 @@ class HUHGame:
 # 主 GUI 类（HUHGUI）—— 采用 Ultimate 风格的 UI，但保留 Heads-Up 游戏流程
 # =========================================================
 
-class HUHGUI(tk.Tk):
-    def __init__(self, initial_balance, username):
-        super().__init__()
-        self.title("单挑扑克")
-        self.geometry("1150x750+50+10")
-        self.resizable(0,0)
+class HUHGUI(tk.Frame):
+    def __init__(self, parent, initial_balance, username, on_back=None, on_balance_change=None):
+        super().__init__(parent, bg=ROOT_BG)
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
         self.configure(bg=ROOT_BG)
         
         self.username = username
@@ -489,7 +488,6 @@ class HUHGUI(tk.Tk):
         
         self._load_assets()
         self._create_widgets()
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # ---------- 规则说明（保留原内容） ----------
     def show_game_instructions(self):
@@ -658,11 +656,22 @@ class HUHGUI(tk.Tk):
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
     def on_close(self):
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-        self.destroy()
-        self.quit()
-        
+        timer = getattr(self, "auto_reset_timer", None)
+        if timer:
+            try:
+                self.after_cancel(timer)
+            except tk.TclError:
+                pass
+        try:
+            update_balance_in_json(self.username, self.balance)
+        except Exception:
+            pass
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
+        if callable(self.on_back):
+            self.on_back(float(self.balance))
+
+
     # ---------- 加载扑克牌图片（轮流使用 Poker1/Poker2） ----------
     def _load_assets(self):
         card_size = (100, 140)
@@ -1028,26 +1037,26 @@ class HUHGUI(tk.Tk):
             body_combined, text="累进大奖 ($2.50)", variable=self.progressive_var,
             font=('Arial', 12, "bold"), bg=PANEL_BG, fg='black', selectcolor=PANEL_BG
         )
-        self.progressive_cb.grid(row=1, column=0, columnspan=3, sticky='w', pady=(4, 2))
+        self.progressive_cb.grid(row=1, column=0, columnspan=3, sticky='w', padx=35, pady=(4, 2))
 
         # 三条注 + 玩家对子
         row_trips = tk.Frame(body_combined, bg=PANEL_BG)
         row_trips.grid(row=2, column=0, columnspan=3, sticky='ew', pady=2)
         left_trips = tk.Frame(row_trips, bg=PANEL_BG)
         left_trips.grid(row=0, sticky='w')
-        tk.Label(left_trips, text="三条注:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
+        tk.Label(left_trips, text="     三条注:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
         self.trips_var = tk.StringVar(value="0")
         self.trips_display = tk.Label(left_trips, textvariable=self.trips_var, font=('Arial', 12),
-                                    bg='white', fg='black', width=6, relief=tk.SUNKEN)
+                                    bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.trips_display.pack(side=tk.LEFT, padx=5)
         self.trips_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("trips"))
         self.trips_display.bind("<Button-3>", lambda e: self.reset_single_bet("trips", e))
         self.bet_widgets["trips"] = self.trips_display
 
-        tk.Label(left_trips, text="      玩家对子:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
+        tk.Label(left_trips, text="  玩家对子:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
         self.player_pair_var = tk.StringVar(value="0")
         self.player_pair_display = tk.Label(left_trips, textvariable=self.player_pair_var, font=('Arial', 12),
-                                            bg='white', fg='black', width=6, relief=tk.SUNKEN)
+                                            bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.player_pair_display.pack(side=tk.LEFT, padx=5)
         self.player_pair_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("player_pair"))
         self.player_pair_display.bind("<Button-3>", lambda e: self.reset_single_bet("player_pair", e))
@@ -1056,10 +1065,10 @@ class HUHGUI(tk.Tk):
         # 底注 = 赔率注
         row_ante = tk.Frame(body_combined, bg=PANEL_BG)
         row_ante.grid(row=3, column=0, columnspan=3, sticky='ew', pady=2)
-        tk.Label(row_ante, text="    底注:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
+        tk.Label(row_ante, text="         底注:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
         self.ante_var = tk.StringVar(value="0")
         self.ante_display = tk.Label(row_ante, textvariable=self.ante_var, font=('Arial', 12),
-                                    bg='white', fg='black', width=6, relief=tk.SUNKEN)
+                                    bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.ante_display.pack(side=tk.LEFT, padx=5)
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante", e))
@@ -1068,7 +1077,7 @@ class HUHGUI(tk.Tk):
         tk.Label(row_ante, text="=", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=5)
         self.blind_var = tk.StringVar(value="0")
         self.blind_display = tk.Label(row_ante, textvariable=self.blind_var, font=('Arial', 12),
-                                    bg='white', fg='black', width=6, relief=tk.SUNKEN)
+                                    bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.blind_display.pack(side=tk.LEFT, padx=5)
         self.bet_widgets["blind"] = self.blind_display
         tk.Label(row_ante, text=": 赔率注", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=5)
@@ -1076,10 +1085,10 @@ class HUHGUI(tk.Tk):
         # 加注
         row_bet = tk.Frame(body_combined, bg=PANEL_BG)
         row_bet.grid(row=4, column=0, columnspan=3, sticky='ew', pady=2)
-        tk.Label(row_bet, text="    加注:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
+        tk.Label(row_bet, text="         加注:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
         self.bet_var = tk.StringVar(value="0")
         self.bet_display = tk.Label(row_bet, textvariable=self.bet_var, font=('Arial', 12),
-                                    bg='white', fg='black', width=6, relief=tk.SUNKEN)
+                                    bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.bet_display.pack(side=tk.LEFT, padx=5)
         self.bet_display.bind("<Button-1>", self.cycle_bet_amount)
         self.bet_display.bind("<Button-3>", lambda e: self.reset_single_bet("bet", e))
@@ -2114,10 +2123,38 @@ class HUHGUI(tk.Tk):
         content_frame.update_idletasks()
         canvas.config(scrollregion=canvas.bbox("all"))
         
-def main(initial_balance=10000, username="Guest"):
-    app = HUHGUI(initial_balance, username)
-    app.mainloop()
-    return app.balance
+def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, user=None,
+         on_back=None, on_balance_change=None):
+    """嵌入现有 Tk 根窗口；未传 parent 时仍可独立运行。"""
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        return HUHGUI(
+            parent, actual_balance, actual_user,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+        )
+
+    root = tk.Tk()
+    root.title("Heads Up Holdem")
+    root.geometry("1150x750+50+10")
+    root.resizable(False, False)
+    page = HUHGUI(root, actual_balance, actual_user)
+    page.pack(fill="both", expand=True)
+
+    def close_standalone():
+        try:
+            update_balance_in_json(page.username, page.balance)
+        except Exception:
+            pass
+        root.destroy()
+
+    page.on_back = lambda final_balance: close_standalone()
+    root.protocol("WM_DELETE_WINDOW", page.on_close)
+    root.mainloop()
+    return page.balance
+
 
 if __name__ == "__main__":
     final_balance = main()

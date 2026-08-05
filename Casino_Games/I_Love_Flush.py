@@ -234,6 +234,7 @@ class Deck:
 def get_flush_cards(hand):
     """
     从7张手牌中选出同花牌（出现次数最多的花色），
+    若多个花色数量相同，则选择牌面列表（降序）字典序更大的那组。
     返回 (selected_cards, max_count)
     """
     if not hand:
@@ -241,14 +242,15 @@ def get_flush_cards(hand):
     suits_count = Counter(c.suit for c in hand)
     max_count = max(suits_count.values())
     best_suit = None
-    best_max_card = -1
+    best_sorted_values = []  # 用于比较
     for suit, cnt in suits_count.items():
         if cnt == max_count:
             cards = [c for c in hand if c.suit == suit]
-            max_card = max(c.value for c in cards)
-            if max_card > best_max_card:
-                best_max_card = max_card
+            cards.sort(key=lambda c: c.value, reverse=True)
+            values = [c.value for c in cards]
+            if best_suit is None or values > best_sorted_values:
                 best_suit = suit
+                best_sorted_values = values
     selected = [c for c in hand if c.suit == best_suit]
     selected.sort(key=lambda c: c.value, reverse=True)
     return selected, max_count
@@ -364,12 +366,11 @@ class ILoveFlushGame:
 # =========================================================
 # 主GUI类
 # =========================================================
-class ILoveFlushGUI(tk.Tk):
-    def __init__(self, initial_balance, username):
-        super().__init__()
-        self.title("I Love Flush")
-        self.geometry("1200x750+50+10")
-        self.resizable(0,0)
+class ILoveFlushGUI(tk.Frame):
+    def __init__(self, parent, initial_balance, username, on_back=None, on_balance_change=None):
+        super().__init__(parent, bg=ROOT_BG)
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
         self.configure(bg=ROOT_BG)
 
         self.username = username
@@ -405,13 +406,23 @@ class ILoveFlushGUI(tk.Tk):
 
         self._load_assets()
         self._create_widgets()
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def on_close(self):
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-        self.destroy()
-        self.quit()
+        timer = getattr(self, "auto_reset_timer", None)
+        if timer:
+            try:
+                self.after_cancel(timer)
+            except tk.TclError:
+                pass
+        try:
+            update_balance_in_json(self.username, self.balance)
+        except Exception:
+            pass
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
+        if callable(self.on_back):
+            self.on_back(float(self.balance))
+
 
     # ---------- 加载扑克牌 ----------
     def _load_assets(self):
@@ -548,27 +559,40 @@ class ILoveFlushGUI(tk.Tk):
 
     def add_main_buttons(self):
         self.clear_btn_frame()
+
+        for i in range(3):
+            self.btn_frame.grid_columnconfigure(i, weight=1)
+
         self.reset_bets_button = tk.Button(
-            self.btn_frame, text="重设金额", command=self.reset_bets,
-            font=('Arial',12,'bold'), bg='#F44336', fg='white',
-            relief=tk.RAISED, bd=2, cursor="hand2", width=10
+            self.btn_frame,
+            text="重设金额",
+            command=self.reset_bets,
+            font=('Arial',12,'bold'),
+            bg='#F44336',
+            fg='white'
         )
-        self.reset_bets_button.pack(side=tk.LEFT, padx=5)
+        self.reset_bets_button.grid(row=0, column=0, padx=5, sticky="ew")
 
         self.repeat_bet_btn = tk.Button(
-            self.btn_frame, text="重复上局下注", command=self.apply_last_bet,
-            font=('Arial',12,'bold'), bg='#FFC107', fg='black',
-            relief=tk.RAISED, bd=2, cursor="hand2", width=12,
-            state=tk.NORMAL if self.last_bet is not None else tk.DISABLED
+            self.btn_frame,
+            text="重复上局下注",
+            command=self.apply_last_bet,
+            font=('Arial',12,'bold'),
+            bg='#FFC107',
+            fg='black',
+            state=tk.NORMAL if self.last_bet else tk.DISABLED
         )
-        self.repeat_bet_btn.pack(side=tk.LEFT, padx=5)
+        self.repeat_bet_btn.grid(row=0, column=1, padx=5, sticky="ew")
 
         self.start_button = tk.Button(
-            self.btn_frame, text="开始游戏", command=self.start_game,
-            font=('Arial',12,'bold'), bg='#4CAF50', fg='white',
-            relief=tk.RAISED, bd=2, cursor="hand2", width=10
+            self.btn_frame,
+            text="开始游戏",
+            command=self.start_game,
+            font=('Arial',12,'bold'),
+            bg='#4CAF50',
+            fg='white'
         )
-        self.start_button.pack(side=tk.LEFT, padx=5)
+        self.start_button.grid(row=0, column=2, padx=5, sticky="ew")
 
     # ---------- 创建主界面 ----------
     def _create_widgets(self):
@@ -611,7 +635,7 @@ class ILoveFlushGUI(tk.Tk):
         self.player_cards_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
         # 右侧控制面板
-        right_panel = tk.Frame(main_frame, bg=ROOT_BG, width=380)
+        right_panel = tk.Frame(main_frame, bg=ROOT_BG, width=340)
         right_panel.pack(side=tk.RIGHT, fill=tk.Y)
         right_panel.pack_propagate(False)
 
@@ -739,17 +763,17 @@ class ILoveFlushGUI(tk.Tk):
         # 第一行：同花注 + 同花顺注
         row1 = tk.Frame(body_combined, bg=PANEL_BG)
         row1.grid(row=1, column=0, columnspan=2, sticky='ew', pady=4)
-        tk.Label(row1, text="同花注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(10,5))
+        tk.Label(row1, text="同花注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(0,5))
         self.flush_display = tk.Label(row1, textvariable=self.flush_bet_var, font=('Arial',12),
-                                      bg='white', fg='black', width=8, relief=tk.SUNKEN)
+                                      bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.flush_display.pack(side=tk.LEFT, padx=5)
         self.flush_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("flush"))
         self.flush_display.bind("<Button-3>", lambda e: self.reset_single_bet("flush", e))
         self.bet_widgets["flush"] = self.flush_display
 
-        tk.Label(row1, text="同花顺注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(20,5))
+        tk.Label(row1, text="同花顺注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(7,5))
         self.straight_flush_display = tk.Label(row1, textvariable=self.straight_flush_bet_var, font=('Arial',12),
-                                               bg='white', fg='black', width=8, relief=tk.SUNKEN)
+                                               bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.straight_flush_display.pack(side=tk.LEFT, padx=5)
         self.straight_flush_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("straight_flush"))
         self.straight_flush_display.bind("<Button-3>", lambda e: self.reset_single_bet("straight_flush", e))
@@ -758,18 +782,18 @@ class ILoveFlushGUI(tk.Tk):
         # 第二行：底注 + 加注
         row2 = tk.Frame(body_combined, bg=PANEL_BG)
         row2.grid(row=2, column=0, columnspan=2, sticky='ew', pady=4)
-        tk.Label(row2, text="底注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(27,5))
+        tk.Label(row2, text="底注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(17,5))
         self.ante_var = tk.StringVar(value="0")
         self.ante_display = tk.Label(row2, textvariable=self.ante_var, font=('Arial',12),
-                                     bg='white', fg='black', width=8, relief=tk.SUNKEN)
+                                     bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.ante_display.pack(side=tk.LEFT, padx=5)
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante", e))
         self.bet_widgets["ante"] = self.ante_display
 
-        tk.Label(row2, text="加注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(53,5))
+        tk.Label(row2, text="加注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(41,5))
         self.play_amount_display = tk.Label(row2, textvariable=self.play_amount_var, font=('Arial',12),
-                                            bg='white', fg='black', width=8, relief=tk.SUNKEN)
+                                            bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.play_amount_display.pack(side=tk.LEFT, padx=5)
         self.bet_widgets["play_amount"] = self.play_amount_display
 
@@ -1242,58 +1266,105 @@ class ILoveFlushGUI(tk.Tk):
         self.animate_flip(card_label, front_img, 0)
 
     def animate_flip(self, card_label, front_img, step):
-        steps = 10
+        steps = 17
+        orig_w, orig_h = 100, 140
+
+        # 结束条件：恢复正面全尺寸图片
         if step > steps:
-            card_label.config(image=front_img)
             card_label.is_face_up = True
             self.animation_in_progress = False
-            card_label.place(width=100, height=140)
-            return
-        if step <= steps//2:
-            width = 100 - step*10
-            if width <=0: width=1
-            card_label.config(image=self.back_image)
-        else:
-            width = (step - steps//2)*10
-            if width<=0: width=1
+            tx, ty = card_label.target_pos if hasattr(card_label, 'target_pos') else (0, 0)
+            card_label.place(x=tx, y=ty, width=orig_w, height=orig_h)
             card_label.config(image=front_img)
-        card_label.place(width=width, height=140)
-        self.after(50, lambda: self.animate_flip(card_label, front_img, step+1))
+            return
+
+        # 计算当前帧的宽度比例（前半段背面缩窄，后半段正面展开）
+        half = steps // 2
+        if step <= half:
+            ratio = 1 - (step / float(half))        # 1 → 0
+            use_back = True
+        else:
+            ratio = (step - half) / float(half)     # 0 → 1
+            use_back = False
+
+        w = max(1, int(orig_w * ratio))            # 当前宽度（至少1px）
+
+        # 从缓存的原始图像生成缩放后的 PhotoImage
+        # 注意：front_img 是完整正面图，但我们需要根据 use_back 选择图像源
+        if use_back:
+            # 使用背面图像（从 original_images 中获取“back”）
+            img_key = "back"
+            if img_key in self.original_images:
+                pil_img = self.original_images[img_key].resize((w, orig_h), Image.LANCZOS)
+            else:
+                # 若没有背面原始图，则用当前 back_image 的原始尺寸? 这里直接使用 self.back_image 的原始图像？但 self.back_image 已经是 PhotoImage，无法缩放。
+                # 保险做法：使用已加载的背面 PIL 原图（若存在）
+                pil_img = self.original_images.get("back", Image.new('RGB', (orig_w, orig_h), 'green'))
+                pil_img = pil_img.resize((w, orig_h), Image.LANCZOS)
+        else:
+            # 正面：从 original_images 中获取对应牌的原图（卡牌原图未缩放）
+            # 根据 card_label.card 获取 key
+            card = card_label.card
+            key = (card.suit, card.rank)
+            pil_img = self.original_images.get(key)
+            if pil_img is None:
+                # 容错：用 front_img 的原始图像？但 front_img 是 PhotoImage，无法获取原图。
+                # 这里我们假设 original_images 中一定有该牌，因为 _load_assets 已加载。
+                # 若没有，则生成一个占位图
+                pil_img = Image.new('RGB', (orig_w, orig_h), 'gray')
+            pil_img = pil_img.resize((w, orig_h), Image.LANCZOS)
+
+        # 转换为 PhotoImage 并保存引用防止被垃圾回收
+        scaled_img = ImageTk.PhotoImage(pil_img)
+        if not hasattr(self, '_temp_flip_images'):
+            self._temp_flip_images = {}
+        self._temp_flip_images[card_label] = scaled_img   # 用 card_label 作为 key
+
+        # 更新 Label 显示
+        tx, ty = card_label.target_pos if hasattr(card_label, 'target_pos') else (0, 0)
+        offset = (orig_w - w) // 2      # 水平居中
+        card_label.config(image=scaled_img)
+        card_label.place(x=tx + offset, y=ty, width=w, height=orig_h)
+
+        # 继续下一帧
+        self.after(30, lambda: self.animate_flip(card_label, front_img, step + 1))
 
     # ---------- 决策按钮 ----------
     def show_decision_buttons(self):
         self.clear_btn_frame()
-        action_frame = tk.Frame(self.btn_frame, bg=PANEL_BG)
-        action_frame.pack()
+        # 四列等宽
+        for i in range(4):
+            self.btn_frame.grid_columnconfigure(i, weight=1)
 
         flush, cnt = get_flush_cards(self.game.player_hand)
         self.player_flush_count = cnt
 
+        btn_width = 9
         self.fold_btn = tk.Button(
-            action_frame, text="弃牌", command=self.fold_action,
-            font=('Arial',12,'bold'), bg='#F44336', fg='white', width=8
+            self.btn_frame, text="弃牌", command=self.fold_action,
+            font=('Arial',12,'bold'), bg='#F44336', fg='white', width=btn_width
         )
-        self.fold_btn.pack(side=tk.LEFT, padx=2)
+        self.fold_btn.grid(row=0, column=0, padx=2, sticky='ew')
 
         self.btn_1 = tk.Button(
-            action_frame, text="下注1倍", command=lambda: self.set_multiplier(1),
-            font=('Arial',12,'bold'), bg='#4CAF50', fg='white', width=8
+            self.btn_frame, text="下注1倍", command=lambda: self.set_multiplier(1),
+            font=('Arial',12,'bold'), bg='#4CAF50', fg='white', width=btn_width
         )
-        self.btn_1.pack(side=tk.LEFT, padx=2)
+        self.btn_1.grid(row=0, column=1, padx=2, sticky='ew')
 
         self.btn_2 = tk.Button(
-            action_frame, text="下注2倍", command=lambda: self.set_multiplier(2),
-            font=('Arial',12,'bold'), bg='#4CAF50', fg='white', width=8,
+            self.btn_frame, text="下注2倍", command=lambda: self.set_multiplier(2),
+            font=('Arial',12,'bold'), bg='#FF9800', fg='white', width=btn_width,
             state=tk.NORMAL if cnt >= 5 else tk.DISABLED
         )
-        self.btn_2.pack(side=tk.LEFT, padx=2)
+        self.btn_2.grid(row=0, column=2, padx=2, sticky='ew')
 
         self.btn_3 = tk.Button(
-            action_frame, text="下注3倍", command=lambda: self.set_multiplier(3),
-            font=('Arial',12,'bold'), bg='#4CAF50', fg='white', width=8,
+            self.btn_frame, text="下注3倍", command=lambda: self.set_multiplier(3),
+            font=('Arial',12,'bold'), bg='#2196F3', fg='white', width=btn_width,
             state=tk.NORMAL if cnt >= 6 else tk.DISABLED
         )
-        self.btn_3.pack(side=tk.LEFT, padx=2)
+        self.btn_3.grid(row=0, column=3, padx=2, sticky='ew')
 
         self.update_play_buttons()
         self.status_label.config(text="选择加注倍数，或弃牌")
@@ -1792,10 +1863,38 @@ class ILoveFlushGUI(tk.Tk):
 # =========================================================
 # 主入口
 # =========================================================
-def main(initial_balance=10000, username="Guest"):
-    app = ILoveFlushGUI(initial_balance, username)
-    app.mainloop()
-    return app.balance
+def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, user=None,
+         on_back=None, on_balance_change=None):
+    """嵌入现有 Tk 根窗口；未传 parent 时仍可独立运行。"""
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        return ILoveFlushGUI(
+            parent, actual_balance, actual_user,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+        )
+
+    root = tk.Tk()
+    root.title("I Love Flush")
+    root.geometry("1150x750+50+10")
+    root.resizable(False, False)
+    page = ILoveFlushGUI(root, actual_balance, actual_user)
+    page.pack(fill="both", expand=True)
+
+    def close_standalone():
+        try:
+            update_balance_in_json(page.username, page.balance)
+        except Exception:
+            pass
+        root.destroy()
+
+    page.on_back = lambda final_balance: close_standalone()
+    root.protocol("WM_DELETE_WINDOW", page.on_close)
+    root.mainloop()
+    return page.balance
+
 
 if __name__ == "__main__":
     final_balance = main()

@@ -432,12 +432,11 @@ class UOHGame:
 # =========================================================
 # 主界面类 UOHGUI（UI 风格与 Ultimate_Texas_Holdem 统一）
 # =========================================================
-class UOHGUI(tk.Tk):
-    def __init__(self, initial_balance, username):
-        super().__init__()
-        self.title("终极奥马哈扑克")
-        self.geometry("1150x750+50+10")
-        self.resizable(0,0)
+class UOHGUI(tk.Frame):
+    def __init__(self, parent, initial_balance, username, on_back=None, on_balance_change=None):
+        super().__init__(parent, bg=ROOT_BG)
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
         self.configure(bg=ROOT_BG)
         
         self.username = username
@@ -472,7 +471,6 @@ class UOHGUI(tk.Tk):
         
         self._load_assets()
         self._create_widgets()
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # ---------- 规则说明（与 Texas 类似，但内容为奥马哈） ----------
     def show_game_instructions(self):
@@ -571,11 +569,22 @@ class UOHGUI(tk.Tk):
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
     def on_close(self):
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-        self.destroy()
-        self.quit()
-        
+        timer = getattr(self, "auto_reset_timer", None)
+        if timer:
+            try:
+                self.after_cancel(timer)
+            except tk.TclError:
+                pass
+        try:
+            update_balance_in_json(self.username, self.balance)
+        except Exception:
+            pass
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
+        if callable(self.on_back):
+            self.on_back(float(self.balance))
+
+
     # ---------- 加载扑克牌图片（轮流使用 Poker1/Poker2） ----------
     def _load_assets(self):
         card_size = (100, 140)
@@ -887,15 +896,15 @@ class UOHGUI(tk.Tk):
             body_combined, text="累进大奖 ($2.50)", variable=self.progressive_var,
             font=('Arial',12,"bold"), bg=PANEL_BG, fg='black', selectcolor=PANEL_BG
         )
-        self.progressive_cb.grid(row=1, column=0, columnspan=3, sticky='w', padx=22, pady=(4,2))
+        self.progressive_cb.grid(row=1, column=0, columnspan=3, sticky='w', padx=35, pady=(4,2))
 
         # 牌型注（Quads）
         row_quads = tk.Frame(body_combined, bg=PANEL_BG)
         row_quads.grid(row=2, column=0, columnspan=3, sticky='ew', pady=2)
-        tk.Label(row_quads, text="      牌型注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT)
+        tk.Label(row_quads, text="     牌型注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT)
         self.quads_var = tk.StringVar(value="0")
         self.quads_display = tk.Label(row_quads, textvariable=self.quads_var, font=('Arial',12),
-                                      bg='white', fg='black', width=6, relief=tk.SUNKEN)
+                                      bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.quads_display.pack(side=tk.LEFT, padx=5)
         self.quads_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("quads"))
         self.quads_display.bind("<Button-3>", lambda e: self.reset_single_bet("quads", e))
@@ -904,10 +913,10 @@ class UOHGUI(tk.Tk):
         # 底注 = 盲注
         row_ante = tk.Frame(body_combined, bg=PANEL_BG)
         row_ante.grid(row=3, column=0, columnspan=3, sticky='ew', pady=2)
-        tk.Label(row_ante, text="          底注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT)
+        tk.Label(row_ante, text="         底注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT)
         self.ante_var = tk.StringVar(value="0")
         self.ante_display = tk.Label(row_ante, textvariable=self.ante_var, font=('Arial',12),
-                                     bg='white', fg='black', width=6, relief=tk.SUNKEN)
+                                     bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.ante_display.pack(side=tk.LEFT, padx=5)
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante", e))
@@ -915,7 +924,7 @@ class UOHGUI(tk.Tk):
         tk.Label(row_ante, text="=", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=5)
         self.blind_var = tk.StringVar(value="0")
         self.blind_display = tk.Label(row_ante, textvariable=self.blind_var, font=('Arial',12),
-                                      bg='white', fg='black', width=6, relief=tk.SUNKEN)
+                                      bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.blind_display.pack(side=tk.LEFT, padx=5)
         self.bet_widgets["blind"] = self.blind_display
         tk.Label(row_ante, text=": 盲注", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=5)
@@ -923,10 +932,10 @@ class UOHGUI(tk.Tk):
         # 加注（可循环）
         row_bet = tk.Frame(body_combined, bg=PANEL_BG)
         row_bet.grid(row=4, column=0, columnspan=3, sticky='ew', pady=2)
-        tk.Label(row_bet, text="          加注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT)
+        tk.Label(row_bet, text="         加注:", font=('Arial',12,"bold"), bg=PANEL_BG).pack(side=tk.LEFT)
         self.bet_var = tk.StringVar(value="0")
         self.bet_display = tk.Label(row_bet, textvariable=self.bet_var, font=('Arial',12),
-                                    bg='white', fg='black', width=6, relief=tk.SUNKEN)
+                                    bg='white', fg='black', width=7, relief=tk.SUNKEN)
         self.bet_display.pack(side=tk.LEFT, padx=5)
         self.bet_display.bind("<Button-1>", self.cycle_bet_amount)
         self.bet_display.bind("<Button-3>", lambda e: self.reset_single_bet("bet", e))
@@ -1294,27 +1303,56 @@ class UOHGUI(tk.Tk):
         self.animate_flip(card_label, front_img, 0)
 
     def animate_flip(self, card_label, front_img, step):
-        steps = 10
+        steps = 12
+        orig_w, orig_h = 100, 140
+
+        # 结束条件：恢复正面全尺寸图片
         if step > steps:
             card_label.is_face_up = True
-            if hasattr(self, 'flop_revealed') and self.flop_revealed > 0:
-                self.flop_revealed -= 1
-                if self.flop_revealed == 0:
-                    pass
-            return
-        if step <= steps // 2:
-            width = 100 - (step * 20)
-            if width <= 0:
-                width = 1
-            card_label.config(image=self.back_image)
-        else:
-            width = (step - steps // 2) * 20
-            if width <= 0:
-                width = 1
+            self.animation_in_progress = False
+            card_label.place(x=0, y=0, width=orig_w, height=orig_h)
             card_label.config(image=front_img)
-        card_label.place(width=width)
-        step += 1
-        card_label.after(50, lambda: self.animate_flip(card_label, front_img, step))
+            return
+
+        # 计算当前帧的宽度比例（前半段背面缩窄，后半段正面展开）
+        half = steps // 2
+        if step <= half:
+            ratio = 1 - (step / float(half))        # 1 → 0
+            use_back = True
+        else:
+            ratio = (step - half) / float(half)     # 0 → 1
+            use_back = False
+
+        w = max(1, int(orig_w * ratio))            # 当前宽度（至少1px）
+
+        # 从缓存的原始图像生成缩放后的 PhotoImage
+        if use_back:
+            # 使用背面图像
+            pil_img = self.original_images.get("back")
+            if pil_img is None:
+                pil_img = Image.new('RGB', (orig_w, orig_h), 'green')
+            pil_img = pil_img.resize((w, orig_h), Image.LANCZOS)
+        else:
+            # 正面：从 original_images 中获取对应牌的原图
+            card = card_label.card
+            key = (card.suit, card.rank)
+            pil_img = self.original_images.get(key)
+            if pil_img is None:
+                pil_img = Image.new('RGB', (orig_w, orig_h), 'gray')
+            pil_img = pil_img.resize((w, orig_h), Image.LANCZOS)
+
+        scaled_img = ImageTk.PhotoImage(pil_img)
+        if not hasattr(self, '_temp_flip_images'):
+            self._temp_flip_images = {}
+        self._temp_flip_images[card_label] = scaled_img
+
+        # 更新 Label 显示，居中放置在 card_frame 内
+        offset = (orig_w - w) // 2
+        card_label.config(image=scaled_img)
+        card_label.place(x=offset, y=0, width=w, height=orig_h)
+
+        # 继续下一帧
+        self.after(30, lambda: self.animate_flip(card_label, front_img, step + 1))
 
     def enable_preflop_buttons(self):
         if not hasattr(self, 'bet_3x_button') or not self.bet_3x_button.winfo_exists():
@@ -2062,10 +2100,38 @@ class UOHGUI(tk.Tk):
 # =========================================================
 # 主入口
 # =========================================================
-def main(initial_balance=10000, username="Guest"):
-    app = UOHGUI(initial_balance, username)
-    app.mainloop()
-    return app.balance
+def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, user=None,
+         on_back=None, on_balance_change=None):
+    """嵌入现有 Tk 根窗口；未传 parent 时仍可独立运行。"""
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        return UOHGUI(
+            parent, actual_balance, actual_user,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+        )
+
+    root = tk.Tk()
+    root.title("Ultimate Omaha Holdem")
+    root.geometry("1150x750+50+10")
+    root.resizable(False, False)
+    page = UOHGUI(root, actual_balance, actual_user)
+    page.pack(fill="both", expand=True)
+
+    def close_standalone():
+        try:
+            update_balance_in_json(page.username, page.balance)
+        except Exception:
+            pass
+        root.destroy()
+
+    page.on_back = lambda final_balance: close_standalone()
+    root.protocol("WM_DELETE_WINDOW", page.on_close)
+    root.mainloop()
+    return page.balance
+
 
 if __name__ == "__main__":
     final_balance = main()

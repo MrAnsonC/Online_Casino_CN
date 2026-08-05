@@ -1,0 +1,397 @@
+[
+  {
+    "timestamp": "2026-07-19 22:44:27",
+    "dealer": [
+      "Q♥",
+      "8♣"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "6♥",
+          "3♦",
+          "9♥"
+        ],
+        "bet": 50.0,
+        "result": "和局",
+        "return": 50.0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 50.0,
+    "shoe_pointer": 5,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:44:35",
+    "dealer": [
+      "8♦",
+      "10♣"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "J♣",
+          "7♥"
+        ],
+        "bet": 50.0,
+        "result": "输",
+        "return": 0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 0,
+    "shoe_pointer": 9,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:44:45",
+    "dealer": [
+      "4♠",
+      "8♥",
+      "4♥",
+      "3♣"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "4♦",
+          "10♥",
+          "9♠"
+        ],
+        "bet": 50.0,
+        "result": "爆牌，输",
+        "return": 0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 0,
+    "shoe_pointer": 16,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:44:53",
+    "dealer": [
+      "Q♣",
+      "9♥"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "A♣",
+          "7♠",
+          "A♥"
+        ],
+        "bet": 100.0,
+        "result": "和局",
+        "return": 100.0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 100.0,
+    "shoe_pointer": 21,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:45:07",
+    "dealer": [
+      "5♦",
+      "J♦",
+      "Q♥"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "2♥",
+          "9♠",
+          "4♠"
+        ],
+        "bet": 100.0,
+        "result": "庄家爆牌，赢",
+        "return": 200.0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 240.0,
+    "shoe_pointer": 27,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:45:20",
+    "dealer": [
+      "7♣",
+      "2♠",
+      "3♣",
+      "2♦",
+      "A♥",
+      "K♣"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "2♦",
+          "10♣"
+        ],
+        "bet": 50.0,
+        "result": "庄家爆牌，赢",
+        "return": 100.0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 1120.0,
+    "shoe_pointer": 35,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:45:30",
+    "dealer": [
+      "A♦",
+      "9♣"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "5♣",
+          "6♥",
+          "10♦"
+        ],
+        "bet": 100.0,
+        "result": "赢",
+        "return": 200.0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 200.0,
+    "shoe_pointer": 40,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:45:37",
+    "dealer": [
+      "9♠",
+      "9♣"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "7♣",
+          "6♠",
+          "6♦"
+        ],
+        "bet": 50.0,
+        "result": "赢",
+        "return": 100.0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 100.0,
+    "shoe_pointer": 45,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:45:45",
+    "dealer": [
+      "10♦",
+      "2♥",
+      "9♥"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "K♠",
+          "9♦"
+        ],
+        "bet": 50.0,
+        "result": "输",
+        "return": 0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 0,
+    "shoe_pointer": 50,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:45:57",
+    "dealer": [
+      "A♥",
+      "A♣",
+      "4♣",
+      "2♠"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "2♠",
+          "4♥",
+          "3♣",
+          "6♣",
+          "9♦"
+        ],
+        "bet": 50.0,
+        "result": "爆牌，输",
+        "return": 0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 0,
+    "shoe_pointer": 59,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:46:04",
+    "dealer": [
+      "J♦",
+      "K♥"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "4♣",
+          "6♠",
+          "2♦"
+        ],
+        "bet": 100.0,
+        "result": "输",
+        "return": 0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 0,
+    "shoe_pointer": 64,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:46:20",
+    "dealer": [
+      "6♥",
+      "10♠",
+      "5♠"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "Q♠",
+          "2♥",
+          "J♠"
+        ],
+        "bet": 50.0,
+        "result": "爆牌，输",
+        "return": 0
+      },
+      {
+        "cards": [
+          "Q♣",
+          "8♠"
+        ],
+        "bet": 50.0,
+        "result": "输",
+        "return": 0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 260.0,
+    "shoe_pointer": 72,
+    "cut_position": 279
+  },
+  {
+    "timestamp": "2026-07-19 22:46:29",
+    "dealer": [
+      "7♠",
+      "K♠"
+    ],
+    "dealer_blackjack": false,
+    "hands": [
+      {
+        "cards": [
+          "8♥",
+          "A♣"
+        ],
+        "bet": 50.0,
+        "result": "赢",
+        "return": 100.0
+      }
+    ],
+    "bets": {
+      "ante": 50.0,
+      "perfect_pair": 20.0,
+      "twenty_one_three": 20.0,
+      "bust": 20.0
+    },
+    "total_return": 100.0,
+    "shoe_pointer": 76,
+    "cut_position": 279
+  }
+]

@@ -1,973 +1,1684 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
+"""Penalty Shootout — ChickenCrossing risk-pool continuous-cashout edition.
+
+R4 economy / flow:
+- No timing/power meter. The player only chooses a target inside the goal.
+- IN / OUT is decided before animation by a Chicken-style fixed danger pool
+  without replacement of successful safe cells.
+- Each difficulty has exactly 10 safe cells so all modes can reach stage 10:
+  Easy 1/11, Medium 2/12, Hard 3/13 initial danger.
+- One stake starts a 10-stage run. After every successful goal the goalkeeper
+  automatically recovers to the centre; the player may immediately shoot again
+  by clicking the goal, or cash out. A later save loses the whole active run.
+- Cash-out multipliers are derived so every stage has ~96% RTP:
+      multiplier(stage) = 0.96 / cumulative_survival_probability(stage)
+- Goalkeeper and shot animation only PRESENT the predetermined outcome; Canvas
+  collision, timing bars and animation pose never change the economic result.
+
+R4 redesigns goalkeeper proportions, multi-phase save/recovery animation, and
+removes the per-stage continue button: the goal itself continues the run.
+
+The HMI follows the project's fixed 1150x750 ChickenCrossing visual system and
+supports EmbeddedGamePage single-Tk embedding.
+"""
+
+from __future__ import annotations
+
 import json
+import math
 import os
 import random
-import math
+import sys
+import tkinter as tk
+from tkinter import messagebox
+from typing import Callable, Optional
 
-# ---------------------------- 数据持久化 ----------------------------
-def get_data_file_path():
+try:
+    from .small_games import EmbeddedGamePage
+except ImportError:
+    try:
+        from small_games import EmbeddedGamePage
+    except ImportError:
+        EmbeddedGamePage = None
+
+
+VERSION = "Penalty-ChickenStyle-R4"
+RTP = 0.96
+TOTAL_STAGES = 10
+
+
+class Theme:
+    APP_BG = "#C8C1B7"
+    PANEL = "#E7E1D8"
+    PANEL_ALT = "#DCD5CB"
+    PANEL_HOVER = "#D1C9BE"
+    CANVAS_BG = "#BFD0C1"
+    BORDER = "#9A9185"
+    BORDER_SOFT = "#B9B0A5"
+
+    TEXT = "#252A2E"
+    TEXT_MUTED = "#596169"
+    TEXT_DIM = "#777E83"
+
+    ACCENT = "#345E73"
+    ACCENT_HOVER = "#294A5A"
+    ACCENT_SOFT = "#B8CAD2"
+    CYAN = "#276E78"
+    GREEN = "#4E7355"
+    GREEN_HOVER = "#3D5C43"
+    RED = "#A84D4D"
+    RED_HOVER = "#873D3D"
+    AMBER = "#A36B22"
+    GOLD = "#D4B55E"
+
+    SKY = "#AFCAD4"
+    CROWD_DARK = "#525B62"
+    CROWD = "#69747B"
+    PITCH = "#73916F"
+    PITCH_ALT = "#7F9B7A"
+    PITCH_LINE = "#E9E8DE"
+    GOAL_POST = "#F3F1E9"
+    NET = "#C9D2CC"
+    NET_SHADOW = "#96A49C"
+
+    KEEPER_JERSEY = "#D48738"
+    KEEPER_JERSEY_DARK = "#A85F25"
+    KEEPER_JERSEY_LIGHT = "#E7A760"
+    KEEPER_SHORTS = "#343D43"
+    KEEPER_SOCK = "#D48738"
+    KEEPER_SKIN = "#C99468"
+    KEEPER_GLOVE = "#F0E7CC"
+    KEEPER_GLOVE_EDGE = "#8D7D5B"
+    KEEPER_BOOT = "#272C30"
+
+    BALL = "#F2F0E9"
+    BALL_PATCH = "#30353A"
+    AIM = "#D4B55E"
+    AIM_INNER = "#F4E1A4"
+
+    STAGE_DONE = "#AAC4A5"
+    STAGE_DONE_EDGE = "#4D7D52"
+    STAGE_ACTIVE = "#B7CCD5"
+    STAGE_ACTIVE_EDGE = "#345E73"
+    STAGE_FUTURE = "#D6D0C7"
+    STAGE_FUTURE_EDGE = "#AAA196"
+
+    FONT = "Segoe UI"
+    FONT_CJK = "Microsoft YaHei UI" if sys.platform.startswith("win") else (
+        "PingFang SC" if sys.platform == "darwin" else "Noto Sans CJK SC"
+    )
+
+
+CHIP_CONFIGS = (
+    ("$5", 5.0, "#D75A54", "#FFFFFF"),
+    ("$25", 25.0, "#67B56A", "#000000"),
+    ("$100", 100.0, "#292929", "#FFFFFF"),
+    ("$500", 500.0, "#D47AB7", "#000000"),
+    ("$1K", 1000.0, "#F4F1EA", "#000000"),
+)
+
+DIFFICULTIES = (
+    ("简单", "easy", 1, 11),
+    ("中等", "medium", 2, 12),
+    ("困难", "hard", 3, 13),
+)
+
+
+def build_multiplier_table(pool_cells: int, danger_count: int) -> tuple[float, ...]:
+    """Build a 10-stage ~96% RTP cash-out ladder.
+
+    A successful stage removes one safe cell only.  Each R3 difficulty is
+    configured with exactly ten safe cells, so stage 10 is always reachable
+    while the live danger probability rises sharply after every goal.
+    """
+    if pool_cells - danger_count < TOTAL_STAGES:
+        raise ValueError("difficulty must contain at least 10 safe cells")
+
+    survival = 1.0
+    result: list[float] = []
+    for step in range(TOTAL_STAGES):
+        safe_cells = pool_cells - danger_count - step
+        total_cells = pool_cells - step
+        survival *= safe_cells / total_cells
+        result.append(round(RTP / survival, 2))
+    return tuple(result)
+
+
+DIFFICULTY_SETTINGS = {
+    "easy": {
+        "name": "简单",
+        "danger_count": 1,
+        "pool_cells": 11,
+        "multipliers": build_multiplier_table(11, 1),
+    },
+    "medium": {
+        "name": "中等",
+        "danger_count": 2,
+        "pool_cells": 12,
+        "multipliers": build_multiplier_table(12, 2),
+    },
+    "hard": {
+        "name": "困难",
+        "danger_count": 3,
+        "pool_cells": 13,
+        "multipliers": build_multiplier_table(13, 3),
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Persistence
+# ---------------------------------------------------------------------------
+
+
+def get_data_file_path() -> str:
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "../saving_data.json")
 
-def save_user_data(users):
-    with open(get_data_file_path(), "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=4)
 
-def load_user_data():
-    with open(get_data_file_path(), "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def update_balance_in_json(username, new_balance):
+def load_user_data() -> list:
     try:
-        users = load_user_data()
-    except FileNotFoundError:
-        return
+        with open(get_data_file_path(), "r", encoding="utf-8") as file:
+            data = json.load(file)
+        return data if isinstance(data, list) else []
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return []
+
+
+def save_user_data(users: list) -> None:
+    try:
+        path = get_data_file_path()
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(users, file, ensure_ascii=False, indent=4)
+    except OSError:
+        pass
+
+
+def update_balance_in_json(username: str, new_balance: float) -> None:
+    users = load_user_data()
     for user in users:
         if user.get("user_name") == username:
-            user["cash"] = f"{new_balance:.2f}"
-            break
+            user["cash"] = f"{float(new_balance):.2f}"
+            save_user_data(users)
+            return
+    users.append({"user_name": username, "cash": f"{float(new_balance):.2f}"})
     save_user_data(users)
 
-# ---------------------------- 绘图辅助 ----------------------------
-def lerp(a, b, t):
-    return a + (b - a) * t
 
-def ease_in_out_cubic(t):
-    if t < 0.5:
-        return 4 * t * t * t
-    return 1 - pow(-2 * t + 2, 3) / 2
+# ---------------------------------------------------------------------------
+# Reusable controls
+# ---------------------------------------------------------------------------
 
-def ease_out_back(t):
-    c1 = 1.70158
-    c3 = c1 + 1
-    return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2
 
-def clamp(v, lo, hi):
-    return max(lo, min(hi, v))
+class ModernButton(tk.Button):
+    def __init__(
+        self,
+        master,
+        *,
+        text: str,
+        command: Optional[Callable[[], None]] = None,
+        background: str = Theme.PANEL_HOVER,
+        hover_background: str = Theme.BORDER,
+        foreground: str = Theme.TEXT,
+        font_size: int = 11,
+        bold: bool = True,
+        **kwargs,
+    ) -> None:
+        self.normal_background = background
+        self.hover_background = hover_background
+        self.normal_foreground = foreground
+        super().__init__(
+            master,
+            text=text,
+            command=command,
+            bg=background,
+            fg=foreground,
+            activebackground=hover_background,
+            activeforeground=foreground,
+            disabledforeground=Theme.TEXT_DIM,
+            font=(Theme.FONT_CJK, font_size, "bold" if bold else "normal"),
+            relief=tk.FLAT,
+            bd=0,
+            highlightthickness=0,
+            cursor="hand2",
+            **kwargs,
+        )
+        self.bind("<Enter>", self._enter, add="+")
+        self.bind("<Leave>", self._leave, add="+")
 
-def point_in_circle(px, py, cx, cy, r):
-    return (px - cx) ** 2 + (py - cy) ** 2 <= r ** 2
+    def _enter(self, _event) -> None:
+        if str(self.cget("state")) != tk.DISABLED:
+            super().configure(bg=self.hover_background)
 
-# ---------------------------- 球门绘制 ----------------------------
-def draw_soccer_net(canvas, left=60, right=460, top=50, bottom=300):
-    """绘制3D足球门网"""
-    canvas.delete("soccer_net")
-    flt = (60, 75, 40); frt = (196, 75, 40); flb = (60, 176, 40); frb = (196, 176, 40)
-    blt = (40, 55, 0); brt = (216, 55, 0); blb = (40, 156, 0); brb = (216, 156, 0)
+    def _leave(self, _event) -> None:
+        super().configure(bg=self.normal_background)
 
-    def orig_tp(p):
-        return (p[0], -p[1] + 200)
+    def set_colors(self, bg: str, hover: str, fg: str = "#FFFFFF") -> None:
+        self.normal_background = bg
+        self.hover_background = hover
+        self.normal_foreground = fg
+        super().configure(
+            bg=bg,
+            fg=fg,
+            activebackground=hover,
+            activeforeground=fg,
+        )
 
-    orig_x_min, orig_x_max = 40, 216
-    orig_y_min, orig_y_max = 24, 145
 
-    def map_point(p):
-        ox, oy = orig_tp(p)
-        nx = left + (ox - orig_x_min) / (orig_x_max - orig_x_min) * (right - left)
-        ny = top + (oy - orig_y_min) / (orig_y_max - orig_y_min) * (bottom - top)
-        return (nx, ny)
+class ChipButton(tk.Canvas):
+    def __init__(
+        self,
+        master,
+        *,
+        label: str,
+        amount: float,
+        color: str,
+        text_color: str,
+        command: Callable[[float], None],
+        width: int = 57,
+        height: int = 50,
+    ) -> None:
+        super().__init__(
+            master,
+            width=width,
+            height=height,
+            bg=Theme.PANEL,
+            bd=0,
+            highlightthickness=0,
+            cursor="hand2",
+        )
+        self.label = label
+        self.amount = float(amount)
+        self.color = color
+        self.text_color = text_color
+        self.command = command
+        self.w = width
+        self.h = height
+        self.enabled = True
+        self.hovered = False
+        self.pressed = False
+        self.bind("<Enter>", self._enter)
+        self.bind("<Leave>", self._leave)
+        self.bind("<ButtonPress-1>", self._press)
+        self.bind("<ButtonRelease-1>", self._release)
+        self.draw()
 
-    def draw_line(p1, p2, **kw):
-        x1, y1 = map_point(p1)
-        x2, y2 = map_point(p2)
-        canvas.create_line(x1, y1, x2, y2, tags="soccer_net", **kw)
+    @staticmethod
+    def _shade(color: str, factor: float) -> str:
+        rgb = [int(color[i:i + 2], 16) for i in (1, 3, 5)]
+        rgb = [max(0, min(255, round(v * factor))) for v in rgb]
+        return "#%02x%02x%02x" % tuple(rgb)
 
-    edges = [
-        (flt, frt), (flt, flb), (frt, frb), (flb, frb),
-        (flt, blt), (frt, brt), (flb, blb), (frb, brb),
-        (blb, brb), (blt, blb), (brt, brb)
-    ]
-    for e in edges:
-        draw_line(e[0], e[1], fill="white", width=3)
+    def draw(self) -> None:
+        self.delete("all")
+        dy = 2 if self.pressed else 0
+        outer = self._shade(self.color, 0.68)
+        self.create_oval(6, 7, self.w - 5, self.h - 1, fill="#8E877E", outline="")
+        self.create_oval(
+            5, 3 + dy, self.w - 6, self.h - 5 + dy,
+            fill=outer,
+            outline=Theme.TEXT if self.hovered and self.enabled else outer,
+            width=3 if self.hovered and self.enabled else 2,
+        )
+        self.create_oval(
+            9, 7 + dy, self.w - 10, self.h - 9 + dy,
+            fill=self.color,
+            outline=self._shade(self.color, 0.84),
+            width=2,
+        )
+        self.create_text(
+            self.w / 2,
+            self.h / 2 + dy - 1,
+            text=self.label,
+            fill=self.text_color,
+            font=(Theme.FONT, 9, "bold"),
+        )
+        if not self.enabled:
+            self.create_oval(
+                5, 3 + dy, self.w - 6, self.h - 5 + dy,
+                fill="#C9C2B8",
+                outline=Theme.BORDER_SOFT,
+                stipple="gray50",
+            )
 
-    def grid(p1, p2, p3, p4, cols, rows):
-        for i in range(1, cols):
-            t = i / cols
-            a = (p1[0] + (p2[0] - p1[0]) * t, p1[1] + (p2[1] - p1[1]) * t, p1[2] + (p2[2] - p1[2]) * t)
-            b = (p4[0] + (p3[0] - p4[0]) * t, p4[1] + (p3[1] - p4[1]) * t, p4[2] + (p3[2] - p4[2]) * t)
-            draw_line(a, b, fill="#c8ffd0", width=1)
-        for i in range(1, rows):
-            t = i / rows
-            a = (p1[0] + (p4[0] - p1[0]) * t, p1[1] + (p4[1] - p1[1]) * t, p1[2] + (p4[2] - p1[2]) * t)
-            b = (p2[0] + (p3[0] - p2[0]) * t, p2[1] + (p3[1] - p2[1]) * t, p2[2] + (p3[2] - p2[2]) * t)
-            draw_line(a, b, fill="#c8ffd0", width=1)
+    def _enter(self, _event) -> None:
+        if self.enabled:
+            self.hovered = True
+            self.draw()
 
-    grid(flt, frt, frb, flb, 18, 10)
-    grid(flt, blt, blb, flb, 6, 10)
-    grid(brt, frt, frb, brb, 6, 10)
-    grid(flb, frb, brb, blb, 18, 6)
-    canvas.tag_lower("soccer_net")
+    def _leave(self, _event) -> None:
+        self.hovered = False
+        self.pressed = False
+        self.draw()
 
-# ---------------------------- 主游戏类 ----------------------------
+    def _press(self, _event) -> None:
+        if self.enabled:
+            self.pressed = True
+            self.draw()
+
+    def _release(self, event) -> None:
+        if not self.enabled:
+            return
+        pressed = self.pressed
+        self.pressed = False
+        inside = 0 <= event.x < self.w and 0 <= event.y < self.h
+        if pressed and inside:
+            self.command(self.amount)
+        self.draw()
+
+    def set_enabled(self, enabled: bool) -> None:
+        self.enabled = bool(enabled)
+        self.configure(cursor="hand2" if self.enabled else "")
+        if not self.enabled:
+            self.hovered = False
+            self.pressed = False
+        self.draw()
+
+
+class MetricTile(tk.Frame):
+    def __init__(
+        self,
+        master,
+        label: str,
+        variable: tk.StringVar,
+        accent: str,
+        *,
+        width: int,
+        height: int,
+    ) -> None:
+        super().__init__(
+            master,
+            width=width,
+            height=height,
+            bg=Theme.PANEL_ALT,
+            highlightthickness=1,
+            highlightbackground=Theme.BORDER_SOFT,
+        )
+        self.pack_propagate(False)
+        tk.Label(
+            self,
+            text=label,
+            bg=Theme.PANEL_ALT,
+            fg=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 9),
+            anchor=tk.W,
+        ).place(x=12, y=8, width=width - 24, height=18)
+        tk.Label(
+            self,
+            textvariable=variable,
+            bg=Theme.PANEL_ALT,
+            fg=accent,
+            font=(Theme.FONT, 15, "bold"),
+            anchor=tk.W,
+        ).place(x=12, y=29, width=width - 24, height=28)
+
+
+# ---------------------------------------------------------------------------
+# Main game
+# ---------------------------------------------------------------------------
+
+
 class PenaltyGame:
-    def __init__(self, root, initial_balance, username):
+    WINDOW_WIDTH = 1150
+    WINDOW_HEIGHT = 750
+    SHELL_WIDTH = 1110
+    SHELL_HEIGHT = 714
+    HEADER_HEIGHT = 70
+    BODY_TOP = 84
+    BODY_HEIGHT = 630
+    GAME_PANEL_WIDTH = 748
+    SIDEBAR_WIDTH = 348
+    PANEL_GAP = 14
+    CANVAS_WIDTH = 746
+    CANVAS_HEIGHT = 536
+
+    GOAL_LEFT = 116
+    GOAL_RIGHT = 630
+    GOAL_TOP = 104
+    GOAL_BOTTOM = 286
+    BALL_START = (373.0, 478.0)
+
+    def __init__(self, root, initial_balance: float, username: str):
         self.root = root
-        self.root.title("点球大战")
-        self.root.geometry("1000x750+50+10")
-        self.root.resizable(0, 0)
-        self.root.configure(bg="#16213e")
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self._configure_root()
 
         self.balance = float(initial_balance)
         self.username = username
         self.current_bet = 0.0
-        self.pending_bet = 0.0
+        self.bet_amount = 0.0
         self.last_win = 0.0
-        self.animation_running = False
 
-        # 龙门有效区域 (基于draw_soccer_net的范围)
-        self.net_left = 60
-        self.net_right = 460
-        self.net_top = 50
-        self.net_bottom = 300
+        self.difficulty = "easy"
+        self.current_stage = 0
+        self.game_active = False
+        self.shot_in_progress = False
+        self.awaiting_decision = False
+        self.shot_ready = False
+
+        self.remaining_cells = DIFFICULTY_SETTINGS[self.difficulty]["pool_cells"]
+        self.remaining_dangers = DIFFICULTY_SETTINGS[self.difficulty]["danger_count"]
+
+        self.aim_x = (self.GOAL_LEFT + self.GOAL_RIGHT) / 2
+        self.aim_y = (self.GOAL_TOP + self.GOAL_BOTTOM) / 2
+        self.ball_pos = self.BALL_START
+        self.ball_radius = 21.0
+        self.keeper_pose = self._neutral_keeper_pose()
+        self.result_overlay = ""
+        self.result_color = Theme.TEXT
+        self.last_shot_saved: Optional[bool] = None
+        self.after_id: Optional[str] = None
+        self.shot_history: list[str] = []
+
+        self.balance_var = tk.StringVar()
+        self.bet_var = tk.StringVar()
+        self.potential_var = tk.StringVar()
+        self.stage_var = tk.StringVar()
+        self.risk_var = tk.StringVar()
+        self.info_var = tk.StringVar(value="选择下注与难度，然后开始高风险 10 关挑战")
+
+        self.chip_buttons: list[ChipButton] = []
+        self.difficulty_buttons: dict[str, ModernButton] = {}
 
         self.create_widgets()
         self.update_display()
 
-        self.draw_goalkeeper()
-        self.goalkeeper_reset_pose()
+    # ------------------------------------------------------------------
+    # Layout
+    # ------------------------------------------------------------------
 
-    # ---------------------------- UI 构建 ----------------------------
-    def create_widgets(self):
-        main_frame = tk.Frame(self.root, bg="#16213e")
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+    def _configure_root(self) -> None:
+        if isinstance(self.root, (tk.Tk, tk.Toplevel)):
+            self.root.title("点球连胜")
+            self.root.geometry("1150x750+50+10")
+            self.root.resizable(False, False)
+            self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        else:
+            self.root.configure(width=self.WINDOW_WIDTH, height=self.WINDOW_HEIGHT)
+            try:
+                self.root.pack_propagate(False)
+                self.root.grid_propagate(False)
+            except tk.TclError:
+                pass
+        self.root.configure(bg=Theme.APP_BG)
 
-        left_frame = tk.Frame(main_frame, bg="#2e7d32", bd=2, relief=tk.RIDGE)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
-        tk.Label(left_frame, text="点球大战", font=("Arial", 20, "bold"),
-                 bg="#2e7d32", fg="#ffffff").pack(pady=10)
+    @staticmethod
+    def _card(master, *, width: int, height: int, padding: int = 12) -> tk.Frame:
+        outer = tk.Frame(
+            master,
+            width=width,
+            height=height,
+            bg=Theme.PANEL,
+            highlightthickness=1,
+            highlightbackground=Theme.BORDER_SOFT,
+        )
+        outer.pack_propagate(False)
+        outer.grid_propagate(False)
+        inner = tk.Frame(outer, bg=Theme.PANEL)
+        inner.place(
+            x=padding,
+            y=padding,
+            width=max(1, width - padding * 2),
+            height=max(1, height - padding * 2),
+        )
+        outer.content = inner
+        return outer
 
-        self.goal_canvas = tk.Canvas(left_frame, width=500, height=500,
-                                     bg="#2e7d32", bd=0, highlightthickness=0)
-        self.goal_canvas.pack(pady=10, padx=10)
-        draw_soccer_net(self.goal_canvas, left=60, right=460, top=50, bottom=300)
+    @staticmethod
+    def _section_title(master, text: str) -> tk.Label:
+        return tk.Label(
+            master,
+            text=text,
+            bg=Theme.PANEL,
+            fg=Theme.TEXT,
+            font=(Theme.FONT_CJK, 10, "bold"),
+            anchor=tk.W,
+        )
 
-        self.goal_canvas.create_line(0, 300, 540, 300, fill="white", width=2, tags="ground_line")
+    def create_widgets(self) -> None:
+        shell = tk.Frame(
+            self.root,
+            width=self.SHELL_WIDTH,
+            height=self.SHELL_HEIGHT,
+            bg=Theme.APP_BG,
+        )
+        shell.pack(padx=20, pady=18)
+        shell.pack_propagate(False)
 
-        # 绑定点击事件（射门）
-        self.goal_canvas.bind("<Button-1>", self.on_goal_canvas_click)
+        self._build_header(shell)
 
-        self.draw_football()
+        body = tk.Frame(
+            shell,
+            width=self.SHELL_WIDTH,
+            height=self.BODY_HEIGHT,
+            bg=Theme.APP_BG,
+        )
+        body.place(x=0, y=self.BODY_TOP, width=self.SHELL_WIDTH, height=self.BODY_HEIGHT)
 
-        right_frame = tk.Frame(main_frame, bg="#16213e", bd=2, relief=tk.RIDGE)
-        right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
+        self._build_game_panel(body)
+        self._build_sidebar(body)
 
-        balance_frame = tk.Frame(right_frame, bg="#16213e")
-        balance_frame.pack(fill=tk.X, padx=10, pady=10)
-        tk.Label(balance_frame, text="余额:", font=("Arial", 14),
-                 bg="#16213e", fg="#ffffff").pack(side=tk.LEFT)
-        self.balance_var = tk.StringVar(value=f"${self.balance:.2f}")
-        tk.Label(balance_frame, textvariable=self.balance_var, font=("Arial", 14, "bold"),
-                 bg="#16213e", fg="#ffd369").pack(side=tk.LEFT, padx=5)
+    def _build_header(self, shell: tk.Frame) -> None:
+        header = tk.Frame(
+            shell,
+            width=self.SHELL_WIDTH,
+            height=self.HEADER_HEIGHT,
+            bg=Theme.PANEL,
+            highlightthickness=1,
+            highlightbackground=Theme.BORDER_SOFT,
+        )
+        header.place(x=0, y=0, width=self.SHELL_WIDTH, height=self.HEADER_HEIGHT)
 
-        chips_frame = tk.Frame(right_frame, bg="#16213e")
-        chips_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-        chips = [
-            ("$5", "#ff0000", "white"),
-            ("$25", "#00ff00", "black"),
-            ("$100", "#000000", "white"),
-            ("$500", "#FF7DDA", "black"),
-            ("$1K", "#ffffff", "black"),
-        ]
-        self.chip_buttons = []
-        for text, bg, fg in chips:
-            btn = self.create_circle_button(
-                chips_frame, text=text, bg_color=bg, fg_color=fg,
-                command=lambda t=text: self.add_chip(t[1:])
+        icon = tk.Canvas(header, width=48, height=48, bg=Theme.PANEL, bd=0, highlightthickness=0)
+        icon.place(x=14, y=11)
+        icon.create_oval(2, 2, 46, 46, fill=Theme.ACCENT_SOFT, outline=Theme.ACCENT, width=2)
+        icon.create_oval(12, 12, 36, 36, fill=Theme.BALL, outline=Theme.TEXT, width=1)
+        icon.create_polygon(24, 16, 30, 21, 28, 29, 20, 29, 18, 21,
+                            fill=Theme.BALL_PATCH, outline="")
+
+        tk.Label(
+            header,
+            text="PENALTY STREAK",
+            bg=Theme.PANEL,
+            fg=Theme.TEXT,
+            font=(Theme.FONT, 18, "bold"),
+            anchor=tk.W,
+        ).place(x=74, y=10, width=350, height=27)
+        tk.Label(
+            header,
+            text="点球连胜 · 10 关连续兑现 · RTP 96%",
+            bg=Theme.PANEL,
+            fg=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 11, "bold"),
+            anchor=tk.W,
+        ).place(x=74, y=39, width=440, height=20)
+
+        balance_box = tk.Frame(
+            header,
+            width=206,
+            height=46,
+            bg=Theme.PANEL_ALT,
+            highlightthickness=1,
+            highlightbackground=Theme.BORDER_SOFT,
+        )
+        balance_box.place(x=self.SHELL_WIDTH - 220, y=12, width=206, height=46)
+        tk.Label(
+            balance_box,
+            text="账户余额",
+            bg=Theme.PANEL_ALT,
+            fg=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 9),
+            anchor=tk.W,
+        ).place(x=12, y=4, width=90, height=17)
+        tk.Label(
+            balance_box,
+            textvariable=self.balance_var,
+            bg=Theme.PANEL_ALT,
+            fg=Theme.ACCENT,
+            font=(Theme.FONT, 15, "bold"),
+            anchor=tk.E,
+        ).place(x=12, y=20, width=182, height=22)
+
+    def _build_game_panel(self, master: tk.Frame) -> None:
+        panel = self._card(master, width=self.GAME_PANEL_WIDTH, height=self.BODY_HEIGHT, padding=0)
+        panel.place(x=0, y=0, width=self.GAME_PANEL_WIDTH, height=self.BODY_HEIGHT)
+
+        top = tk.Frame(panel, width=self.CANVAS_WIDTH, height=74, bg=Theme.PANEL)
+        top.place(x=0, y=0, width=self.CANVAS_WIDTH, height=74)
+        tk.Label(
+            top,
+            textvariable=self.info_var,
+            bg=Theme.PANEL,
+            fg=Theme.TEXT,
+            font=(Theme.FONT_CJK, 17, "bold"),
+            anchor=tk.W,
+        ).place(x=18, y=11, width=535, height=29)
+        tk.Label(
+            top,
+            text="点击球门选择射门位置",
+            bg=Theme.PANEL,
+            fg=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 9, "bold"),
+            anchor=tk.W,
+        ).place(x=18, y=43, width=350, height=18)
+        tk.Label(
+            top,
+            textvariable=self.risk_var,
+            bg=Theme.ACCENT_SOFT,
+            fg=Theme.ACCENT,
+            font=(Theme.FONT_CJK, 9, "bold"),
+            anchor=tk.CENTER,
+        ).place(x=580, y=18, width=146, height=31)
+
+        self.game_canvas = tk.Canvas(
+            panel,
+            width=self.CANVAS_WIDTH,
+            height=self.CANVAS_HEIGHT,
+            bg=Theme.CANVAS_BG,
+            bd=0,
+            highlightthickness=0,
+            cursor="arrow",
+        )
+        self.game_canvas.place(x=1, y=74, width=self.CANVAS_WIDTH, height=self.CANVAS_HEIGHT)
+        self.game_canvas.bind("<Motion>", self._on_canvas_motion)
+        self.game_canvas.bind("<Leave>", self._on_canvas_leave)
+        self.game_canvas.bind("<Button-1>", self._on_goal_click)
+
+    def _build_sidebar(self, master: tk.Frame) -> None:
+        sidebar = tk.Frame(
+            master,
+            width=self.SIDEBAR_WIDTH,
+            height=self.BODY_HEIGHT,
+            bg=Theme.APP_BG,
+        )
+        sidebar.place(
+            x=self.GAME_PANEL_WIDTH + self.PANEL_GAP,
+            y=0,
+            width=self.SIDEBAR_WIDTH,
+            height=self.BODY_HEIGHT,
+        )
+
+        MetricTile(
+            sidebar, "当前下注", self.bet_var, Theme.CYAN,
+            width=169, height=68,
+        ).place(x=0, y=0, width=169, height=68)
+        MetricTile(
+            sidebar, "当前可兑现", self.potential_var, Theme.GREEN,
+            width=169, height=68,
+        ).place(x=179, y=0, width=169, height=68)
+
+        bet_card = self._card(sidebar, width=348, height=100, padding=9)
+        bet_card.place(x=0, y=78, width=348, height=100)
+        self._section_title(bet_card.content, "下注金额").place(x=0, y=0, width=110, height=20)
+        for index, (label, amount, color, text_color) in enumerate(CHIP_CONFIGS):
+            chip = ChipButton(
+                bet_card.content,
+                label=label,
+                amount=amount,
+                color=color,
+                text_color=text_color,
+                command=self.add_chip,
+                width=57,
+                height=50,
             )
-            btn.pack(side=tk.LEFT, padx=5, pady=5)
-            self.chip_buttons.append(btn)
+            chip.place(x=index * 62, y=24, width=57, height=50)
+            self.chip_buttons.append(chip)
 
-        bet_frame = tk.Frame(right_frame, bg="#16213e")
-        bet_frame.pack(fill=tk.X, padx=10, pady=10)
-        tk.Label(bet_frame, text="下注金额:", font=("Arial", 12),
-                 bg="#16213e", fg="#ffffff").pack(anchor=tk.W)
-        self.bet_var = tk.StringVar(value="$0.00")
-        tk.Label(bet_frame, textvariable=self.bet_var, font=("Arial", 20, "bold"),
-                 bg="#16213e", fg="#4cc9f0").pack(anchor=tk.W, pady=5)
+        difficulty_card = self._card(sidebar, width=348, height=88, padding=9)
+        difficulty_card.place(x=0, y=188, width=348, height=88)
+        self._section_title(difficulty_card.content, "难度").place(x=0, y=0, width=80, height=20)
+        for index, (name, key, dangers, pool_cells) in enumerate(DIFFICULTIES):
+            button = ModernButton(
+                difficulty_card.content,
+                text=f"{name} · {dangers}/{pool_cells}",
+                command=lambda value=key: self.set_difficulty(value),
+                background=Theme.PANEL_ALT,
+                hover_background=Theme.PANEL_HOVER,
+                foreground=Theme.TEXT,
+                font_size=9,
+                bold=True,
+            )
+            button.place(x=index * 107, y=28, width=100, height=34)
+            self.difficulty_buttons[key] = button
 
-        win_frame = tk.Frame(right_frame, bg="#16213e")
-        win_frame.pack(fill=tk.X, padx=10, pady=10)
-        tk.Label(win_frame, text="上局获胜金额:", font=("Arial", 12),
-                 bg="#16213e", fg="#ffffff").pack(anchor=tk.W)
-        self.last_win_var = tk.StringVar(value="$0.00")
-        tk.Label(win_frame, textvariable=self.last_win_var, font=("Arial", 20, "bold"),
-                 bg="#16213e", fg="#4cc9f0").pack(anchor=tk.W, pady=5)
-
-        button_frame = tk.Frame(right_frame, bg="#16213e")
-        button_frame.pack(fill=tk.X, padx=10, pady=20)
-        self.play_button = tk.Button(button_frame, text="开始点球", font=("Arial", 12, "bold"),
-                                     bg="#27ae60", fg="white", width=12, command=self.play_game)
-        self.play_button.pack(pady=5)
-        self.reset_bet_button = tk.Button(button_frame, text="重设下注金额", font=("Arial", 12),
-                                          bg="#3498db", fg="white", width=12, command=self.reset_bet)
-        self.reset_bet_button.pack(pady=5)
-
-        rules_frame = tk.Frame(right_frame, bg="#16213e")
-        rules_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        tk.Label(rules_frame, text="游戏规则:", font=("Arial", 12, "bold"),
-                 bg="#16213e", fg="#ffffff").pack(anchor=tk.W, pady=(0, 5))
-        for rule in [
-            "1. 选择下注金额",
-            "2. 点击'开始点球'",
-            "3. 点击龙门内任意位置射门",
-            "4. 守门员会随机移动并做出扑救动作",
-            "5. 球碰到守门员任何部位 = 不进",
-            "6. 球飞入球门 = 进球赢",
-        ]:
-            tk.Label(rules_frame, text=rule, font=("Arial", 10),
-                     bg="#16213e", fg="#c8e6c9", justify=tk.LEFT).pack(anchor=tk.W, pady=2)
-
-    def create_circle_button(self, parent, text, bg_color, fg_color, command=None, radius=30):
-        canvas = tk.Canvas(parent, width=radius * 2, height=radius * 2,
-                           highlightthickness=0, bg="#16213e")
-        canvas.create_oval(0, 0, radius * 2, radius * 2, fill=bg_color, outline="#16213e", width=2)
-        canvas.create_text(radius, radius, text=text, fill=fg_color, font=("Arial", 12, "bold"))
-        canvas.bind("<Button-1>", lambda e: command() if command else None)
-        return canvas
-
-    def draw_football(self):
-        left, right = 60, 460
-        bottom = 350
-        self.ball_start_pos = ((left + right) / 2, bottom + 100)
-        cx, cy = self.ball_start_pos
-        r = 40
-        self.goal_canvas.delete("football")
-        self.goal_canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill="white", outline="black", width=2, tags="football")
-        self.goal_canvas.create_line(cx - r, cy, cx + r, cy, fill="black", width=2, tags="football")
-        self.goal_canvas.create_line(cx, cy - r, cx, cy + r, fill="black", width=2, tags="football")
-        self.goal_canvas.create_line(cx - r * 0.7, cy - r * 0.7, cx + r * 0.7, cy + r * 0.7,
-                                     fill="black", width=2, tags="football")
-        self.goal_canvas.create_line(cx - r * 0.7, cy + r * 0.7, cx + r * 0.7, cy - r * 0.7,
-                                     fill="black", width=2, tags="football")
-
-    # ---------------------------- 守门员绘制 ----------------------------
-    def draw_goalkeeper(self):
-        self.gk_items = {}
-
-        self.gk_items["shadow"] = self.goal_canvas.create_oval(
-            0, 0, 0, 0, fill="#0a0a0a", outline="", stipple="gray50", tags="goalkeeper"
+        ladder_card = self._card(sidebar, width=348, height=204, padding=9)
+        ladder_card.place(x=0, y=286, width=348, height=204)
+        self._section_title(ladder_card.content, "10 关兑现倍率").place(x=0, y=0, width=130, height=20)
+        tk.Label(
+            ladder_card.content,
+            text="每一关兑现 RTP 约 96% · 后段倍率快速上升",
+            bg=Theme.PANEL,
+            fg=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 8),
+            anchor=tk.E,
+        ).place(x=130, y=1, width=192, height=18)
+        self.ladder_canvas = tk.Canvas(
+            ladder_card.content,
+            width=322,
+            height=154,
+            bg=Theme.PANEL,
+            bd=0,
+            highlightthickness=0,
         )
-        self.gk_items["body"] = self.goal_canvas.create_oval(
-            0, 0, 0, 0, fill="#1e88e5", outline="white", width=2, tags="goalkeeper"
+        self.ladder_canvas.place(x=0, y=28, width=322, height=154)
+
+        action_card = self._card(sidebar, width=348, height=130, padding=9)
+        action_card.place(x=0, y=500, width=348, height=130)
+
+        stats = tk.Frame(action_card.content, bg=Theme.PANEL)
+        stats.place(x=0, y=0, width=322, height=36)
+        tk.Label(
+            stats, text="阶段", bg=Theme.PANEL, fg=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 8), anchor=tk.W,
+        ).place(x=0, y=0, width=45, height=16)
+        tk.Label(
+            stats, textvariable=self.stage_var, bg=Theme.PANEL, fg=Theme.ACCENT,
+            font=(Theme.FONT, 10, "bold"), anchor=tk.W,
+        ).place(x=0, y=16, width=90, height=18)
+        tk.Label(
+            stats, text="下一球风险", bg=Theme.PANEL, fg=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 8), anchor=tk.E,
+        ).place(x=150, y=0, width=172, height=16)
+        tk.Label(
+            stats, textvariable=self.risk_var, bg=Theme.PANEL, fg=Theme.RED,
+            font=(Theme.FONT, 10, "bold"), anchor=tk.E,
+        ).place(x=150, y=16, width=172, height=18)
+
+        self.reset_button = ModernButton(
+            action_card.content,
+            text="清空下注",
+            command=self.reset_bet,
+            background=Theme.RED,
+            hover_background=Theme.RED_HOVER,
+            foreground="#FFFFFF",
+            font_size=10,
         )
-        self.gk_items["shorts"] = self.goal_canvas.create_oval(
-            0, 0, 0, 0, fill="#0d47a1", outline="white", width=1, tags="goalkeeper"
+        # Pregame actions deliberately split the full width 50 / 50.
+        self.reset_button.place(x=0, y=44, width=156, height=32)
+
+        self.start_button = ModernButton(
+            action_card.content,
+            text="开始游戏",
+            command=self.start_game,
+            background=Theme.GREEN,
+            hover_background=Theme.GREEN_HOVER,
+            foreground="#FFFFFF",
+            font_size=11,
         )
-        self.gk_items["head"] = self.goal_canvas.create_oval(
-            0, 0, 0, 0, fill="#ffcc80", outline="#5d4037", width=2, tags="goalkeeper"
-        )
-        self.gk_items["hair"] = self.goal_canvas.create_arc(
-            0, 0, 0, 0, start=0, extent=180, style=tk.PIESLICE,
-            fill="#3e2723", outline="#3e2723", tags="goalkeeper"
-        )
-        self.gk_items["left_eye"] = self.goal_canvas.create_oval(0, 0, 0, 0, fill="black", outline="", tags="goalkeeper")
-        self.gk_items["right_eye"] = self.goal_canvas.create_oval(0, 0, 0, 0, fill="black", outline="", tags="goalkeeper")
-        self.gk_items["mouth"] = self.goal_canvas.create_line(0, 0, 0, 0, fill="#6d4c41", width=2, tags="goalkeeper")
+        self.start_button.place(x=166, y=44, width=156, height=32)
 
-        self.gk_items["left_upper_arm"] = self.goal_canvas.create_line(0, 0, 0, 0, fill="#1976d2", width=9, capstyle=tk.ROUND, tags="goalkeeper")
-        self.gk_items["left_lower_arm"] = self.goal_canvas.create_line(0, 0, 0, 0, fill="#1976d2", width=8, capstyle=tk.ROUND, tags="goalkeeper")
-        self.gk_items["right_upper_arm"] = self.goal_canvas.create_line(0, 0, 0, 0, fill="#1976d2", width=9, capstyle=tk.ROUND, tags="goalkeeper")
-        self.gk_items["right_lower_arm"] = self.goal_canvas.create_line(0, 0, 0, 0, fill="#1976d2", width=8, capstyle=tk.ROUND, tags="goalkeeper")
-        self.gk_items["left_glove"] = self.goal_canvas.create_oval(0, 0, 0, 0, fill="#ffd966", outline="#7f6000", width=2, tags="goalkeeper")
-        self.gk_items["right_glove"] = self.goal_canvas.create_oval(0, 0, 0, 0, fill="#ffd966", outline="#7f6000", width=2, tags="goalkeeper")
-
-        self.gk_items["left_upper_leg"] = self.goal_canvas.create_line(0, 0, 0, 0, fill="#1565c0", width=10, capstyle=tk.ROUND, tags="goalkeeper")
-        self.gk_items["left_lower_leg"] = self.goal_canvas.create_line(0, 0, 0, 0, fill="#1565c0", width=9, capstyle=tk.ROUND, tags="goalkeeper")
-        self.gk_items["right_upper_leg"] = self.goal_canvas.create_line(0, 0, 0, 0, fill="#1565c0", width=10, capstyle=tk.ROUND, tags="goalkeeper")
-        self.gk_items["right_lower_leg"] = self.goal_canvas.create_line(0, 0, 0, 0, fill="#1565c0", width=9, capstyle=tk.ROUND, tags="goalkeeper")
-        self.gk_items["left_shoe"] = self.goal_canvas.create_oval(0, 0, 0, 0, fill="#263238", outline="white", width=1, tags="goalkeeper")
-        self.gk_items["right_shoe"] = self.goal_canvas.create_oval(0, 0, 0, 0, fill="#263238", outline="white", width=1, tags="goalkeeper")
-
-    def goalkeeper_reset_pose(self):
-        self.gk_center_x = 260
-        self.gk_center_y = 290
-        self.gk_pose = self.make_pose(
-            self.gk_center_x, self.gk_center_y,
-            lean=0.0, crouch=0.15, arm_open=0.25, reach_x=0.0, reach_y=0.0, leg_spread=0.18, dive=0.0
-        )
-        self.update_goalkeeper_pose(self.gk_pose)
-        self._enforce_floor()
-
-    def make_pose(self, cx, cy, lean=0.0, crouch=0.0, arm_open=0.0,
-                  reach_x=0.0, reach_y=0.0, leg_spread=0.0, dive=0.0,
-                  twist=0.0, stretch=0.0):
-        return {
-            "cx": cx,
-            "cy": cy,
-            "lean": lean,
-            "crouch": crouch,
-            "arm_open": arm_open,
-            "reach_x": reach_x,
-            "reach_y": reach_y,
-            "leg_spread": leg_spread,
-            "dive": dive,
-            "twist": twist,
-            "stretch": stretch,
-        }
-
-    def _joint(self, start, angle_deg, length):
-        rad = math.radians(angle_deg)
-        return (start[0] + math.cos(rad) * length, start[1] + math.sin(rad) * length)
-
-    def _draw_limb(self, upper_item, lower_item, shoe_item, start, upper_angle, upper_len, lower_angle, lower_len, shoe_r=7):
-        knee = self._joint(start, upper_angle, upper_len)
-        foot = self._joint(knee, lower_angle, lower_len)
-        self.goal_canvas.coords(upper_item, start[0], start[1], knee[0], knee[1])
-        self.goal_canvas.coords(lower_item, knee[0], knee[1], foot[0], foot[1])
-        self.goal_canvas.coords(shoe_item, foot[0] - shoe_r, foot[1] - shoe_r, foot[0] + shoe_r, foot[1] + shoe_r)
-        return knee, foot
-
-    def update_goalkeeper_pose(self, pose):
-        """更自然、丝滑、分层明确的守门员姿态。"""
-        cx = pose["cx"]
-        cy = pose["cy"]
-        lean = pose["lean"]
-        crouch = pose["crouch"]
-        arm_open = pose["arm_open"]
-        reach_x = pose["reach_x"]
-        reach_y = pose["reach_y"]
-        leg_spread = pose["leg_spread"]
-        dive = pose["dive"]
-        twist = pose.get("twist", 0.0)
-        stretch = pose.get("stretch", 0.0)
-
-        shoulder_x = cx + lean * 18 + reach_x * 6
-        shoulder_y = cy - 44 + crouch * 10 - dive * 10 + reach_y * 6
-        hip_x = cx - lean * 10 + reach_x * 3
-        hip_y = cy + 6 + crouch * 14 + dive * 8 + reach_y * 2
-
-        shadow_w = 96 + stretch * 18 - dive * 18
-        shadow_h = 18 - dive * 8 + stretch * 2
-        self.goal_canvas.coords(
-            self.gk_items["shadow"],
-            cx - shadow_w / 2, cy + 60,
-            cx + shadow_w / 2, cy + 60 + shadow_h
+        self.cashout_button = ModernButton(
+            action_card.content,
+            text="兑现",
+            command=self.cash_out,
+            background=Theme.GREEN,
+            hover_background=Theme.GREEN_HOVER,
+            foreground="#FFFFFF",
+            font_size=11,
         )
 
-        body_w = 52 + abs(lean) * 8 + stretch * 4
-        body_h = 62 + dive * 12 + stretch * 10
-        self.goal_canvas.coords(
-            self.gk_items["body"],
-            shoulder_x - body_w / 2, shoulder_y - 4,
-            shoulder_x + body_w / 2, shoulder_y + body_h
-        )
-        self.goal_canvas.coords(
-            self.gk_items["shorts"],
-            hip_x - 26, hip_y,
-            hip_x + 26, hip_y + 32 + crouch * 4
-        )
+        tk.Label(
+            action_card.content,
+            text="进球后门将自动回中；直接再次点击球门继续，或按兑现结束本局。",
+            bg=Theme.PANEL,
+            fg=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 8),
+            anchor=tk.W,
+            justify=tk.LEFT,
+            wraplength=322,
+        ).place(x=0, y=84, width=322, height=28)
 
-        head_x = cx + lean * 14 + reach_x * 4 - dive * 4
-        head_y = cy - 70 + crouch * 6 - dive * 8 + reach_y * 3
-        self.goal_canvas.coords(
-            self.gk_items["head"],
-            head_x - 20, head_y - 20,
-            head_x + 20, head_y + 20
-        )
-        self.goal_canvas.coords(
-            self.gk_items["hair"],
-            head_x - 20, head_y - 22,
-            head_x + 20, head_y + 4
-        )
-        self.goal_canvas.coords(
-            self.gk_items["left_eye"],
-            head_x - 9, head_y - 5,
-            head_x - 4, head_y - 1
-        )
-        self.goal_canvas.coords(
-            self.gk_items["right_eye"],
-            head_x + 4, head_y - 5,
-            head_x + 9, head_y - 1
-        )
-        self.goal_canvas.coords(
-            self.gk_items["mouth"],
-            head_x - 7, head_y + 11,
-            head_x + 7, head_y + 11
-        )
+    # ------------------------------------------------------------------
+    # Difficulty / economy
+    # ------------------------------------------------------------------
 
-        ls = (shoulder_x - 24, shoulder_y + 2)
-        rs = (shoulder_x + 24, shoulder_y + 2)
-        lh = (hip_x - 18, hip_y + 2)
-        rh = (hip_x + 18, hip_y + 2)
+    @property
+    def multipliers(self) -> tuple[float, ...]:
+        return DIFFICULTY_SETTINGS[self.difficulty]["multipliers"]
 
-        # reach_y < 0 时，手臂向上抬；高位封堵会非常明显
-        left_upper_angle = 205 - arm_open * 72 - reach_x * 40 + reach_y * 80 - twist * 14 - dive * 12
-        left_lower_angle = 168 - arm_open * 30 - reach_x * 28 + reach_y * 45 - twist * 8 - dive * 8
-        right_upper_angle = 335 + arm_open * 72 + reach_x * 40 - reach_y * 80 + twist * 14 + dive * 12
-        right_lower_angle = 12 + arm_open * 30 + reach_x * 28 - reach_y * 45 + twist * 8 + dive * 8
+    def set_difficulty(self, difficulty: str) -> None:
+        if self.game_active or self.shot_in_progress:
+            return
+        if difficulty not in DIFFICULTY_SETTINGS:
+            return
+        self.difficulty = difficulty
+        self.remaining_dangers = DIFFICULTY_SETTINGS[difficulty]["danger_count"]
+        self.remaining_cells = DIFFICULTY_SETTINGS[difficulty]["pool_cells"]
+        self._refresh_difficulty_buttons()
+        self.update_display()
 
-        if reach_x < -0.25:
-            left_upper_angle -= 28
-            left_lower_angle -= 30
-            right_upper_angle += 10
-            right_lower_angle += 8
-        elif reach_x > 0.25:
-            right_upper_angle += 28
-            right_lower_angle += 30
-            left_upper_angle -= 10
-            left_lower_angle -= 8
+    def _refresh_difficulty_buttons(self) -> None:
+        for key, button in self.difficulty_buttons.items():
+            selected = key == self.difficulty
+            if self.game_active:
+                button.configure(state=tk.DISABLED)
+            else:
+                button.configure(state=tk.DISABLED if selected else tk.NORMAL)
+            button.set_colors(
+                Theme.ACCENT if selected else Theme.PANEL_ALT,
+                Theme.ACCENT_HOVER if selected else Theme.PANEL_HOVER,
+                "#FFFFFF" if selected else Theme.TEXT,
+            )
 
-        upper_arm_len = 36 + arm_open * 12 + stretch * 2
-        lower_arm_len = 32 + arm_open * 10 + stretch * 2
+    def add_chip(self, amount: float) -> None:
+        if self.game_active or self.shot_in_progress:
+            return
+        amount = float(amount)
+        if self.current_bet + amount <= self.balance:
+            self.current_bet += amount
+            self.last_win = 0.0
+            self.update_display()
+        else:
+            messagebox.showwarning("余额不足", "下注金额不能超过账户余额。", parent=self.root)
 
-        self._draw_limb(
-            self.gk_items["left_upper_arm"], self.gk_items["left_lower_arm"], self.gk_items["left_glove"],
-            ls, left_upper_angle, upper_arm_len, left_lower_angle, lower_arm_len, shoe_r=11
-        )
-        self._draw_limb(
-            self.gk_items["right_upper_arm"], self.gk_items["right_lower_arm"], self.gk_items["right_glove"],
-            rs, right_upper_angle, upper_arm_len, right_lower_angle, lower_arm_len, shoe_r=11
-        )
+    def reset_bet(self) -> None:
+        if self.game_active or self.shot_in_progress:
+            return
+        self.current_bet = 0.0
+        self.last_win = 0.0
+        self.update_display()
 
-        left_upper_leg_angle = 106 + leg_spread * 38 + lean * 16 + dive * 54
-        left_lower_leg_angle = 100 + leg_spread * 22 + lean * 12 + dive * 30
-        right_upper_leg_angle = 74 - leg_spread * 38 + lean * 16 - dive * 54
-        right_lower_leg_angle = 80 - leg_spread * 22 + lean * 12 - dive * 30
+    def _live_failure_rate(self) -> float:
+        if self.remaining_cells <= 0:
+            return 1.0
+        return self.remaining_dangers / self.remaining_cells
 
-        if abs(reach_x) > 0.25:
-            move_dir = -1 if reach_x < 0 else 1
-            hip_shift = move_dir * 10
-            lh = (lh[0] + hip_shift, lh[1])
-            rh = (rh[0] + hip_shift, rh[1])
+    def _draw_risk_failure(self) -> bool:
+        """ChickenCrossing-style fixed-pool draw.
 
-        leg_upper_len = 42
-        leg_lower_len = 38
-        self._draw_limb(
-            self.gk_items["left_upper_leg"], self.gk_items["left_lower_leg"], self.gk_items["left_shoe"],
-            lh, left_upper_leg_angle, leg_upper_len, left_lower_leg_angle, leg_lower_len, shoe_r=10
-        )
-        self._draw_limb(
-            self.gk_items["right_upper_leg"], self.gk_items["right_lower_leg"], self.gk_items["right_shoe"],
-            rh, right_upper_leg_angle, leg_upper_len, right_lower_leg_angle, leg_lower_len, shoe_r=10
-        )
-
-        self._enforce_floor()
-
-    def _play_gk_sequence(self, sequence, on_complete=None, delay=28):
+        Risk is evaluated from the remaining danger/total counts. A successful
+        draw consumes one safe cell, so the danger count stays unchanged while
+        the denominator shrinks. A failed draw ends the run immediately.
         """
-        通用关键帧播放器。
-        sequence 格式:
-            [
-                (pose1, frames1, easing1),
-                (pose2, frames2, easing2),
-                ...
-            ]
-        """
-        if not sequence:
-            if on_complete:
-                on_complete()
+        failure_rate = self._live_failure_rate()
+        failed = random.random() < failure_rate
+        if self.remaining_cells > 0:
+            self.remaining_cells -= 1
+        return failed
+
+    # ------------------------------------------------------------------
+    # Game flow
+    # ------------------------------------------------------------------
+
+    def start_game(self) -> None:
+        if self.game_active or self.shot_in_progress:
+            return
+        if self.current_bet <= 0:
+            messagebox.showwarning("尚未下注", "请先选择下注金额。", parent=self.root)
+            return
+        if self.current_bet > self.balance:
+            messagebox.showwarning("余额不足", "账户余额不足。", parent=self.root)
             return
 
-        start_pose = dict(self.gk_pose)
-        poses = [start_pose] + [item[0] for item in sequence]
-        frames_list = [max(1, int(item[1])) for item in sequence]
-        easings = [item[2] if len(item) > 2 and item[2] else ease_in_out_cubic for item in sequence]
+        self.bet_amount = self.current_bet
+        self.balance -= self.bet_amount
+        self.last_win = 0.0
+        self.current_stage = 0
+        self.game_active = True
+        self.awaiting_decision = False
+        self.shot_ready = True
+        self.result_overlay = ""
+        self.last_shot_saved = None
+        self.shot_history = []
+        self.remaining_cells = DIFFICULTY_SETTINGS[self.difficulty]["pool_cells"]
+        self.remaining_dangers = DIFFICULTY_SETTINGS[self.difficulty]["danger_count"]
+        self._reset_field()
+        self._set_pre_game_controls(False)
+        update_balance_in_json(self.username, self.balance)
+        self.info_var.set("第 1 关 · 点击球门任意位置射门")
+        self.update_display()
 
-        seg = 0
-        frame = 0
 
-        def step():
-            nonlocal seg, frame
+    def cash_out(self) -> None:
+        if not self.game_active or self.current_stage <= 0 or self.shot_in_progress:
+            return
+        multiplier = self.multipliers[self.current_stage - 1]
+        amount = self.bet_amount * multiplier
+        self.balance += amount
+        self.last_win = amount
+        self.result_overlay = f"CASH OUT  ×{multiplier:.2f}"
+        self.result_color = Theme.GOLD
+        self.info_var.set(f"兑现成功 · 返还 ${amount:,.2f}")
+        update_balance_in_json(self.username, self.balance)
+        self._finish_run()
 
-            if seg >= len(frames_list):
-                if on_complete:
-                    on_complete()
+    def _finish_run(self) -> None:
+        self.game_active = False
+        self.awaiting_decision = False
+        self.shot_ready = False
+        self.shot_in_progress = False
+        self._reset_field()
+        self._set_pre_game_controls(True)
+        self.update_display()
+
+    def _on_canvas_motion(self, event) -> None:
+        if not self.game_active or not self.shot_ready or self.shot_in_progress:
+            return
+        if self._inside_goal(event.x, event.y):
+            self.aim_x = float(event.x)
+            self.aim_y = float(event.y)
+            self.game_canvas.configure(cursor="crosshair")
+            self.draw_scene()
+        else:
+            self.game_canvas.configure(cursor="arrow")
+
+    def _on_canvas_leave(self, _event) -> None:
+        self.game_canvas.configure(cursor="arrow")
+
+    def _on_goal_click(self, event) -> None:
+        if not self.game_active or not self.shot_ready or self.shot_in_progress:
+            return
+        if not self._inside_goal(event.x, event.y):
+            return
+        self.aim_x = float(event.x)
+        self.aim_y = float(event.y)
+        self._commit_shot((self.aim_x, self.aim_y))
+
+    def _inside_goal(self, x: float, y: float) -> bool:
+        return self.GOAL_LEFT <= x <= self.GOAL_RIGHT and self.GOAL_TOP <= y <= self.GOAL_BOTTOM
+
+    def _commit_shot(self, target: tuple[float, float]) -> None:
+        self.shot_ready = False
+        self.shot_in_progress = True
+        failed = self._draw_risk_failure()
+
+        # The economic result is fixed here. Animation below is presentation only.
+        if failed:
+            keeper_target = target
+        else:
+            keeper_target = self._choose_wrong_keeper_target(target)
+
+        self._animate_shot(target, keeper_target, saved=failed)
+
+    def _choose_wrong_keeper_target(self, shot_target: tuple[float, float]) -> tuple[float, float]:
+        zones = [
+            (165, 135), (373, 135), (581, 135),
+            (165, 195), (373, 195), (581, 195),
+            (165, 258), (373, 258), (581, 258),
+        ]
+        sx, sy = shot_target
+        candidates = [
+            p for p in zones
+            if math.hypot(p[0] - sx, p[1] - sy) > 150
+        ]
+        return random.choice(candidates or zones)
+
+    @staticmethod
+    def _mix_pose(a: dict[str, float], b: dict[str, float], t: float) -> dict[str, float]:
+        t = max(0.0, min(1.0, t))
+        return {key: a[key] + (b[key] - a[key]) * t for key in a}
+
+    @staticmethod
+    def _ease_out_cubic(t: float) -> float:
+        t = max(0.0, min(1.0, t))
+        return 1.0 - (1.0 - t) ** 3
+
+    @staticmethod
+    def _ease_in_out_cubic(t: float) -> float:
+        t = max(0.0, min(1.0, t))
+        if t < 0.5:
+            return 4.0 * t * t * t
+        return 1.0 - ((-2.0 * t + 2.0) ** 3) / 2.0
+
+    def _animate_shot(
+        self,
+        target: tuple[float, float],
+        keeper_target: tuple[float, float],
+        *,
+        saved: bool,
+    ) -> None:
+        # R4 uses a three-phase keeper save: preload -> launch -> full extension.
+        # This removes the old linear puppet-like interpolation.
+        frames = 36
+        frame_ms = 22
+        start_ball = self.BALL_START
+        neutral = self._neutral_keeper_pose()
+        preload = self._keeper_preload_pose(keeper_target)
+        final_pose = self._keeper_target_pose(keeper_target)
+
+        curve = (target[0] - start_ball[0]) * -0.065
+
+        def keeper_pose_at(t: float) -> dict[str, float]:
+            if t < 0.18:
+                q = self._ease_in_out_cubic(t / 0.18)
+                return self._mix_pose(neutral, preload, q)
+            if t < 0.78:
+                q = self._ease_out_cubic((t - 0.18) / 0.60)
+                return self._mix_pose(preload, final_pose, q)
+            # Slight settling at full reach instead of snapping to a hard pose.
+            hold = dict(final_pose)
+            hold["compression"] = min(1.0, final_pose["compression"] + 0.08)
+            q = self._ease_in_out_cubic((t - 0.78) / 0.22)
+            return self._mix_pose(final_pose, hold, q)
+
+        def step(frame: int = 0) -> None:
+            if frame > frames:
+                self._finish_shot_animation(target, keeper_target, saved)
                 return
 
-            total = frames_list[seg]
-            t = clamp(frame / total, 0.0, 1.0)
-            t = easings[seg](t)
+            t = frame / frames
+            ball_t = 1.0 - (1.0 - t) ** 2.45
 
-            a = poses[seg]
-            b = poses[seg + 1]
+            mx = (start_ball[0] + target[0]) / 2 + curve
+            my = (start_ball[1] + target[1]) / 2 - 43
+            inv = 1.0 - ball_t
+            bx = inv * inv * start_ball[0] + 2 * inv * ball_t * mx + ball_t * ball_t * target[0]
+            by = inv * inv * start_ball[1] + 2 * inv * ball_t * my + ball_t * ball_t * target[1]
+            self.ball_pos = (bx, by)
+            self.ball_radius = 21.0 - 9.5 * ball_t
 
-            pose = self.make_pose(
-                lerp(a["cx"], b["cx"], t),
-                lerp(a["cy"], b["cy"], t),
-                lean=lerp(a["lean"], b["lean"], t),
-                crouch=lerp(a["crouch"], b["crouch"], t),
-                arm_open=lerp(a["arm_open"], b["arm_open"], t),
-                reach_x=lerp(a["reach_x"], b["reach_x"], t),
-                reach_y=lerp(a["reach_y"], b["reach_y"], t),
-                leg_spread=lerp(a["leg_spread"], b["leg_spread"], t),
-                dive=lerp(a["dive"], b["dive"], t),
-                twist=lerp(a.get("twist", 0.0), b.get("twist", 0.0), t),
-                stretch=lerp(a.get("stretch", 0.0), b.get("stretch", 0.0), t),
-            )
-
-            self.gk_pose = pose
-            self.update_goalkeeper_pose(pose)
-
-            frame += 1
-            if frame > total:
-                seg += 1
-                frame = 0
-
-            self.root.after(delay, step)
+            self.keeper_pose = keeper_pose_at(min(1.0, t / 0.93))
+            self.draw_scene()
+            self.after_id = self.root.after(frame_ms, lambda: step(frame + 1))
 
         step()
 
-    def _enforce_floor(self):
-        """将守门员整体向上移动，使脚底不高于地面线300"""
-        floor_y = 300
-        max_y = -1e9
-        for item in self.gk_items.values():
-            bbox = self.goal_canvas.bbox(item)
-            if bbox:
-                max_y = max(max_y, bbox[3])
-        if max_y > floor_y:
-            dy = max_y - floor_y
-            for item in self.gk_items.values():
-                self.goal_canvas.move(item, 0, -dy)
-            self.gk_pose["cy"] -= dy
+    def _animate_keeper_return(self, *, resume_run: bool = True) -> None:
+        """Recover naturally to the centre after a save attempt."""
+        start_pose = dict(self.keeper_pose)
+        neutral = self._neutral_keeper_pose()
+        frames = 22
+        frame_ms = 20
 
-    def _get_glove_positions(self):
-        """返回左右手中心点 + 半径"""
-        result = []
-
-        for key in ["left_glove", "right_glove"]:
-            bbox = self.goal_canvas.bbox(self.gk_items[key])
-            if bbox:
-                x = (bbox[0] + bbox[2]) / 2
-                y = (bbox[1] + bbox[3]) / 2
-                r = (bbox[2] - bbox[0]) / 2
-                result.append((x, y, r))
-
-        return result
-
-    def check_ball_collision(self, ball_x, ball_y, ball_r):
-        """
-        返回:
-        - None: 未碰撞
-        - "catch": 被手接住
-        - "block": 被身体挡住
-        """
-
-        # 1️⃣ 手套检测（优先级最高）
-        for gx, gy, gr in self._get_glove_positions():
-            dist_sq = (ball_x - gx) ** 2 + (ball_y - gy) ** 2
-            if dist_sq <= (ball_r + gr * 0.9) ** 2:
-                return "catch", (gx, gy)
-
-        # 2️⃣ 身体检测
-        body_bbox = self.goal_canvas.bbox(self.gk_items["body"])
-        if body_bbox:
-            if (body_bbox[0] <= ball_x <= body_bbox[2] and
-                    body_bbox[1] <= ball_y <= body_bbox[3]):
-                return "block", (ball_x, ball_y)
-
-        return None, None
-
-    # ---------------------------- 守门员动作动画（随机版） ----------------------------
-    def animate_goalkeeper_random_action(self, action_type, target_gk_x, on_complete):
-        """
-        守门员移动到随机目标X位置并做出指定动作。
-        action_type: "save_high_block", "catch_middle", "kick_foot", "dive_save", "split_save"
-        target_gk_x: 守门员最终的中心X坐标（160~360之间）
-        """
-        start = dict(self.gk_pose)
-        sx = start["cx"]
-        sy = start["cy"]
-
-        # 目标Y坐标略微根据动作变化，但基本保持原高度附近
-        target_gk_y = sy
-        if action_type in ("kick_foot", "split_save"):
-            target_gk_y = sy + 8
-        elif action_type == "dive_save":
-            target_gk_y = sy + 12
-        elif action_type == "save_high_block":
-            target_gk_y = sy - 4
-
-        # 判断移动方向
-        side = 1 if target_gk_x > sx else -1
-        move_x = target_gk_x - sx
-
-        def P(cx, cy, lean=0.0, crouch=0.0, arm_open=0.0, reach_x=0.0, reach_y=0.0,
-              leg_spread=0.0, dive=0.0, twist=0.0, stretch=0.0):
-            return self.make_pose(
-                cx, cy,
-                lean=lean, crouch=crouch, arm_open=arm_open,
-                reach_x=reach_x, reach_y=reach_y,
-                leg_spread=leg_spread, dive=dive,
-                twist=twist, stretch=stretch
-            )
-
-        if action_type == "save_high_block":
-            seq = [
-                (P(sx + move_x * 0.2, sy - 1,
-                   lean=side * 0.12, crouch=0.22, arm_open=0.52,
-                   reach_x=side * 0.10, reach_y=-0.20,
-                   leg_spread=0.20, dive=0.00, twist=side * 0.04, stretch=0.03), 4, ease_in_out_cubic),
-                (P(target_gk_x, target_gk_y - 2,
-                   lean=side * 0.26, crouch=0.36, arm_open=1.46,
-                   reach_x=side * 0.32, reach_y=-1.10,
-                   leg_spread=0.30, dive=0.08, twist=side * 0.08, stretch=0.18), 5, ease_out_back),
-                (P(target_gk_x + side * 2, target_gk_y - 1,
-                   lean=side * 0.18, crouch=0.32, arm_open=1.52,
-                   reach_x=side * 0.38, reach_y=-1.18,
-                   leg_spread=0.28, dive=0.05, twist=side * 0.06, stretch=0.16), 4, ease_in_out_cubic),
-                (P(target_gk_x, target_gk_y,
-                   lean=side * 0.08, crouch=0.22, arm_open=0.58,
-                   reach_x=side * 0.08, reach_y=-0.18,
-                   leg_spread=0.20, dive=0.00, twist=side * 0.03, stretch=0.02), 4, ease_in_out_cubic),
-            ]
-
-        elif action_type == "catch_middle":
-            seq = [
-                (P(sx + move_x * 0.2, sy - 1,
-                   lean=side * 0.12, crouch=0.24, arm_open=0.48,
-                   reach_x=side * 0.12, reach_y=-0.10,
-                   leg_spread=0.22, dive=0.00, twist=side * 0.04, stretch=0.03), 4, ease_in_out_cubic),
-                (P(target_gk_x, target_gk_y,
-                   lean=side * 0.32, crouch=0.34, arm_open=1.20,
-                   reach_x=side * 1.00, reach_y=-0.40,
-                   leg_spread=0.34, dive=0.04, twist=side * 0.10, stretch=0.08), 5, ease_out_back),
-                (P(target_gk_x + side * 2, target_gk_y,
-                   lean=side * 0.28, crouch=0.30, arm_open=1.28,
-                   reach_x=side * 1.10, reach_y=-0.42,
-                   leg_spread=0.30, dive=0.03, twist=side * 0.08, stretch=0.06), 4, ease_in_out_cubic),
-                (P(target_gk_x, target_gk_y,
-                   lean=side * 0.10, crouch=0.22, arm_open=0.52,
-                   reach_x=side * 0.10, reach_y=-0.08,
-                   leg_spread=0.20, dive=0.00, twist=side * 0.03, stretch=0.02), 4, ease_in_out_cubic),
-            ]
-
-        elif action_type == "kick_foot":
-            seq = [
-                (P(sx + move_x * 0.2, sy + 2,
-                   lean=side * 0.08, crouch=0.40, arm_open=0.40,
-                   reach_x=side * 0.06, reach_y=0.02,
-                   leg_spread=0.50, dive=0.00, twist=side * 0.03, stretch=0.03), 4, ease_in_out_cubic),
-                (P(target_gk_x, target_gk_y + 4,
-                   lean=side * 0.30, crouch=0.92, arm_open=0.60,
-                   reach_x=side * 0.42, reach_y=0.10,
-                   leg_spread=1.06, dive=0.00, twist=side * 0.08, stretch=0.12), 6, ease_out_back),
-                (P(target_gk_x + side * 2, target_gk_y + 6,
-                   lean=side * 0.24, crouch=0.96, arm_open=0.58,
-                   reach_x=side * 0.34, reach_y=0.12,
-                   leg_spread=1.14, dive=0.00, twist=side * 0.06, stretch=0.10), 4, ease_in_out_cubic),
-            ]
-
-        elif action_type == "dive_save":
-            seq = [
-                (P(sx + move_x * 0.15, sy,
-                   lean=side * 0.12, crouch=0.32, arm_open=0.42,
-                   reach_x=side * 0.10, reach_y=0.00,
-                   leg_spread=0.24, dive=0.05, twist=side * 0.05, stretch=0.02), 3, ease_in_out_cubic),
-                (P(target_gk_x + side * 18, target_gk_y + 6,
-                   lean=side * 0.72, crouch=0.50, arm_open=1.18,
-                   reach_x=side * 1.02, reach_y=0.12,
-                   leg_spread=0.72, dive=0.46, twist=side * 0.18, stretch=0.14), 5, ease_out_back),
-                (P(target_gk_x + side * 42, target_gk_y + 12,
-                   lean=side * 0.96, crouch=0.60, arm_open=1.42,
-                   reach_x=side * 1.28, reach_y=0.22,
-                   leg_spread=0.92, dive=0.82, twist=side * 0.24, stretch=0.20), 5, ease_out_back),
-                (P(target_gk_x + side * 30, target_gk_y + 8,
-                   lean=side * 0.62, crouch=0.52, arm_open=1.20,
-                   reach_x=side * 1.08, reach_y=0.14,
-                   leg_spread=0.76, dive=0.52, twist=side * 0.16, stretch=0.12), 3, ease_in_out_cubic),
-            ]
-
-        elif action_type == "split_save":  # 一字马扑救
-            seq = [
-                (P(sx + move_x * 0.2, sy + 2,
-                   lean=side * 0.10, crouch=0.50, arm_open=0.60,
-                   reach_x=side * 0.15, reach_y=0.05,
-                   leg_spread=0.70, dive=0.10, twist=side * 0.05, stretch=0.05), 4, ease_in_out_cubic),
-                (P(target_gk_x, target_gk_y + 8,
-                   lean=side * 0.35, crouch=1.10, arm_open=1.30,
-                   reach_x=side * 0.60, reach_y=0.20,
-                   leg_spread=1.50, dive=0.20, twist=side * 0.12, stretch=0.20), 6, ease_out_back),
-                (P(target_gk_x + side * 3, target_gk_y + 10,
-                   lean=side * 0.30, crouch=1.05, arm_open=1.25,
-                   reach_x=side * 0.55, reach_y=0.18,
-                   leg_spread=1.45, dive=0.15, twist=side * 0.10, stretch=0.18), 4, ease_in_out_cubic),
-                (P(target_gk_x, target_gk_y + 6,
-                   lean=side * 0.20, crouch=0.90, arm_open=1.10,
-                   reach_x=side * 0.40, reach_y=0.10,
-                   leg_spread=1.30, dive=0.10, twist=side * 0.08, stretch=0.12), 4, ease_in_out_cubic),
-            ]
-
-        else:
-            # 默认简单移动
-            seq = [
-                (P(target_gk_x, target_gk_y,
-                   lean=0.0, crouch=0.15, arm_open=0.25,
-                   reach_x=0.0, reach_y=0.0,
-                   leg_spread=0.18, dive=0.0, twist=0.0, stretch=0.0), 10, ease_in_out_cubic)
-            ]
-
-        self._play_gk_sequence(seq, on_complete=on_complete)
-
-    # ---------------------------- 足球动画 ----------------------------
-    def animate_ball(self, start, control, end, start_r, end_r, frames=20,
-                    callback=None, on_frame=None):
-        """
-        新版本：
-        - 每一帧调用 on_frame(x, y, r, t)
-        - 可用于实时碰撞检测
-        """
-
-        self.goal_canvas.delete("shot_ball")
-        self.ball_animation_stop = False
-
-        def update(i=0):
-            if self.ball_animation_stop:
+        def step(frame: int = 0) -> None:
+            if frame > frames:
+                self.after_id = None
+                self.keeper_pose = neutral
+                self.ball_pos = self.BALL_START
+                self.ball_radius = 21.0
+                self.shot_in_progress = False
+                self.awaiting_decision = False
+                if resume_run:
+                    self.shot_ready = True
+                    self.result_overlay = ""
+                    potential = self.bet_amount * self.multipliers[self.current_stage - 1]
+                    self.info_var.set(
+                        f"第 {self.current_stage} 关已进球 · 点击球门继续，或兑现 ${potential:,.2f}"
+                    )
+                else:
+                    self.shot_ready = False
+                    self.game_active = False
+                    self._set_pre_game_controls(True)
+                self.update_display()
                 return
 
-            if i > frames:
-                if callback:
-                    callback((end[0], end[1]))
-                return
+            t = self._ease_in_out_cubic(frame / frames)
+            self.keeper_pose = self._mix_pose(start_pose, neutral, t)
+            # Ball visually returns to the spot during the final half of recovery.
+            if t > 0.45:
+                q = (t - 0.45) / 0.55
+                self.ball_pos = (
+                    self.ball_pos[0] + (self.BALL_START[0] - self.ball_pos[0]) * q * 0.18,
+                    self.ball_pos[1] + (self.BALL_START[1] - self.ball_pos[1]) * q * 0.18,
+                )
+                self.ball_radius += (21.0 - self.ball_radius) * q * 0.18
+            self.draw_scene()
+            self.after_id = self.root.after(frame_ms, lambda: step(frame + 1))
 
-            t = i / frames
-            inv = 1 - t
+        step()
 
-            x = inv * inv * start[0] + 2 * inv * t * control[0] + t * t * end[0]
-            y = inv * inv * start[1] + 2 * inv * t * control[1] + t * t * end[1]
-            r = start_r + (end_r - start_r) * t
+    def _finish_shot_animation(
+        self,
+        target: tuple[float, float],
+        keeper_target: tuple[float, float],
+        saved: bool,
+    ) -> None:
+        self.after_id = None
 
-            # 👉 实时回调（关键）
-            if on_frame:
-                should_stop = on_frame(x, y, r, t)
-                if should_stop:
-                    self.ball_animation_stop = True
-                    return
-
-            self.goal_canvas.delete("shot_ball")
-            self.goal_canvas.create_oval(
-                x - r, y - r, x + r, y + r,
-                fill="white", outline="black", width=2, tags="shot_ball"
-            )
-
-            self.root.after(40, update, i + 1)
-
-        update()
-
-    def show_ball_in_hand(self, hand_pos):
-        """在守门员手部显示被抓住的球"""
-        self.goal_canvas.delete("shot_ball")
-        self.goal_canvas.delete("blocked_ball")
-        r = 20
-        x, y = hand_pos
-        self.goal_canvas.create_oval(x - r, y - r, x + r, y + r, fill="white", outline="black", width=2, tags="caught_ball")
-        self.goal_canvas.create_line(x - r, y, x + r, y, fill="black", width=1, tags="caught_ball")
-        self.goal_canvas.create_line(x, y - r, x, y + r, fill="black", width=1, tags="caught_ball")
-
-    def show_ball_blocked(self, ball_pos):
-        """显示被封堵住的球"""
-        self.goal_canvas.delete("shot_ball")
-        self.goal_canvas.delete("caught_ball")
-        self.goal_canvas.delete("blocked_ball")
-        r = 16
-        x, y = ball_pos
-        self.goal_canvas.create_oval(x - r, y - r, x + r, y + r, fill="white", outline="black", width=2, tags="blocked_ball")
-        self.goal_canvas.create_line(x - r, y, x + r, y, fill="black", width=1, tags="blocked_ball")
-        self.goal_canvas.create_line(x, y - r, x, y + r, fill="black", width=1, tags="blocked_ball")
-
-    # ---------------------------- 点球核心流程（修正版） ----------------------------
-    def on_goal_canvas_click(self, event):
-        """玩家点击龙门内任意位置射门"""
-        if self.animation_running:
-            return
-        if self.current_bet <= 0:
-            messagebox.showwarning("错误", "请先下注")
-            return
-        if self.current_bet > self.balance:
-            messagebox.showwarning("余额不足", "您的余额不足以进行此下注")
+        if saved:
+            self.last_shot_saved = True
+            self.result_overlay = "SAVED"
+            self.result_color = Theme.RED
+            self.shot_history.append("S")
+            self.last_win = 0.0
+            self.info_var.set(f"第 {self.current_stage + 1} 关被扑出 · 本局归零")
+            update_balance_in_json(self.username, self.balance)
+            self.update_display()
+            # Hold the completed save for a beat, then let the keeper recover
+            # naturally instead of snapping back to the centre.
+            self.after_id = self.root.after(520, lambda: self._animate_keeper_return(resume_run=False))
             return
 
-        # 检查点击位置是否在龙门有效区域内
-        if not (self.net_left <= event.x <= self.net_right and self.net_top <= event.y <= self.net_bottom):
-            messagebox.showwarning("无效区域", "请点击龙门网区域射门！")
+        self.last_shot_saved = False
+        self.current_stage += 1
+        multiplier = self.multipliers[self.current_stage - 1]
+        potential = self.bet_amount * multiplier
+        self.result_overlay = "GOAL"
+        self.result_color = Theme.GREEN
+        self.shot_history.append("G")
+
+        if self.current_stage >= TOTAL_STAGES:
+            self.shot_in_progress = False
+            self.balance += potential
+            self.last_win = potential
+            self.info_var.set(f"第 10 关完成 · 自动兑现 ${potential:,.2f}")
+            update_balance_in_json(self.username, self.balance)
+            self._finish_run()
             return
 
-        # 开始点球流程
-        self.animation_running = True
-        self.set_buttons_state(False)
-
-        target_pos = (event.x, event.y)  # 射门目标点
-
-        # 扣注
-        shot_bet = self.current_bet
-        self.pending_bet = shot_bet
-        self.balance -= shot_bet
-        self.current_bet = 0.0
-        self.bet_var.set("$0.00")
+        # No 'continue' confirmation.  The keeper recovers automatically, then
+        # the goal becomes clickable for the next stage while cash-out stays available.
+        self.awaiting_decision = False
+        self.info_var.set(f"第 {self.current_stage} 关进球 · 门将回位中…")
         self.update_display()
-        update_balance_in_json(self.username, self.balance)
+        self.after_id = self.root.after(360, self._animate_keeper_return)
 
-        # 随机决定守门员目标X位置（范围180~340，避免出界）
-        gk_target_x = random.randint(180, 340)
-        # 随机选择动作类型
-        action_types = ["save_high_block", "catch_middle", "kick_foot", "dive_save", "split_save"]
-        action = random.choice(action_types)
+    # ------------------------------------------------------------------
+    # Keeper geometry / drawing
+    # ------------------------------------------------------------------
 
-        # 状态管理
-        state = {
-            "ball_done": False,
-            "gk_done": False,
-            "collision": False,
-            "collision_pos": None,
-            "scored": False  # 默认未进球，等碰撞检测后决定
+    def _neutral_keeper_pose(self) -> dict[str, float]:
+        return {
+            "cx": 373.0,
+            "cy": 252.0,
+            "angle": 0.0,
+            "air": 0.0,
+            "reach": 0.18,
+            "crouch": 0.16,
+            "spread": 0.28,
+            "compression": 0.0,
+            "side": 0.0,
+            "high": 0.0,
         }
 
-        def try_finish():
-            if state["ball_done"] and state["gk_done"]:
-                # 结算：如果发生了碰撞则输，否则进球赢
-                if state["collision"]:
-                    self.settle_shot(False, None, collision_pos=state.get("collision_pos"))
-                else:
-                    self.settle_shot(True, None)
+    def _keeper_preload_pose(self, target: tuple[float, float]) -> dict[str, float]:
+        tx, ty = target
+        side = max(-1.0, min(1.0, (tx - 373.0) / 215.0))
+        high = max(-1.0, min(1.0, (190.0 - ty) / 92.0))
+        return {
+            "cx": 373.0 - side * 8.0,
+            "cy": 254.0 + max(0.0, -high) * 5.0,
+            "angle": side * 0.06,
+            "air": 0.0,
+            "reach": 0.28,
+            "crouch": 0.38 + max(0.0, -high) * 0.16,
+            "spread": 0.40,
+            "compression": 0.38,
+            "side": side,
+            "high": high,
+        }
 
-        def after_gk():
-            state["gk_done"] = True
-            try_finish()
+    def _keeper_target_pose(self, target: tuple[float, float]) -> dict[str, float]:
+        tx, ty = target
+        side = max(-1.0, min(1.0, (tx - 373.0) / 215.0))
+        high = max(-1.0, min(1.0, (190.0 - ty) / 92.0))
+        abs_side = abs(side)
+        high_pos = max(0.0, high)
+        low = max(0.0, -high)
 
-        def after_ball(pos=None):
-            state["ball_done"] = True
-            # 如果球到达终点且没有碰撞，则进球
-            if not state["collision"]:
-                # 显示球在网内效果（可选）
-                self.goal_canvas.delete("shot_ball")
-                self.goal_canvas.create_oval(
-                    pos[0] - 15, pos[1] - 15, pos[0] + 15, pos[1] + 15,
-                    fill="white", outline="black", width=2, tags="goal_ball"
-                )
-            try_finish()
+        # Realistic save categories emerge continuously from target position:
+        # central = set/block, high lateral = airborne dive, low lateral = skid save.
+        return {
+            "cx": 373.0 + side * (132.0 + 24.0 * high_pos),
+            "cy": 250.0 - high_pos * (47.0 + 18.0 * abs_side) + low * 24.0,
+            "angle": side * (0.18 + 0.88 * abs_side) * (1.0 - 0.18 * low),
+            "air": min(1.0, high_pos * 0.90 + abs_side * 0.36),
+            "reach": min(1.0, 0.48 + abs_side * 0.50 + high_pos * 0.18),
+            "crouch": min(1.0, 0.14 + low * 0.78 + (1.0 - abs_side) * 0.10),
+            "spread": min(1.0, 0.34 + low * 0.55 + abs_side * 0.25),
+            "compression": 0.08,
+            "side": side,
+            "high": high,
+        }
 
-        def on_ball_frame(x, y, r, t):
-            # 实时碰撞检测
-            result, col_pos = self.check_ball_collision(x, y, r)
-            if result:
-                state["collision"] = True
-                state["collision_pos"] = col_pos
-                state["ball_done"] = True
-                # 显示碰撞效果
-                if result == "catch":
-                    self.show_ball_in_hand(col_pos)
-                else:
-                    self.show_ball_blocked(col_pos)
-                try_finish()
-                return True  # 停止动画
-            return False
-
-        # 准备球轨迹 - 修正为更接近直线的轨迹
-        start_pos = self.ball_start_pos
-        # 控制点取中点并加上轻微弧度（保证球基本沿直线飞向目标，但略有弧线增加真实感）
-        ctrl_x = (start_pos[0] + target_pos[0]) / 2 + random.randint(-15, 15)
-        # 弧线高度：让球稍微向上拱起，但不会偏离目标方向
-        arc_height = max(20, min(80, (start_pos[1] - target_pos[1]) * 0.3))
-        ctrl_y = (start_pos[1] + target_pos[1]) / 2 - random.randint(int(arc_height*0.5), int(arc_height))
-
-        # 可选：绘制一条临时轨迹线（帮助玩家看到预期路径）
-        self.goal_canvas.delete("trajectory")
-        points = []
-        for i in range(0, 11):
-            t = i / 10
-            inv = 1 - t
-            x = inv * inv * start_pos[0] + 2 * inv * t * ctrl_x + t * t * target_pos[0]
-            y = inv * inv * start_pos[1] + 2 * inv * t * ctrl_y + t * t * target_pos[1]
-            points.extend([x, y])
-        if len(points) >= 4:
-            self.goal_canvas.create_line(points, fill="#ffff88", width=2, dash=(4, 4), tags="trajectory")
-        # 0.5秒后擦除轨迹
-        self.root.after(500, lambda: self.goal_canvas.delete("trajectory"))
-
-        # 开始守门员动画和足球动画
-        self.animate_goalkeeper_random_action(action, gk_target_x, on_complete=after_gk)
-        self.animate_ball(
-            start_pos,
-            (ctrl_x, ctrl_y),
-            target_pos,
-            40,
-            25,
-            frames=20,
-            callback=after_ball,
-            on_frame=on_ball_frame
+    @staticmethod
+    def _basis_point(
+        origin: tuple[float, float],
+        right: tuple[float, float],
+        up: tuple[float, float],
+        x: float,
+        y: float,
+    ) -> tuple[float, float]:
+        return (
+            origin[0] + right[0] * x + up[0] * y,
+            origin[1] + right[1] * x + up[1] * y,
         )
 
-    def settle_shot(self, scored, action_type=None, collision_pos=None):
-        pending = self.pending_bet
+    def _draw_keeper(self) -> None:
+        """Draw a proportioned articulated goalkeeper rather than a rotating puppet."""
+        c = self.game_canvas
+        p = self.keeper_pose
+        cx, cy = p["cx"], p["cy"]
+        angle = p["angle"] * math.radians(54)
+        air = p["air"]
+        reach = p["reach"]
+        crouch = p["crouch"]
+        spread = p["spread"]
+        side = p["side"]
+        high = p["high"]
 
-        if scored:
-            payout = pending * 2
-            self.balance += payout
-            self.last_win = payout
-            messagebox.showinfo("进球啦！", f"球进了！您获得 ${payout:.2f}")
+        right = (math.cos(angle), math.sin(angle))
+        up = (math.sin(angle), -math.cos(angle))
+        origin = (cx, cy)
+
+        # Body proportions are intentionally more human: larger torso/head relation,
+        # narrower waist, longer limbs and asymmetric push-off/trailing legs.
+        pelvis = self._basis_point(origin, right, up, 0, 0)
+        chest = self._basis_point(origin, right, up, 0, 42 - crouch * 12)
+        neck = self._basis_point(chest, right, up, 0, 18)
+        head = self._basis_point(neck, right, up, side * 2, 13)
+
+        shadow_y = 297
+        shadow_half = 35 + abs(side) * 55
+        shadow_h = max(3.0, 10.0 - air * 5.5)
+        c.create_oval(
+            cx - shadow_half, shadow_y - shadow_h,
+            cx + shadow_half, shadow_y + shadow_h,
+            fill="#39413E", outline="", stipple="gray50", tags="keeper",
+        )
+
+        # Legs first so torso/arms layer naturally above them.
+        hip_l = self._basis_point(pelvis, right, up, -13, 1)
+        hip_r = self._basis_point(pelvis, right, up, 13, 1)
+        dive_sign = 1.0 if side >= 0 else -1.0
+        low = max(0.0, -high)
+
+        for idx, (hip_pt, sign) in enumerate(((hip_l, -1.0), (hip_r, 1.0))):
+            leading = (sign == dive_sign)
+            if abs(side) < 0.12:
+                leading = sign > 0
+
+            lateral = sign * (17 + spread * 23)
+            if abs(side) > 0.15:
+                lateral += -side * (8 if leading else 24)
+            knee = (
+                hip_pt[0] + right[0] * lateral + up[0] * (-26 + low * 8),
+                hip_pt[1] + right[1] * lateral + up[1] * (-26 + low * 8),
+            )
+            extension = 31 + (10 if not leading and abs(side) > 0.2 else 0) + low * 8
+            foot = (
+                knee[0] + right[0] * (sign * (10 + spread * 12) - side * 13) + up[0] * (-extension),
+                knee[1] + right[1] * (sign * (10 + spread * 12) - side * 13) + up[1] * (-extension),
+            )
+
+            c.create_line(*hip_pt, *knee, fill=Theme.KEEPER_SHORTS, width=12,
+                          capstyle=tk.ROUND, tags="keeper")
+            c.create_line(*knee, *foot, fill=Theme.KEEPER_SOCK, width=9,
+                          capstyle=tk.ROUND, tags="keeper")
+            boot_tip = (foot[0] + right[0] * sign * 8, foot[1] + right[1] * sign * 8)
+            c.create_line(*foot, *boot_tip, fill=Theme.KEEPER_BOOT, width=8,
+                          capstyle=tk.ROUND, tags="keeper")
+
+        # Shorts / torso.
+        shorts = [
+            self._basis_point(pelvis, right, up, -16, 4),
+            self._basis_point(pelvis, right, up, 16, 4),
+            self._basis_point(pelvis, right, up, 13, -14),
+            self._basis_point(pelvis, right, up, -13, -14),
+        ]
+        c.create_polygon(*sum(([x, y] for x, y in shorts), []),
+                         fill=Theme.KEEPER_SHORTS, outline="#20292E", width=1, tags="keeper")
+
+        torso = [
+            self._basis_point(chest, right, up, -21, 2),
+            self._basis_point(chest, right, up, 21, 2),
+            self._basis_point(pelvis, right, up, 15, 3),
+            self._basis_point(pelvis, right, up, -15, 3),
+        ]
+        c.create_polygon(*sum(([x, y] for x, y in torso), []),
+                         fill=Theme.KEEPER_JERSEY, outline=Theme.KEEPER_JERSEY_DARK,
+                         width=2, tags="keeper")
+
+        # Jersey shoulder panel and number give the figure a sports-game silhouette.
+        shoulder_a = self._basis_point(chest, right, up, -19, -1)
+        shoulder_b = self._basis_point(chest, right, up, 19, -1)
+        c.create_line(*shoulder_a, *shoulder_b, fill=Theme.KEEPER_JERSEY_LIGHT,
+                      width=5, tags="keeper")
+        number_pos = self._basis_point(chest, right, up, 0, -12)
+        c.create_text(number_pos[0], number_pos[1], text="1", fill="#F4E8CF",
+                      font=(Theme.FONT, 9, "bold"), angle=-math.degrees(angle), tags="keeper")
+
+        # Arms.  In side dives both hands travel toward the ball but retain elbow bend.
+        sh_l = self._basis_point(chest, right, up, -22, 0)
+        sh_r = self._basis_point(chest, right, up, 22, 0)
+        high_world = max(-1.0, min(1.0, high))
+        side_abs = abs(side)
+
+        if side_abs < 0.18:
+            # Central block: symmetric hands, high shots overhead / low shots down.
+            hand_l = (sh_l[0] - 18, sh_l[1] - 24 - high_world * 28 + low * 28)
+            hand_r = (sh_r[0] + 18, sh_r[1] - 24 - high_world * 28 + low * 28)
         else:
-            self.last_win = 0
-            messagebox.showinfo("没进", f"守门员扑出了点球！本次已扣除 ${pending:.2f}")
-
-        self.update_display()
-        update_balance_in_json(self.username, self.balance)
-
-        self.pending_bet = 0.0
-        self.goalkeeper_reset_pose()
-        self.animation_running = False
-        self.set_buttons_state(True)
-        # 清理所有临时球体
-        self.goal_canvas.delete("shot_ball")
-        self.goal_canvas.delete("caught_ball")
-        self.goal_canvas.delete("blocked_ball")
-        self.goal_canvas.delete("goal_ball")
-        self.goal_canvas.delete("trajectory")
-
-    def set_buttons_state(self, enabled):
-        state = tk.NORMAL if enabled else tk.DISABLED
-        for btn in self.chip_buttons:
-            btn.config(state=state)
-        self.play_button.config(state=state)
-        self.reset_bet_button.config(state=state)
-
-    def add_chip(self, amount):
-        if self.animation_running:
-            return
-        try:
-            amount_val = 1000.0 if amount == "1K" else float(amount)
-            new_bet = self.current_bet + amount_val
-            if new_bet <= self.balance:
-                self.current_bet = new_bet
-                self.bet_var.set(f"${self.current_bet:.2f}")
+            reach_len = 47 + reach * 32
+            vertical = -18 - max(0.0, high_world) * 33 + low * 22
+            lead_sh = sh_r if side > 0 else sh_l
+            trail_sh = sh_l if side > 0 else sh_r
+            lead_hand = (lead_sh[0] + dive_sign * reach_len, lead_sh[1] + vertical)
+            trail_hand = (trail_sh[0] + dive_sign * (reach_len - 15), trail_sh[1] + vertical + 8)
+            if side > 0:
+                hand_r, hand_l = lead_hand, trail_hand
             else:
-                messagebox.showwarning("余额不足", "下注金额不能超过余额")
-        except Exception:
-            pass
+                hand_l, hand_r = lead_hand, trail_hand
 
-    def reset_bet(self):
-        if self.animation_running:
-            return
-        self.current_bet = 0.0
-        self.bet_var.set("$0.00")
+        for shoulder_pt, hand in ((sh_l, hand_l), (sh_r, hand_r)):
+            elbow = (
+                shoulder_pt[0] * 0.46 + hand[0] * 0.54 - up[0] * 5,
+                shoulder_pt[1] * 0.46 + hand[1] * 0.54 - up[1] * 5,
+            )
+            c.create_line(*shoulder_pt, *elbow, fill=Theme.KEEPER_JERSEY,
+                          width=10, capstyle=tk.ROUND, tags="keeper")
+            c.create_line(*elbow, *hand, fill=Theme.KEEPER_JERSEY_LIGHT,
+                          width=8, capstyle=tk.ROUND, tags="keeper")
+            # Glove palm + cuff.
+            cuff = ((elbow[0] + hand[0]) / 2 * 0.15 + hand[0] * 0.85,
+                    (elbow[1] + hand[1]) / 2 * 0.15 + hand[1] * 0.85)
+            c.create_line(*cuff, *hand, fill=Theme.KEEPER_GLOVE_EDGE, width=10,
+                          capstyle=tk.ROUND, tags="keeper")
+            c.create_oval(hand[0] - 8, hand[1] - 8, hand[0] + 8, hand[1] + 8,
+                          fill=Theme.KEEPER_GLOVE, outline=Theme.KEEPER_GLOVE_EDGE,
+                          width=2, tags="keeper")
 
-    def play_game(self):
-        if self.animation_running:
-            return
-        if self.current_bet <= 0:
-            messagebox.showwarning("错误", "请先下注")
-            return
-        if self.current_bet > self.balance:
-            messagebox.showwarning("余额不足", "您的余额不足以进行此下注")
-            return
-        messagebox.showinfo("点球大战", "请点击龙门网内任意位置射门！")
+        # Neck/head last.
+        c.create_line(*neck, *head, fill=Theme.KEEPER_SKIN, width=7,
+                      capstyle=tk.ROUND, tags="keeper")
+        c.create_oval(head[0] - 12, head[1] - 13, head[0] + 12, head[1] + 13,
+                      fill=Theme.KEEPER_SKIN, outline="#73513D", width=1, tags="keeper")
+        c.create_arc(head[0] - 12, head[1] - 14, head[0] + 12, head[1] + 5,
+                     start=0, extent=180, style=tk.PIESLICE,
+                     fill="#352F2A", outline="#352F2A", tags="keeper")
 
-    def update_display(self):
-        self.balance_var.set(f"${self.balance:.2f}")
-        self.last_win_var.set(f"${self.last_win:.2f}")
 
-    def on_closing(self):
+    # ------------------------------------------------------------------
+    # Scene drawing
+    # ------------------------------------------------------------------
+
+    def _reset_field(self) -> None:
+        self.ball_pos = self.BALL_START
+        self.ball_radius = 21.0
+        self.keeper_pose = self._neutral_keeper_pose()
+        self.aim_x = (self.GOAL_LEFT + self.GOAL_RIGHT) / 2
+        self.aim_y = (self.GOAL_TOP + self.GOAL_BOTTOM) / 2
+        self.draw_scene()
+
+    def _draw_goal(self) -> None:
+        c = self.game_canvas
+        left, right = self.GOAL_LEFT, self.GOAL_RIGHT
+        top, bottom = self.GOAL_TOP, self.GOAL_BOTTOM
+        back_left, back_right = left + 25, right - 25
+        back_top = top + 22
+
+        # Back net plane.
+        c.create_polygon(
+            back_left, back_top,
+            back_right, back_top,
+            right, bottom,
+            left, bottom,
+            fill="#80958A",
+            outline="",
+            stipple="gray50",
+            tags="goal",
+        )
+
+        # Net grid in perspective.
+        for i in range(1, 11):
+            t = i / 11
+            x_top = back_left + (back_right - back_left) * t
+            x_bottom = left + (right - left) * t
+            c.create_line(x_top, back_top, x_bottom, bottom, fill=Theme.NET, width=1, tags="goal")
+        for i in range(1, 6):
+            t = i / 6
+            y = back_top + (bottom - back_top) * t
+            inset = 25 * (1 - t)
+            c.create_line(left + inset, y, right - inset, y, fill=Theme.NET, width=1, tags="goal")
+
+        # Thick frame.
+        c.create_line(left, bottom, left, top, right, top, right, bottom,
+                      fill=Theme.GOAL_POST, width=8, joinstyle=tk.ROUND, tags="goal")
+        c.create_line(left + 7, bottom, right - 7, bottom, fill=Theme.GOAL_POST, width=5, tags="goal")
+
+    def _draw_ball(self) -> None:
+        c = self.game_canvas
+        x, y = self.ball_pos
+        r = self.ball_radius
+        c.create_oval(x - r, y - r, x + r, y + r,
+                      fill=Theme.BALL, outline="#33383C", width=2, tags="ball")
+        c.create_polygon(
+            x, y - r * 0.46,
+            x + r * 0.42, y - r * 0.12,
+            x + r * 0.26, y + r * 0.38,
+            x - r * 0.26, y + r * 0.38,
+            x - r * 0.42, y - r * 0.12,
+            fill=Theme.BALL_PATCH,
+            outline="",
+            tags="ball",
+        )
+        for angle in range(0, 360, 72):
+            rad = math.radians(angle)
+            px = x + math.cos(rad) * r * 0.72
+            py = y + math.sin(rad) * r * 0.72
+            c.create_oval(px - r * 0.12, py - r * 0.12, px + r * 0.12, py + r * 0.12,
+                          fill=Theme.BALL_PATCH, outline="", tags="ball")
+
+    def _draw_stage_strip(self) -> None:
+        c = self.game_canvas
+        left = 61
+        y = 18
+        gap = 5
+        total_width = self.CANVAS_WIDTH - left * 2
+        cell_w = (total_width - gap * 9) / 10
+        for index in range(10):
+            x1 = left + index * (cell_w + gap)
+            x2 = x1 + cell_w
+            if index < self.current_stage:
+                fill = Theme.STAGE_DONE
+                edge = Theme.STAGE_DONE_EDGE
+                fg = Theme.STAGE_DONE_EDGE
+            elif index == self.current_stage and self.game_active:
+                fill = Theme.STAGE_ACTIVE
+                edge = Theme.STAGE_ACTIVE_EDGE
+                fg = Theme.ACCENT
+            else:
+                fill = Theme.STAGE_FUTURE
+                edge = Theme.STAGE_FUTURE_EDGE
+                fg = Theme.TEXT_DIM
+            c.create_rectangle(x1, y, x2, y + 38, fill=fill, outline=edge,
+                               width=2 if index == self.current_stage and self.game_active else 1,
+                               tags="stage")
+            c.create_text((x1 + x2) / 2, y + 11, text=f"{index + 1}",
+                          fill=fg, font=(Theme.FONT, 7, "bold"), tags="stage")
+            c.create_text((x1 + x2) / 2, y + 27, text=f"×{self.multipliers[index]:.2f}",
+                          fill=Theme.TEXT if index != self.current_stage else Theme.AMBER,
+                          font=(Theme.FONT, 7, "bold"), tags="stage")
+
+    def draw_scene(self) -> None:
+        c = self.game_canvas
+        c.delete("all")
+        w = self.CANVAS_WIDTH
+        h = self.CANVAS_HEIGHT
+
+        # Broadcast-style stadium background.
+        c.create_rectangle(0, 0, w, 86, fill=Theme.SKY, outline="")
+        c.create_rectangle(0, 56, w, 116, fill=Theme.CROWD_DARK, outline="")
+        for x in range(8, w, 18):
+            crowd_fill = Theme.CROWD if (x // 18) % 2 == 0 else "#7C6F67"
+            c.create_oval(x, 69 + (x % 3) * 3, x + 8, 77 + (x % 3) * 3,
+                          fill=crowd_fill, outline="")
+
+        # Perspective pitch.
+        c.create_polygon(0, 116, w, 116, w, h, 0, h, fill=Theme.PITCH, outline="")
+        c.create_polygon(0, 116, w / 2, 116, w / 2, h, 0, h,
+                         fill=Theme.PITCH_ALT, outline="")
+        c.create_polygon(w / 2, 116, w, 116, w, h, w / 2, h,
+                         fill=Theme.PITCH, outline="")
+
+        # Penalty area perspective lines.
+        c.create_line(92, 302, 654, 302, fill=Theme.PITCH_LINE, width=2)
+        c.create_line(92, 302, 22, h, fill=Theme.PITCH_LINE, width=2)
+        c.create_line(654, 302, 724, h, fill=Theme.PITCH_LINE, width=2)
+        c.create_arc(275, 300, 471, 390, start=190, extent=160,
+                     outline=Theme.PITCH_LINE, width=2, style=tk.ARC)
+
+        self._draw_stage_strip()
+        self._draw_goal()
+        self._draw_keeper()
+        self._draw_ball()
+
+        # Aim ring exists only when the player is allowed to choose a shot.
+        if self.game_active and self.shot_ready and not self.shot_in_progress:
+            r = 20
+            c.create_oval(
+                self.aim_x - r, self.aim_y - r,
+                self.aim_x + r, self.aim_y + r,
+                outline=Theme.AIM,
+                width=3,
+                dash=(5, 3),
+                tags="aim",
+            )
+            c.create_oval(
+                self.aim_x - 5, self.aim_y - 5,
+                self.aim_x + 5, self.aim_y + 5,
+                fill=Theme.AIM_INNER,
+                outline=Theme.AMBER,
+                width=1,
+                tags="aim",
+            )
+
+        if self.result_overlay:
+            c.create_text(
+                w / 2,
+                344,
+                text=self.result_overlay,
+                fill=self.result_color,
+                font=(Theme.FONT, 27, "bold"),
+            )
+
+        # Recent sequence is compact and unobtrusive.
+        c.create_text(32, 505, text="本局", fill=Theme.TEXT_MUTED,
+                      font=(Theme.FONT_CJK, 8, "bold"), anchor=tk.W)
+        for index in range(10):
+            x = 82 + index * 46
+            value = self.shot_history[index] if index < len(self.shot_history) else "·"
+            if value == "G":
+                fill = Theme.GREEN
+            elif value == "S":
+                fill = Theme.RED
+            else:
+                fill = Theme.TEXT_DIM
+            c.create_text(x, 505, text=value, fill=fill,
+                          font=(Theme.FONT, 10, "bold"))
+
+    def draw_ladder(self) -> None:
+        c = self.ladder_canvas
+        c.delete("all")
+        multipliers = self.multipliers
+        cols = 5
+        gap = 5
+        cell_w = (322 - gap * 4) / 5
+        cell_h = 70
+        for index, multiplier in enumerate(multipliers):
+            row = index // cols
+            col = index % cols
+            x1 = col * (cell_w + gap)
+            y1 = row * 76
+            x2 = x1 + cell_w
+            y2 = y1 + cell_h
+            if index < self.current_stage:
+                fill = Theme.STAGE_DONE
+                edge = Theme.STAGE_DONE_EDGE
+            elif index == self.current_stage and self.game_active:
+                fill = Theme.STAGE_ACTIVE
+                edge = Theme.STAGE_ACTIVE_EDGE
+            else:
+                fill = Theme.PANEL_ALT
+                edge = Theme.BORDER_SOFT
+            c.create_rectangle(x1, y1, x2, y2, fill=fill, outline=edge,
+                               width=2 if index == self.current_stage and self.game_active else 1)
+            c.create_text((x1 + x2) / 2, y1 + 17, text=f"第{index + 1}关",
+                          fill=Theme.TEXT_MUTED, font=(Theme.FONT_CJK, 7, "bold"))
+            c.create_text((x1 + x2) / 2, y1 + 42, text=f"{multiplier:.2f}×",
+                          fill=Theme.ACCENT, font=(Theme.FONT, 9, "bold"))
+            if index < self.current_stage:
+                c.create_text((x1 + x2) / 2, y1 + 59, text="IN",
+                              fill=Theme.GREEN, font=(Theme.FONT, 7, "bold"))
+
+    # ------------------------------------------------------------------
+    # UI state
+    # ------------------------------------------------------------------
+
+    def _set_pre_game_controls(self, enabled: bool) -> None:
+        for chip in self.chip_buttons:
+            chip.set_enabled(enabled)
+        self.reset_button.configure(state=tk.NORMAL if enabled else tk.DISABLED)
+        self.start_button.configure(state=tk.NORMAL if enabled else tk.DISABLED)
+        self._refresh_difficulty_buttons()
+
+    def _sync_action_buttons(self) -> None:
+        self.reset_button.place_forget()
+        self.start_button.place_forget()
+        self.cashout_button.place_forget()
+
+        if not self.game_active:
+            # Exactly half / half across the 322 px action width.
+            self.reset_button.place(x=0, y=44, width=156, height=32)
+            self.start_button.place(x=166, y=44, width=156, height=32)
+            self.reset_button.configure(state=tk.NORMAL)
+            self.start_button.configure(state=tk.NORMAL)
+            return
+
+        # During an active run the goal itself is the 'continue' control.
+        # Cash-out becomes available after at least one successful stage.
+        if self.current_stage > 0:
+            amount = self.bet_amount * self.multipliers[self.current_stage - 1]
+            self.cashout_button.configure(
+                text=f"兑现 ${amount:,.2f}",
+                state=tk.DISABLED if self.shot_in_progress else tk.NORMAL,
+            )
+            self.cashout_button.place(x=0, y=44, width=322, height=32)
+
+    def update_display(self) -> None:
+        self.balance_var.set(f"${self.balance:,.2f}")
+        self.bet_var.set(f"${self.current_bet:,.2f}")
+
+        if self.game_active and self.current_stage > 0:
+            potential = self.bet_amount * self.multipliers[self.current_stage - 1]
+            self.potential_var.set(f"${potential:,.2f}")
+        else:
+            self.potential_var.set("$0.00")
+
+        self.stage_var.set(f"{self.current_stage} / {TOTAL_STAGES}")
+        if self.game_active and self.current_stage < TOTAL_STAGES:
+            self.risk_var.set(f"{self._live_failure_rate() * 100:.2f}%")
+        else:
+            setting = DIFFICULTY_SETTINGS[self.difficulty]
+            initial = setting["danger_count"] / setting["pool_cells"]
+            self.risk_var.set(f"{initial * 100:.2f}%")
+
+        self._refresh_difficulty_buttons()
+        self._sync_action_buttons()
+        self.draw_ladder()
+        self.draw_scene()
+
+    def on_closing(self) -> None:
+        if self.after_id is not None:
+            try:
+                self.root.after_cancel(self.after_id)
+            except tk.TclError:
+                pass
+            self.after_id = None
         update_balance_in_json(self.username, self.balance)
-        self.root.destroy()
+        finish = getattr(self.root, "finish", None)
+        if callable(finish):
+            finish(self.balance)
+        else:
+            self.root.destroy()
 
-# ---------------------------- 外部调用 ----------------------------
-def main(initial_balance, username):
+
+def main(
+    initial_balance=1000.0,
+    username="Guest",
+    *,
+    parent=None,
+    balance=None,
+    user=None,
+    on_back=None,
+    on_balance_change=None,
+):
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        if EmbeddedGamePage is None:
+            raise RuntimeError(
+                "EmbeddedGamePage is unavailable. Place Penalty.py inside the "
+                "Small_Games package or make small_games.py importable."
+            )
+        page = EmbeddedGamePage(
+            parent,
+            title="点球连胜",
+            username=actual_user,
+            balance=actual_balance,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+        )
+        page.set_requested_size(1150, 750)
+        game = PenaltyGame(page.host, actual_balance, actual_user)
+        page.attach_game(game)
+        return page
+
     root = tk.Tk()
-    game = PenaltyGame(root, initial_balance, username)
+    game = PenaltyGame(root, actual_balance, actual_user)
     root.mainloop()
     return game.balance
 
+
 if __name__ == "__main__":
-    root = tk.Tk()
-    game = PenaltyGame(root, 1000.0, "test_user")
-    root.mainloop()
+    final_balance = main(10000.0, "demo_player")
+    print(f"Final balance: {final_balance:.2f}")

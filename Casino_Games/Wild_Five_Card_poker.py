@@ -622,18 +622,18 @@ HEADER_BG = "#D8B46A"
 TITLE_FG = "#2A1B08"
 GOLD = "#D4AF37"
 
-class WildFivePokerUI(tk.Tk):
-    def __init__(self, initial_balance, username):
-        super().__init__()
-        self.title("⺩牌五張撲克")
-        self.geometry("1150x750+50+10")
-        self.resizable(0,0)
+class WildFivePokerUI(tk.Frame):
+    def __init__(self, parent, initial_balance, username, on_back=None, on_balance_change=None):
+        super().__init__(parent, bg=ROOT_BG)
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
         self.configure(bg=ROOT_BG)
 
         self.username = username
         self.balance = initial_balance
         self.game = WildFivePokerGame()
         self.card_images = {}
+        self._temp_flip_images = {} 
         self.original_images = {}
         self.animation_queue = []
         self.animation_in_progress = False
@@ -660,17 +660,27 @@ class WildFivePokerUI(tk.Tk):
         self.high_bet_mode = False
         self._load_assets()
         self._create_widgets()
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.ante_var.trace_add('write', self.on_ante_changed)
 
         self.player_selected_label = None
 
     def on_close(self):
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-        self.destroy()
-        self.quit()
+        timer = getattr(self, "auto_reset_timer", None)
+        if timer:
+            try:
+                self.after_cancel(timer)
+            except tk.TclError:
+                pass
+        try:
+            update_balance_in_json(self.username, self.balance)
+        except Exception:
+            pass
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
+        if callable(self.on_back):
+            self.on_back(float(self.balance))
+
 
     # ---------- 加载扑克牌（交替 Poker1/Poker2） ----------
     def _load_assets(self):
@@ -1528,45 +1538,63 @@ class WildFivePokerUI(tk.Tk):
                 self.active_card_labels.remove(card_label)
 
     # ---------- 翻转动画 ----------
-    def flip_card_animation(self, card_label):
-        if card_label is None or not card_label.winfo_exists():
+    def animate_flip(self, card_label, front_img, step):
+        steps = 12
+        orig_w, orig_h = 100, 140
+
+        # 结束条件：恢复正面全尺寸图片
+        if step > steps:
+            card_label.is_face_up = True
+            self.animation_in_progress = False
+            tx, ty = card_label.target_pos if hasattr(card_label, 'target_pos') else (0, 0)
+            card_label.place(x=tx, y=ty, width=orig_w, height=orig_h)
+            card_label.config(image=front_img)
             return
-        card = card_label.card
-        front_img = self._card_image_for(card)
 
-        def animate(step=0):
-            if not card_label.winfo_exists():
-                return
-            if step > 10:
-                card_label.config(image=front_img)
-                card_label.image = front_img
-                card_label.is_face_up = True
-                card_label.place(width=105, height=140)
-                return
+        # 计算当前帧的宽度比例（前半段背面缩窄，后半段正面展开）
+        half = steps // 2
+        if step <= half:
+            ratio = 1 - (step / float(half))        # 1 → 0
+            use_back = True
+        else:
+            ratio = (step - half) / float(half)     # 0 → 1
+            use_back = False
 
-            if step <= 5:
-                width = 105 - step * 11
-                if width < 1:
-                    width = 1
-                card_label.config(image=self.back_image)
-                card_label.image = self.back_image
-            else:
-                width = (step - 5) * 11
-                if width < 1:
-                    width = 1
-                card_label.config(image=front_img)
-                card_label.image = front_img
+        w = max(1, int(orig_w * ratio))            # 当前宽度（至少1px）
 
-            card_label.place(width=width, height=140)
-            self.after(50, lambda: animate(step + 1))
+        # 从缓存的原始图像生成缩放后的 PhotoImage
+        if use_back:
+            pil_img = self.original_images.get("back")
+            if pil_img is None:
+                pil_img = Image.new('RGB', (orig_w, orig_h), 'green')
+            pil_img = pil_img.resize((w, orig_h), Image.LANCZOS)
+        else:
+            card = card_label.card
+            key = (card.suit, card.rank)
+            pil_img = self.original_images.get(key)
+            if pil_img is None:
+                pil_img = Image.new('RGB', (orig_w, orig_h), 'gray')
+            pil_img = pil_img.resize((w, orig_h), Image.LANCZOS)
 
-        animate(0)
+        scaled_img = ImageTk.PhotoImage(pil_img)
+        self._temp_flip_images[card_label] = scaled_img   # 保存引用防止被回收
+
+        # 更新 Label 显示
+        tx, ty = card_label.target_pos if hasattr(card_label, 'target_pos') else (0, 0)
+        offset = (orig_w - w) // 2
+        card_label.config(image=scaled_img)
+        card_label.place(x=tx + offset, y=ty, width=w, height=orig_h)
+
+        # 继续下一帧
+        self.after(30, lambda: self.animate_flip(card_label, front_img, step + 1))
 
     # ---------- 翻开玩家牌 ----------
     def reveal_player_cards(self):
         for lbl in self.player_cards_frame.winfo_children():
             if hasattr(lbl, "card") and not lbl.is_face_up:
-                self.flip_card_animation(lbl)
+                lbl.target_pos = (lbl.winfo_x(), lbl.winfo_y())
+                front_img = self._card_image_for(lbl.card)
+                self.animate_flip(lbl, front_img, 0)
         if self.game.player_hand:
             rank_name, _, _, _, _ = best_hand_with_joker(self.game.player_hand)
             self.player_label.config(text=f"玩家 - {rank_name}")
@@ -1762,8 +1790,8 @@ class WildFivePokerUI(tk.Tk):
         target_x = 585
         target_y = 545
 
-        ghost = tk.Label(self, image=label.image, bg='#2a4a3c', bd=0)
-        ghost.image = label.image
+        ghost = tk.Label(self, image=label.cget('image'), bg='#2a4a3c', bd=0)
+        ghost.image = label.cget('image')
         ghost.place(x=start_x, y=start_y, width=105, height=140)
 
         try:
@@ -1843,8 +1871,8 @@ class WildFivePokerUI(tk.Tk):
         target_x = 585
         target_y = 85
 
-        ghost = tk.Label(self, image=target_label.image, bg='#2a4a3c', bd=0)
-        ghost.image = target_label.image
+        ghost = tk.Label(self, image=target_label.cget('image'), bg='#2a4a3c', bd=0)
+        ghost.image = target_label.cget('image')
         ghost.place(x=start_x, y=start_y, width=105, height=140)
 
         try:
@@ -1897,7 +1925,9 @@ class WildFivePokerUI(tk.Tk):
         self.status_label.config(text="庄家开牌中...")
         for lbl in self.dealer_cards_frame.winfo_children():
             if hasattr(lbl, "card") and not lbl.is_face_up:
-                self.flip_card_animation(lbl)
+                lbl.target_pos = (lbl.winfo_x(), lbl.winfo_y())
+                front_img = self._card_image_for(lbl.card)
+                self.animate_flip(lbl, front_img, 0)
         self.after(1000, self.start_dealer_sort_animation)
 
     def start_dealer_sort_animation(self):
@@ -1958,7 +1988,9 @@ class WildFivePokerUI(tk.Tk):
     def _after_dealer_discard(self):
         for lbl in self.public_cards_frame.winfo_children():
             if hasattr(lbl, "card") and not lbl.is_face_up:
-                self.flip_card_animation(lbl)
+                lbl.target_pos = (lbl.winfo_x(), lbl.winfo_y())
+                front_img = self._card_image_for(lbl.card)
+                self.animate_flip(lbl, front_img, 0)
         self.after(1000, self._finish_showdown)
 
     def _finish_showdown(self):
@@ -2558,10 +2590,38 @@ class WildFivePokerUI(tk.Tk):
 # =========================================================
 # 主入口
 # =========================================================
-def main(initial_balance=10000, username="Guest"):
-    app = WildFivePokerUI(initial_balance, username)
-    app.mainloop()
-    return app.balance
+def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, user=None,
+         on_back=None, on_balance_change=None):
+    """嵌入现有 Tk 根窗口；未传 parent 时仍可独立运行。"""
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        return WildFivePokerUI(
+            parent, actual_balance, actual_user,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+        )
+
+    root = tk.Tk()
+    root.title("Wild Five Card Poker")
+    root.geometry("1150x750+50+10")
+    root.resizable(False, False)
+    page = WildFivePokerUI(root, actual_balance, actual_user)
+    page.pack(fill="both", expand=True)
+
+    def close_standalone():
+        try:
+            update_balance_in_json(page.username, page.balance)
+        except Exception:
+            pass
+        root.destroy()
+
+    page.on_back = lambda final_balance: close_standalone()
+    root.protocol("WM_DELETE_WINDOW", page.on_close)
+    root.mainloop()
+    return page.balance
+
 
 if __name__ == "__main__":
     final_balance = main()

@@ -1,183 +1,319 @@
+import importlib
 import json
 import os
-import time
-import sys
+import tkinter as tk
+from tkinter import messagebox
+from typing import Callable, Optional
 
-# 只在 Unix-like 系统上导入这些模块
-if os.name != 'nt':  # 不是 Windows 系统
-    import select
-    import termios
-    import tty
 
-## Lotto games import
-from tkinter import Tk
-from Lotto import golfs_gui
-from Lotto import pass_3_level_gui
-from Lotto import stacked
-from Lotto import num_gui
-from Lotto import Banknote_Detection_gui
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(BASE_DIR)
+DATA_FILE = os.path.join(PROJECT_DIR, "saving_data.json")
 
-def get_data_file_path():
-    # 用于获取保存数据的文件路径
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../saving_data.json')
 
-# 保存用户数据
-def save_user_data(users):
-    file_path = get_data_file_path()
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(users, f, ensure_ascii=False, indent=4)
+LOTTO_GAMES = [
+    {
+        "name": "验钞机",
+        "subtitle": "1 元 / 特易中奖",
+        "prize": "大奖 1,000",
+        "module": "Lotto.Banknote_Detection_gui",
+    },
+    {
+        "name": "高尔夫球",
+        "subtitle": "每局 1 元",
+        "prize": "大奖 10,000",
+        "module": "Lotto.golfs_gui",
+    },
+    {
+        "name": "过三关",
+        "subtitle": "每局 1 元",
+        "prize": "大奖 10,000",
+        "module": "Lotto.pass_3_level_gui",
+    },
+    {
+        "name": "叠叠乐",
+        "subtitle": "每局 5 元",
+        "prize": "大奖 50,000",
+        "module": "Lotto.stacked",
+    },
+    {
+        "name": "100X 现金大挑战",
+        "subtitle": "每局 5 元",
+        "prize": "大奖 50,000",
+        "module": "Lotto.num_gui",
+    },
+]
 
-# 读取用户数据
-def load_user_data():
-    file_path = get_data_file_path()
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-    
-def update_balance_in_json(username, new_balance):
-    users = load_user_data()  # 先加载现有用户数据
+
+def load_user_data() -> list:
+    if not os.path.exists(DATA_FILE):
+        return []
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as file:
+            data = json.load(file)
+        return data if isinstance(data, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def save_user_data(users: list) -> None:
+    with open(DATA_FILE, "w", encoding="utf-8") as file:
+        json.dump(users, file, ensure_ascii=False, indent=4)
+
+
+def update_balance_in_json(username: str, new_balance: float) -> None:
+    users = load_user_data()
     for user in users:
-        if user['user_name'] == username:  # 查找当前用户
-            user['cash'] = f"{new_balance:.2f}"  # 更新余额
-            break
-    save_user_data(users)  # 保存更新后的数据
+        if user.get("user_name") == username:
+            user["cash"] = f"{float(new_balance):.2f}"
+            save_user_data(users)
+            return
 
-def display_menu(selected_row):
-    # 定义游戏菜单布局（每行一个选项）
-    menu_items = [
-        "验钞机(1块/特易中奖)  - 大奖1000！",
-        "高尔夫球(1块)       - 大奖10 000！",
-        "过三关(1块)         - 大奖10 000！",
-        "叠叠乐(5块)         - 大奖50 000！",
-        "100X现金大挑战(5块) - 大奖50 000！",
-        "返回主目录"
-    ]
-    
-    os.system('cls' if os.name == 'nt' else 'clear')
-    print(" 欢迎来到刮刮卡中心!\n")
-    print("请使用方向键选择游戏，回车确认(ESC返回主目录):\n")
-    
-    # 打印菜单，高亮显示选中的游戏
-    for idx, item in enumerate(menu_items):
-        if idx == selected_row:
-            print(f">> {item} <<")  # 高亮显示选中的选项
-        else:
-            print(f"   {item}   ")
-    print("\n")
 
-def get_key():
-    """跨平台获取键盘按键"""
-    # Windows系统
-    if os.name == 'nt':
-        import msvcrt
-        while True:
-            if msvcrt.kbhit():
-                key = msvcrt.getch()
-                if key == b'\xe0':  # 扩展键（方向键）
-                    key = msvcrt.getch()
-                    if key == b'H': return 'up'
-                    elif key == b'P': return 'down'
-                    elif key == b'K': return 'left'
-                    elif key == b'M': return 'right'
-                elif key == b'\r':  # 回车键
-                    return 'enter'
-                elif key == b'\x1b':  # ESC键
-                    return 'esc'
-                elif key == b'0':
-                    return '0'
-                else:
-                    return key
-            time.sleep(0.05)  # 减少CPU占用
-    
-    # Unix-like系统 (Mac/Linux)
-    else:
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
+class LottoPage(tk.Frame):
+    """嵌入 index.py 唯一 Tk 根窗口的刮刮乐目录。"""
+
+    BG = "#071713"
+    PANEL = "#102923"
+    CARD = "#17362e"
+    CARD_HOVER = "#245246"
+    GOLD = "#e7be63"
+    TEXT = "#f5f1e8"
+    MUTED = "#afc3ba"
+
+    def __init__(
+        self,
+        master: tk.Misc,
+        username: str,
+        balance: float,
+        on_back: Callable[[float], None],
+        on_balance_change: Optional[Callable[[float], None]] = None,
+    ):
+        super().__init__(master, bg=self.BG)
+        self.username = username
+        self.balance = float(balance)
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
+        self.game_cards = []
+
+        self.balance_var = tk.StringVar()
+        self.status_var = tk.StringVar(value="请选择一张刮刮卡")
+        self._build_ui()
+        self._refresh_balance_label()
+
+    def _build_ui(self) -> None:
+        header = tk.Frame(self, bg=self.PANEL, height=92)
+        header.pack(fill="x")
+        header.pack_propagate(False)
+
+        tk.Button(
+            header,
+            text="← 返回主目录",
+            command=self.back_to_main,
+            font=("Microsoft YaHei UI", 11, "bold"),
+            bg=self.CARD,
+            fg=self.TEXT,
+            activebackground=self.GOLD,
+            activeforeground="#182018",
+            relief="flat",
+            bd=0,
+            cursor="hand2",
+            padx=16,
+            pady=10,
+        ).pack(side="left", padx=25, pady=20)
+
+        title_area = tk.Frame(header, bg=self.PANEL)
+        title_area.pack(side="left", padx=12)
+        tk.Label(
+            title_area,
+            text="刮刮乐中心",
+            font=("Microsoft YaHei UI", 23, "bold"),
+            bg=self.PANEL,
+            fg=self.GOLD,
+        ).pack(anchor="w")
+        tk.Label(
+            title_area,
+            text="点击卡片后将在当前窗口打开游戏，返回时余额会自动同步",
+            font=("Microsoft YaHei UI", 9),
+            bg=self.PANEL,
+            fg=self.MUTED,
+        ).pack(anchor="w", pady=(2, 0))
+
+        tk.Label(
+            header,
+            textvariable=self.balance_var,
+            font=("Microsoft YaHei UI", 15, "bold"),
+            bg=self.PANEL,
+            fg=self.TEXT,
+        ).pack(side="right", padx=30)
+
+        status = tk.Frame(self, bg=self.BG)
+        status.pack(fill="x", padx=35, pady=(18, 6))
+        tk.Label(
+            status,
+            textvariable=self.status_var,
+            font=("Microsoft YaHei UI", 10),
+            bg=self.BG,
+            fg=self.MUTED,
+        ).pack(side="left")
+
+        grid = tk.Frame(self, bg=self.BG)
+        grid.pack(expand=True, pady=(0, 30))
+
+        for index, game in enumerate(LOTTO_GAMES):
+            row, column = divmod(index, 3)
+            card = self._make_game_card(grid, game)
+            card.grid(row=row, column=column, padx=13, pady=13)
+            self.game_cards.append(card)
+
+    def _make_game_card(self, master: tk.Misc, game: dict) -> tk.Frame:
+        card = tk.Frame(master, bg=self.CARD, width=290, height=190, cursor="hand2")
+        card.grid_propagate(False)
+        card.pack_propagate(False)
+
+        tk.Label(
+            card,
+            text=game["name"],
+            font=("Microsoft YaHei UI", 16, "bold"),
+            bg=self.CARD,
+            fg=self.GOLD,
+            cursor="hand2",
+        ).pack(pady=(28, 8))
+        tk.Label(
+            card,
+            text=game["subtitle"],
+            font=("Microsoft YaHei UI", 10),
+            bg=self.CARD,
+            fg=self.MUTED,
+            cursor="hand2",
+        ).pack()
+        tk.Label(
+            card,
+            text=game["prize"],
+            font=("Microsoft YaHei UI", 12, "bold"),
+            bg=self.CARD,
+            fg=self.TEXT,
+            cursor="hand2",
+        ).pack(pady=(10, 0))
+
+        def set_bg(widget: tk.Misc, colour: str) -> None:
+            try:
+                widget.configure(bg=colour)
+            except tk.TclError:
+                pass
+            for child in widget.winfo_children():
+                set_bg(child, colour)
+
+        def enter(_event=None):
+            set_bg(card, self.CARD_HOVER)
+
+        def leave(_event=None):
+            set_bg(card, self.CARD)
+
+        def click(_event=None):
+            self.launch_game(game["name"], game["module"])
+
+        for widget in (card, *card.winfo_children()):
+            widget.bind("<Enter>", enter)
+            widget.bind("<Leave>", leave)
+            widget.bind("<Button-1>", click)
+        return card
+
+    def _refresh_balance_label(self) -> None:
+        self.balance_var.set(f"当前余额  ${self.balance:,.2f}")
+
+    def _replace_root_page(self, page: tk.Widget) -> None:
+        """调用 index.py 的 replace_page()，在唯一 Tk 根窗口中切换页面。"""
+        replace_page = getattr(self.master, "replace_page", None)
+        if not callable(replace_page):
+            raise RuntimeError(
+                "父窗口没有 replace_page(page) 方法，无法进行嵌入式页面切换。"
+            )
+        replace_page(page)
+
+    def launch_game(self, display_name: str, module_name: str) -> None:
         try:
-            tty.setraw(sys.stdin.fileno())
-            if select.select([sys.stdin], [], [], 0.1)[0]:
-                key = sys.stdin.read(1)
-                if key == '\x1b':  # 可能是方向键
-                    # 读取接下来的字符
-                    if select.select([sys.stdin], [], [], 0.1)[0]:
-                        rest = sys.stdin.read(2)
-                        if rest == '[A':  # 上箭头
-                            return 'up'
-                        elif rest == '[B':  # 下箭头
-                            return 'down'
-                        elif rest == '[C':  # 右箭头
-                            return 'right'
-                        elif rest == '[D':  # 左箭头
-                            return 'left'
-                    else:
-                        return 'esc'  # ESC键
-                elif key == '\r':  # 回车键
-                    return 'enter'
-                elif key == '0':
-                    return '0'
-                else:
-                    return key
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return None
+            module = importlib.import_module(module_name)
+            game_main = getattr(module, "main", None)
+            if not callable(game_main):
+                raise AttributeError(f"{module_name} 没有可调用的 main()")
 
-def main(balance, user):
-    # 初始选择位置 (第0行)
-    selected_row = 0
-    
-    # 定义游戏映射
-    game_map = {
-        0: ('1', Banknote_Detection_gui.main),
-        1: ('2', lambda bal, usr: run_golf_game(bal, usr)),
-        2: ('3', pass_3_level_gui.main),
-        3: ('4', stacked.main),
-        4: ('5', num_gui.main),
-        5: ('return', None)  # 返回主目录选项
-    }
-    
-    # 高尔夫游戏的特殊处理函数
-    def run_golf_game(bal, usr):
-        root = Tk()
-        game = golfs_gui.ScratchGame(root, bal, usr)  # 创建游戏实例
-        root.mainloop()  # 运行游戏
-        return game.balance  # 退出后获取余额
-    
-    while True:
-        display_menu(selected_row)
-        
-        # 获取当前选择对应的游戏
-        current_game = game_map.get(selected_row)
-        
-        # 获取按键
-        key = get_key()
-        
-        # 处理方向键
-        if key == 'up':
-            selected_row = (selected_row - 1) % 6  # 循环选择，共6个选项
-            
-        elif key == 'down':
-            selected_row = (selected_row + 1) % 6  # 循环选择，共6个选项
-            
-        elif key == 'left':
-            selected_row = (selected_row - 1) % 6  # 左键等同于上键
-            
-        elif key == 'right':
-            selected_row = (selected_row + 1) % 6  # 右键等同于下键
-            
-        # 处理回车键
-        elif key == 'enter':
-            if current_game and current_game[1]:
-                try:
-                    if selected_row == 1:  # 高尔夫球游戏特殊处理
-                        balance = run_golf_game(balance, user)
-                    else:
-                        balance = current_game[1](balance, user)
-                    update_balance_in_json(user, balance)
-                except Exception as e:
-                    print(f"游戏运行出错: {e}")
-                    time.sleep(2)
-            elif current_game and current_game[0] == 'return':
-                return balance  # 返回主目录
-                
-        # 处理退出键
-        elif key == '0' or key == 'esc':  # 0 或 ESC 键
-            return balance
+            master = self.master
+            username = self.username
+            parent_back = self.on_back
+            balance_callback = self.on_balance_change
+
+            def return_to_lotto(final_balance: float) -> None:
+                new_balance = float(final_balance)
+                update_balance_in_json(username, new_balance)
+
+                if callable(balance_callback):
+                    balance_callback(new_balance)
+
+                new_page = LottoPage(
+                    master=master,
+                    username=username,
+                    balance=new_balance,
+                    on_back=parent_back,
+                    on_balance_change=balance_callback,
+                )
+                replace_page = getattr(master, "replace_page", None)
+                if not callable(replace_page):
+                    raise RuntimeError("父窗口没有 replace_page(page) 方法。")
+                replace_page(new_page)
+
+            game_page = game_main(
+                parent=master,
+                balance=self.balance,
+                user=username,
+                on_back=return_to_lotto,
+                on_balance_change=balance_callback,
+            )
+
+            if not isinstance(game_page, tk.Widget):
+                raise TypeError(
+                    f"{module_name}.main() 必须返回一个 Tkinter Widget/Frame。"
+                )
+
+            self._replace_root_page(game_page)
+
+        except Exception as exc:
+            messagebox.showerror(
+                "启动失败",
+                f"无法在当前窗口打开《{display_name}》：\n\n"
+                f"{type(exc).__name__}: {exc}",
+                parent=self,
+            )
+
+    def back_to_main(self) -> None:
+        self.on_back(self.balance)
+
+    on_close = back_to_main
+
+
+def main(
+    parent: tk.Misc,
+    balance: float,
+    user: str,
+    on_back: Callable[[float], None],
+    on_balance_change: Optional[Callable[[float], None]] = None,
+) -> LottoPage:
+    """供 index.py 使用；不会创建新的 Tk 根窗口或 mainloop。"""
+    return LottoPage(
+        parent,
+        username=user,
+        balance=balance,
+        on_back=on_back,
+        on_balance_change=on_balance_change,
+    )
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.withdraw()
+    messagebox.showinfo(
+        "提示",
+        "lotto.py 应由项目根目录的 index.py 启动。",
+        parent=root,
+    )
+    root.destroy()

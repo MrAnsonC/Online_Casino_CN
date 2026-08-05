@@ -11,6 +11,27 @@ import time
 import secrets
 import subprocess, sys
 
+# =========================================================
+# Caribbean Stud Poker 风格 UI 配色
+# 下注区内部布局与交互保持 Auto Texas Hold'em 原设计
+# =========================================================
+ROOT_BG = "#1B3D31"
+TABLE_PANEL_BG = "#2A4A3C"
+TEXT = "#FFFFFF"
+GOLD = "#D4AF37"
+PANEL_BG = "#F2E6C9"
+HEADER_BG = "#D8B46A"
+TITLE_FG = "#2A1B08"
+ACCENT_GOLD = "#A88100"
+CARD_SIZE = (82, 115)
+HOLE_CARD_SPACING = 88
+COMMUNITY_CARD_SPACING = 84
+
+def measure_text(draw, text, font):
+    """兼容新版 Pillow 的文本尺寸计算。"""
+    bbox = draw.textbbox((0, 0), text, font=font)
+    return bbox[2] - bbox[0], bbox[3] - bbox[1]
+
 # 扑克牌花色和点数
 SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
@@ -38,6 +59,21 @@ BET_PAYOUT = {
     "three_kind_straight": 3.7,
     "full_house": 19,
     "four_kind_flush": 247
+}
+
+# 每个下注项目的独立上限。
+BET_LIMITS = {
+    "cowboy_win": 50000,
+    "bull_win": 50000,
+    "tie": 10000,
+    "any_suited_connector": 25000,
+    "any_pair": 25000,
+    "any_ace_pair": 25000,
+    "high_card": 25000,
+    "two_pair": 25000,
+    "three_kind_straight": 25000,
+    "full_house": 25000,
+    "four_kind_flush": 25000,
 }
 
 def get_data_file_path():
@@ -219,8 +255,8 @@ class TexasHoldemGame:
     def reset_game(self):
         self.deck = Deck()
         self.community_cards = []
-        self.cowboy_hole = []  # 牛仔手牌
-        self.bull_hole = []    # 公牛手牌
+        self.cowboy_hole = []  # 玩家1手牌
+        self.bull_hole = []    # 玩家2手牌
         self.bets = {bet_type: 0 for bet_type in BET_PAYOUT}
         self.stage = "betting"  # betting, dealing, showdown
         self.cards_revealed = {
@@ -233,13 +269,13 @@ class TexasHoldemGame:
         self.card_sequence = self.deck.card_sequence
     
     def deal_initial(self):
-        """发初始牌：牛仔2张，公牛2张，公共牌5张"""
+        """发初始牌：先发5张公共牌，再发玩家1和玩家2各2张。"""
+        self.community_cards = self.deck.deal(5)
         self.cowboy_hole = self.deck.deal(2)
         self.bull_hole = self.deck.deal(2)
-        self.community_cards = self.deck.deal(5)
     
     def evaluate_hands(self):
-        """评估牛仔和公牛的手牌"""
+        """评估玩家1和玩家2的手牌"""
         cowboy_cards = self.cowboy_hole + self.community_cards
         bull_cards = self.bull_hole + self.community_cards
         
@@ -272,7 +308,7 @@ class TexasHoldemGame:
             "any_ace_pair": False
         }
         
-        # 检查牛仔手牌
+        # 检查玩家1手牌
         c1, c2 = self.cowboy_hole
         # 同花
         if c1.suit == c2.suit:
@@ -286,7 +322,7 @@ class TexasHoldemGame:
             if c1.rank == "A":
                 results["any_ace_pair"] = True
         
-        # 检查公牛手牌
+        # 检查玩家2手牌
         b1, b2 = self.bull_hole
         # 同花
         if b1.suit == b2.suit:
@@ -345,13 +381,13 @@ class TexasHoldemGame:
         elif hand_rank in [1, 0]:  # 对子、高牌
             return "high_card", winner_eval
 
-class TexasHoldemGUI(tk.Tk):
-    def __init__(self, initial_balance, username):
-        super().__init__()
-        self.title("德州扑克双人对决")
-        self.geometry("850x755+50+10")
-        self.resizable(0,0)
-        self.configure(bg='#35654d')
+class TexasHoldemGUI(tk.Frame):
+    def __init__(self, parent, initial_balance, username, on_back=None, on_balance_change=None):
+        super().__init__(parent, bg=ROOT_BG)
+        self.parent = parent
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
+        self.configure(bg=ROOT_BG)
         
         self.username = username
         self.balance = initial_balance
@@ -364,6 +400,7 @@ class TexasHoldemGUI(tk.Tk):
         self.selected_chip = None  # 当前选中的筹码
         self.chip_buttons = []  # 筹码按钮列表
         self.last_win = 0
+        self.last_bet = None
         self.auto_reset_timer = None
         self.auto_start_timer = None  # 自动开始游戏的计时器
         self.buttons_disabled = False  # 跟踪按钮是否被禁用
@@ -371,14 +408,17 @@ class TexasHoldemGUI(tk.Tk):
         self.bet_widgets = {}  # 存储下注显示控件
         self.bet_start_time = 0  # 下注开始时间
         self.enter_enabled = True
-        self.destroyed = False  # 标记窗口是否已被销毁
+        self.destroyed = False  # 标记页面是否已被销毁
+        self.freeze_current_bet_display = False
+        self._return_bind_id = None
         
         self._load_assets()
         self._create_widgets()
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
-        
-        # 绑定键盘事件
-        self.bind("<Return>", self.on_enter_key)
+
+        # 嵌入 Parent 后，Enter 必须绑定到唯一根窗口，才能在任何子控件有焦点时生效。
+        root = self.winfo_toplevel()
+        self._return_bind_id = root.bind("<Return>", self.on_enter_key, add="+")
+        self.bind("<Destroy>", self._handle_widget_destroy, add="+")
 
     def on_enter_key(self, event):
         """处理回车键按下事件"""
@@ -406,10 +446,10 @@ class TexasHoldemGUI(tk.Tk):
         win.geometry("800x650")
         win.resizable(0,0)
         win.resizable(False, False)
-        win.configure(bg='#F0F0F0')
+        win.configure(bg=PANEL_BG)
         
         # 创建主框架
-        main_frame = tk.Frame(win, bg='#F0F0F0')
+        main_frame = tk.Frame(win, bg=PANEL_BG)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
         # 添加滚动条
@@ -417,12 +457,12 @@ class TexasHoldemGUI(tk.Tk):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # 创建画布用于滚动
-        canvas = tk.Canvas(main_frame, bg='#F0F0F0', yscrollcommand=scrollbar.set)
+        canvas = tk.Canvas(main_frame, bg=PANEL_BG, yscrollcommand=scrollbar.set)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.config(command=canvas.yview)
         
         # 创建内部框架放置所有内容
-        content_frame = tk.Frame(canvas, bg='#F0F0F0')
+        content_frame = tk.Frame(canvas, bg=PANEL_BG)
         canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
         
         # 游戏规则文本
@@ -430,26 +470,27 @@ class TexasHoldemGUI(tk.Tk):
         德州扑克双人对决游戏规则
 
         1. 游戏参与者:
-           - 牛仔 (Cowboy): 电脑玩家A
-           - 公牛 (Bull): 电脑玩家B
+           - 玩家1 : 电脑玩家A
+           - 玩家2 : 电脑玩家B
 
         2. 游戏流程:
-           a. 下注阶段:
+           a. 预发牌阶段:
+               - 系统先发公共牌5张，再发玩家1和玩家2各2张暗牌
+               - 翻开第1张公共牌后才进入下注阶段
+
+           b. 下注阶段:
                - 玩家可以在多个选项上下注
-               - 下注完成后点击"开始游戏"
-               
-           b. 发牌阶段:
-               - 系统自动发牌：牛仔2张，公牛2张，公共牌5张
-               
-           c. 结算阶段:
-               - 系统比较牛仔和公牛的牌力
-               - 根据下注选项结算输赢
+               - 按回车或等待15秒倒计时结束后停止下注
+
+           c. 开牌与结算阶段:
+               - 系统翻开其余公共牌及双方手牌
+               - 比较玩家1和玩家2的牌力，并按下注选项结算输赢
 
         3. 下注选项:
            a. 胜负平:
-               - 牛仔胜 (1X)
+               - 玩家1胜 (1X)
                - 平手 (20X)
-               - 公牛胜 (1X)
+               - 玩家2胜 (1X)
                
            b. 任一人手牌组合:
                - 同花/连牌 (1.66X)
@@ -468,7 +509,7 @@ class TexasHoldemGUI(tk.Tk):
             content_frame, 
             text=rules_text,
             font=('微软雅黑', 11),
-            bg='#F0F0F0',
+            bg=PANEL_BG,
             justify=tk.LEFT,
             padx=10,
             pady=10
@@ -490,23 +531,61 @@ class TexasHoldemGUI(tk.Tk):
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
     
-    def on_close(self):
-        """处理窗口关闭事件"""
+    def _cancel_timers(self):
+        for attr in ("auto_reset_timer", "auto_start_timer"):
+            timer = getattr(self, attr, None)
+            if timer:
+                try:
+                    self.after_cancel(timer)
+                except tk.TclError:
+                    pass
+                setattr(self, attr, None)
+
+    def _unbind_return_key(self):
+        bind_id = getattr(self, "_return_bind_id", None)
+        if bind_id:
+            try:
+                self.winfo_toplevel().unbind("<Return>", bind_id)
+            except tk.TclError:
+                pass
+            self._return_bind_id = None
+
+    def _handle_widget_destroy(self, event):
+        """Parent 切换页面时安全停止计时器和键盘绑定。"""
+        if event.widget is not self:
+            return
         self.destroyed = True
-        
-        # 取消所有可能存在的计时器
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-            self.auto_reset_timer = None
-        if self.auto_start_timer:
-            self.after_cancel(self.auto_start_timer)
-            self.auto_start_timer = None
-        
-        self.destroy()
-        self.quit()
-        
+        self._cancel_timers()
+        self._unbind_return_key()
+
+    def on_close(self):
+        """返回 Parent 的赌场游戏页面，不销毁唯一的 Tk 根窗口。"""
+        if self.destroyed:
+            return
+
+        self.destroyed = True
+        self._cancel_timers()
+        self._unbind_return_key()
+
+        try:
+            update_balance_in_json(self.username, self.balance)
+        except Exception:
+            pass
+
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
+
+        if callable(self.on_back):
+            self.on_back(float(self.balance))
+        else:
+            # 仅用于异常的无回调嵌入场景；不会销毁 Parent 根窗口。
+            try:
+                self.destroy()
+            except tk.TclError:
+                pass
+
     def _load_assets(self):
-        card_size = (75, 105)
+        card_size = CARD_SIZE
         parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         # 使用实例变量来跟踪当前使用的扑克牌文件夹
@@ -575,7 +654,7 @@ class TexasHoldemGUI(tk.Tk):
                             font = ImageFont.truetype("arial.ttf", 20)
                         except:
                             font = ImageFont.load_default()
-                        text_width, text_height = draw.textsize(text, font=font)
+                        text_width, text_height = measure_text(draw, text, font)
                         x = (card_size[0] - text_width) / 2
                         y = (card_size[1] - text_height) / 2
                         draw.text((x, y), text, fill="white", font=font)
@@ -594,7 +673,7 @@ class TexasHoldemGUI(tk.Tk):
                         font = ImageFont.truetype("arial.ttf", 20)
                     except:
                         font = ImageFont.load_default()
-                    text_width, text_height = draw.textsize(text, font=font)
+                    text_width, text_height = measure_text(draw, text, font)
                     x = (card_size[0] - text_width) / 2
                     y = (card_size[1] - text_height) / 2
                     draw.text((x, y), text, fill="white", font=font)
@@ -604,27 +683,84 @@ class TexasHoldemGUI(tk.Tk):
                     # 创建缩放后的图像用于显示
                     self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
                     
+    def _parse_chip_value(self, chip_text):
+        raw = chip_text.replace('$', '').upper()
+        return float(raw[:-1]) * 1000 if raw.endswith('K') else float(raw)
+
+    def _format_bet_value(self, value):
+        if float(value).is_integer():
+            return str(int(value))
+        return f"{value:.2f}".rstrip('0').rstrip('.')
+
+    def get_bet_amounts(self):
+        bet_amounts = {}
+        for bet_type in BET_PAYOUT:
+            bet_var = getattr(self, f"{bet_type}_var", None)
+            if bet_var is not None:
+                try:
+                    bet_amounts[bet_type] = float(bet_var.get())
+                except ValueError:
+                    bet_amounts[bet_type] = 0.0
+        return bet_amounts
+
+    def _update_repeat_button_state(self):
+        if hasattr(self, 'repeat_bet_btn') and self.repeat_bet_btn is not None:
+            enabled = self.game.stage == "betting" and self.last_bet is not None
+            self.repeat_bet_btn.config(state=tk.NORMAL if enabled else tk.DISABLED)
+
+    def refresh_bet_info(self):
+        """刷新下注资讯；结算期间不改动“本局下注”显示。"""
+        if not self.freeze_current_bet_display:
+            total_bet = self.get_total_bet()
+            if hasattr(self, 'current_bet_label'):
+                self.current_bet_label.config(text=f"本局下注: {format_money(total_bet)}")
+        self._update_repeat_button_state()
+
+    def set_bet_amounts(self, bet_amounts):
+        for bet_type in BET_PAYOUT:
+            amount = float(bet_amounts.get(bet_type, 0))
+            bet_var = getattr(self, f"{bet_type}_var", None)
+            if bet_var is not None:
+                bet_var.set(self._format_bet_value(amount))
+        self.refresh_bet_info()
+
     def add_chip_to_bet(self, bet_type):
-        """添加筹码到下注区域"""
-        if not self.selected_chip:
+        """按当前选中筹码增加下注，并执行项目上限与余额上限。"""
+        if not self.selected_chip or self.game.stage != "betting":
             return
-            
-        # 获取筹码金额
-        chip_value = float(self.selected_chip.replace('$', '').replace('K', '000'))
-        
-        # 更新对应的下注变量
+
+        try:
+            chip_value = self._parse_chip_value(self.selected_chip)
+        except ValueError:
+            return
+
         bet_var = getattr(self, f"{bet_type}_var", None)
-        if bet_var:
-            current = float(bet_var.get())
-            new_value = current + chip_value
-            # 检查总下注是否超过上限
-            total_bet = self.get_total_bet() + chip_value
-            if total_bet > 500000:  # 500,000上限
-                messagebox.showwarning("下注上限", "本局下注总额不能超过500,000")
-                return
-                
-            bet_var.set(str(int(new_value)))
-    
+        if bet_var is None:
+            return
+
+        current = float(bet_var.get())
+        limit = BET_LIMITS[bet_type]
+        requested = current + chip_value
+        remaining_balance = max(0.0, self.balance - self.get_total_bet())
+        max_by_balance = current + remaining_balance
+        new_value = min(requested, limit, max_by_balance)
+
+        if current >= limit:
+            messagebox.showwarning("下注限制", f"该下注项目上限为 {format_money(limit)}")
+            return
+
+        if new_value <= current and remaining_balance <= 0:
+            messagebox.showwarning("余额不足", "当前余额不足，无法继续下注。")
+            return
+
+        bet_var.set(self._format_bet_value(new_value))
+        self.refresh_bet_info()
+
+        if requested > limit:
+            messagebox.showwarning("下注限制", f"该下注项目上限为 {format_money(limit)}，已自动调整。")
+        elif requested > max_by_balance:
+            messagebox.showwarning("余额不足", f"余额不足，已自动调整为当前可下注的最大金额 {format_money(new_value)}。")
+
     def get_total_bet(self):
         """计算总下注金额"""
         total = 0
@@ -640,326 +776,241 @@ class TexasHoldemGUI(tk.Tk):
         if bet_var:
             bet_var.set("0")
             self.bet_widgets[bet_type].config(bg='white')
+            self.refresh_bet_info()
     
     def _create_widgets(self):
-        # 主框架 - 上下布局
-        main_frame = tk.Frame(self, bg='#35654d')
+        """创建 1150×750 的 Caribbean Stud Poker 风格界面。"""
+        main_frame = tk.Frame(self, bg=ROOT_BG)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # 顶部信息栏
-        info_frame = tk.Frame(main_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        info_frame.pack(fill=tk.X, pady=(0, 10))
-        self.balance_label = tk.Label(
-            info_frame,
-            text=f"余额: {format_money(self.balance)}",
-            font=('Arial', 16),
-            bg='#2a4a3c',
-            fg='white'
+        # 左侧牌桌。
+        table_canvas = tk.Canvas(
+            main_frame, bg=ROOT_BG, width=500, height=730,
+            highlightthickness=0
         )
-        self.balance_label.pack(side=tk.LEFT, padx=20, pady=10)
+        table_canvas.pack(side=tk.LEFT, fill=tk.Y)
+        table_canvas.pack_propagate(False)
+        table_canvas.create_rectangle(
+            3, 3, 496, 726, fill=ROOT_BG, outline=GOLD, width=5
+        )
 
-        # 牌桌区域
-        table_frame = tk.Frame(main_frame, bg='#35654d')
-        table_frame.pack(fill=tk.BOTH, expand=True)
-
-        # 牛仔区域
-        cowboy_frame = tk.Frame(table_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        cowboy_frame.place(x=10, y=20, width=180, height=180)
-        self.cowboy_label = tk.Label(cowboy_frame, text="牛仔", font=('Arial', 16), bg='#2a4a3c', fg='white')
+        player1_frame = tk.Frame(table_canvas, bg=TABLE_PANEL_BG, bd=2, relief=tk.RAISED)
+        player1_frame.place(x=25, y=45, width=210, height=185)
+        self.cowboy_label = tk.Label(
+            player1_frame, text="玩家1", font=('Arial', 15, 'bold'),
+            bg=TABLE_PANEL_BG, fg=TEXT
+        )
         self.cowboy_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
-        self.cowboy_cards_frame = tk.Frame(cowboy_frame, bg='#2a4a3c')
-        self.cowboy_cards_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        self.cowboy_cards_frame = tk.Frame(player1_frame, bg=TABLE_PANEL_BG)
+        self.cowboy_cards_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=5)
 
-        # 公牛区域
-        bull_frame = tk.Frame(table_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bull_frame.place(x=640, y=20, width=180, height=180)
-        self.bull_label = tk.Label(bull_frame, text="公牛", font=('Arial', 16), bg='#2a4a3c', fg='white')
+        player2_frame = tk.Frame(table_canvas, bg=TABLE_PANEL_BG, bd=2, relief=tk.RAISED)
+        player2_frame.place(x=265, y=45, width=210, height=185)
+        self.bull_label = tk.Label(
+            player2_frame, text="玩家2", font=('Arial', 15, 'bold'),
+            bg=TABLE_PANEL_BG, fg=TEXT
+        )
         self.bull_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
-        self.bull_cards_frame = tk.Frame(bull_frame, bg='#2a4a3c')
-        self.bull_cards_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        self.bull_cards_frame = tk.Frame(player2_frame, bg=TABLE_PANEL_BG)
+        self.bull_cards_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=5)
 
-        # 公共牌区域
-        community_frame = tk.Frame(table_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        community_frame.place(x=210, y=20, width=410, height=180)
-        community_label = tk.Label(community_frame, text="公共牌", font=('Arial', 16), bg='#2a4a3c', fg='white')
-        community_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
-        self.community_cards_frame = tk.Frame(community_frame, bg='#2a4a3c')
-        self.community_cards_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        tk.Label(
+            table_canvas, text="AUTO TEXAS HOLD'EM",
+            font=('Arial', 23, 'bold'), bg=ROOT_BG, fg=GOLD
+        ).place(x=250, y=270, anchor='center')
+        tk.Label(
+            table_canvas, text="玩家1  ·  公共牌  ·  玩家2",
+            font=('Arial', 14, 'bold'), bg=ROOT_BG, fg=TEXT
+        ).place(x=250, y=310, anchor='center')
+        self.table_status_label = tk.Label(
+            table_canvas, text="准备发牌",
+            font=('Arial', 15, 'bold'), bg=ROOT_BG, fg='#FFD700'
+        )
+        self.table_status_label.place(x=250, y=355, anchor='center')
 
-        # ========== 下注区域（新布局，顶部三栏：牛仔赢 / 平手 / 公牛赢） ==========
-        bet_frame = tk.Frame(main_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_frame.pack(fill=tk.X, pady=10, padx=10)
+        community_frame = tk.Frame(table_canvas, bg=TABLE_PANEL_BG, bd=2, relief=tk.RAISED)
+        community_frame.place(x=25, y=410, width=450, height=190)
+        tk.Label(
+            community_frame, text="公共牌", font=('Arial', 15, 'bold'),
+            bg=TABLE_PANEL_BG, fg=TEXT
+        ).pack(side=tk.TOP, anchor='w', padx=10, pady=5)
+        self.community_cards_frame = tk.Frame(community_frame, bg=TABLE_PANEL_BG)
+        self.community_cards_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=5)
 
-        # 第一行：牛仔赢 / 平手 / 公牛赢
-        top_row_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        top_row_frame.pack(fill=tk.X, padx=10, pady=5)
+        # 右侧控制面板。
+        right_panel = tk.Frame(main_frame, bg=ROOT_BG, width=620)
+        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(10, 0))
+        right_panel.pack_propagate(False)
 
-        # 牛仔赢
-        self.cowboy_win_frame = tk.LabelFrame(
-            top_row_frame, text="牛仔赢 (1X)",
-            font=('Arial', 20, 'bold'), bg='#2a4a3c', fg='white', width=150, height=80
+        info_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        info_card.pack(fill=tk.X, pady=(0, 3))
+        header_info = tk.Frame(info_card, bg=HEADER_BG)
+        header_info.pack(fill=tk.X)
+        header_info.columnconfigure(0, weight=1)
+        header_info.columnconfigure(1, weight=0)
+        tk.Label(
+            header_info, text="游戏信息", font=('Arial', 12, 'bold'),
+            bg=HEADER_BG, fg=TITLE_FG
+        ).grid(row=0, column=0, sticky="ew", padx=(72, 0), pady=3)
+        self.back_button = tk.Button(
+            header_info, text="", command=self.on_close,
+            font=('Arial', 9, 'bold'), bg=HEADER_BG,
+            activebackground=HEADER_BG,
+            relief=tk.FLAT, width=0
         )
-        self.cowboy_win_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-        self.cowboy_win_var = tk.StringVar(value="0")
-        cowboy_win_display = tk.Label(
-            self.cowboy_win_frame, textvariable=self.cowboy_win_var,
-            font=('Arial', 14), bg='white', fg='black', height=2
-        )
-        cowboy_win_display.pack(fill=tk.BOTH, expand=True)
-        cowboy_win_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("cowboy_win"))
-        cowboy_win_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "cowboy_win"))
-        self.bet_widgets["cowboy_win"] = cowboy_win_display
+        self.back_button.grid(row=0, column=1, padx=5, pady=2)
+        body_info = tk.Frame(info_card, bg=PANEL_BG)
+        body_info.pack(fill=tk.X, padx=10, pady=6)
+        for col in range(3):
+            body_info.columnconfigure(col, weight=1, uniform='game_info')
+        self.balance_label = tk.Label(body_info, text=f"余额: {format_money(self.balance)}", font=('Arial', 13, 'bold'), bg=PANEL_BG, fg='black', anchor='w')
+        self.balance_label.grid(row=0, column=0, sticky='w')
+        self.timer_label = tk.Label(body_info, text="下注时间: --", font=('Arial', 15, 'bold'), bg=PANEL_BG, fg='#D32F2F', anchor='center')
+        self.timer_label.grid(row=0, column=1, sticky='ew')
+        self.stage_label = tk.Label(body_info, text="准备发牌", font=('Arial', 13, 'bold'), bg=PANEL_BG, fg=ACCENT_GOLD, anchor='e')
+        self.stage_label.grid(row=0, column=2, sticky='e')
 
-        # 平手
-        tie_frame = tk.LabelFrame(
-            top_row_frame, text="平手 (20X)",
-            font=('Arial', 20, 'bold'), bg='#2a4a3c', fg='white', width=150, height=80
-        )
-        tie_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-        self.tie_var = tk.StringVar(value="0")
-        tie_display = tk.Label(
-            tie_frame, textvariable=self.tie_var,
-            font=('Arial', 14), bg='white', fg='black', height=2
-        )
-        tie_display.pack(fill=tk.BOTH, expand=True)
-        tie_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("tie"))
-        tie_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "tie"))
-        self.bet_widgets["tie"] = tie_display
-
-        # 公牛赢
-        self.bull_win_frame = tk.LabelFrame(
-            top_row_frame, text="公牛赢 (1X)",
-            font=('Arial', 20, 'bold'), bg='#2a4a3c', fg='white', width=150, height=80
-        )
-        self.bull_win_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-        self.bull_win_var = tk.StringVar(value="0")
-        bull_win_display = tk.Label(
-            self.bull_win_frame, textvariable=self.bull_win_var,
-            font=('Arial', 14), bg='white', fg='black', height=2
-        )
-        bull_win_display.pack(fill=tk.BOTH, expand=True)
-        bull_win_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("bull_win"))
-        bull_win_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "bull_win"))
-        self.bet_widgets["bull_win"] = bull_win_display
-
-        # 第二行：左右分栏
-        bottom_row_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        bottom_row_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-
-        # ---------- 左侧：任一人手牌 ----------
-        left_frame = tk.LabelFrame(
-            bottom_row_frame, text="任一人手牌",
-            font=('Arial', 20, 'bold'), bg='#2a4a3c', fg='white'
-        )
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-
-        # 顺子/同花
-        suited_frame = tk.LabelFrame(
-            left_frame, text="顺子/同花 (1.66X)",
-            font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='white', height=60
-        )
-        suited_frame.pack(fill=tk.X, padx=10, pady=2)
-        self.any_suited_connector_var = tk.StringVar(value="0")
-        suited_display = tk.Label(
-            suited_frame, textvariable=self.any_suited_connector_var,
-            font=('Arial', 14), bg='white', fg='black', height=1
-        )
-        suited_display.pack(fill=tk.BOTH, expand=True)
-        suited_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("any_suited_connector"))
-        suited_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "any_suited_connector"))
-        self.bet_widgets["any_suited_connector"] = suited_display
-
-        # 对子
-        pair_frame = tk.LabelFrame(
-            left_frame, text="对子 (8.5X)",
-            font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='white', height=60
-        )
-        pair_frame.pack(fill=tk.X, padx=10, pady=2)
-        self.any_pair_var = tk.StringVar(value="0")
-        pair_display = tk.Label(
-            pair_frame, textvariable=self.any_pair_var,
-            font=('Arial', 14), bg='white', fg='black', height=1
-        )
-        pair_display.pack(fill=tk.BOTH, expand=True)
-        pair_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("any_pair"))
-        pair_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "any_pair"))
-        self.bet_widgets["any_pair"] = pair_display
-
-        # 对子A
-        ace_pair_frame = tk.LabelFrame(
-            left_frame, text="对子A (100X)",
-            font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='white', height=60
-        )
-        ace_pair_frame.pack(fill=tk.X, padx=10, pady=2)
-        self.any_ace_pair_var = tk.StringVar(value="0")
-        ace_pair_display = tk.Label(
-            ace_pair_frame, textvariable=self.any_ace_pair_var,
-            font=('Arial', 14), bg='white', fg='black', height=1
-        )
-        ace_pair_display.pack(fill=tk.BOTH, expand=True)
-        ace_pair_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("any_ace_pair"))
-        ace_pair_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "any_ace_pair"))
-        self.bet_widgets["any_ace_pair"] = ace_pair_display
-
-        # ---------- 右侧：获胜牌型（网格布局） ----------
-        right_frame = tk.LabelFrame(
-            bottom_row_frame, text="赢家牌型",
-            font=('Arial', 20, 'bold'), bg='#2a4a3c', fg='white'
-        )
-        right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-
-        # 创建2列布局
-        right_frame.grid_columnconfigure(0, weight=1, uniform='win')
-        right_frame.grid_columnconfigure(1, weight=1, uniform='win')
-
-        # 高牌/对子
-        high_card_frame = tk.LabelFrame(
-            right_frame, text="高牌/对子 (2.2X)",
-            font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='white', height=60
-        )
-        high_card_frame.grid(row=0, column=0, sticky='nsew', padx=2, pady=2)
-        self.high_card_var = tk.StringVar(value="0")
-        high_card_display = tk.Label(
-            high_card_frame, textvariable=self.high_card_var,
-            font=('Arial', 12), bg='white', fg='black', height=1
-        )
-        high_card_display.pack(fill=tk.BOTH, expand=True)
-        high_card_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("high_card"))
-        high_card_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "high_card"))
-        self.bet_widgets["high_card"] = high_card_display
-
-        # 两对
-        two_pair_frame = tk.LabelFrame(
-            right_frame, text="两对 (3.1X)",
-            font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='white', height=60
-        )
-        two_pair_frame.grid(row=0, column=1, sticky='nsew', padx=2, pady=2)
-        self.two_pair_var = tk.StringVar(value="0")
-        two_pair_display = tk.Label(
-            two_pair_frame, textvariable=self.two_pair_var,
-            font=('Arial', 12), bg='white', fg='black', height=1
-        )
-        two_pair_display.pack(fill=tk.BOTH, expand=True)
-        two_pair_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("two_pair"))
-        two_pair_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "two_pair"))
-        self.bet_widgets["two_pair"] = two_pair_display
-
-        # 三条/顺子/同花
-        three_kind_frame = tk.LabelFrame(
-            right_frame, text="三条/顺子/同花 (4.7X)",
-            font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='white', height=60
-        )
-        three_kind_frame.grid(row=1, column=0, sticky='nsew', padx=2, pady=2)
-        self.three_kind_straight_var = tk.StringVar(value="0")
-        three_kind_display = tk.Label(
-            three_kind_frame, textvariable=self.three_kind_straight_var,
-            font=('Arial', 12), bg='white', fg='black', height=1
-        )
-        three_kind_display.pack(fill=tk.BOTH, expand=True)
-        three_kind_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("three_kind_straight"))
-        three_kind_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "three_kind_straight"))
-        self.bet_widgets["three_kind_straight"] = three_kind_display
-
-        # 葫芦
-        full_house_frame = tk.LabelFrame(
-            right_frame, text="葫芦 (20X)",
-            font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='white', height=60
-        )
-        full_house_frame.grid(row=1, column=1, sticky='nsew', padx=2, pady=2)
-        self.full_house_var = tk.StringVar(value="0")
-        full_house_display = tk.Label(
-            full_house_frame, textvariable=self.full_house_var,
-            font=('Arial', 12), bg='white', fg='black', height=1
-        )
-        full_house_display.pack(fill=tk.BOTH, expand=True)
-        full_house_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("full_house"))
-        full_house_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "full_house"))
-        self.bet_widgets["full_house"] = full_house_display
-
-        # 四条/同花顺（占两列）
-        four_kind_frame = tk.LabelFrame(
-            right_frame, text="四条/同花顺 (248X)",
-            font=('Arial', 18, 'bold'), bg='#2a4a3c', fg='white', height=60
-        )
-        four_kind_frame.grid(row=2, column=0, columnspan=2, sticky='nsew', padx=2, pady=2)
-        self.four_kind_flush_var = tk.StringVar(value="0")
-        four_kind_display = tk.Label(
-            four_kind_frame, textvariable=self.four_kind_flush_var,
-            font=('Arial', 12), bg='white', fg='black', height=1
-        )
-        four_kind_display.pack(fill=tk.BOTH, expand=True)
-        four_kind_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("four_kind_flush"))
-        four_kind_display.bind("<Button-3>", lambda e: self.reset_bet_area(e, "four_kind_flush"))
-        self.bet_widgets["four_kind_flush"] = four_kind_display
-
-        # ========== 底部操作区域（筹码、信息、按钮） ==========
-        bottom_frame = tk.Frame(bet_frame, bg='#2a4a3c')
-        bottom_frame.pack(fill=tk.X, pady=10, padx=10)
-
-        # 筹码区域（保持原有代码不变）
-        chips_frame = tk.Frame(bottom_frame, bg='#2a4a3c')
-        chips_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        chips_label.pack(anchor='w', padx=(10, 5), pady=5, side=tk.LEFT)
-        chip_row = tk.Frame(chips_frame, bg='#2a4a3c')
-        chip_row.pack(side=tk.LEFT, fill=tk.X, pady=5)
+        chip_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        chip_card.pack(fill=tk.X, pady=3)
+        chip_header = tk.Frame(chip_card, bg=HEADER_BG)
+        chip_header.pack(fill=tk.X)
+        tk.Label(chip_header, text="筹码区", font=('Arial', 12, 'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=3)
+        self.chip_container = tk.Frame(chip_card, bg=PANEL_BG)
+        self.chip_container.pack(fill=tk.X, padx=8, pady=5)
+        for i in range(8):
+            self.chip_container.columnconfigure(i, weight=1)
 
         chip_configs = [
-            ("$5", '#ff0000', 'white'),
-            ('$25', '#00ff00', 'black'),
+            ('$10', '#ffa500', 'black'),
+            ("$25", '#00ff00', 'black'),
             ("$100", '#000000', 'white'),
             ("$500", "#FF7DDA", 'black'),
             ("$1K", '#ffffff', 'black'),
+            ("$5K", '#ff0000', 'white'),
+            ("$10K", '#00fbff', 'black'),
+            ("$50K", '#00ffae', 'black')
         ]
         self.chip_buttons = []
         self.chip_texts = {}
-        for text, bg_color, fg_color in chip_configs:
-            chip_canvas = tk.Canvas(chip_row, width=55, height=55, bg='#2a4a3c', highlightthickness=0)
-            chip_canvas.create_oval(2, 2, 53, 53, fill=bg_color, outline='black')
-            chip_canvas.create_text(27.5, 27.5, text=text, fill=fg_color, font=('Arial', 16, 'bold'))
-            chip_canvas.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
-            chip_canvas.pack(side=tk.LEFT, padx=5)
+        for i, (chip_text, bg_color, fg_color) in enumerate(chip_configs):
+            cell = tk.Frame(self.chip_container, bg=PANEL_BG)
+            cell.grid(row=0, column=i, padx=1, pady=1, sticky='nsew')
+            chip_canvas = tk.Canvas(cell, width=48, height=48, bg=PANEL_BG, highlightthickness=0)
+            chip_canvas.pack(anchor='center')
+            chip_canvas.create_oval(2, 2, 46, 46, fill=bg_color, outline='black')
+            chip_canvas.create_text(24, 24, text=chip_text, fill=fg_color, font=('Arial', 10, 'bold'))
+            chip_canvas.bind("<Button-1>", lambda e, t=chip_text: self.select_chip(t))
             self.chip_buttons.append(chip_canvas)
-            self.chip_texts[chip_canvas] = text
-        self.select_chip("$100")
+            self.chip_texts[chip_canvas] = chip_text
+        self.select_chip("$10")
 
-        # 信息显示区域（保持原有代码不变）
-        info_frame = tk.Frame(bottom_frame, bg='#2a4a3c')
-        info_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-        self.current_bet_label = tk.Label(
-            info_frame, text="本局下注: $0",
-            font=('Arial', 14), bg='#2a4a3c', fg='white'
-        )
-        self.current_bet_label.pack(side=tk.TOP, anchor='e', padx=10, pady=3)
-        self.last_win_label = tk.Label(
-            info_frame, text="上局获胜: $0",
-            font=('Arial', 14), bg='#2a4a3c', fg='#FFD700'
-        )
-        self.last_win_label.pack(side=tk.TOP, anchor='e', padx=10, pady=3)
-        self.timer_label = tk.Label(
-            info_frame, text="下注时间: 15秒",
-            font=('Arial', 14, 'bold'), bg='#2a4a3c', fg='#FF0000'
-        )
-        self.timer_label.pack(side=tk.TOP, anchor='e', padx=10, pady=3)
+        limit_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        limit_card.pack(fill=tk.X, pady=3)
+        limit_header = tk.Frame(limit_card, bg=HEADER_BG)
+        limit_header.pack(fill=tk.X)
+        tk.Label(limit_header, text="下注上限", font=('Arial', 12, 'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=3)
+        limit_body = tk.Frame(limit_card, bg=PANEL_BG)
+        limit_body.pack(fill=tk.X, padx=10, pady=5)
+        limit_table = tk.Frame(limit_body, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        limit_table.pack(fill=tk.X)
+        limit_items = [("玩家1 / 玩家2赢", "$50,000"), ("平手", "$10,000"), ("其他下注", "$25,000")]
+        for col, (title, amount) in enumerate(limit_items):
+            limit_table.columnconfigure(col, weight=1, uniform='limits')
+            tk.Label(limit_table, text=title, font=('Arial', 10, 'bold'), bg=PANEL_BG, fg=TITLE_FG, borderwidth=1, relief=tk.SOLID, pady=2).grid(row=0, column=col, sticky='nsew')
+            tk.Label(limit_table, text=amount, font=('Arial', 11, 'bold'), bg=PANEL_BG, fg=ACCENT_GOLD, borderwidth=1, relief=tk.SOLID, pady=2).grid(row=1, column=col, sticky='nsew')
 
-        # 操作按钮区域（保持原有代码不变）
-        self.action_frame = tk.Frame(bottom_frame, bg='#2a4a3c')
-        self.action_frame.pack(side=tk.RIGHT, fill=tk.X, padx=10)
-        button_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        button_frame.pack(pady=5)
+        bet_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        bet_card.pack(fill=tk.BOTH, expand=True, pady=(3, 0))
+        bet_header = tk.Frame(bet_card, bg=HEADER_BG)
+        bet_header.pack(fill=tk.X)
+        tk.Label(bet_header, text="下注区", font=('Arial', 12, 'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=3)
 
-        self.info_button = tk.Button(
-            bottom_frame,
-            text="游戏规则",
-            command=self.show_game_instructions,
-            bg='#4B8BBE',
-            fg='white',
-            font=('Arial', 12),
-            width=10,
-            relief=tk.RAISED
-        )
-        self.info_button.pack(side=tk.RIGHT, padx=10, pady=5)
-    
+        bet_body = tk.Frame(bet_card, bg=TABLE_PANEL_BG, bd=2, relief=tk.RAISED)
+        bet_body.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+
+        def create_bet_box(parent, title, bet_type, *, pack_opts=None, grid_opts=None, title_font=12,
+                           display_font=12, display_height=1, title_anchor='w'):
+            box = tk.Frame(parent, bg='#315546', bd=1, relief=tk.SOLID)
+            if pack_opts is not None:
+                box.pack(**pack_opts)
+            elif grid_opts is not None:
+                box.grid(**grid_opts)
+
+            header = tk.Label(box, text=title, font=('Arial', title_font, 'bold'), bg='#345949', fg=TEXT,
+                              anchor=title_anchor, padx=6, pady=2)
+            header.pack(fill=tk.X)
+
+            var = tk.StringVar(value="0")
+            setattr(self, f"{bet_type}_var", var)
+            display = tk.Label(box, textvariable=var, font=('Arial', display_font, 'bold'), bg='white',
+                               fg='black', height=display_height, relief=tk.SUNKEN, bd=1)
+            display.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+            display.bind("<Button-1>", lambda e, bt=bet_type: self.add_chip_to_bet(bt))
+            display.bind("<Button-3>", lambda e, bt=bet_type: self.reset_bet_area(e, bt))
+            self.bet_widgets[bet_type] = display
+            return box
+
+        top_row = tk.Frame(bet_body, bg=TABLE_PANEL_BG)
+        top_row.pack(fill=tk.X, padx=8, pady=(8, 6))
+        create_bet_box(top_row, "玩家1赢 (1X)", "cowboy_win", pack_opts={'side': tk.LEFT, 'fill': tk.BOTH, 'expand': True, 'padx': 4}, title_font=15, display_font=16, display_height=2)
+        create_bet_box(top_row, "平手 (20X)", "tie", pack_opts={'side': tk.LEFT, 'fill': tk.BOTH, 'expand': True, 'padx': 4}, title_font=15, display_font=16, display_height=2, title_anchor='center')
+        create_bet_box(top_row, "玩家2赢 (1X)", "bull_win", pack_opts={'side': tk.LEFT, 'fill': tk.BOTH, 'expand': True, 'padx': 4}, title_font=15, display_font=16, display_height=2)
+
+        middle = tk.Frame(bet_body, bg=TABLE_PANEL_BG)
+        middle.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 6))
+
+        left_group = tk.Frame(middle, bg=TABLE_PANEL_BG)
+        left_group.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 4))
+        left_header = tk.Label(left_group, text="任一人手牌", font=('Arial', 13, 'bold'), bg=TABLE_PANEL_BG, fg=TEXT)
+        left_header.pack(anchor='w', pady=(0, 4))
+        create_bet_box(left_group, "顺子 / 同花 (1.66X)", "any_suited_connector", pack_opts={'fill': tk.X, 'pady': 3}, title_font=12, display_font=12)
+        create_bet_box(left_group, "对子 (8.5X)", "any_pair", pack_opts={'fill': tk.X, 'pady': 3}, title_font=12, display_font=12)
+        create_bet_box(left_group, "对子 A (100X)", "any_ace_pair", pack_opts={'fill': tk.X, 'pady': 3}, title_font=12, display_font=12)
+
+        right_group = tk.Frame(middle, bg=TABLE_PANEL_BG)
+        right_group.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(4, 0))
+        right_header = tk.Label(right_group, text="赢家牌型", font=('Arial', 14, 'bold'), bg=TABLE_PANEL_BG, fg=TEXT)
+        right_header.pack(anchor='w', pady=(0, 4))
+        winner_grid = tk.Frame(right_group, bg=TABLE_PANEL_BG)
+        winner_grid.pack(fill=tk.BOTH, expand=True)
+        for col in range(2):
+            winner_grid.columnconfigure(col, weight=1, uniform='winner_type')
+        create_bet_box(winner_grid, "高牌 / 对子 (2.2X)", "high_card", grid_opts={'row': 0, 'column': 0, 'sticky': 'nsew', 'padx': 3, 'pady': 3}, title_font=11, display_font=11, display_height=1)
+        create_bet_box(winner_grid, "两对 (3.1X)", "two_pair", grid_opts={'row': 0, 'column': 1, 'sticky': 'nsew', 'padx': 3, 'pady': 3}, title_font=11, display_font=11, display_height=1)
+        create_bet_box(winner_grid, "三条 / 顺子 / 同花 (4.7X)", "three_kind_straight", grid_opts={'row': 1, 'column': 0, 'sticky': 'nsew', 'padx': 3, 'pady': 3}, title_font=11, display_font=11, display_height=1)
+        create_bet_box(winner_grid, "葫芦 (20X)", "full_house", grid_opts={'row': 1, 'column': 1, 'sticky': 'nsew', 'padx': 3, 'pady': 3}, title_font=11, display_font=11, display_height=1)
+        create_bet_box(winner_grid, "四条 / 同花顺 (248X)", "four_kind_flush", grid_opts={'row': 2, 'column': 0, 'columnspan': 2, 'sticky': 'nsew', 'padx': 3, 'pady': 3}, title_font=11, display_font=11, display_height=1)
+
+        footer = tk.Frame(bet_body, bg=TABLE_PANEL_BG)
+        footer.pack(fill=tk.X, padx=10, pady=(2, 8))
+
+        row1 = tk.Frame(footer, bg=TABLE_PANEL_BG)
+        row1.pack(fill=tk.X, pady=(0, 4))
+        self.current_bet_label = tk.Label(row1, text="本局下注: $0.00", font=('Arial', 11, 'bold'), bg=TABLE_PANEL_BG, fg=TEXT)
+        self.current_bet_label.pack(side=tk.LEFT)
+        buttons_row1 = tk.Frame(row1, bg=TABLE_PANEL_BG)
+        buttons_row1.pack(side=tk.RIGHT)
+        self.info_button = tk.Button(buttons_row1, text="游戏规则", command=self.show_game_instructions, bg='#4B8BBE', fg='white', font=('Arial', 10, 'bold'), width=8)
+        self.info_button.pack(side=tk.LEFT, padx=3)
+        self.repeat_bet_btn = tk.Button(buttons_row1, text="重复下注", command=self.apply_last_bet, bg='#FFC107', fg='black', font=('Arial', 10, 'bold'), width=8, state=tk.DISABLED)
+        self.repeat_bet_btn.pack(side=tk.LEFT, padx=3)
+
+        row2 = tk.Frame(footer, bg=TABLE_PANEL_BG)
+        row2.pack(fill=tk.X)
+        self.last_win_label = tk.Label(row2, text="上局获胜: $0.00", font=('Arial', 11, 'bold'), bg=TABLE_PANEL_BG, fg='#FFD700')
+        self.last_win_label.pack(side=tk.LEFT)
+        buttons_row2 = tk.Frame(row2, bg=TABLE_PANEL_BG)
+        buttons_row2.pack(side=tk.RIGHT)
+        self.reset_button = tk.Button(buttons_row2, text="重设金额", command=self.reset_bets, bg='#F44336', fg='white', font=('Arial', 10, 'bold'), width=8)
+        self.reset_button.pack(side=tk.LEFT, padx=3)
+        self.start_button = tk.Button(buttons_row2, text="开始游戏", command=lambda: self.on_enter_key(None), bg='#4CAF50', fg='white', font=('Arial', 10, 'bold'), width=8)
+        self.start_button.pack(side=tk.LEFT, padx=3)
+
+        self.bet_vars = [getattr(self, f"{bet_type}_var") for bet_type in BET_PAYOUT]
+        for var in self.bet_vars:
+            var.trace_add('write', lambda *args: self.refresh_bet_info())
+        self.refresh_bet_info()
+
     def select_chip(self, chip_text):
         """选择筹码，并更新筹码的高亮状态"""
         self.selected_chip = chip_text
@@ -992,19 +1043,38 @@ class TexasHoldemGUI(tk.Tk):
                 chip.create_oval(x1, y1, x2, y2, outline='gold', width=3, tags="highlight")
                 break
     
+    def apply_last_bet(self):
+        """重复最近一局的下注；若余额不足则自动按当前最大可下注额回填。"""
+        if self.game.stage != "betting" or not self.last_bet:
+            return
+
+        applied = {}
+        remaining_balance = self.balance
+        for bet_type in BET_PAYOUT:
+            saved_amount = float(self.last_bet.get(bet_type, 0))
+            if saved_amount <= 0:
+                applied[bet_type] = 0
+                continue
+            amount = min(saved_amount, BET_LIMITS[bet_type], remaining_balance)
+            applied[bet_type] = amount
+            remaining_balance -= amount
+
+        self.set_bet_amounts(applied)
+
     def update_balance(self):
         self.balance_label.config(text=f"余额: {format_money(self.balance)}")
         if self.username != 'Guest':
             update_balance_in_json(self.username, self.balance)
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
     
     def start_game(self):
-        if self.destroyed:
+        """结束下注阶段，扣除下注并翻开其余牌。"""
+        if self.destroyed or self.game.stage != "betting":
             return
-        
+
         self.enter_enabled = False
-            
         try:
-            # 收集所有下注金额
             bet_amounts = {
                 "cowboy_win": float(self.cowboy_win_var.get()),
                 "tie": float(self.tie_var.get()),
@@ -1018,289 +1088,264 @@ class TexasHoldemGUI(tk.Tk):
                 "full_house": float(self.full_house_var.get()),
                 "four_kind_flush": float(self.four_kind_flush_var.get())
             }
-            
-            # 计算总下注金额
+
+            for bet_type, amount in bet_amounts.items():
+                if amount > BET_LIMITS[bet_type]:
+                    messagebox.showerror(
+                        "下注限制",
+                        f"{bet_type} 的下注超过上限 {format_money(BET_LIMITS[bet_type])}"
+                    )
+                    return
+
             total_bet = sum(bet_amounts.values())
-                
-            # 修改后的代码 - 确保余额不足时不扣除金额
             if total_bet > self.balance:
-                messagebox.showerror("错误", "余额不足")
-                # 清空所有下注金额的数据结构
-                for bet_type in bet_amounts:
-                    bet_amounts[bet_type] = 0
-
-                for bet_type, widget in self.bet_widgets.items():
-                    getattr(self, f"{bet_type}_var").set("0")
-                    # 背景色恢复白色
-                    widget.config(bg='white')
-                
-                # 重置本局下注显示为0
-                self.current_bet_label.config(text=f"本局下注: {format_money(0)}")
-                
-                # 重新启动15秒倒计时
+                messagebox.showwarning("余额不足", "下注金额已超过余额，请调整后再开始。")
+                self.set_bet_amounts(bet_amounts)
                 self.bet_start_time = time.time()
-                if self.auto_start_timer:
-                    self.after_cancel(self.auto_start_timer)
+                self.enter_enabled = True
                 self.auto_start_timer = self.after(1000, self.update_timer)
-                total_bet = 0
+                return
 
-            self.balance -= total_bet
-            self.update_balance()
-            
-            # 更新本局下注显示
-            self.current_bet_label.config(text=f"本局下注: {format_money(total_bet)}")
-            
-            # 取消自动开始计时器（如果存在）
             if self.auto_start_timer:
                 self.after_cancel(self.auto_start_timer)
                 self.auto_start_timer = None
-            
-            self.game.reset_game()
-            self.game.deal_initial()
+
+            if total_bet > 0:
+                self.last_bet = bet_amounts.copy()
+            self.balance -= total_bet
+            self.update_balance()
             self.game.bets = bet_amounts
-            
-            # 清除所有卡片
-            for widget in self.cowboy_cards_frame.winfo_children():
-                widget.destroy()
-            for widget in self.bull_cards_frame.winfo_children():
-                widget.destroy()
-            for widget in self.community_cards_frame.winfo_children():
-                widget.destroy()
-            
-            # 重置动画状态
-            self.animation_queue = []
-            self.animation_in_progress = False
-            self.active_card_labels = []
-            
-            # 初始化卡片位置
-            self.card_positions = {}
-            
-            # 添加所有卡片到动画队列
-            self.animation_queue = []
-            
-            # 牛仔牌
-            for i in range(2):
-                card_id = f"cowboy_{i}"
-                self.card_positions[card_id] = {
-                    "current": (50, 50), 
-                    "target": (i * 77.5, 0)  # 缩小间距
-                }
-                self.animation_queue.append(card_id)
-            
-            # 公牛牌
-            for i in range(2):
-                card_id = f"bull_{i}"
-                self.card_positions[card_id] = {
-                    "current": (50, 50), 
-                    "target": (i * 77.5, 0)  # 缩小间距
-                }
-                self.animation_queue.append(card_id)
-            
-            # 公共牌
-            for i in range(5):
-                card_id = f"community_{i}"
-                self.card_positions[card_id] = {
-                    "current": (50, 50), 
-                    "target": (i * 77.5, 0)  # 缩小间距
-                }
-                self.animation_queue.append(card_id)
-            
-            # 开始动画
-            self.animate_deal()
-            
-            # 禁用下注区域
-            for widget in self.bet_widgets.values():
-                widget.unbind("<Button-1>")
-            for chip in self.chip_buttons:
-                chip.unbind("<Button-1>")
-            
+            self.refresh_bet_info()
+            self.game.stage = "showdown"
+
+            self.timer_label.config(text="下注时间: 0秒")
+            self.stage_label.config(text="开牌中")
+            self.table_status_label.config(text="下注结束，正在开牌...")
+            self._set_betting_controls_enabled(False)
+            self.after(300, self.reveal_all_cards)
+
         except ValueError:
             messagebox.showerror("错误", "请输入有效的下注金额")
-    
+
     def animate_deal(self):
         if self.destroyed:
             return
-            
+
         if not self.animation_queue:
             self.animation_in_progress = False
-            # 发牌动画完成后翻开所有牌
-            self.after(500, self.reveal_all_cards)
+            self.after(300, self.reveal_first_community_card)
             return
-            
+
         self.animation_in_progress = True
         card_id = self.animation_queue.pop(0)
-        
-        # 创建卡片标签
+
         if card_id.startswith("cowboy"):
             frame = self.cowboy_cards_frame
             idx = int(card_id.split("_")[1])
-            card = self.game.cowboy_hole[idx] if idx < len(self.game.cowboy_hole) else None
+            card = self.game.cowboy_hole[idx]
         elif card_id.startswith("bull"):
             frame = self.bull_cards_frame
             idx = int(card_id.split("_")[1])
-            card = self.game.bull_hole[idx] if idx < len(self.game.bull_hole) else None
-        elif card_id.startswith("community"):
+            card = self.game.bull_hole[idx]
+        else:
             frame = self.community_cards_frame
             idx = int(card_id.split("_")[1])
-            card = self.game.community_cards[idx] if idx < len(self.game.community_cards) else None
-        
-        # 创建卡片标签
-        card_label = tk.Label(frame, image=self.back_image, bg='#2a4a3c')
-        card_label.place(
-            x=self.card_positions[card_id]["current"][0],
-            y=self.card_positions[card_id]["current"][1] + 20
-        )
-        
-        # 存储卡片信息
+            card = self.game.community_cards[idx]
+
+        card_label = tk.Label(frame, image=self.back_image, bg=TABLE_PANEL_BG)
+        cx, cy = self.card_positions[card_id]["current"]
+        card_label.place(x=cx, y=cy + 20, width=CARD_SIZE[0], height=CARD_SIZE[1])
         card_label.card_id = card_id
         card_label.card = card
         card_label.is_face_up = False
         card_label.is_moving = True
         card_label.target_pos = self.card_positions[card_id]["target"]
-        
-        # 添加到活动卡片列表
         self.active_card_labels.append(card_label)
-        
-        # 开始移动动画
         self.animate_card_move(card_label)
-    
+
     def animate_card_move(self, card_label):
         if self.destroyed:
             return
-            
-        # 检查卡片是否仍然存在
         if not hasattr(card_label, "target_pos") or card_label not in self.active_card_labels:
             return
-            
+
         try:
-            current_x, current_y = card_label.winfo_x(), card_label.winfo_y()
-            target_x, target_y = card_label.target_pos
-            
-            # 计算移动方向向量
-            dx = target_x - current_x
-            dy = target_y - current_y
-            distance = math.sqrt(dx**2 + dy**2)
-            
-            # 如果已经到达目标位置
+            cx, cy = card_label.winfo_x(), card_label.winfo_y()
+            tx, ty = card_label.target_pos
+            dx, dy = tx - cx, ty - cy
+            distance = math.hypot(dx, dy)
             if distance < 5:
-                card_label.place(x=target_x, y=target_y)
+                card_label.place(x=tx, y=ty, width=CARD_SIZE[0], height=CARD_SIZE[1])
                 card_label.is_moving = False
-                
-                # 如果是回收动画且到达左上角，销毁卡片
-                if card_label.target_pos == (50, 50):
-                    if card_label in self.active_card_labels:
-                        self.active_card_labels.remove(card_label)
-                    card_label.destroy()
-                    
-                self.after(100, self.animate_deal)  # 处理下一张牌
+                self.after(20, self.animate_deal)
                 return
-            
-            # 计算移动步长
-            step_x = dx * 0.2
-            step_y = dy * 0.2
-            
-            # 更新位置
-            new_x = current_x + step_x
-            new_y = current_y + step_y
-            card_label.place(x=new_x, y=new_y)
-            
-            # 继续动画
+
+            card_label.place(
+                x=cx + dx * 0.2, y=cy + dy * 0.2,
+                width=CARD_SIZE[0], height=CARD_SIZE[1]
+            )
             self.after(20, lambda: self.animate_card_move(card_label))
-            
         except tk.TclError:
-            # 卡片已被销毁，停止动画
             if card_label in self.active_card_labels:
                 self.active_card_labels.remove(card_label)
-            return
-    
-    def reveal_all_cards(self):
+
+    def _set_betting_controls_enabled(self, enabled):
+        """统一启用或禁用下注格、筹码与底部操作按钮。"""
+        for bet_type, widget in self.bet_widgets.items():
+            widget.unbind("<Button-1>")
+            widget.unbind("<Button-3>")
+            if enabled:
+                widget.bind("<Button-1>", lambda e, bt=bet_type: self.add_chip_to_bet(bt))
+                widget.bind("<Button-3>", lambda e, bt=bet_type: self.reset_bet_area(e, bt))
+        for chip in self.chip_buttons:
+            chip.unbind("<Button-1>")
+            if enabled:
+                chip_text = self.chip_texts[chip]
+                chip.bind("<Button-1>", lambda e, t=chip_text: self.select_chip(t))
+
+        button_state = tk.NORMAL if enabled else tk.DISABLED
+        if hasattr(self, 'reset_button'):
+            self.reset_button.config(state=button_state)
+        if hasattr(self, 'start_button'):
+            self.start_button.config(state=button_state)
+        self._update_repeat_button_state()
+
+    def _find_card_label(self, card_id):
+        for label in self.active_card_labels:
+            if getattr(label, 'card_id', None) == card_id and label.winfo_exists():
+                return label
+        return None
+
+    def reveal_first_community_card(self):
+        """发牌完成后只翻开第0张公共牌，再开放下注。"""
         if self.destroyed:
             return
-            
-        """翻开所有牌（带动画）"""
-        # 翻牛仔牌
-        for i, card_label in enumerate(self.cowboy_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flip_card_animation(card_label)
-                # 标记牌已翻开
+        first = self._find_card_label("community_0")
+        if first is None:
+            self.begin_betting_phase()
+            return
+        self.stage_label.config(text="准备下注")
+        self.table_status_label.config(text="翻开第1张公共牌")
+        self.game.cards_revealed["community"][0] = True
+        self.flip_card_animation(first)
+        self.after(550, self.begin_betting_phase)
+
+    def begin_betting_phase(self):
+        if self.destroyed:
+            return
+        self.game.stage = "betting"
+        self.stage_label.config(text="下注中")
+        self.table_status_label.config(text="首张公共牌已开，请下注")
+        self._set_betting_controls_enabled(True)
+        self._update_repeat_button_state()
+        self.bet_start_time = time.time()
+        self.enter_enabled = True
+        self.timer_label.config(text="下注时间: 15秒")
+        if self.auto_start_timer:
+            self.after_cancel(self.auto_start_timer)
+        self.auto_start_timer = self.after(1000, self.update_timer)
+
+    def reveal_all_cards(self):
+        """先翻开玩家1和玩家2手牌，再翻开剩余4张公共牌，最后更新标签。"""
+        if self.destroyed:
+            return
+
+        self.stage_label.config(text="开牌中")
+        self.table_status_label.config(text="先翻开玩家手牌")
+
+        hole_labels = []
+        for i in range(2):
+            lbl = self._find_card_label(f"cowboy_{i}")
+            if lbl is not None and not lbl.is_face_up:
                 self.game.cards_revealed["cowboy"][i] = True
-        
-        # 翻公牛牌
-        for i, card_label in enumerate(self.bull_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flip_card_animation(card_label)
-                # 标记牌已翻开
+                hole_labels.append(lbl)
+        for i in range(2):
+            lbl = self._find_card_label(f"bull_{i}")
+            if lbl is not None and not lbl.is_face_up:
                 self.game.cards_revealed["bull"][i] = True
-                
-        # 翻公共牌
-        for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flip_card_animation(card_label)
-                # 标记牌已翻开
-                self.game.cards_revealed["community"][i] = True
-        
-        # 更新牌型标签
-        self.update_hand_labels()
-        
-        # 2秒后结算游戏
-        self.after(2000, self.settle_game)
-    
+                hole_labels.append(lbl)
+
+        for lbl in hole_labels:
+            self.flip_card_animation(lbl)
+
+        self.after(700, lambda: self.reveal_remaining_community_cards(1))
+
+    def reveal_remaining_community_cards(self, index):
+        if self.destroyed:
+            return
+        if index >= 5:
+            self.after(450, self.update_hand_labels)
+            self.after(1500, self.settle_game)
+            return
+
+        self.table_status_label.config(text=f"翻开第 {index + 1} 张至第 5 张公共牌")
+        lbl = self._find_card_label(f"community_{index}")
+        if lbl is not None and not lbl.is_face_up:
+            self.game.cards_revealed["community"][index] = True
+            self.flip_card_animation(lbl)
+        self.after(220, lambda: self.reveal_remaining_community_cards(index + 1))
+
     def flip_card_animation(self, card_label):
-        """卡片翻转动画"""
-        # 获取卡片正面图像
         card = card_label.card
         front_img = self.card_images.get((card.suit, card.rank), self.back_image)
-        
-        # 创建动画序列
         self.animate_flip(card_label, front_img, 0)
-    
+
     def animate_flip(self, card_label, front_img, step):
-        if self.destroyed:
+        """Caribbean Stud Poker 同款：PIL逐帧缩窄背面，再展开正面。"""
+        if self.destroyed or not card_label.winfo_exists():
             return
-            
-        """执行翻转动画"""
-        steps = 10  # 动画总步数
-        
+
+        steps = 12
+        orig_w, orig_h = CARD_SIZE
         if step > steps:
-            # 动画结束
             card_label.is_face_up = True
-            return
-        
-        if step <= steps // 2:
-            # 第一阶段：从背面翻转到侧面（宽度减小）
-            width = 75 - (step * 15)  # 缩小宽度变化
-            if width <= 0:
-                width = 1
-            # 创建缩放后的背面图像
-            card_label.config(image=self.back_image)
-        else:
-            # 第二阶段：从侧面翻转到正面（宽度增加）
-            width = (step - steps // 2) * 15  # 缩小宽度变化
-            if width <= 0:
-                width = 1
-            # 创建缩放后的正面图像
+            tx, ty = card_label.target_pos if hasattr(card_label, 'target_pos') else (0, 0)
+            card_label.place(x=tx, y=ty, width=orig_w, height=orig_h)
             card_label.config(image=front_img)
-        
-        # 更新卡片显示
-        card_label.place(width=width)
-        
-        # 下一步
-        step += 1
-        card_label.after(50, lambda: self.animate_flip(card_label, front_img, step))
-    
+            if hasattr(self, '_temp_flip_images'):
+                self._temp_flip_images.pop(card_label, None)
+            return
+
+        half = steps // 2
+        if step <= half:
+            ratio = 1 - step / float(half)
+            pil_img = self.original_images.get("back")
+        else:
+            ratio = (step - half) / float(half)
+            card = card_label.card
+            pil_img = self.original_images.get((card.suit, card.rank))
+
+        width = max(1, int(orig_w * ratio))
+        if pil_img is None:
+            pil_img = Image.new('RGB', (orig_w, orig_h), 'gray')
+        scaled = pil_img.resize((width, orig_h), Image.LANCZOS)
+        scaled_img = ImageTk.PhotoImage(scaled)
+        if not hasattr(self, '_temp_flip_images'):
+            self._temp_flip_images = {}
+        self._temp_flip_images[card_label] = scaled_img
+
+        tx, ty = card_label.target_pos if hasattr(card_label, 'target_pos') else (0, 0)
+        offset = (orig_w - width) // 2
+        card_label.config(image=scaled_img)
+        card_label.place(x=tx + offset, y=ty, width=width, height=orig_h)
+        self.after(30, lambda: self.animate_flip(card_label, front_img, step + 1))
+
     def update_hand_labels(self):
-        """更新牛仔和公牛的牌型标签"""
-        # 计算牛仔当前牌型
-        community_revealed_count = sum(self.game.cards_revealed["community"])
-        cowboy_eval = self.game.evaluate_current_hand(self.game.cowboy_hole, community_revealed_count)
-        cowboy_hand_name = HAND_RANK_NAMES[cowboy_eval[0]] if cowboy_eval else ""
-        self.cowboy_label.config(text=f"牛仔 - {cowboy_hand_name}" if cowboy_hand_name else "牛仔")
-        
-        # 计算公牛当前牌型
-        bull_eval = self.game.evaluate_current_hand(self.game.bull_hole, community_revealed_count)
-        bull_hand_name = HAND_RANK_NAMES[bull_eval[0]] if bull_eval else ""
-        self.bull_label.config(text=f"公牛 - {bull_hand_name}" if bull_hand_name else "公牛")
-    
+        """开牌完成后显示玩家1和玩家2的最终最佳五张牌型。"""
+        all_revealed = (
+            all(self.game.cards_revealed["cowboy"]) and
+            all(self.game.cards_revealed["bull"]) and
+            all(self.game.cards_revealed["community"])
+        )
+        if not all_revealed:
+            self.cowboy_label.config(text="玩家1")
+            self.bull_label.config(text="玩家2")
+            return
+
+        cowboy_eval, _, bull_eval, _ = self.game.evaluate_hands()
+        self.cowboy_label.config(text=f"玩家1 - {HAND_RANK_NAMES[cowboy_eval[0]]}")
+        self.bull_label.config(text=f"玩家2 - {HAND_RANK_NAMES[bull_eval[0]]}")
+
     def settle_game(self):
         if self.destroyed:
             return
@@ -1365,8 +1410,14 @@ class TexasHoldemGUI(tk.Tk):
         self.last_win = winnings
         self.last_win_label.config(text=f"上局获胜: {format_money(winnings)}")
         
+        self._set_betting_controls_enabled(False)
+
         # 显示结果
-        result_text = f"游戏结束! {'牛仔' if winner == 'cowboy' else '公牛' if winner == 'bull' else '平手'}获胜"
+        result_text = f"游戏结束! {'玩家1' if winner == 'cowboy' else '玩家2' if winner == 'bull' else '平手'}获胜"
+        if hasattr(self, "stage_label"):
+            self.stage_label.config(text="结算完成")
+        if hasattr(self, "table_status_label"):
+            self.table_status_label.config(text=result_text)
         
         # 高亮显示获胜的下注选项
         hit_bets = {
@@ -1383,6 +1434,9 @@ class TexasHoldemGUI(tk.Tk):
             "four_kind_flush": winner_hand_type == "four_kind_flush"
         }
         
+        # 结算时下注格会显示赔付金额，但“本局下注”保持原下注总额。
+        self.freeze_current_bet_display = True
+
         # 在获胜格子中显示赔付金额（本金+利润）
         for bet_type, widget in self.bet_widgets.items():
             if hit_bets.get(bet_type, False):
@@ -1408,6 +1462,8 @@ class TexasHoldemGUI(tk.Tk):
             return
             
         """收起所有卡片到左上角"""
+        if hasattr(self, "stage_label"):
+            self.stage_label.config(text="收牌中")
         # 设置所有卡片的回收位置
         for card_label in self.active_card_labels:
             card_label.target_pos = (50, 50)
@@ -1498,82 +1554,83 @@ class TexasHoldemGUI(tk.Tk):
     
     def reset_bets(self):
         """重置所有下注金额为0"""
-        self.cowboy_win_var.set("0")
-        self.tie_var.set("0")
-        self.bull_win_var.set("0")
-        self.any_suited_connector_var.set("0")
-        self.any_pair_var.set("0")
-        self.any_ace_pair_var.set("0")
-        self.high_card_var.set("0")
-        self.two_pair_var.set("0")
-        self.three_kind_straight_var.set("0")
-        self.full_house_var.set("0")
-        self.four_kind_flush_var.set("0")
-        
-        # 更新本局下注显示
-        self.current_bet_label.config(text=f"本局下注: {format_money(0)}")
-            
-        # 重置背景色为白色
+        zero_bets = {bet_type: 0 for bet_type in BET_PAYOUT}
+        self.set_bet_amounts(zero_bets)
+
         for widget in self.bet_widgets.values():
             widget.config(bg='white')
-        
-        # 短暂高亮显示重置效果
         for widget in self.bet_widgets.values():
-            widget.config(bg='#FFCDD2')  # 浅红色
+            widget.config(bg='#FFCDD2')
         self.after(500, lambda: [w.config(bg='white') for w in self.bet_widgets.values()])
-    
+
     def reset_game(self, auto_reset=False):
-        self._load_assets()
-        
+        """初始化下一局：先发全部暗牌，翻开首张公共牌后才开始下注。"""
         if self.destroyed:
             return
-            
-        # 取消自动重置计时器
+
+        self._load_assets()
         if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
+            try:
+                self.after_cancel(self.auto_reset_timer)
+            except tk.TclError:
+                pass
             self.auto_reset_timer = None
-        
-        # 重置游戏状态
-        self.game.reset_game()
-        
-        # 重置下注金额为0
-        self.reset_bets()
-        
-        # 清空活动卡片列表
-        self.active_card_labels = []
-        
-        # 清除所有卡片
-        for widget in self.cowboy_cards_frame.winfo_children():
-            widget.destroy()
-        for widget in self.bull_cards_frame.winfo_children():
-            widget.destroy()
-        for widget in self.community_cards_frame.winfo_children():
-            widget.destroy()
-        
-        # 重置牌型标签
-        self.cowboy_label.config(text="牛仔")
-        self.bull_label.config(text="公牛")
-        
-        # 恢复下注区域
-        for bet_type, widget in self.bet_widgets.items():
-            widget.bind("<Button-1>", lambda e, bt=bet_type: self.add_chip_to_bet(bt))
-            widget.bind("<Button-3>", lambda e, bt=bet_type: self.reset_bet_area(e, bt))
-        for chip in self.chip_buttons:
-            # 使用存储的文本重新绑定事件
-            text = self.chip_texts[chip]
-            chip.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
-        
-        # 清除操作区域的额外按钮
-        for widget in self.action_frame.winfo_children():
-            if not isinstance(widget, tk.Frame):
-                widget.destroy()
-        
-        # 启动15秒自动开始计时器
-        self.bet_start_time = time.time()
         if self.auto_start_timer:
-            self.after_cancel(self.auto_start_timer)
-        self.auto_start_timer = self.after(1000, self.update_timer)
-        self.enter_enabled = True
+            try:
+                self.after_cancel(self.auto_start_timer)
+            except tk.TclError:
+                pass
+            self.auto_start_timer = None
+
+        self.game.reset_game()
+        self.game.deal_initial()
+        self.game.stage = "dealing"
+        self.enter_enabled = False
+
+        # 新一局恢复“本局下注”的正常刷新。
+        self.freeze_current_bet_display = False
+        self.reset_bets()
+        self.active_card_labels = []
+        self.animation_queue = []
+        self.animation_in_progress = False
+        self.card_positions = {}
+        self._temp_flip_images = {}
+
+        for frame in (self.cowboy_cards_frame, self.bull_cards_frame, self.community_cards_frame):
+            for widget in frame.winfo_children():
+                widget.destroy()
+
+        self.cowboy_label.config(text="玩家1")
+        self.bull_label.config(text="玩家2")
+        self.stage_label.config(text="发牌中")
+        self.timer_label.config(text="下注时间: --")
+        self.table_status_label.config(text="先发暗牌，再翻开首张公共牌")
+        self._set_betting_controls_enabled(False)
+
+        # 按需求的可视发牌顺序：公共牌5张、玩家1两张、玩家2两张。
+        for i in range(5):
+            card_id = f"community_{i}"
+            self.card_positions[card_id] = {
+                "current": (40, 35),
+                "target": (i * COMMUNITY_CARD_SPACING, 0)
+            }
+            self.animation_queue.append(card_id)
+        for i in range(2):
+            card_id = f"cowboy_{i}"
+            self.card_positions[card_id] = {
+                "current": (40, 35),
+                "target": (i * HOLE_CARD_SPACING, 0)
+            }
+            self.animation_queue.append(card_id)
+        for i in range(2):
+            card_id = f"bull_{i}"
+            self.card_positions[card_id] = {
+                "current": (40, 35),
+                "target": (i * HOLE_CARD_SPACING, 0)
+            }
+            self.animation_queue.append(card_id)
+
+        self.after(150, self.animate_deal)
 
     def show_card_sequence(self, event):
         """显示本局牌序窗口 - 右键点击时取消15秒计时"""
@@ -1652,7 +1709,7 @@ class TexasHoldemGUI(tk.Tk):
                     font = ImageFont.truetype("arial.ttf", 12)
                 except:
                     font = ImageFont.load_default()
-                text_width, text_height = draw.textsize(text, font=font)
+                text_width, text_height = measure_text(draw, text, font)
                 x = (small_size[0] - text_width) / 2
                 y = (small_size[1] - text_height) / 2
                 draw.text((x, y), text, fill="white", font=font)
@@ -1707,13 +1764,53 @@ class TexasHoldemGUI(tk.Tk):
         # 绑定鼠标滚轮滚动
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-def main(initial_balance=10000, username="Guest"):
-    app = TexasHoldemGUI(initial_balance, username)
-    app.reset_game()  # 初始化游戏并启动计时器
-    app.mainloop()
-    return app.balance
+def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, user=None,
+         on_back=None, on_balance_change=None):
+    """
+    Parent 嵌入接口：
+        main(parent=..., balance=..., user=..., on_back=..., on_balance_change=...)
+
+    未传 parent 时仍可独立运行。
+    """
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        page = TexasHoldemGUI(
+            parent,
+            actual_balance,
+            actual_user,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+        )
+        page.reset_game()
+        return page
+
+    root = tk.Tk()
+    root.title("德州扑克双人对决")
+    root.geometry("1150x750+50+10")
+    root.resizable(False, False)
+    root.configure(bg=ROOT_BG)
+
+    page = TexasHoldemGUI(root, actual_balance, actual_user)
+    page.pack(fill="both", expand=True)
+    page.reset_game()
+
+    def close_standalone(final_balance=None):
+        try:
+            update_balance_in_json(page.username, page.balance)
+        except Exception:
+            pass
+        page._cancel_timers()
+        page._unbind_return_key()
+        root.destroy()
+
+    page.on_back = close_standalone
+    root.protocol("WM_DELETE_WINDOW", page.on_close)
+    root.mainloop()
+    return page.balance
+
 
 if __name__ == "__main__":
-    # 独立运行时的示例调用
     final_balance = main()
     print(f"最终余额: {final_balance}")

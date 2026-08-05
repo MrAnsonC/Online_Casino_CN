@@ -1,0 +1,145 @@
+[
+  {
+    "time": "2026-08-05T10:04:08",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T10:01:05",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 10,
+    "point_after": null,
+    "net": -1166.67
+  },
+  {
+    "time": "2026-08-05T10:01:01",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": 10,
+    "point_after": 10,
+    "net": -500.0
+  },
+  {
+    "time": "2026-08-05T10:00:55",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": null,
+    "point_after": 10,
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T10:00:49",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": 6,
+    "point_after": null,
+    "net": -500.0
+  },
+  {
+    "time": "2026-08-05T10:00:43",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 6,
+    "point_after": 6,
+    "net": -500.0
+  },
+  {
+    "time": "2026-08-05T10:00:35",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 6,
+    "point_after": 6,
+    "net": -500.0
+  },
+  {
+    "time": "2026-08-05T10:00:29",
+    "dice": [
+      3,
+      2
+    ],
+    "total": 5,
+    "point_before": 6,
+    "point_after": 6,
+    "net": -500.0
+  },
+  {
+    "time": "2026-08-05T10:00:16",
+    "dice": [
+      6,
+      4
+    ],
+    "total": 10,
+    "point_before": 6,
+    "point_after": 6,
+    "net": -500.0
+  },
+  {
+    "time": "2026-08-05T10:00:12",
+    "dice": [
+      6,
+      3
+    ],
+    "total": 9,
+    "point_before": 6,
+    "point_after": 6,
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T10:00:09",
+    "dice": [
+      6,
+      3
+    ],
+    "total": 9,
+    "point_before": 6,
+    "point_after": 6,
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T10:00:04",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 6,
+    "point_after": 6,
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T09:59:59",
+    "dice": [
+      4,
+      2
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "net": 0.0
+  }
+]

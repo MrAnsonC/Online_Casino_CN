@@ -1,1174 +1,1088 @@
-import tkinter as tk
-from tkinter import ttk, messagebox
-import random
+"""Stock Market — ChickenCrossing-style warm fixed HMI.
+
+Gameplay retained from the original stock_market.py:
+- 12-second betting countdown, then a 10-second market round starts automatically.
+- Bets can be added to both UP and DOWN while the round is idle/counting down.
+- Market updates every 0.05s using the original direction/magnitude random logic.
+- Position value is settled from the final cumulative percentage; winning profit
+  carries the original 5% fee (0.95 factor).
+- Positions remain invested between rounds until Cash Out; positions under $5
+  are automatically cashed out.
+- 20-round history is persisted in A_Logs/stock_market.json.
+
+The UI is rebuilt to match ChickenCrossing_tk.py: 1150x750 fixed viewport,
+warm mineral palette, 1110x714 shell, 748/348 split, metric tiles, tactile
+chips and EmbeddedGamePage support.
+"""
+
+from __future__ import annotations
+
 import json
 import os
-import time
-import math
-from datetime import datetime
+import random
+import sys
+import tkinter as tk
+from tkinter import messagebox
+from typing import Callable, Optional
 
-def get_data_file_path():
-    # 用于获取保存数据的文件路径
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../saving_data.json')
+try:
+    from .small_games import EmbeddedGamePage
+except ImportError:
+    from small_games import EmbeddedGamePage
 
-# 获取历史记录文件路径
-def get_history_file_path():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../A_Logs/stock_market.json')
 
-# 保存用户数据
-def save_user_data(users):
-    file_path = get_data_file_path()
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(users, f, ensure_ascii=False, indent=4)
+VERSION = "StockMarket-ChickenStyle-R2"
 
-# 读取用户数据
-def load_user_data():
-    file_path = get_data_file_path()
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-    
-def update_balance_in_json(username, new_balance):
-    users = load_user_data()  # 先加载现有用户数据
-    for user in users:
-        if user['user_name'] == username:  # 查找当前用户
-            user['cash'] = f"{new_balance:.2f}"  # 更新余额
-            break
-    save_user_data(users)  # 保存更新后的数据
 
-# 保存历史记录到文件
-def save_history_to_file(history_dict):
-    file_path = get_history_file_path()
-    # 确保目录存在
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(history_dict, f, ensure_ascii=False, indent=4)
+class Theme:
+    APP_BG = "#C8C1B7"
+    PANEL = "#E7E1D8"
+    PANEL_ALT = "#DCD5CB"
+    PANEL_HOVER = "#D1C9BE"
+    CANVAS_BG = "#BFD0C1"
+    BORDER = "#9A9185"
+    BORDER_SOFT = "#B9B0A5"
 
-# 加载历史记录从文件
-def load_history_from_file():
-    file_path = get_history_file_path()
-    # 如果文件不存在，返回默认的空历史记录
-    if not os.path.exists(file_path):
-        # 创建默认的20条历史记录，全部为0
-        default_history = {f"{i:02d}": 0 for i in range(1, 21)}
-        save_history_to_file(default_history)
-        return default_history
-    
+    TEXT = "#252A2E"
+    TEXT_MUTED = "#596169"
+    TEXT_DIM = "#777E83"
+
+    ACCENT = "#345E73"
+    ACCENT_HOVER = "#294A5A"
+    ACCENT_SOFT = "#B8CAD2"
+    CYAN = "#276E78"
+    GREEN = "#4E7355"
+    GREEN_HOVER = "#3D5C43"
+    RED = "#A84D4D"
+    RED_HOVER = "#873D3D"
+    AMBER = "#A36B22"
+
+    CHART_BG = "#D9E1D8"
+    CHART_GRID = "#AEB9AF"
+    CHART_ZERO = "#69766C"
+    CHART_UP = "#A84D4D"      # retain original CN market convention: red = up
+    CHART_DOWN = "#4E7355"    # green = down
+    CHART_POINT = "#345E73"
+    HISTORY_EMPTY = "#CCC6BD"
+
+    FONT = "Segoe UI"
+    FONT_CJK = "Microsoft YaHei UI" if sys.platform.startswith("win") else (
+        "PingFang SC" if sys.platform == "darwin" else "Noto Sans CJK SC"
+    )
+    FONT_EMOJI = "Segoe UI Emoji"
+
+
+CHIP_CONFIGS = (
+    ("$5", "5", "#D75A54", "white"),
+    ("$25", "25", "#67B56A", "black"),
+    ("$100", "100", "#292929", "white"),
+    ("$500", "500", "#D47AB7", "black"),
+    ("$1K", "1000", "#F4F1EA", "black"),
+)
+
+# Intentionally retained exactly from the original game.
+price_changes = {
+    1: 0.34,
+    2: 0.23,
+    3: 0.13,
+    4: 0.08,
+    5: 0.07,
+    6: 0.06,
+    7: 0.06,
+    8: 0.05,
+    9: 0.04,
+    10: 0.03,
+}
+
+
+def get_data_file_path() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "../saving_data.json")
+
+
+def get_history_file_path() -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "../A_Logs/stock_market.json")
+
+
+def load_user_data() -> list:
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            history = json.load(f)
-            # 确保历史记录有20条
-            if len(history) < 20:
-                for i in range(len(history) + 1, 21):
-                    history[f"{i:02d}"] = 0
-            return history
-    except (json.JSONDecodeError, FileNotFoundError):
-        # 如果文件损坏或读取失败，返回默认历史记录
-        default_history = {f"{i:02d}": 0 for i in range(1, 21)}
-        save_history_to_file(default_history)
-        return default_history
+        with open(get_data_file_path(), "r", encoding="utf-8") as file:
+            data = json.load(file)
+        return data if isinstance(data, list) else []
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return []
 
-# 更新历史记录：添加新结果，移动旧记录
-def update_history_in_file(new_percent):
-    # 加载当前历史记录
+
+def save_user_data(users: list) -> None:
+    try:
+        with open(get_data_file_path(), "w", encoding="utf-8") as file:
+            json.dump(users, file, ensure_ascii=False, indent=4)
+    except OSError:
+        pass
+
+
+def update_balance_in_json(username: str, new_balance: float) -> None:
+    users = load_user_data()
+    for user in users:
+        if user.get("user_name") == username:
+            user["cash"] = f"{float(new_balance):.2f}"
+            break
+    if users:
+        save_user_data(users)
+
+
+def save_history_to_file(history_dict: dict) -> None:
+    path = get_history_file_path()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as file:
+            json.dump(history_dict, file, ensure_ascii=False, indent=4)
+    except OSError:
+        pass
+
+
+def load_history_from_file() -> dict:
+    default = {f"{i:02d}": 0 for i in range(1, 21)}
+    path = get_history_file_path()
+    if not os.path.exists(path):
+        save_history_to_file(default)
+        return default
+    try:
+        with open(path, "r", encoding="utf-8") as file:
+            history = json.load(file)
+        if not isinstance(history, dict):
+            raise ValueError
+        for i in range(1, 21):
+            history.setdefault(f"{i:02d}", 0)
+        return history
+    except (OSError, json.JSONDecodeError, ValueError):
+        save_history_to_file(default)
+        return default
+
+
+def update_history_in_file(new_percent: float) -> dict:
     history = load_history_from_file()
-    
-    # 移动历史记录：01->02, 02->03, ..., 19->20
     for i in range(19, 0, -1):
-        old_key = f"{i:02d}"
-        new_key = f"{i+1:02d}"
-        if old_key in history:
-            history[new_key] = history[old_key]
-    
-    # 添加新记录到01位置（整数形式，不带小数）
+        history[f"{i + 1:02d}"] = history.get(f"{i:02d}", 0)
     history["01"] = int(round(new_percent))
-    
-    # 保存更新后的历史记录
     save_history_to_file(history)
     return history
 
-# 股票价格变动概率分布
-price_changes = {
-    1: 0.34,   # 1% 变动
-    2: 0.23,   # 2% 变动
-    3: 0.13,   # 3% 变动
-    4: 0.08,   # 4% 变动
-    5: 0.07,   # 5% 变动
-    6: 0.06,   # 6% 变动
-    7: 0.06,   # 7% 变动
-    8: 0.05,   # 8% 变动
-    9: 0.04,   # 9% 变动
-    10: 0.03   # 10% 变动
-}
 
-class CircleButton(tk.Canvas):
-    """自定义圆形按钮"""
-    def __init__(self, master, text, bg_color, fg_color, command=None, radius=30, 
-                 border_color="#16213e", border_width=2, *args, **kwargs):
-        super().__init__(master, width=radius*2, height=radius*2, 
-                         highlightthickness=0, bg="#16213e", *args, **kwargs)  # 背景色与父容器一致
-        self.radius = radius
-        self.bg_color = bg_color
-        self.fg_color = fg_color
-        self.text = text
-        self.command = command
-        self.border_color = border_color
-        self.border_width = border_width
-        self.border_id = None  # 边框对象ID
-        
-        # 绘制圆形按钮
-        self.create_oval(0, 0, radius*2, radius*2, fill=bg_color, outline="#16213e", width=2)
-        # 修改字体大小为18
-        self.create_text(radius, radius, text=text, fill=fg_color, 
-                        font=("Arial", 18, "bold"))  # 字体大小从10改为18
-        
-        # 添加边框
-        self.add_border()
-        
-        # 绑定点击事件
-        self.bind("<Button-1>", self.on_click)
-    
-    def add_border(self):
-        """添加边框"""
-        # 创建一个稍大的圆形作为边框
-        border_padding = 1  # 边框内边距，让边框更靠近圆形
-        self.border_id = self.create_oval(
-            self.border_width - border_padding, 
-            self.border_width - border_padding, 
-            self.radius*2 - self.border_width + border_padding, 
-            self.radius*2 - self.border_width + border_padding,
-            outline=self.border_color, 
-            width=self.border_width
+class ModernButton(tk.Button):
+    def __init__(
+        self,
+        master,
+        *,
+        text: str = "",
+        textvariable: Optional[tk.StringVar] = None,
+        command: Optional[Callable[[], None]] = None,
+        background: str = Theme.PANEL_HOVER,
+        hover_background: str = Theme.BORDER,
+        foreground: str = Theme.TEXT,
+        font_size: int = 12,
+        bold: bool = False,
+        **kwargs,
+    ) -> None:
+        self.normal_background = background
+        self.hover_background = hover_background
+        self.normal_foreground = foreground
+        super().__init__(
+            master,
+            text=text,
+            textvariable=textvariable,
+            command=command,
+            bg=background,
+            fg=foreground,
+            activebackground=hover_background,
+            activeforeground=foreground,
+            disabledforeground=Theme.TEXT_DIM,
+            font=(Theme.FONT_CJK, font_size, "bold" if bold else "normal"),
+            relief=tk.FLAT,
+            bd=0,
+            highlightthickness=0,
+            cursor="hand2",
+            **kwargs,
         )
-    
-    def change_border_color(self, new_color):
-        """修改边框颜色"""
-        self.border_color = new_color
-        self.itemconfig(self.border_id, outline=new_color)
-    
-    def on_click(self, event):
-        if self.command:
-            self.command()
+        self.bind("<Enter>", self._on_enter, add="+")
+        self.bind("<Leave>", self._on_leave, add="+")
+
+    def _on_enter(self, _event) -> None:
+        if str(self.cget("state")) != tk.DISABLED:
+            super().configure(bg=self.hover_background)
+
+    def _on_leave(self, _event) -> None:
+        super().configure(bg=self.normal_background)
+
+    def set_colors(self, background: str, hover: str, foreground: str = "#FFFFFF") -> None:
+        self.normal_background = background
+        self.hover_background = hover
+        self.normal_foreground = foreground
+        super().configure(
+            bg=background,
+            fg=foreground,
+            activebackground=hover,
+            activeforeground=foreground,
+        )
+
+
+class ChipButton(tk.Canvas):
+    def __init__(
+        self,
+        master,
+        *,
+        label: str,
+        amount: str,
+        chip_color: str,
+        text_color: str,
+        command: Callable[[str], None],
+        width: int = 57,
+        height: int = 50,
+    ) -> None:
+        super().__init__(
+            master, width=width, height=height, bg=Theme.PANEL,
+            bd=0, highlightthickness=0, cursor="hand2",
+        )
+        self.label = label
+        self.amount = amount
+        self.chip_color = chip_color
+        self.text_color = text_color
+        self.command = command
+        self.control_width = width
+        self.control_height = height
+        self._state = tk.NORMAL
+        self._hovered = False
+        self._pressed = False
+        self._selected = False
+        self.bind("<Enter>", self._on_enter)
+        self.bind("<Leave>", self._on_leave)
+        self.bind("<ButtonPress-1>", self._on_press)
+        self.bind("<ButtonRelease-1>", self._on_release)
+        self.draw()
+
+    @staticmethod
+    def _shade(color: str, factor: float) -> str:
+        if not color.startswith("#") or len(color) != 7:
+            return "#555555"
+        rgb = [int(color[i:i+2], 16) for i in (1, 3, 5)]
+        rgb = [max(0, min(255, round(v * factor))) for v in rgb]
+        return "#%02x%02x%02x" % tuple(rgb)
+
+    def draw(self) -> None:
+        self.delete("all")
+        off = 3 if self._pressed else 0
+        outer = self._shade(self.chip_color, 0.68)
+        inner = self._shade(self.chip_color, 0.86)
+        outline = Theme.AMBER if self._selected else (Theme.TEXT if self._hovered else outer)
+        width = 4 if self._selected else (3 if self._hovered else 2)
+
+        self.create_oval(6, 7, self.control_width - 5, self.control_height - 1,
+                         fill="#8E877E", outline="")
+        self.create_oval(5, 3 + off, self.control_width - 6, self.control_height - 5 + off,
+                         fill=outer, outline=outline, width=width)
+        self.create_oval(9, 7 + off, self.control_width - 10, self.control_height - 9 + off,
+                         fill=self.chip_color, outline=inner, width=2)
+        self.create_oval(14, 12 + off, self.control_width - 15, self.control_height - 14 + off,
+                         fill=self.chip_color, outline=outer, width=1)
+        cx = self.control_width / 2
+        cy = (self.control_height - 2) / 2 + off
+        for x1, y1, x2, y2 in (
+            (cx - 3, 4 + off, cx + 3, 10 + off),
+            (cx - 3, self.control_height - 12 + off, cx + 3, self.control_height - 6 + off),
+            (6, cy - 3, 12, cy + 3),
+            (self.control_width - 13, cy - 3, self.control_width - 7, cy + 3),
+        ):
+            self.create_rectangle(x1, y1, x2, y2, fill=self.text_color, outline="")
+        self.create_text(cx, cy, text=self.label, fill=self.text_color,
+                         font=(Theme.FONT, 10 if len(self.label) <= 4 else 9, "bold"))
+        if self._state == tk.DISABLED:
+            self.create_oval(5, 3 + off, self.control_width - 6, self.control_height - 5 + off,
+                             fill="#C9C2B8", outline=Theme.BORDER_SOFT,
+                             width=1, stipple="gray50")
+
+    def set_selected(self, selected: bool) -> None:
+        self._selected = selected
+        self.draw()
+
+    def _on_enter(self, _event) -> None:
+        if self._state != tk.DISABLED:
+            self._hovered = True
+            self.draw()
+
+    def _on_leave(self, _event) -> None:
+        self._hovered = False
+        self._pressed = False
+        self.draw()
+
+    def _on_press(self, _event) -> None:
+        if self._state != tk.DISABLED:
+            self._pressed = True
+            self.draw()
+
+    def _on_release(self, event) -> None:
+        if self._state == tk.DISABLED:
+            return
+        pressed = self._pressed
+        self._pressed = False
+        inside = 0 <= event.x < self.control_width and 0 <= event.y < self.control_height
+        if pressed and inside:
+            self.command(self.amount)
+        self.draw()
+
+    def configure(self, cnf=None, **kwargs):
+        state = kwargs.pop("state", None)
+        if state is not None:
+            self._state = state
+            self._hovered = False
+            self._pressed = False
+            super().configure(cursor="" if state == tk.DISABLED else "hand2")
+            self.draw()
+        if cnf is not None or kwargs:
+            return super().configure(cnf, **kwargs)
+        return None
+
+    config = configure
+
+
+class MetricTile(tk.Frame):
+    def __init__(self, master, label: str, variable: tk.StringVar, accent: str, *, width: int, height: int):
+        super().__init__(
+            master, width=width, height=height, bg=Theme.PANEL_ALT,
+            highlightthickness=1, highlightbackground=Theme.BORDER_SOFT,
+        )
+        self.pack_propagate(False)
+        tk.Label(self, text=label, bg=Theme.PANEL_ALT, fg=Theme.TEXT_MUTED,
+                 font=(Theme.FONT_CJK, 9), anchor=tk.W).place(x=12, y=8, width=width-24, height=18)
+        tk.Label(self, textvariable=variable, bg=Theme.PANEL_ALT, fg=accent,
+                 font=(Theme.FONT, 15, "bold"), anchor=tk.W).place(x=12, y=29, width=width-24, height=28)
+
 
 class StockChart(tk.Canvas):
-    """股票图表"""
-    def __init__(self, master, width=500, height=200, *args, **kwargs):
-        super().__init__(master, width=width, height=height, 
-                        bg="#0f3460", highlightthickness=0, *args, **kwargs)
-        self.width = width
-        self.height = height
-        self.points = []  # 存储价格点 (x, y)
-        self.base_price = 100  # 起始价格
-        self.current_price = 100  # 当前价格
-        self.max_points = 230  # 最多显示200个点（10秒/0.05秒）
-            
-    def update_chart(self, new_price_percent):
-        """
-        更新图表数据并重绘。
-        new_price_percent: 相对于 base_price 的百分比变化（例如 -5 表示 -5%）
-        横向刻度线只绘制到 x_pos_200（200 点参考线的位置）。
-        右侧刻度数字固定放在 x=210（或在画布宽度允许范围内的最大值），并左对齐。
-        """
-        # 更新当前价格（基于百分比）
+    """Warm market chart; price mechanics remain external and unchanged."""
+
+    def __init__(self, master, width=746, height=380, **kwargs):
+        super().__init__(master, width=width, height=height, bg=Theme.CHART_BG,
+                         bd=0, highlightthickness=0, **kwargs)
+        self.chart_width = width
+        self.chart_height = height
+        self.points: list[float] = []
+        self.base_price = 100.0
+        self.current_price = 100.0
+        # 0s initial point + 200 updates at 0.05s = exactly 10.00 seconds.
+        self.max_points = 201
+        self.draw_chart()
+
+    def reset(self) -> None:
+        # Include the t=0 starting point so the 200th 0.05s update lands
+        # exactly at the right edge (10.00 seconds).
+        self.points = [0.0]
+        self.current_price = self.base_price
+        self.draw_chart()
+
+    def update_chart(self, new_price_percent: float) -> float:
         self.current_price = self.base_price * (1 + new_price_percent / 100.0)
+        self.current_price = min(self.base_price * 2, max(0.0, self.current_price))
+        self.points.append(max(-100.0, min(100.0, float(new_price_percent))))
+        if len(self.points) > self.max_points:
+            self.points = self.points[-self.max_points:]
+        self.draw_chart()
+        return ((self.current_price - self.base_price) / self.base_price) * 100.0
 
-        # 限制价格范围，避免显示异常值
-        if self.current_price > self.base_price * 2:
-            self.current_price = self.base_price * 2
-        elif self.current_price < 0:
-            self.current_price = 0
-
-        # 画布内边距
-        top_margin = 8
-        bottom_margin = 8
-        effective_height = max(self.height - top_margin - bottom_margin, 1)
-
-        # 将 new_price_percent（范围 -100 .. +100）归一化到 [0..1]，0->底部(-100)，1->顶部(+100)
-        pct = max(min(new_price_percent, 100.0), -100.0)
-        normalized_from_bottom = (pct + 100.0) / 200.0
-
-        # 计算 y（像素）
-        y = top_margin + (1.0 - normalized_from_bottom) * effective_height
-
-        # x 计算（横向滚动逻辑保持不变）
-        if len(self.points) < self.max_points:
-            x = len(self.points) * (self.width / self.max_points)
-        else:
-            step = (self.width / self.max_points)
-            self.points = [(x - step, y) for x, y in self.points[1:]]
-            x = self.width
-
-        # 添加新点
-        self.points.append((x, y))
-
-        # 清空画布并重绘
+    def draw_chart(self) -> None:
         self.delete("all")
+        w = max(1, int(self.winfo_width() if self.winfo_width() > 1 else self.chart_width))
+        h = max(1, int(self.winfo_height() if self.winfo_height() > 1 else self.chart_height))
+        left, right, top, bottom = 48, 22, 18, 28
+        plot_w = max(1, w - left - right)
+        plot_h = max(1, h - top - bottom)
 
-        # 计算 200 点参考线的横向位置（用于限制横向刻度线长度）
-        try:
-            if self.max_points and self.max_points >= 200:
-                x_pos_200 = (self.width / float(self.max_points)) * 200.0
-                x_pos_200 = max(0.0, min(self.width, x_pos_200))
-            else:
-                x_pos_200 = self.width
-        except Exception:
-            x_pos_200 = self.width
+        def y_for(pct: float) -> float:
+            return top + (100.0 - max(-100.0, min(100.0, pct))) / 200.0 * plot_h
 
-        # --- 绘制横向刻度线（只绘制到 x_pos_200）和右侧刻度数字（放在 x=210 左对齐） ---
-        # 文字的固定 x 位置，尽量保留在 210 左对齐；若画布不足宽则退到 self.width - 30
-        label_x_fixed = 515
-        if label_x_fixed > self.width - 30:
-            label_x_fixed = max(10, self.width - 30)  # 避免越界
+        for pct in (-100, -50, 0, 50, 100):
+            y = y_for(pct)
+            color = Theme.CHART_ZERO if pct == 0 else Theme.CHART_GRID
+            self.create_line(left, y, left + plot_w, y, fill=color, width=2 if pct == 0 else 1,
+                             dash=(5, 5) if pct == 0 else ())
+            self.create_text(left - 8, y, text=f"{pct:+d}%" if pct else "0%",
+                             fill=Theme.TEXT_MUTED, font=(Theme.FONT, 9, "bold"), anchor=tk.E)
 
-        for j in range(5):
-            # j=0 -> -100 (最底); j=4 -> 100 (最顶)
-            label_value = -100 + j * 50
-            y_pos = top_margin + (1.0 - ((label_value + 100) / 200.0)) * effective_height
-            y_pos = max(top_margin, min(self.height - bottom_margin, y_pos))
-
-            if label_value in (100, -100):
-                line_color = "#FF0000"
-            elif label_value in (50, -50):
-                line_color = "#ffd369"
-            else:
-                line_color = "#2d4059"
-
-            # 横线：从左侧到 x_pos_200（不再延伸整列）
-            self.create_line(0, y_pos, x_pos_200, y_pos, fill=line_color, width=1)
-
-            # 右侧刻度文字 — 固定在 label_x_fixed，并左对齐（anchor='w'）
-            # 使用左对齐：文字从 label_x_fixed 开始向右画
-            self.create_text(
-                label_x_fixed, y_pos,
-                text=str(label_value),
-                fill="#bdc3c7",
-                font=("Arial", 12),
-                anchor='w'  # 左对齐
+        # Horizontal time axis: 10 equal cells = exactly 10 seconds.
+        # Each vertical grid line is one real second, from 0s through 10s.
+        for second in range(0, 11):
+            x = left + plot_w * second / 10
+            self.create_line(
+                x, top, x, top + plot_h,
+                fill=Theme.CHART_GRID, width=1, stipple="gray50"
             )
-
-        # 绘制折线（涨为绿色，跌为红色）
-        if len(self.points) > 1:
-            for i in range(1, len(self.points)):
-                x1, y1 = self.points[i - 1]
-                x2, y2 = self.points[i]
-                color = "#e74c3c" if y2 <= y1 else "#27ae60"
-                self.create_line(x1, y1, x2, y2, fill=color, width=2)
-
-        # 绘制当前点标记
-        last_x, last_y = self.points[-1]
-        self.create_oval(
-            last_x - 3, last_y - 3,
-            last_x + 3, last_y + 3,
-            fill="#4cc9f0", outline="#4cc9f0"
+            self.create_text(
+                x, top + plot_h + 15,
+                text=str(second),
+                fill=Theme.TEXT_MUTED,
+                font=(Theme.FONT, 8, "bold"),
+                anchor=tk.CENTER,
+            )
+        self.create_text(
+            w - 3, top + plot_h + 15,
+            text="秒", fill=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 8, "bold"), anchor=tk.E,
         )
 
-        # 中心虚线（基线）——与 0% 对齐，长度同样限制到 x_pos_200
-        zero_normalized = (0.0 + 100.0) / 200.0
-        y_center = top_margin + (1.0 - zero_normalized) * effective_height
-        self.create_line(0, y_center, x_pos_200, y_center, fill="#ffffff", width=1, dash=(2, 2))
+        if not self.points:
+            self.create_text(left + plot_w/2, top + plot_h/2,
+                             text="等待下一局行情", fill=Theme.TEXT_MUTED,
+                             font=(Theme.FONT_CJK, 14, "bold"))
+            return
 
-        # 200 点参考线（竖线）
-        try:
-            if self.max_points and self.max_points >= 200:
-                if 0 <= x_pos_200 <= self.width:
-                    self.create_line(x_pos_200, 0, x_pos_200, self.height, fill="#000000", width=3)
-        except Exception:
-            pass
+        n = len(self.points)
+        coords = []
+        for i, pct in enumerate(self.points):
+            x = left if self.max_points <= 1 else left + plot_w * i / max(1, self.max_points - 1)
+            coords.extend((x, y_for(pct)))
 
-        percent_change = ((self.current_price - self.base_price) / self.base_price) * 100.0
-        return percent_change
+        # Segment colours keep the original China-market red-up / green-down convention.
+        for i in range(1, n):
+            x1, y1 = coords[(i-1)*2:(i-1)*2+2]
+            x2, y2 = coords[i*2:i*2+2]
+            color = Theme.CHART_UP if self.points[i] >= self.points[i-1] else Theme.CHART_DOWN
+            self.create_line(x1, y1, x2, y2, fill=color, width=3)
+
+        x, y = coords[-2], coords[-1]
+        self.create_oval(x-5, y-5, x+5, y+5, fill=Theme.CHART_POINT, outline="#FFFFFF", width=2)
+        self.create_text(left + plot_w - 4, top + 8,
+                         text=f"PRICE  {self.current_price:.2f}", fill=Theme.ACCENT,
+                         font=(Theme.FONT, 10, "bold"), anchor=tk.NE)
+
 
 class HistoryBar(tk.Canvas):
-    """历史记录条"""
-    def __init__(self, master, width=400, height=250, *args, **kwargs):
-        super().__init__(master, width=width, height=height, bg="#0f3460", highlightthickness=0, *args, **kwargs)
-        self.width = width
-        self.height = height
-        self.history = []  # 存储历史记录（正数表示上涨，负数表示下跌）
+    def __init__(self, master, width=746, height=118, **kwargs):
+        super().__init__(master, width=width, height=height, bg=Theme.PANEL_ALT,
+                         bd=0, highlightthickness=0, **kwargs)
+        self.history: list[float] = []
         self.max_history = 20
 
-    def add_result(self, result_percent):
-        """添加新的历史记录并重绘"""
-        self.history.append(result_percent)
-        if len(self.history) > self.max_history:
-            self.history = self.history[-self.max_history:]
-        self.draw_history()
-    
-    def set_history(self, history_list):
-        """直接设置历史记录列表"""
-        self.history = history_list[-self.max_history:]  # 只保留最多max_history条
+    def set_history(self, history_list) -> None:
+        self.history = list(history_list)[-self.max_history:]
         self.draw_history()
 
-    def draw_history(self):
-        """绘制历史记录（美化版）"""
+    def draw_history(self) -> None:
         self.delete("all")
-
-        # 绘制背景（保留画布背景）
-        max_slots = self.max_history
-        hist = self.history[-max_slots:]
-        n = len(hist)
-
-        # 获取画布实际尺寸（优先使用运行时真实尺寸，回退到配置值）
-        try:
-            actual_width = self.winfo_width()
-            if actual_width <= 1:
-                actual_width = int(self.cget("width"))
-        except Exception:
-            actual_width = getattr(self, "width", 400)
-
-        try:
-            actual_height = self.winfo_height()
-            if actual_height <= 1:
-                actual_height = int(self.cget("height"))
-        except Exception:
-            actual_height = getattr(self, "height", 250)
-
-        # 槽间距与槽宽（固定 max_slots 个槽位，右对齐显示最近 N 条）
-        gap = 6
-        # 防止负值和极小宽度
-        slot_width = max(18, (actual_width - (max_slots + 1) * gap) / max_slots) if actual_width > 0 else 18
-        slot_width = float(slot_width)
-
-        # 计算起始 x，使全部 slots 右对齐（保证固定 max_slots 个槽位）
-        total_width_used = max_slots * slot_width + (max_slots + 1) * gap
-        start_x = max(0, actual_width - total_width_used)
-
-        baseline = actual_height / 2.0
-        max_visual_percent = 50.0  # 用于高度归一化（50% -> 最大高度）
-
-        # 每个槽位的绘制
-        for slot_index in range(max_slots):
-            x1 = start_x + gap + slot_index * (slot_width + gap)
-            x2 = x1 + slot_width
-
-            # 对应数据索引（右对齐）
-            data_offset = max_slots - n
-            if slot_index < data_offset:
-                # 空槽：暗色小卡片
-                y_top = 6
-                y_bottom = max(6, actual_height - 6)
-                self.create_rectangle(x1, y_top, x2, y_bottom, fill="#081826", outline="#0f2740", width=1)
+        w = max(1, int(self.winfo_width() if self.winfo_width() > 1 else self.cget("width")))
+        h = max(1, int(self.winfo_height() if self.winfo_height() > 1 else self.cget("height")))
+        baseline = h / 2
+        gap = 4
+        slot_w = (w - gap * (self.max_history + 1)) / self.max_history
+        hist = self.history[-self.max_history:]
+        data_offset = self.max_history - len(hist)
+        for i in range(self.max_history):
+            x1 = gap + i * (slot_w + gap)
+            x2 = x1 + slot_w
+            if i < data_offset:
+                self.create_rectangle(x1, 8, x2, h-8, fill=Theme.HISTORY_EMPTY,
+                                      outline=Theme.BORDER_SOFT, width=1)
+                continue
+            val = float(hist[i - data_offset])
+            ratio = min(abs(val) / 50.0, 1.0)
+            half = max(3.0, (h/2 - 18) * ratio)
+            if val > 0:
+                y1, y2, fill = baseline-half, baseline, Theme.CHART_UP
+                text_y, anchor = y1-3, tk.S
+            elif val < 0:
+                y1, y2, fill = baseline, baseline+half, Theme.CHART_DOWN
+                text_y, anchor = y2+3, tk.N
             else:
-                val = hist[slot_index - data_offset]
-                # 归一化高度
-                height_ratio = min(abs(val) / max_visual_percent, 1.0)
-                bar_half_height = max(2.0, (actual_height / 2.0 - 16.0) * height_ratio)  # 留边距，避免为0
+                y1, y2, fill = baseline-4, baseline+4, Theme.AMBER
+                text_y, anchor = baseline, tk.CENTER
+            self.create_rectangle(x1, y1, x2, y2, fill=fill, outline="")
+            if slot_w >= 20:
+                self.create_text((x1+x2)/2, text_y, text=f"{abs(val):.0f}",
+                                 fill=Theme.TEXT, font=(Theme.FONT, 8, "bold"), anchor=anchor)
+        self.create_line(0, baseline, w, baseline, fill=Theme.BORDER, width=1)
 
-                if val > 0:
-                    y1 = baseline - bar_half_height
-                    y2 = baseline
-                    color = "#e74c3c"  # 上涨（红）
-                    txt_color = "#ffffff"
-                elif val < 0:
-                    y1 = baseline
-                    y2 = baseline + bar_half_height
-                    color = "#27ae60"  # 下跌（绿）
-                    txt_color = "#ffffff"
-                else:
-                    # 平手显示为中性小条（黄色）
-                    y1 = baseline - 20
-                    y2 = baseline + 20
-                    color = "#ffd369"
-                    txt_color = "#000000"
-
-                # 画条形
-                self.create_rectangle(x1, y1, x2, y2, fill=color, outline="#0b1114", width=1)
-
-                # 百分比文本：**不带符号**（始终显示绝对值，如 "56%"）
-                percent_text = f"{abs(val):.0f}"
-                text_font = ("Arial", 9, "bold")
-
-                text_x = (x1 + x2) / 2.0
-                if val > 0:
-                    text_y = y1 - 8
-                elif val < 0:
-                    text_y = y2 + 8
-                else:
-                    text_y = baseline
-                self.create_text(text_x, text_y, text=percent_text, fill=txt_color, font=text_font)
-
-        # 绘制基准线（中线），只绘制到可视槽位区域
-        self.create_line(start_x, baseline, start_x + total_width_used, baseline, fill="#13202a", width=1)
 
 class StockMarketGame:
+    WINDOW_WIDTH = 1150
+    WINDOW_HEIGHT = 750
+    SHELL_WIDTH = 1110
+    SHELL_HEIGHT = 714
+    HEADER_HEIGHT = 70
+    BODY_TOP = 84
+    BODY_HEIGHT = 630
+    GAME_PANEL_WIDTH = 748
+    SIDEBAR_WIDTH = 348
+    PANEL_GAP = 14
+    CANVAS_WIDTH = 746
+
     def __init__(self, root, initial_balance, username):
         self.root = root
-        self.root.title("股市风云")
-        self.root.geometry("1070x650+50+10")
-        self.root.resizable(0,0)
-        self.root.configure(bg="#1a1a2e")
-        
-        # 绑定窗口关闭事件
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
-        
-        # 游戏数据
+        self._configure_root()
+
         self.balance = float(initial_balance)
         self.username = username
-        self.bet_amount_up = 0.0  # 上涨区下注金额
-        self.bet_amount_down = 0.0  # 下跌区下注金额
-        self.game_active = False  # 游戏是否进行中
-        self.timer_active = False  # 倒计时是否进行中
+        self.bet_amount_up = 0.0
+        self.bet_amount_down = 0.0
+        self.game_active = False
+        self.timer_active = False
         self.last_win = 0.0
-        self.current_price_percent = 0.0  # 当前价格变化百分比
+        self.current_price_percent = 0.0
         self.cumulative_net_since_cashout = 0.0
-        self.starting_price = 100  # 起始价格
-        self.result_history = []  # 历史记录
-        self.bet_direction = None  # 下注方向：'up' 或 'down'
-        self.chip_buttons = []  # 存储筹码按钮的引用
-        self.timer_id = None  # 定时器ID
-        self.selected_chip = 5.0  # 默认选中的筹码金额为5
-        self.original_bet_up = 0.0  # 上涨区原始下注金额
-        self.original_bet_down = 0.0  # 下跌区原始下注金额
-        self.current_selected_chip_button = None  # 当前选中的筹码按钮
-        
-        # 加载历史记录
+        self.starting_price = 100
+        self.result_history = []
+        self.bet_direction = None
+        self.timer_id = None
+        self.round_job = None
+        self.next_round_job = None
+        self.selected_chip = 5.0
+        self.original_bet_up = 0.0
+        self.original_bet_down = 0.0
+        self.countdown = 12
+        self.current_update = 0
+        self.total_updates = 0
+        self.update_interval = 0.05
+
+        self.chip_buttons: list[ChipButton] = []
         self.load_history_data()
-        
-        # 创建UI
+        self._create_vars()
         self.create_widgets()
         self.update_display()
-        self.start_countdown()  # 首次加载开始倒计时
-            
-    def create_widgets(self):
-        # 主框架
-        main_frame = tk.Frame(self.root, bg="#1a1a2e")
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        self.start_countdown()
 
-        # 左侧区域
-        left_frame = tk.Frame(main_frame, bg="#16213e", bd=2, relief=tk.RIDGE)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+    def _configure_root(self) -> None:
+        if isinstance(self.root, (tk.Tk, tk.Toplevel)):
+            self.root.title("股市风云")
+            self.root.geometry("1150x750+50+10")
+            self.root.resizable(False, False)
+            self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        else:
+            self.root.configure(width=self.WINDOW_WIDTH, height=self.WINDOW_HEIGHT)
+            try:
+                self.root.pack_propagate(False)
+                self.root.grid_propagate(False)
+            except tk.TclError:
+                pass
+        self.root.configure(bg=Theme.APP_BG)
 
-        # 标题
-        tk.Label(
-            left_frame,
-            text="股市风云",
-            font=("Arial", 20, "bold"),
-            bg="#16213e",
-            fg="#e94560"
-        ).pack(pady=(10, 4))
-
-        # 当前百分比显示（在标题和图表之间）
-        self.percent_var = tk.StringVar(value="当前: 0%")
-        self.percent_label = tk.Label(
-            left_frame,
-            textvariable=self.percent_var,
-            font=("Arial", 16, "bold"),
-            bg="#16213e",
-            fg="#ffd369"
-        )
-        self.percent_label.pack(pady=(0, 6))
-
-        # 图表框架
-        chart_frame_height = 250
-        chart_frame = tk.Frame(left_frame, bg="#0f3460", height=chart_frame_height)
-        chart_frame.pack(fill=tk.X, padx=10, pady=(5, 5))
-        chart_frame.pack_propagate(False)
-
-        # 股票图表
-        self.stock_chart = StockChart(chart_frame, width=580, height=200)
-
-        # 将画布锚定在容器顶部，避免纵向 expand 导致空白
-        self.stock_chart.pack(anchor='n', pady=(20, 10))
-
-        # 买涨 / 买跌按钮区域（下面内容保持原样）
-        bet_direction_frame = tk.Frame(left_frame, bg="#16213e")
-        bet_direction_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        center_frame = tk.Frame(bet_direction_frame, bg="#16213e")
-        center_frame.pack(expand=True)
-
-        buttons_frame = tk.Frame(center_frame, bg="#16213e")
-        buttons_frame.pack()
-
-        self.up_button_text_var = tk.StringVar(value="买涨 ↑\n$0.00")
-        self.up_button = tk.Button(
-            buttons_frame, textvariable=self.up_button_text_var,
-            font=("Arial", 12, "bold"),
-            bg="#e74c3c", fg="white",
-            width=15, height=2,
-            command=lambda: self.add_bet('up')
-        )
-        self.up_button.pack(side=tk.LEFT, padx=10)
-
-        self.down_button_text_var = tk.StringVar(value="买跌 ↓\n$0.00")
-        self.down_button = tk.Button(
-            buttons_frame, textvariable=self.down_button_text_var,
-            font=("Arial", 12, "bold"),
-            bg="#27ae60", fg="white",
-            width=15, height=2,
-            command=lambda: self.add_bet('down')
-        )
-        self.down_button.pack(side=tk.LEFT, padx=10)
-
-        # 兑现按钮（放在方向按钮下方）
-        cashout_frame = tk.Frame(left_frame, bg="#16213e")
-        cashout_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        self.cashout_button = tk.Button(
-            cashout_frame, text="兑现", font=("Arial", 12, "bold"),
-            bg="#3498db", fg="white", width=15, height=1, command=self.cashout
-        )
-        self.cashout_button.pack()
-
-        # 历史记录（高度调整为 60）
-        history_frame = tk.Frame(left_frame, bg="#0f3460")
-        history_frame.pack(fill=tk.X, padx=10, pady=(5, 10))
-
-        tk.Label(history_frame, text="过去20局历史记录:", font=("Arial", 10),
-                bg="#0f3460", fg="#f1f1f1").pack(anchor=tk.W, pady=(5, 2))
-
-        # 这里把高度设为 60（比原来 +30px）
-        self.history_bar = HistoryBar(history_frame, width=600, height=80)
-        self.history_bar.pack(fill=tk.X, pady=(0, 5))
-
-        # 右侧 - 控制面板（保留原样）
-        right_frame = tk.Frame(main_frame, bg="#16213e", bd=2, relief=tk.RIDGE)
-        right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(10, 0))
-
-        # 余额显示
-        balance_frame = tk.Frame(right_frame, bg="#16213e")
-        balance_frame.pack(fill=tk.X, padx=10, pady=10)
-
-        tk.Label(balance_frame, text="余额:", font=("Arial", 14),
-                bg="#16213e", fg="#f1f1f1").pack(side=tk.LEFT)
-
+    def _create_vars(self) -> None:
         self.balance_var = tk.StringVar()
-        self.balance_var.set(f"${self.balance:.2f}")
-        tk.Label(balance_frame, textvariable=self.balance_var, font=("Arial", 14, "bold"),
-                bg="#16213e", fg="#ffd369").pack(side=tk.LEFT, padx=(5, 0))
+        self.up_position_var = tk.StringVar()
+        self.down_position_var = tk.StringVar()
+        self.percent_var = tk.StringVar(value="0%")
+        self.price_var = tk.StringVar(value="$100 / $100")
+        self.timer_var = tk.StringVar(value="开盘时间剩下: 12秒")
+        self.selected_chip_var = tk.StringVar(value="$5")
+        self.status_var = tk.StringVar(value="请选择筹码并建立买涨/买跌仓位")
+        self.last_result_var = tk.StringVar(value="尚未开始")
+        self.pnl_var = tk.StringVar(value="累计盈亏 $0.00")
+        self.up_button_text_var = tk.StringVar(value="买涨 ↑\n$0.00")
+        self.down_button_text_var = tk.StringVar(value="买跌 ↓\n$0.00")
 
-        # 筹码按钮（修改：添加边框）
-        chips_frame = tk.Frame(right_frame, bg="#16213e")
-        chips_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+    @staticmethod
+    def _card(master, *, width: int, height: int, padding: int = 12) -> tk.Frame:
+        card = tk.Frame(master, width=width, height=height, bg=Theme.PANEL,
+                        highlightthickness=1, highlightbackground=Theme.BORDER_SOFT)
+        card.pack_propagate(False)
+        card.grid_propagate(False)
+        content = tk.Frame(card, bg=Theme.PANEL)
+        content.place(x=padding, y=padding, width=max(1, width-padding*2), height=max(1, height-padding*2))
+        card.content = content
+        return card
 
-        chips = [
-            ("$5", '#ff0000', 'white'),
-            ("$25", '#00ff00', 'black'),
-            ("$100", '#000000', 'white'),
-            ("$500", "#FF7DDA", 'black'),
-            ("$1K", '#ffffff', 'black')
-        ]
+    @staticmethod
+    def _section_title(master, text: str) -> tk.Label:
+        return tk.Label(master, text=text, bg=Theme.PANEL, fg=Theme.TEXT,
+                        font=(Theme.FONT_CJK, 11, "bold"), anchor=tk.W)
 
-        self.chip_buttons = []
-        for i, (text, bg_color, fg_color) in enumerate(chips):
-            # 预设$5筹码边框为金色，其他为白色
-            if i == 0:  # $5筹码
-                border_color = "#ffd369"  # 金色边框
-            else:
-                border_color = "#16213e"  # 白色边框
-                
-            btn = CircleButton(
-                chips_frame, text=text, bg_color=bg_color, fg_color=fg_color,
-                command=lambda t=text: self.select_chip(t),
-                border_color=border_color,  # 设置边框颜色
-                border_width=3  # 边框宽度
-            )
-            btn.pack(side=tk.LEFT, padx=5, pady=5)
-            self.chip_buttons.append(btn)
-            
-            # 记录$5筹码为当前选中的按钮
-            if i == 0:
-                self.current_selected_chip_button = btn
+    def create_widgets(self) -> None:
+        shell = tk.Frame(self.root, width=self.SHELL_WIDTH, height=self.SHELL_HEIGHT, bg=Theme.APP_BG)
+        shell.pack(padx=20, pady=18)
+        shell.pack_propagate(False)
+        self._build_header(shell)
+        body = tk.Frame(shell, width=self.SHELL_WIDTH, height=self.BODY_HEIGHT, bg=Theme.APP_BG)
+        body.place(x=0, y=self.BODY_TOP, width=self.SHELL_WIDTH, height=self.BODY_HEIGHT)
+        self._build_market_panel(body)
+        self._build_control_panel(body)
 
-        # 游戏信息（保留原样）
-        info_frame = tk.Frame(right_frame, bg="#16213e")
-        info_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+    def _build_header(self, shell: tk.Frame) -> None:
+        header = tk.Frame(shell, width=self.SHELL_WIDTH, height=self.HEADER_HEIGHT, bg=Theme.PANEL,
+                          highlightthickness=1, highlightbackground=Theme.BORDER_SOFT)
+        header.place(x=0, y=0, width=self.SHELL_WIDTH, height=self.HEADER_HEIGHT)
+        icon = tk.Canvas(header, width=48, height=48, bg=Theme.PANEL, bd=0, highlightthickness=0)
+        icon.place(x=14, y=11)
+        icon.create_oval(2, 2, 46, 46, fill=Theme.ACCENT_SOFT, outline=Theme.ACCENT, width=2)
+        icon.create_line(12, 34, 20, 27, 27, 30, 37, 15, fill=Theme.ACCENT, width=3, smooth=True)
+        icon.create_polygon(34, 15, 39, 14, 38, 20, fill=Theme.ACCENT, outline="")
+        tk.Label(header, text="MARKET PULSE", bg=Theme.PANEL, fg=Theme.TEXT,
+                 font=(Theme.FONT, 18, "bold"), anchor=tk.W).place(x=74, y=10, width=330, height=27)
+        tk.Label(header, text="股市风云", bg=Theme.PANEL, fg=Theme.TEXT_MUTED,
+                 font=(Theme.FONT_CJK, 11, "bold"), anchor=tk.W).place(x=74, y=39, width=220, height=20)
 
-        tk.Label(info_frame, text="游戏规则:", font=("Arial", 18, "bold"),
-                bg="#16213e", fg="#f1f1f1").pack(anchor=tk.W, pady=(0, 5))
+        box = tk.Frame(header, width=206, height=46, bg=Theme.PANEL_ALT,
+                       highlightthickness=1, highlightbackground=Theme.BORDER_SOFT)
+        box.place(x=self.SHELL_WIDTH-220, y=12, width=206, height=46)
+        tk.Label(box, text="账户余额", bg=Theme.PANEL_ALT, fg=Theme.TEXT_MUTED,
+                 font=(Theme.FONT_CJK, 9), anchor=tk.W).place(x=12, y=4, width=90, height=17)
+        tk.Label(box, textvariable=self.balance_var, bg=Theme.PANEL_ALT, fg=Theme.ACCENT,
+                 font=(Theme.FONT, 15, "bold"), anchor=tk.E).place(x=12, y=20, width=182, height=22)
 
-        rules = [
-            "1. 选择下注金额和方向(买涨 或 买跌)",
-            "2. 倒计时结束后游戏自动开始",
-            "3. 股票随机涨跌，结果完全随机",
-            "4. 游戏结束后自动结算",
-            "5. 点击'兑现'按钮获取收益",
-            "6. 获胜时，系统会在收益中抽取5%手续费",
-            "7. 下注<5元时，自动兑现",
-        ]
+    def _build_market_panel(self, master: tk.Frame) -> None:
+        panel = self._card(master, width=self.GAME_PANEL_WIDTH, height=self.BODY_HEIGHT, padding=0)
+        panel.place(x=0, y=0, width=self.GAME_PANEL_WIDTH, height=self.BODY_HEIGHT)
 
-        for rule in rules:
-            tk.Label(info_frame, text=rule, font=("Arial", 14),
-                    bg="#16213e", fg="#bdc3c7", justify=tk.LEFT).pack(anchor=tk.W, pady=2)
+        top = tk.Frame(panel, width=self.CANVAS_WIDTH, height=74, bg=Theme.PANEL)
+        top.place(x=0, y=0, width=self.CANVAS_WIDTH, height=74)
+        tk.Label(top, text="当前市场变化", bg=Theme.PANEL, fg=Theme.TEXT_MUTED,
+                 font=(Theme.FONT_CJK, 9), anchor=tk.W).place(x=18, y=9, width=120, height=18)
+        self.percent_label = tk.Label(top, textvariable=self.percent_var, bg=Theme.PANEL,
+                                      fg=Theme.AMBER, font=(Theme.FONT, 23, "bold"), anchor=tk.W)
+        self.percent_label.place(x=18, y=26, width=175, height=34)
+        tk.Label(top, text="本金100/当前价格", bg=Theme.PANEL, fg=Theme.TEXT_MUTED,
+                 font=(Theme.FONT_CJK, 9), anchor=tk.W).place(x=230, y=9, width=150, height=18)
+        tk.Label(top, textvariable=self.price_var, bg=Theme.PANEL, fg=Theme.ACCENT,
+                 font=(Theme.FONT, 17, "bold"), anchor=tk.W).place(x=230, y=29, width=155, height=28)
+        self.market_badge = tk.Label(top, textvariable=self.timer_var, bg=Theme.ACCENT_SOFT, fg=Theme.ACCENT,
+                                     font=(Theme.FONT_CJK, 10, "bold"), anchor=tk.CENTER)
+        self.market_badge.place(x=545, y=19, width=181, height=32)
 
-        # 上局结果与本局/累计 盈亏显示 — 合并为单行 "上局结果：{status}"
-        win_frame = tk.Frame(right_frame, bg="#16213e")
-        win_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        chart_wrap = tk.Frame(panel, width=self.CANVAS_WIDTH, height=383, bg=Theme.CHART_BG)
+        chart_wrap.place(x=0, y=74, width=self.CANVAS_WIDTH, height=383)
+        self.stock_chart = StockChart(chart_wrap, width=self.CANVAS_WIDTH, height=383)
+        self.stock_chart.place(x=0, y=0, width=self.CANVAS_WIDTH, height=383)
 
-        # 新增：本局/累计 盈亏显示（默认空）
-        self.result_win_or_loss_var = tk.StringVar()
-        self.result_win_or_loss_var.set("")
-        self.result_win_or_loss_label = tk.Label(win_frame, textvariable=self.result_win_or_loss_var,
-                                                font=("Arial", 11, "bold"), bg="#16213e", fg="#ffd369")
-        self.result_win_or_loss_label.pack(anchor=tk.W, pady=(2, 0))
+        history_wrap = tk.Frame(panel, width=self.CANVAS_WIDTH, height=173, bg=Theme.PANEL)
+        history_wrap.place(x=0, y=457, width=self.CANVAS_WIDTH, height=173)
+        tk.Label(history_wrap, text="过去 20 局", bg=Theme.PANEL, fg=Theme.TEXT,
+                 font=(Theme.FONT_CJK, 11, "bold"), anchor=tk.W).place(x=16, y=9, width=120, height=22)
+        tk.Label(history_wrap, text="红=上涨 · 绿=下跌", bg=Theme.PANEL, fg=Theme.TEXT_MUTED,
+                 font=(Theme.FONT_CJK, 9), anchor=tk.E).place(x=540, y=10, width=188, height=20)
+        self.history_bar = HistoryBar(history_wrap, width=714, height=124)
+        self.history_bar.place(x=16, y=38, width=714, height=124)
+        self.history_bar.set_history(self.result_history)
 
-        # 合并（初始显示为 未开始）
-        self.last_result_var = tk.StringVar()
-        self.last_result_var.set("结果：未开始")
-        # 这是合并后唯一的"上局结果"标签（颜色会在 finish_game 中按涨跌调整）
-        self.last_result_label = tk.Label(win_frame, textvariable=self.last_result_var,
-                                        font=("Arial", 18, "bold"), bg="#16213e", fg="#4cc9f0")
-        self.last_result_label.pack(anchor=tk.W, pady=(5, 0))
+    def _build_control_panel(self, master: tk.Frame) -> None:
+        sidebar = tk.Frame(master, width=self.SIDEBAR_WIDTH, height=self.BODY_HEIGHT, bg=Theme.APP_BG)
+        sidebar.place(x=self.GAME_PANEL_WIDTH + self.PANEL_GAP, y=0, width=self.SIDEBAR_WIDTH, height=self.BODY_HEIGHT)
 
-        # 倒计时显示（合并为一行）
-        timer_frame = tk.Frame(right_frame, bg="#16213e")
-        timer_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+        MetricTile(sidebar, "买涨仓位", self.up_position_var, Theme.RED, width=169, height=68).place(x=0, y=0, width=169, height=68)
+        MetricTile(sidebar, "买跌仓位", self.down_position_var, Theme.GREEN, width=169, height=68).place(x=179, y=0, width=169, height=68)
 
-        # 创建合并的 timer 字符串变量，初始显示（若 self.countdown 未定义则显示默认）
-        self.timer_var = tk.StringVar()
-        # 如果已有 countdown（如首次 start_countdown 之前），展示默认 12 秒样式，否则显示未开始
-        init_seconds = getattr(self, 'countdown', 12)
-        self.timer_var.set(f"下一局倒计时: {init_seconds}秒")
-        tk.Label(timer_frame, textvariable=self.timer_var, font=("Arial", 20, "bold"),
-                bg="#16213e", fg="#ffd369").pack(anchor=tk.W, pady=(5, 0))
+        chips = self._card(sidebar, width=348, height=101)
+        chips.place(x=0, y=78, width=348, height=101)
+        self._section_title(chips.content, "选择筹码").place(x=0, y=0, width=100, height=20)
+        tk.Label(chips.content, textvariable=self.selected_chip_var, bg=Theme.PANEL, fg=Theme.AMBER,
+                 font=(Theme.FONT, 10, "bold"), anchor=tk.E).place(x=220, y=0, width=102, height=20)
+        for i, (label, amount, color, text_color) in enumerate(CHIP_CONFIGS):
+            chip = ChipButton(chips.content, label=label, amount=amount, chip_color=color,
+                              text_color=text_color, command=self.select_chip)
+            chip.place(x=i*62, y=24, width=57, height=50)
+            chip.set_selected(i == 0)
+            self.chip_buttons.append(chip)
 
-        # 状态信息
-        self.status_var = tk.StringVar()
-        self.status_var.set("请选择下注金额和方向")
-        status_label = tk.Label(right_frame, textvariable=self.status_var,
-                            font=("Arial", 14), bg="#16213e", fg="#ffd369")
-        status_label.pack(fill=tk.X, padx=10, pady=(0, 10))
-    
-    def load_history_data(self):
-        """加载历史记录数据"""
-        history_dict = load_history_from_file()
-        
-        # 将历史记录转换为列表，按顺序从01到20（01为最新，20为最旧）
-        # 我们需要反转顺序，因为历史记录条从左到右显示最旧到最新
-        history_list = []
-        for i in range(20, 0, -1):
-            key = f"{i:02d}"
-            if key in history_dict:
-                history_list.append(history_dict[key])
-        
-        # 存储到游戏历史记录中
-        self.result_history = history_list
-    
-    def select_chip(self, amount_text):
-        """选择筹码金额"""
-        try:
-            # 处理特殊格式（如$1K）
-            if amount_text == "$1K":
-                amount_val = 1000.0
-            else:
-                # 去掉$符号并转换为浮点数
-                amount_val = float(amount_text[1:])
-            
-            self.selected_chip = amount_val
-            
-            # 将所有筹码边框改为白色
-            for btn in self.chip_buttons:
-                btn.change_border_color("#16213e")
-            
-            # 找到被点击的筹码按钮并将其边框改为金色
-            for btn in self.chip_buttons:
-                # 获取按钮上的文本
-                btn_text = btn.text
-                if btn_text == amount_text:
-                    btn.change_border_color("#ffd369")  # 金色边框
-                    self.current_selected_chip_button = btn
-                    break
-                
-        except ValueError:
-            pass
-    
-    def add_bet(self, direction):
-        """添加下注（允许在倒计时期间下注，但游戏进行中禁止下注）"""
-        # 仅当游戏正在运行时禁止下注
+        state = self._card(sidebar, width=348, height=70, padding=9)
+        state.place(x=0, y=189, width=348, height=70)
+
+        # --------------------------------------------------
+        # 左侧：市场状态
+        # --------------------------------------------------
+        tk.Label(
+            state.content,
+            text="市场状态",
+            bg=Theme.PANEL,
+            fg=Theme.TEXT_MUTED,
+            font=(Theme.FONT_CJK, 12),
+            anchor=tk.W,
+        ).place(
+            x=0,
+            y=3,
+            width=150,
+            height=18,
+        )
+
+        tk.Label(
+            state.content,
+            textvariable=self.timer_var,
+            bg=Theme.PANEL,
+            fg=Theme.ACCENT,
+            font=(Theme.FONT_CJK, 10, "bold"),
+            anchor=tk.W,
+        ).place(
+            x=0,
+            y=27,
+            width=205,
+            height=24,
+        )
+
+
+        # --------------------------------------------------
+        # 右侧：累计盈亏
+        # --------------------------------------------------
+        self.pnl_label = tk.Label(
+            state.content,
+            textvariable=self.pnl_var,
+            bg=Theme.PANEL,
+            fg=Theme.TEXT,
+            font=(Theme.FONT, 11, "bold"),
+            anchor=tk.E,
+        )
+        self.pnl_label.place(
+            x=215,
+            y=27,
+            width=107,
+            height=24,
+        )
+
+        actions = self._card(sidebar, width=348, height=144)
+        actions.place(x=0, y=265, width=348, height=144)
+        self._section_title(actions.content, "建立 / 管理仓位").place(x=0, y=0, width=150, height=20)
+        self.up_button = ModernButton(
+            actions.content, textvariable=self.up_button_text_var,
+            command=lambda: self.add_bet("up"), background=Theme.RED,
+            hover_background=Theme.RED_HOVER, foreground="#FFFFFF", font_size=12, bold=True,
+        )
+        self.up_button.place(x=0, y=27, width=156, height=52)
+        self.down_button = ModernButton(
+            actions.content, textvariable=self.down_button_text_var,
+            command=lambda: self.add_bet("down"), background=Theme.GREEN,
+            hover_background=Theme.GREEN_HOVER, foreground="#FFFFFF", font_size=12, bold=True,
+        )
+        self.down_button.place(x=166, y=27, width=156, height=52)
+        self.cashout_button = ModernButton(
+            actions.content, text="兑现全部仓位", command=self.cashout,
+            background=Theme.ACCENT, hover_background=Theme.ACCENT_HOVER,
+            foreground="#FFFFFF", font_size=12, bold=True,
+        )
+        self.cashout_button.place(x=0, y=88, width=322, height=32)
+
+        result = self._card(sidebar, width=348, height=82)
+        result.place(x=0, y=419, width=348, height=82)
+        self._section_title(result.content, "上局结果").place(x=0, y=0, width=100, height=20)
+        self.last_result_label = tk.Label(result.content, textvariable=self.last_result_var, bg=Theme.PANEL,
+                                          fg=Theme.TEXT, font=(Theme.FONT_CJK, 12, "bold"), anchor=tk.W)
+        self.last_result_label.place(x=0, y=28, width=322, height=24)
+
+        rules = self._card(sidebar, width=348, height=130)
+        rules.place(x=0, y=511, width=348, height=130)
+        self._section_title(rules.content, "玩法说明").place(x=0, y=0, width=100, height=20)
+        tk.Label(
+            rules.content,
+            text="倒计时可加仓；开局后锁定操作。\n10 秒行情结束后仓位自动重估\n盈利收 5% 费用；低于 $5 自动兑现。\n仓位会跨局保留，点击兑现才返回余额。",
+            bg=Theme.PANEL, fg=Theme.TEXT_MUTED, font=(Theme.FONT_CJK, 10),
+            justify=tk.LEFT, anchor=tk.NW,
+        ).place(x=0, y=20, width=322, height=77)
+
+    def load_history_data(self) -> None:
+        history = load_history_from_file()
+        self.result_history = [history.get(f"{i:02d}", 0) for i in range(20, 0, -1)]
+
+    def select_chip(self, amount_text: str) -> None:
         if self.game_active:
             return
-
-        # 检查余额是否足够
-        if self.selected_chip > self.balance:
-            messagebox.showwarning("余额不足", "您的余额不足以进行此下注")
+        try:
+            amount = float(amount_text)
+        except (TypeError, ValueError):
             return
+        self.selected_chip = amount
+        label = "$1K" if amount == 1000 else f"${amount:g}"
+        self.selected_chip_var.set(f"已选 {label}")
+        for chip in self.chip_buttons:
+            chip.set_selected(float(chip.amount) == amount)
 
-        # 设置下注方向（记录最后一次选择的方向）
+    def add_bet(self, direction: str) -> None:
+        if self.game_active:
+            return
+        if self.selected_chip > self.balance:
+            messagebox.showwarning("余额不足", "您的余额不足以进行此下注。", parent=self.root)
+            return
         self.bet_direction = direction
-
-        # 根据下注方向添加到相应的区域并扣款
-        if direction == 'up':
+        if direction == "up":
             self.bet_amount_up += self.selected_chip
-            self.balance -= self.selected_chip
-            # 按钮视觉反馈：按下一侧，下侧为非按下样式
-            self.up_button.configure(bg="#c0392b", relief=tk.SUNKEN)
-            self.down_button.configure(bg="#27ae60", relief=tk.RAISED)
         else:
             self.bet_amount_down += self.selected_chip
-            self.balance -= self.selected_chip
-            self.down_button.configure(bg="#229954", relief=tk.SUNKEN)
-            self.up_button.configure(bg="#e74c3c", relief=tk.RAISED)
-
-        # 更新显示（余额、按钮文本、状态）
+        self.balance -= self.selected_chip
+        update_balance_in_json(self.username, self.balance)
         self.update_display()
-        self.update_direction_buttons_text()
         self.update_status()
-        
-    def update_direction_buttons_text(self):
-        """更新方向按钮的文本显示
 
-        - 游戏进行中（game_active=True）：显示"当前价值"（基于 original_bet_* 与 current_price_percent）
-        - 游戏未进行时：显示已下注金额（bet_amount_*）
-        """
-        # 游戏进行中：显示即时计算的价值（并防止负值显示）
+    def update_direction_buttons_text(self) -> None:
         if self.game_active:
-            # 上涨区（当前价值 = original_bet_up * (1 + 当前百分比/100)）
-            if self.original_bet_up > 0:
-                current_value_up = self.original_bet_up * (1 + self.current_price_percent / 100)
-                if current_value_up < 0:
-                    current_value_up = 0.0
-                self.up_button_text_var.set(f"买涨 ↑\n${current_value_up:.2f}")
-            else:
-                self.up_button_text_var.set("买涨 ↑\n$0.00")
-
-            # 下跌区（当前价值 = original_bet_down * (1 - 当前百分比/100)）
-            if self.original_bet_down > 0:
-                current_value_down = self.original_bet_down * (1 - self.current_price_percent / 100)
-                if current_value_down < 0:
-                    current_value_down = 0.0
-                self.down_button_text_var.set(f"买跌 ↓\n${current_value_down:.2f}")
-            else:
-                self.down_button_text_var.set("买跌 ↓\n$0.00")
+            up_val = self.original_bet_up * (1 + self.current_price_percent / 100) if self.original_bet_up > 0 else 0.0
+            down_val = self.original_bet_down * (1 - self.current_price_percent / 100) if self.original_bet_down > 0 else 0.0
+            self.up_button_text_var.set(f"买涨 ↑\n${max(0.0, up_val):.2f}")
+            self.down_button_text_var.set(f"买跌 ↓\n${max(0.0, down_val):.2f}")
         else:
-            # 非游戏中：显示实际已下注金额
             self.up_button_text_var.set(f"买涨 ↑\n${self.bet_amount_up:.2f}")
             self.down_button_text_var.set(f"买跌 ↓\n${self.bet_amount_down:.2f}")
-    
-    def cashout(self):
-        """
-        兑现当前下注区的全部金额：
-        - 将 bet_amount_up + bet_amount_down 加回 balance
-        - 清空下注区（并重置 original_bet_*）
-        - 更新显示和状态
-        - 显示自上次兑现以来的累计盈亏（然后重置累计）
-        """
+
+    def cashout(self) -> None:
+        if self.game_active:
+            return
         total = float(self.bet_amount_up) + float(self.bet_amount_down)
         if total <= 0:
-            # 无下注，无需操作，但仍显示累计盈亏（如果有）
-            if hasattr(self, 'cumulative_net_since_cashout') and self.cumulative_net_since_cashout != 0.0:
-                cum = self.cumulative_net_since_cashout
-                if cum > 0:
-                    self.result_win_or_loss_var.set(f"总共盈利了 ${cum:.2f}")
-                    self.result_win_or_loss_label.configure(fg="#27ae60")
-                elif cum < 0:
-                    self.result_win_or_loss_var.set(f"总共亏损了 ${abs(cum):.2f}")
-                    self.result_win_or_loss_label.configure(fg="#e74c3c")
-                else:
-                    self.result_win_or_loss_var.set("平手")
-                    self.result_win_or_loss_label.configure(fg="#ffd369")
-                # 重置累计（已兑现）
+            if self.cumulative_net_since_cashout != 0.0:
+                self._show_cumulative_result()
                 self.cumulative_net_since_cashout = 0.0
+                self.update_display()
             return
-
-        # 将下注区金额返还到余额
-        self.balance = float(self.balance) + total
-
-        # 清空下注区与原始下注记录（以免与下一轮冲突）
+        self.balance += total
         self.bet_amount_up = 0.0
         self.bet_amount_down = 0.0
         self.original_bet_up = 0.0
         self.original_bet_down = 0.0
+        self._show_cumulative_result()
+        self.cumulative_net_since_cashout = 0.0
+        update_balance_in_json(self.username, self.balance)
+        self.update_display()
+        self.update_status()
 
-        # 显示自上次兑现以来的累计盈亏，然后重置累计
-        if not hasattr(self, 'cumulative_net_since_cashout'):
-            self.cumulative_net_since_cashout = 0.0
-
+    def _show_cumulative_result(self) -> None:
         cum = self.cumulative_net_since_cashout
         if cum > 0:
-            self.result_win_or_loss_var.set(f"总共盈利了 ${cum:.2f}")
-            self.result_win_or_loss_label.configure(fg="#27ae60")
+            self.last_result_var.set(f"累计盈利 ${cum:.2f} · 已兑现")
+            self.last_result_label.configure(fg=Theme.GREEN)
         elif cum < 0:
-            self.result_win_or_loss_var.set(f"总共亏损了 ${abs(cum):.2f}")
-            self.result_win_or_loss_label.configure(fg="#e74c3c")
+            self.last_result_var.set(f"累计亏损 ${abs(cum):.2f} · 已兑现")
+            self.last_result_label.configure(fg=Theme.RED)
         else:
-            self.result_win_or_loss_var.set("平手")
-            self.result_win_or_loss_label.configure(fg="#ffd369")
+            self.last_result_var.set("累计持平 · 已兑现")
+            self.last_result_label.configure(fg=Theme.AMBER)
 
-        # 重置累计（已兑现）
-        self.cumulative_net_since_cashout = 0.0
-
-        # 更新界面与按钮文本
-        try:
-            self.update_direction_buttons_text()
-        except Exception:
-            pass
-        try:
-            self.update_display()
-        except Exception:
-            pass
-        try:
-            self.update_status()
-        except Exception:
-            pass
-    
-    def auto_cashout_small_bets(self):
-        """自动兑现小于5元的下注"""
+    def auto_cashout_small_bets(self) -> None:
         total_cashed = 0.0
-
-        if self.bet_amount_up < 5 and self.bet_amount_up > 0:
+        if 0 < self.bet_amount_up < 5:
             self.balance += self.bet_amount_up
             total_cashed += self.bet_amount_up
             self.bet_amount_up = 0.0
             self.original_bet_up = 0.0
-
-        if self.bet_amount_down < 5 and self.bet_amount_down > 0:
+        if 0 < self.bet_amount_down < 5:
             self.balance += self.bet_amount_down
             total_cashed += self.bet_amount_down
             self.bet_amount_down = 0.0
             self.original_bet_down = 0.0
-
         if total_cashed > 0:
-            # 如果两个区域都小于5元，重置按钮样式
-            if self.bet_amount_up == 0 and self.bet_amount_down == 0:
-                self.up_button.configure(bg="#e74c3c", relief=tk.RAISED)
-                self.down_button.configure(bg="#27ae60", relief=tk.RAISED)
-                self.bet_direction = None
-
-            # 在自动兑现时，显示自上次兑现以来的累计盈亏（若有）
-            if not hasattr(self, 'cumulative_net_since_cashout'):
-                self.cumulative_net_since_cashout = 0.0
-
-            cum = self.cumulative_net_since_cashout
-            if cum > 0:
-                self.result_win_or_loss_var.set(f"总共盈利了 ${cum:.2f}")
-                self.result_win_or_loss_label.configure(fg="#27ae60")
-            elif cum < 0:
-                self.result_win_or_loss_var.set(f"总共亏损了 ${abs(cum):.2f}")
-                self.result_win_or_loss_label.configure(fg="#e74c3c")
-            else:
-                # 若没有累计盈亏则清空或显示平手
-                self.result_win_or_loss_var.set("平手")
-                self.result_win_or_loss_label.configure(fg="#ffd369")
-
-            # 重置累计（自动兑现等同于兑现动作）
+            self._show_cumulative_result()
             self.cumulative_net_since_cashout = 0.0
-
+            update_balance_in_json(self.username, self.balance)
             self.update_display()
-            self.update_direction_buttons_text()
-    
-    def update_status(self):
-        self.status_var.set("请选择下注金额和方向")
-    
-    def update_display(self):
-        """更新显示"""
-        self.balance_var.set(f"${self.balance:.2f}")
-    
-    def start_countdown(self, countdown=12):
-        """开始倒计时"""
+
+    def update_status(self) -> None:
+        if self.game_active:
+            return
+        if self.bet_amount_up > 0 or self.bet_amount_down > 0:
+            self.status_var.set("仓位已建立，可继续加仓或等待开局")
+        else:
+            self.status_var.set("请选择筹码并建立买涨/买跌仓位")
+
+    def update_display(self) -> None:
+        self.balance_var.set(f"${self.balance:,.2f}")
+        self.up_position_var.set(f"${self.bet_amount_up:,.2f}")
+        self.down_position_var.set(f"${self.bet_amount_down:,.2f}")
+        simulated_price = int(round(100.0 * (1 + self.current_price_percent / 100)))
+        simulated_price = max(0, min(200, simulated_price))
+        self.price_var.set(f"$100 / ${simulated_price}")
+        self.percent_var.set(f"{self.current_price_percent:+.0f}%")
+        if self.current_price_percent > 0:
+            self.percent_label.configure(fg=Theme.RED)
+        elif self.current_price_percent < 0:
+            self.percent_label.configure(fg=Theme.GREEN)
+        else:
+            self.percent_label.configure(fg=Theme.AMBER)
+        self.pnl_var.set(f"累计盈亏 {self.cumulative_net_since_cashout:+.2f}")
+        self.update_direction_buttons_text()
+
+    def _set_controls(self, enabled: bool) -> None:
+        state = tk.NORMAL if enabled else tk.DISABLED
+        self.up_button.configure(state=state)
+        self.down_button.configure(state=state)
+        self.cashout_button.configure(state=state)
+        for chip in self.chip_buttons:
+            chip.configure(state=state)
+
+    def start_countdown(self, countdown: int = 12) -> None:
+        if self.game_active:
+            return
         self.timer_active = True
         self.countdown = countdown
-        
-        # 启用方向按钮
-        self.up_button.configure(state=tk.NORMAL)
-        self.down_button.configure(state=tk.NORMAL)
-        self.cashout_button.configure(state=tk.NORMAL)
-        
-        # 启用筹码按钮
-        for btn in self.chip_buttons:
-            btn.configure(state=tk.NORMAL)
-        
-        # 自动兑现小于5元的注
+        self._set_controls(True)
         self.auto_cashout_small_bets()
-        
-        # 初始化时加载历史记录到历史记录条
-        if hasattr(self, 'result_history') and self.result_history:
-            self.history_bar.set_history(self.result_history)
-        
+        self.history_bar.set_history(self.result_history)
+        self.update_status()
         self.update_timer()
-    
-    def update_timer(self):
-        """更新倒计时"""
+
+    def update_timer(self) -> None:
+        if not self.timer_active:
+            return
         if self.countdown > 0:
-            self.timer_var.set(f"下一局倒计时: {self.countdown}秒")
+            self.timer_var.set(f"开盘时间剩下: {self.countdown}秒")
             self.countdown -= 1
             self.timer_id = self.root.after(1000, self.update_timer)
         else:
-            self.timer_var.set("下一局倒计时: 游戏中")
+            self.timer_var.set("离收盘时间剩下: 10.0秒")
             self.timer_active = False
+            self.timer_id = None
             self.start_game_auto()
-    
-    def start_game_auto(self):
-        """自动开始游戏"""
-        # 无论是否有下注，都开始游戏
+
+    def start_game_auto(self) -> None:
         self.start_game()
-    
-    def start_game(self):
-        """开始游戏"""
+
+    def start_game(self) -> None:
         if self.game_active:
             return
-        
-        # 保存原始下注金额
         self.original_bet_up = self.bet_amount_up
         self.original_bet_down = self.bet_amount_down
-        
-        # 设置游戏状态
         self.game_active = True
-        
-        # 禁用所有按钮
-        self.up_button.configure(state=tk.DISABLED)
-        self.down_button.configure(state=tk.DISABLED)
-        self.cashout_button.configure(state=tk.DISABLED)
-        for btn in self.chip_buttons:
-            btn.configure(state=tk.DISABLED)
-        
-        # 重置图表
-        self.stock_chart.points = []
-        self.stock_chart.current_price = self.stock_chart.base_price
+        self._set_controls(False)
+        self.stock_chart.reset()
         self.current_price_percent = 0.0
-        
-        # 开始游戏循环 - 每0.05秒更新一次
-        self.game_duration = 10  # 10秒
-        self.update_interval = 0.05  # 0.05秒更新一次
-        self.updates_per_second = int(1 / self.update_interval)
+        self.game_duration = 10
+        self.update_interval = 0.05
         self.total_updates = int(self.game_duration / self.update_interval)
         self.current_update = 0
-        
-        self.run_game_update()
-        
-    def run_game_update(self):
-        """运行游戏更新"""
+        self.status_var.set("市场开盘 · 仓位已锁定")
+        self.timer_var.set(f"离收盘时间剩下: {self.game_duration:.1f}秒")
+        self.update_display()
+        # Do not consume the first 0.05-second market step immediately.
+        # The first update happens after 0.05s; update #200 therefore lands
+        # at 10.00s and at the chart's exact right edge.
+        self.round_job = self.root.after(
+            int(self.update_interval * 1000), self.run_game_update
+        )
+
+    def run_game_update(self) -> None:
+        if not self.game_active:
+            return
         if self.current_update >= self.total_updates:
             self.finish_game()
             return
 
-        # 生成随机涨跌
-        direction = random.choice(['up', 'down'])  # 50%上涨，50%下跌
-
-        # 根据概率分布选择涨跌幅度
+        direction = random.choice(["up", "down"])
         rand_val = random.random()
-        cumulative_prob = 0
-        change_percent = 1  # 默认1%
-
+        cumulative_prob = 0.0
+        change_percent = 1
         for percent, prob in price_changes.items():
             cumulative_prob += prob
             if rand_val <= cumulative_prob:
                 change_percent = percent
                 break
-
-        # 应用涨跌方向
-        if direction == 'down':
+        if direction == "down":
             change_percent = -change_percent
 
-        # 计算新价格百分比
-        new_price_percent = self.current_price_percent + change_percent
-
-        # 限制在-100%到+100%之间
-        if new_price_percent > 100:
-            new_price_percent = 100
-        elif new_price_percent < -100:
-            new_price_percent = -100
-
-        self.current_price_percent = new_price_percent
-
-        #  关键修改在这里（原来只有一行）
-        percent_change = self.stock_chart.update_chart(new_price_percent)
-        self.percent_var.set(f"当前: {percent_change:.0f}%")
-
-        # 更新按钮文本（显示当前价值）
-        self.update_direction_buttons_text()
-
-        # 更新状态
-        color = "#e74c3c" if change_percent > 0 else "#27ae60"
-        direction_symbol = "↑" if change_percent > 0 else "↓"
-        self.status_var.set(f"更新中... {direction_symbol}{abs(change_percent):.0f}%")
-
-        # 继续下一次更新
+        self.current_price_percent = max(-100.0, min(100.0, self.current_price_percent + change_percent))
+        self.stock_chart.update_chart(self.current_price_percent)
+        self.status_var.set(f"市场更新 · {'↑' if change_percent > 0 else '↓'}{abs(change_percent):.0f}%")
         self.current_update += 1
-        self.root.after(int(self.update_interval * 1000), self.run_game_update)
-            
-    def finish_game(self):
-        """结束游戏并结算——将上局结果前缀"结果："设置为黑色，涨/跌部分单独用颜色显示。"""
-        final_percent = self.current_price_percent
+        elapsed = self.current_update * self.update_interval
+        remaining = max(0.0, self.game_duration - elapsed)
+        self.timer_var.set(f"离收盘时间剩下: {remaining:.1f}秒")
+        self.update_display()
 
-        # 保存历史记录到文件
+        # The 200th 0.05s update is exactly t=10.00s.  At that moment the
+        # pointer is on the chart's right edge, so close the market now rather
+        # than waiting for an unnecessary 201st timer callback.
+        if self.current_update >= self.total_updates:
+            self.finish_game()
+            return
+
+        self.round_job = self.root.after(
+            int(self.update_interval * 1000), self.run_game_update
+        )
+
+    def finish_game(self) -> None:
+        if not self.game_active:
+            return
+        final_percent = self.current_price_percent
         update_history_in_file(final_percent)
-        
-        # 重新加载历史记录
         self.load_history_data()
-        
-        # 更新历史记录条
         self.history_bar.set_history(self.result_history)
 
-        # 结算（保持你现有的结算逻辑）
         total_win = 0.0
         total_loss = 0.0
-
-        if getattr(self, 'original_bet_up', 0) > 0:
-            if final_percent > 0:  # 上涨，买涨赢
+        if self.original_bet_up > 0:
+            if final_percent > 0:
                 winnings = self.original_bet_up * (final_percent / 100) * 0.95
                 total_win += winnings
                 self.bet_amount_up = self.original_bet_up + winnings
-            else:  # 买涨输
+            else:
                 loss = self.original_bet_up * (abs(final_percent) / 100)
                 total_loss += loss
                 self.bet_amount_up = max(0.0, self.original_bet_up - loss)
-
-        if getattr(self, 'original_bet_down', 0) > 0:
-            if final_percent < 0:  # 下跌，买跌赢
+        if self.original_bet_down > 0:
+            if final_percent < 0:
                 winnings = self.original_bet_down * (abs(final_percent) / 100) * 0.95
                 total_win += winnings
                 self.bet_amount_down = self.original_bet_down + winnings
-            else:  # 买跌输
+            else:
                 loss = self.original_bet_down * (final_percent / 100)
                 total_loss += loss
                 self.bet_amount_down = max(0.0, self.original_bet_down - loss)
 
         net_win = total_win - total_loss
         self.last_win = net_win
-
-        # 累计自上次"兑现"以来的净额
-        if not hasattr(self, 'cumulative_net_since_cashout'):
-            self.cumulative_net_since_cashout = 0.0
         self.cumulative_net_since_cashout += net_win
 
-        # 构建结果文本与颜色（百分比不带小数）
         if final_percent > 0:
-            status_text = f"上涨{final_percent:.0f}%"
-            market_color = "#e74c3c"  # 红色表示上涨
+            self.last_result_var.set(f"上涨 {final_percent:.0f}% · 本局 {net_win:+.2f}")
+            self.last_result_label.configure(fg=Theme.RED)
         elif final_percent < 0:
-            status_text = f"下跌{abs(final_percent):.0f}%"
-            market_color = "#27ae60"  # 绿色表示下跌
+            self.last_result_var.set(f"下跌 {abs(final_percent):.0f}% · 本局 {net_win:+.2f}")
+            self.last_result_label.configure(fg=Theme.GREEN)
         else:
-            status_text = "持平 0%"
-            market_color = "#ffd369"
+            self.last_result_var.set(f"持平 0% · 本局 {net_win:+.2f}")
+            self.last_result_label.configure(fg=Theme.AMBER)
 
-        # --------- 关键：以两段 Label 显示（前缀黑色，状态有颜色） ----------
-        # 若已有分离的 prefix/status label，直接更新颜色与文本
-        if hasattr(self, 'last_result_status_label') and hasattr(self, 'last_result_prefix_label'):
-            try:
-                self.last_result_prefix_label.configure(text="结果：", fg="#4cc9f0")
-                self.last_result_status_label.configure(text=status_text, fg=market_color)
-            except Exception:
-                # 兜底回退到 single label
-                try:
-                    if hasattr(self, 'last_result_label'):
-                        self.last_result_label.configure(text=f"结果：{status_text}", fg=market_color)
-                    else:
-                        self.last_result_label = tk.Label(self.root, text=f"结果：{status_text}", font=("Arial", 18, "bold"))
-                        self.last_result_label.pack(anchor=tk.W, pady=(5, 0))
-                except Exception:
-                    pass
-        # 如果界面只有一个旧的 last_result_label，则把它替换为两段显示
-        elif hasattr(self, 'last_result_label'):
-            try:
-                parent = self.last_result_label.master
-                parent_bg = parent.cget('bg') if hasattr(parent, 'cget') else None
-                # 销毁旧标签
-                self.last_result_label.destroy()
-                # 在同一父容器中创建容器帧和两个标签
-                container = tk.Frame(parent, bg=parent_bg) if parent_bg is not None else tk.Frame(parent)
-                container.pack(anchor=tk.W, pady=(5, 0))
-                self.last_result_prefix_label = tk.Label(container, text="结果：", font=("Arial", 18, "bold"),
-                                                        bg=parent_bg, fg="#4cc9f0") if parent_bg is not None else tk.Label(container, text="结果：", font=("Arial", 14, "#4cc9f0"), fg="black")
-                self.last_result_prefix_label.pack(side=tk.LEFT)
-                self.last_result_status_label = tk.Label(container, text=status_text, font=("Arial", 18, "bold"),
-                                                        bg=parent_bg, fg=market_color) if parent_bg is not None else tk.Label(container, text=status_text, font=("Arial", 14, "bold"), fg=market_color)
-                self.last_result_status_label.pack(side=tk.LEFT)
-            except Exception:
-                # 兜底：回到单一标签显示
-                try:
-                    self.last_result_label = tk.Label(parent, text=f"结果：{status_text}", font=("Arial", 18, "bold"), fg=market_color)
-                    self.last_result_label.pack(anchor=tk.W, pady=(5, 0))
-                except Exception:
-                    pass
-        # 如果既没有分离标签也没有旧标签，尝试创建新的分离标签在可用的 right_frame 或 root 上
-        else:
-            try:
-                target_parent = getattr(self, 'win_frame', None) or getattr(self, 'right_frame', None) or self.root
-                parent_bg = target_parent.cget('bg') if hasattr(target_parent, 'cget') else None
-                container = tk.Frame(target_parent, bg=parent_bg) if parent_bg is not None else tk.Frame(target_parent)
-                container.pack(anchor=tk.W, pady=(5, 0))
-                self.last_result_prefix_label = tk.Label(container, text="结果：", font=("Arial", 18, "bold"),
-                                                        bg=parent_bg, fg="#4cc9f0") if parent_bg is not None else tk.Label(container, text="结果：", font=("Arial", 18, "bold"), fg="black")
-                self.last_result_prefix_label.pack(side=tk.LEFT)
-                self.last_result_status_label = tk.Label(container, text=status_text, font=("Arial", 18, "bold"),
-                                                        bg=parent_bg, fg=market_color) if parent_bg is not None else tk.Label(container, text=status_text, font=("Arial", 18, "bold"), fg=market_color)
-                self.last_result_status_label.pack(side=tk.LEFT)
-            except Exception:
-                # 最后兜底：单一标签（不分色）
-                try:
-                    self.last_result_label = tk.Label(self.root, text=f"结果：{status_text}", font=("Arial", 18, "bold"))
-                    self.last_result_label.pack(anchor=tk.W, pady=(5, 0))
-                except Exception:
-                    pass
-
-        # --------- 本局盈亏显示（仅当有下注时显示） ----------
-        if (getattr(self, 'original_bet_up', 0) > 0) or (getattr(self, 'original_bet_down', 0) > 0):
-            if net_win > 0:
-                self.result_win_or_loss_var.set(f"本局盈利了 ${net_win:.2f}")
-                try:
-                    self.result_win_or_loss_label.configure(fg="#27ae60")
-                except Exception:
-                    pass
-            elif net_win < 0:
-                self.result_win_or_loss_var.set(f"本局亏损了 ${abs(net_win):.2f}")
-                try:
-                    self.result_win_or_loss_label.configure(fg="#e74c3c")
-                except Exception:
-                    pass
-            else:
-                self.result_win_or_loss_var.set("平手")
-                try:
-                    self.result_win_or_loss_label.configure(fg="#ffd369")
-                except Exception:
-                    pass
-        else:
-            # 本局没有下注则不显示
-            try:
-                self.result_win_or_loss_var.set("")
-            except Exception:
-                pass
-
-        # 自动兑现小注（如果实现）
-        if hasattr(self, 'auto_cashout_small_bets'):
-            try:
-                self.auto_cashout_small_bets()
-            except Exception:
-                pass
-
-        # 标记游戏结束并刷新显示
         self.game_active = False
-        try:
-            self.update_direction_buttons_text()
-        except Exception:
-            pass
-        try:
-            self.update_display()
-        except Exception:
-            pass
+        self.round_job = None
+        self.status_var.set("本局收盘 · 2 秒后进入下一轮倒计时")
+        self.timer_var.set("本局已收盘")
+        self.auto_cashout_small_bets()
+        self.update_display()
+        self.next_round_job = self.root.after(2000, lambda: self.start_countdown(12))
 
-        # 更新状态栏文本
-        try:
-            self.status_var.set("游戏结束")
-        except Exception:
-            pass
-
-        # 启动下一局倒计时（延迟 2 秒后开始）
-        try:
-            self.root.after(2000, lambda: self.start_countdown(12))
-        except Exception:
-            pass
-    
-    def on_closing(self):
-        """窗口关闭事件处理"""
-        # 取消定时器
-        if self.timer_id:
-            self.root.after_cancel(self.timer_id)
-        
-        # 更新余额到JSON
+    def on_closing(self) -> None:
+        for job in (self.timer_id, self.round_job, self.next_round_job):
+            if job:
+                try:
+                    self.root.after_cancel(job)
+                except tk.TclError:
+                    pass
         update_balance_in_json(self.username, self.balance)
-        self.root.destroy()
+        finish = getattr(self.root, "finish", None)
+        if callable(finish):
+            finish(self.balance)
+        else:
+            self.root.destroy()
 
-def main(initial_balance, username):
-    """供small_games.py调用的主函数"""
+
+def main(
+    initial_balance=1000.0,
+    username="Guest",
+    *,
+    parent=None,
+    balance=None,
+    user=None,
+    on_back=None,
+    on_balance_change=None,
+):
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        page = EmbeddedGamePage(
+            parent,
+            title="股市风云",
+            username=actual_user,
+            balance=actual_balance,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+        )
+        page.set_requested_size(1150, 750)
+        game = StockMarketGame(page.host, actual_balance, actual_user)
+        page.attach_game(game)
+        return page
+
     root = tk.Tk()
-    game = StockMarketGame(root, initial_balance, username)
+    game = StockMarketGame(root, actual_balance, actual_user)
     root.mainloop()
-    # 返回更新后的余额
     return game.balance
 
+
 if __name__ == "__main__":
-    # 单独运行时的测试代码
-    root = tk.Tk()
-    # 使用测试余额和用户名
-    game = StockMarketGame(root, 1000.0, "test_user")
-    root.mainloop()
+    final_balance = main(10000.0, "test_user")
+    print(f"Final balance: {final_balance:.2f}")

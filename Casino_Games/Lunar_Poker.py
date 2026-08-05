@@ -11,6 +11,8 @@ import secrets
 import subprocess, sys
 from itertools import combinations
 
+
+
 # 扑克牌花色和点数
 SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
@@ -387,12 +389,11 @@ class LunarPokerGame:
         has_king = any(card.rank == 'K' for card in self.dealer_hand)
         return has_ace and has_king
 
-class LunarPokerGUI(tk.Tk):
-    def __init__(self, initial_balance, username):
-        super().__init__()
-        self.title("月亮搜哈扑克")
-        self.geometry("1150x650+50+10")
-        self.resizable(0,0)
+class LunarPokerGUI(tk.Frame):
+    def __init__(self, parent, initial_balance, username, on_back=None, on_balance_change=None):
+        super().__init__(parent, bg="#1B3D31")
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
         self.configure(bg='#35654d')
 
         self.username = username
@@ -432,7 +433,6 @@ class LunarPokerGUI(tk.Tk):
 
         self._load_assets()
         self._create_widgets()
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     def cancel_auto_reset_timer(self):
         if self.auto_reset_timer:
@@ -444,10 +444,21 @@ class LunarPokerGUI(tk.Tk):
                 self.auto_reset_timer = None
 
     def on_close(self):
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-        self.destroy()
-        self.quit()
+        timer = getattr(self, "auto_reset_timer", None)
+        if timer:
+            try:
+                self.after_cancel(timer)
+            except tk.TclError:
+                pass
+        try:
+            update_balance_in_json(self.username, self.balance)
+        except Exception:
+            pass
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
+        if callable(self.on_back):
+            self.on_back(float(self.balance))
+
 
     def _load_assets(self):
         card_size = (100, 150)
@@ -3470,10 +3481,38 @@ class LunarPokerGUI(tk.Tk):
         canvas.config(scrollregion=canvas.bbox("all"))
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-def main(initial_balance=10000, username="Guest"):
-    app = LunarPokerGUI(initial_balance, username)
-    app.mainloop()
-    return app.balance
+def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, user=None,
+         on_back=None, on_balance_change=None):
+    """嵌入现有 Tk 根窗口；未传 parent 时仍可独立运行。"""
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        return LunarPokerGUI(
+            parent, actual_balance, actual_user,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+        )
+
+    root = tk.Tk()
+    root.title("Lunar Poker")
+    root.geometry("1150x750+50+10")
+    root.resizable(False, False)
+    page = LunarPokerGUI(root, actual_balance, actual_user)
+    page.pack(fill="both", expand=True)
+
+    def close_standalone():
+        try:
+            update_balance_in_json(page.username, page.balance)
+        except Exception:
+            pass
+        root.destroy()
+
+    page.on_back = lambda final_balance: close_standalone()
+    root.protocol("WM_DELETE_WINDOW", page.on_close)
+    root.mainloop()
+    return page.balance
+
 
 if __name__ == "__main__":
     final_balance = main()
