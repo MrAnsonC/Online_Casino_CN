@@ -514,13 +514,17 @@ class BubbleCrapsGame(tk.Frame):
             top.title('花摇骰')
         except tk.TclError:
             pass
-        self.bind('<Return>', lambda _event: self.roll_dice())
+        self._enter_bindings = []
+        for sequence in ('<Return>', '<KP_Enter>'):
+            bind_id = top.bind(sequence, self.handle_enter_roll, add='+')
+            self._enter_bindings.append((sequence, bind_id))
         self.bind('<Control-z>', lambda _event: self.undo_last_bet())
         self.bind('<Shift-R>', lambda _event: self.show_developer_input_dialog())
 
         self.history_file = self.get_history_file()
         self.history_data = self.load_history_data()
         self.restore_point_from_history()
+        self.restore_last_result_from_history()
         self.create_dice_images()
         self.create_ui()
         self.select_chip(1.0)
@@ -1171,8 +1175,8 @@ class BubbleCrapsGame(tk.Frame):
         self.total_bet_text = c.create_text(10, 710, anchor='w', text='本局下注: $0.00',
                                             font=('Arial', 18, 'bold'), fill='white', tags=('dynamic', 'controls'))
 
-        self.repeat_button = self.create_control_button(
-            300, 648, 410, 700, '重复下注', self.repeat_last_bets, '#5b4938', font_size=11
+        self.clear_button = self.create_control_button(
+            300, 638, 410, 708, '清除下注', self.clear_bets, '#7c3b40', font_size=12
         )
 
         chip_x = 420
@@ -1198,11 +1202,12 @@ class BubbleCrapsGame(tk.Frame):
         # optional betting-cell hover hints; the option starts disabled.
         self.canvas.tag_bind(self.info_button, '<Button-3>', self.toggle_bet_hover_help)
 
-        self.clear_button = self.create_control_button(
-            875, 638, 1005, 708, '清除下注', self.clear_bets, '#7c3b40', font_size=12
+        self.repeat_button = self.create_control_button(
+            875, 638, 1005, 708, '重复下注', self.repeat_last_bets, '#5b4938', font_size=12
         )
         self.roll_button = self.create_control_button(
-            1020, 628, 1135, 720, '转动', self.roll_dice, '#d5ad4d', fg='#111', font_size=14
+            1020, 628, 1135, 720, '转动', self.roll_dice, '#d5ad4d',
+            fg='#111', font_size=14, subtext='ENTER', subtext_font_size=10
         )
 
         c.tag_raise('controls')
@@ -1305,7 +1310,10 @@ class BubbleCrapsGame(tk.Frame):
         values = [max(0, min(255, int(value * factor))) for value in values]
         return '#' + ''.join(f'{value:02x}' for value in values)
 
-    def create_control_button(self, x0, y0, x1, y1, text, command, fill, fg='white', font_size=11):
+    def create_control_button(
+        self, x0, y0, x1, y1, text, command, fill, fg='white', font_size=11,
+        subtext=None, subtext_font_size=10,
+    ):
         """Draw a bevelled machine-style button with hover, press and disabled states."""
         tag = f'control_button_{len(self.control_buttons)}'
         shadow = self.canvas.create_rectangle(
@@ -1324,24 +1332,48 @@ class BubbleCrapsGame(tk.Frame):
             x0 + 8, y0 + 8, x1 - 8, y0 + 8,
             fill=self.shade_color(fill, 1.45), width=2, tags=(tag, 'controls')
         )
+
+        base_center_y = (y0 + y1) / 2 - 1
+        text_center_y = base_center_y - 11 if subtext else base_center_y
         text_id = self.canvas.create_text(
-            (x0 + x1) / 2, (y0 + y1) / 2 - 1, text=text,
+            (x0 + x1) / 2, text_center_y, text=text,
             font=('Arial', font_size, 'bold'), fill=fg, tags=(tag, 'controls')
         )
+        subtext_id = None
+        subtext_center_y = None
+        if subtext:
+            subtext_center_y = base_center_y + 17
+            subtext_id = self.canvas.create_text(
+                (x0 + x1) / 2, subtext_center_y, text=subtext,
+                font=('Arial', subtext_font_size, 'bold'), fill=fg,
+                tags=(tag, 'controls')
+            )
+
         data = {
             'shadow': shadow,
             'rim': rim,
             'face': face,
             'highlight': highlight,
             'text': text_id,
+            'subtext': subtext_id,
             'command': command,
             'fill': fill,
             'fg': fg,
             'enabled': True,
             'pressed': False,
-            'center_y': (y0 + y1) / 2 - 1,
+            'center_y': text_center_y,
+            'subtext_center_y': subtext_center_y,
         }
         self.control_buttons[tag] = data
+
+        def move_labels(button, offset):
+            x, _y = self.canvas.coords(button['text'])
+            self.canvas.coords(button['text'], x, button['center_y'] + offset)
+            if button['subtext'] is not None:
+                sub_x, _sub_y = self.canvas.coords(button['subtext'])
+                self.canvas.coords(
+                    button['subtext'], sub_x, button['subtext_center_y'] + offset
+                )
 
         def enter(_event=None):
             button = self.control_buttons.get(tag)
@@ -1360,8 +1392,7 @@ class BubbleCrapsGame(tk.Frame):
             button['pressed'] = True
             self.canvas.itemconfig(button['face'], fill=self.shade_color(button['fill'], 0.72))
             self.canvas.itemconfig(button['highlight'], fill=self.shade_color(button['fill'], 0.8))
-            x, _y = self.canvas.coords(button['text'])
-            self.canvas.coords(button['text'], x, button['center_y'] + 2)
+            move_labels(button, 2)
 
         def release(_event=None):
             button = self.control_buttons.get(tag)
@@ -1370,8 +1401,7 @@ class BubbleCrapsGame(tk.Frame):
             button['pressed'] = False
             self.canvas.itemconfig(button['face'], fill=button['fill'])
             self.canvas.itemconfig(button['highlight'], fill=self.shade_color(button['fill'], 1.45))
-            x, _y = self.canvas.coords(button['text'])
-            self.canvas.coords(button['text'], x, button['center_y'])
+            move_labels(button, 0)
             button['command']()
 
         self.canvas.tag_bind(tag, '<Enter>', enter)
@@ -1395,6 +1425,8 @@ class BubbleCrapsGame(tk.Frame):
             self.canvas.itemconfig(button['rim'], fill=self.shade_color(button['fill'], 0.55))
             self.canvas.itemconfig(button['highlight'], fill=self.shade_color(button['fill'], 1.45))
             self.canvas.itemconfig(button['text'], fill=button['fg'])
+            if button['subtext'] is not None:
+                self.canvas.itemconfig(button['subtext'], fill=button['fg'])
 
     def set_control_button_state(self, tag, enabled):
         button = self.control_buttons.get(tag)
@@ -1404,16 +1436,31 @@ class BubbleCrapsGame(tk.Frame):
         button['pressed'] = False
         x, _y = self.canvas.coords(button['text'])
         self.canvas.coords(button['text'], x, button['center_y'])
+        if button['subtext'] is not None:
+            sub_x, _sub_y = self.canvas.coords(button['subtext'])
+            self.canvas.coords(button['subtext'], sub_x, button['subtext_center_y'])
+        label_color = button['fg'] if enabled else '#9b9690'
         if enabled:
             self.canvas.itemconfig(button['face'], fill=button['fill'])
             self.canvas.itemconfig(button['rim'], fill=self.shade_color(button['fill'], 0.55))
             self.canvas.itemconfig(button['highlight'], fill=self.shade_color(button['fill'], 1.45))
-            self.canvas.itemconfig(button['text'], fill=button['fg'])
         else:
             self.canvas.itemconfig(button['face'], fill='#4a4743')
             self.canvas.itemconfig(button['rim'], fill='#262422')
             self.canvas.itemconfig(button['highlight'], fill='#66615b')
-            self.canvas.itemconfig(button['text'], fill='#9b9690')
+        self.canvas.itemconfig(button['text'], fill=label_color)
+        if button['subtext'] is not None:
+            self.canvas.itemconfig(button['subtext'], fill=label_color)
+
+    def handle_enter_roll(self, _event=None):
+        """Make Enter behave exactly like clicking the enabled ROLL button."""
+        if self._closing or not self.winfo_ismapped():
+            return None
+        button = self.control_buttons.get(getattr(self, 'roll_button', None))
+        if not button or not button['enabled']:
+            return None
+        button['command']()
+        return 'break'
 
     def ensure_point_puck_on_top(self):
         """Keep the white ON puck above every canvas layer."""
@@ -1464,6 +1511,26 @@ class BubbleCrapsGame(tk.Frame):
             point_after = None
         if note == 'ON' and point_after in CrapsEngine.BOX_NUMBERS:
             self.engine.point = point_after
+
+    def restore_last_result_from_history(self):
+        """Show the latest recorded dice immediately after entering the game."""
+        dice = [6, 6]
+        total = 12
+
+        if self.history_data:
+            latest = self.history_data[0]
+            recorded_dice = latest.get('dice')
+            if (isinstance(recorded_dice, (list, tuple)) and len(recorded_dice) == 2
+                    and all(isinstance(value, int) and 1 <= value <= 6 for value in recorded_dice)):
+                dice = list(recorded_dice)
+                total = sum(dice)
+
+        # update_display() only needs these fields to restore the large dice and
+        # the result row.  When there is no history, the required fallback is 6 + 6.
+        self.last_result = {
+            'dice': dice,
+            'total': total,
+        }
 
     def toggle_number_bets_active(self):
         if not self.accept_bets or self.animation_running or self.settlement_running:
@@ -1702,41 +1769,118 @@ class BubbleCrapsGame(tk.Frame):
     def animate_embedded_dice(self):
         if not self.animation_running:
             return
+
         elapsed = time.time() - self.animation_start_time
         x0, y0, x1, y1 = self.animation_panel
         centre_x = (x0 + x1) / 2
         centre_y = y0 + 138
 
+        # 骰子转动动画阶段
         if elapsed < self.animation_duration:
-            current = self.animation_fixed_dice or [die.roll() for die in self.dice_objects]
+            current = (
+                list(self.animation_fixed_dice)
+                if self.animation_fixed_dice
+                else [die.roll() for die in self.dice_objects]
+            )
+
+            # 保留当前骰子的实际左右顺序
             self.animation_final_dice = list(current)
-            bases = (centre_x - 65, centre_x + 65)
+
+            bases = (
+                centre_x - 65,
+                centre_x + 65,
+            )
+
             for index, item in enumerate(self.animation_dice_items):
                 x = bases[index] + secrets.randbelow(31) - 15
                 y = centre_y + secrets.randbelow(31) - 15
+
                 self.canvas.coords(item, x, y)
-                self.canvas.itemconfig(item, image=self.dice_images_animation[current[index] - 1], state='normal')
-            self.animation_after_id = self.root.after(38, self.animate_embedded_dice)
+                self.canvas.itemconfig(
+                    item,
+                    image=self.dice_images_animation[current[index] - 1],
+                    state='normal'
+                )
+
+            self.animation_after_id = self.root.after(
+                38,
+                self.animate_embedded_dice
+            )
             return
 
+        # 动画结束时仍未取得最终骰子，则在这里产生一次
         if self.animation_final_dice is None:
-            self.animation_final_dice = self.animation_fixed_dice or [die.roll() for die in self.dice_objects]
-        self.animation_final_dice = sorted(self.animation_final_dice)
-        bases = (centre_x - 65, centre_x + 65)
+            self.animation_final_dice = (
+                list(self.animation_fixed_dice)
+                if self.animation_fixed_dice
+                else [die.roll() for die in self.dice_objects]
+            )
+
+        # 实际骰子结果保持原来的左右顺序
+        raw_dice = list(self.animation_final_dice)
+        self.animation_final_dice = raw_dice
+
+        # 中间两颗大骰子保持实际顺序
+        bases = (
+            centre_x - 65,
+            centre_x + 65,
+        )
+
         for index, item in enumerate(self.animation_dice_items):
-            self.canvas.coords(item, bases[index], centre_y)
-            self.canvas.itemconfig(item, image=self.dice_images_animation[self.animation_final_dice[index] - 1], state='normal')
-        total = sum(self.animation_final_dice)
-        self.canvas.coords(self.animation_status_text, centre_x - 62, y1 - 38)
-        self.canvas.itemconfig(self.animation_status_text, text='本轮结果是:', fill='white', anchor='e')
+            self.canvas.coords(
+                item,
+                bases[index],
+                centre_y
+            )
+            self.canvas.itemconfig(
+                item,
+                image=self.dice_images_animation[raw_dice[index] - 1],
+                state='normal'
+            )
+
+        total = sum(raw_dice)
+
+        self.canvas.coords(
+            self.animation_status_text,
+            centre_x - 62,
+            y1 - 38
+        )
+        self.canvas.itemconfig(
+            self.animation_status_text,
+            text='本轮结果是:',
+            fill='white',
+            anchor='e'
+        )
+
+        # 只有状态文字旁边的两颗小骰子按点数从小到大显示
+        status_dice = sorted(raw_dice)
+
         for index, item in enumerate(self.animation_result_dice_items):
-            self.canvas.itemconfig(item, image=self.dice_images_history[self.animation_final_dice[index] - 1], state='normal')
-        self.canvas.itemconfig(self.animation_plus_text, state='normal')
-        self.canvas.itemconfig(self.animation_equals_text, text=f'=   {total}', state='normal')
+            self.canvas.itemconfig(
+                item,
+                image=self.dice_images_history[status_dice[index] - 1],
+                state='normal'
+            )
+
+        self.canvas.itemconfig(
+            self.animation_plus_text,
+            state='normal'
+        )
+        self.canvas.itemconfig(
+            self.animation_equals_text,
+            text=f'=   {total}',
+            state='normal'
+        )
+
         self.canvas.tag_raise('status_bubble')
         self.canvas.tag_raise(self.animation_status_text)
         self.canvas.tag_raise('animation_result')
-        self.animation_after_id = self.root.after(850, self.finish_embedded_dice_animation)
+        self.ensure_point_puck_on_top()
+
+        self.animation_after_id = self.root.after(
+            850,
+            self.finish_embedded_dice_animation
+        )
 
     def finish_embedded_dice_animation(self):
         dice = list(self.animation_final_dice)
@@ -2133,26 +2277,59 @@ class BubbleCrapsGame(tk.Frame):
         if not self.animation_running:
             if self.last_result:
                 result = self.last_result
-                ordered_dice = sorted(result['dice'])
-                centre_x = (self.animation_panel[0] + self.animation_panel[2]) / 2
+
+                raw_dice = list(result['dice'])
+                status_dice = sorted(raw_dice)
+
+                centre_x = (
+                    self.animation_panel[0] +
+                    self.animation_panel[2]
+                ) / 2
                 y1 = self.animation_panel[3]
-                self.canvas.coords(self.animation_status_text, centre_x - 62, y1 - 38)
-                self.canvas.itemconfig(self.animation_status_text, text='本轮结果是:', fill='white', anchor='e')
+
+                self.canvas.coords(
+                    self.animation_status_text,
+                    centre_x - 62,
+                    y1 - 38
+                )
+                self.canvas.itemconfig(
+                    self.animation_status_text,
+                    text='本轮结果是:',
+                    fill='white',
+                    anchor='e'
+                )
+
+                # 上方大骰子：保持原始左右顺序。
                 for index, item in enumerate(self.animation_dice_items):
-                    self.canvas.itemconfig(item, image=self.dice_images_animation[ordered_dice[index] - 1], state='normal')
-                for index, item in enumerate(self.animation_result_dice_items):
-                    self.canvas.itemconfig(item, image=self.dice_images_history[ordered_dice[index] - 1], state='normal')
-                self.canvas.itemconfig(self.animation_plus_text, state='normal')
-            else:
-                centre_x = (self.animation_panel[0] + self.animation_panel[2]) / 2
-                self.canvas.coords(self.animation_status_text, centre_x, self.animation_panel[3] - 38)
-                self.canvas.itemconfig(self.animation_status_text, text='按下"转动"按钮以开始本局', fill='white', anchor='center')
-                for item in self.animation_dice_items:
-                    self.canvas.itemconfig(item, state='hidden')
-                for item in self.animation_result_dice_items:
-                    self.canvas.itemconfig(item, state='hidden')
-                self.canvas.itemconfig(self.animation_plus_text, state='hidden')
-                self.canvas.itemconfig(self.animation_equals_text, state='hidden')
+                    self.canvas.itemconfig(
+                        item,
+                        image=self.dice_images_animation[
+                            raw_dice[index] - 1
+                        ],
+                        state='normal'
+                    )
+
+                # 状态文字旁的小骰子：左小右大。
+                for index, item in enumerate(
+                    self.animation_result_dice_items
+                ):
+                    self.canvas.itemconfig(
+                        item,
+                        image=self.dice_images_history[
+                            status_dice[index] - 1
+                        ],
+                        state='normal'
+                    )
+
+                self.canvas.itemconfig(
+                    self.animation_plus_text,
+                    state='normal'
+                )
+                self.canvas.itemconfig(
+                    self.animation_equals_text,
+                    text=f"=   {result['total']}",
+                    state='normal'
+                )
 
         self.canvas.tag_raise('status_bubble')
         self.canvas.tag_raise(self.animation_status_text)
@@ -2363,6 +2540,15 @@ class BubbleCrapsGame(tk.Frame):
         if self._closing:
             return
         self._closing = True
+
+        top = self.winfo_toplevel()
+        for sequence, bind_id in getattr(self, '_enter_bindings', []):
+            if bind_id:
+                try:
+                    top.unbind(sequence, bind_id)
+                except tk.TclError:
+                    pass
+        self._enter_bindings = []
 
         # 即使正在摇骰或结算，也允许关闭并返回上一页。
         self.cancel_pending_callbacks()

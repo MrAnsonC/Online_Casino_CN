@@ -1,5 +1,3473 @@
 [
   {
+    "time": "2026-08-06T16:52:14",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:52:03",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:51:51",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:51:40",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:51:29",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:51:18",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:51:06",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:50:55",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:50:44",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:50:33",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:50:22",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 9,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:50:10",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:49:59",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:49:48",
+    "dice": [
+      5,
+      5
+    ],
+    "total": 10,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:49:37",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": null,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:49:25",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": 4,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:49:14",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": null,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:49:03",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:48:51",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:48:40",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:48:29",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:48:18",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:48:07",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:47:55",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:47:44",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:47:33",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:47:22",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:47:11",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:46:59",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:46:48",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:46:37",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:46:26",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:46:15",
+    "dice": [
+      5,
+      5
+    ],
+    "total": 10,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:46:03",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:45:52",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:45:41",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:45:30",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:45:19",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:45:08",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:44:57",
+    "dice": [
+      1,
+      1
+    ],
+    "total": 2,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:44:45",
+    "dice": [
+      1,
+      1
+    ],
+    "total": 2,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:44:34",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:44:23",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:44:11",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 4,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:44:00",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": null,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:43:49",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OUT",
+    "net": -1800.0
+  },
+  {
+    "time": "2026-08-06T16:43:38",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 466.67
+  },
+  {
+    "time": "2026-08-06T16:43:27",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OFF",
+    "net": 466.67
+  },
+  {
+    "time": "2026-08-06T16:43:15",
+    "dice": [
+      3,
+      5
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 466.67
+  },
+  {
+    "time": "2026-08-06T16:43:01",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": 9,
+    "point_after": null,
+    "note": "OFF",
+    "net": 18205.25
+  },
+  {
+    "time": "2026-08-06T16:42:41",
+    "dice": [
+      1,
+      1
+    ],
+    "total": 2,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:42:25",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": null,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:42:12",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 5000.0
+  },
+  {
+    "time": "2026-08-06T16:41:58",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OFF",
+    "net": 466.67
+  },
+  {
+    "time": "2026-08-06T16:41:47",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 420.0
+  },
+  {
+    "time": "2026-08-06T16:41:36",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 420.0
+  },
+  {
+    "time": "2026-08-06T16:41:24",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:41:06",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:40:54",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:40:43",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:40:32",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:40:21",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:40:10",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 10,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:39:59",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:39:48",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:39:36",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": null,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:39:25",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:39:14",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 4,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:39:02",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 4,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:38:51",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": null,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:38:40",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:38:29",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:38:17",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 4,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:38:06",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": null,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:37:55",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": 9,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:37:44",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:37:32",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:37:21",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:37:10",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:36:58",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:36:47",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": null,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:36:36",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 10,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:36:25",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:36:14",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:36:03",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:35:51",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:35:40",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:35:29",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:35:18",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:35:07",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:34:55",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:34:44",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:34:33",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": null,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:34:22",
+    "dice": [
+      3,
+      5
+    ],
+    "total": 8,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:34:11",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:34:00",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 9,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:33:48",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": null,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:33:38",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:33:26",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:33:15",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:33:04",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:32:53",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:32:42",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:32:31",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": 4,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:32:20",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 4,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:32:09",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 4,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:31:58",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": null,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:31:46",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:31:35",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:31:24",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:31:13",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:31:02",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:30:51",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:30:40",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:30:28",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 9,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:30:17",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:30:06",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": null,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:29:54",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:29:43",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:29:32",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:29:21",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:29:09",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:28:58",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:28:47",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:28:36",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:28:24",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:28:13",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 9,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:28:02",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:27:51",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:27:40",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:27:29",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:27:18",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:27:06",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:26:55",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:26:44",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:26:33",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:26:21",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:26:10",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:25:59",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:25:48",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:25:37",
+    "dice": [
+      3,
+      5
+    ],
+    "total": 8,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:25:25",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:25:14",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:25:03",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:24:52",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": null,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:24:41",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:24:30",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:24:18",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:24:08",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:23:56",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:23:45",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:23:34",
+    "dice": [
+      3,
+      5
+    ],
+    "total": 8,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:23:23",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:23:12",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:23:00",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:22:49",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:22:38",
+    "dice": [
+      3,
+      5
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:22:27",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:22:16",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:22:04",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": 9,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:21:53",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": null,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:21:42",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OUT",
+    "net": -3220.0
+  },
+  {
+    "time": "2026-08-06T16:21:31",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 837.0
+  },
+  {
+    "time": "2026-08-06T16:21:20",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 700.0
+  },
+  {
+    "time": "2026-08-06T16:21:09",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OFF",
+    "net": 700.0
+  },
+  {
+    "time": "2026-08-06T16:20:57",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:19:57",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:19:46",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T16:19:35",
+    "dice": [
+      3,
+      5
+    ],
+    "total": 8,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T15:34:53",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T15:34:41",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T15:34:30",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OUT",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T14:49:47",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T11:38:31",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-06T11:38:11",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T23:48:54",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OUT",
+    "net": -9000.0
+  },
+  {
+    "time": "2026-08-05T23:48:42",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T23:48:32",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T23:48:21",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OFF",
+    "net": 1983.33
+  },
+  {
+    "time": "2026-08-05T23:48:08",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 1983.33
+  },
+  {
+    "time": "2026-08-05T23:48:00",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T23:47:31",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OFF",
+    "net": 1983.33
+  },
+  {
+    "time": "2026-08-05T23:47:20",
+    "dice": [
+      1,
+      1
+    ],
+    "total": 2,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T23:47:08",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T23:47:02",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T23:46:50",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 5000.0
+  },
+  {
+    "time": "2026-08-05T23:02:10",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 10,
+    "point_after": null,
+    "note": "OUT",
+    "net": -29000.0
+  },
+  {
+    "time": "2026-08-05T23:01:58",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T23:01:47",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T23:01:35",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 1983.33
+  },
+  {
+    "time": "2026-08-05T23:01:22",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": null,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T23:01:09",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OFF",
+    "net": 1983.33
+  },
+  {
+    "time": "2026-08-05T23:00:57",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 2100.0
+  },
+  {
+    "time": "2026-08-05T23:00:45",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T23:00:34",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T23:00:21",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T23:00:09",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 2100.0
+  },
+  {
+    "time": "2026-08-05T22:59:57",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T22:59:46",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 6,
+    "point_after": 6,
+    "note": "ON",
+    "net": 2100.0
+  },
+  {
+    "time": "2026-08-05T22:59:38",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T22:59:24",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OFF",
+    "net": 2100.0
+  },
+  {
+    "time": "2026-08-05T22:59:12",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T22:59:01",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2100.0
+  },
+  {
+    "time": "2026-08-05T22:58:49",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 7340.0
+  },
+  {
+    "time": "2026-08-05T22:58:37",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T22:58:26",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 1983.33
+  },
+  {
+    "time": "2026-08-05T22:58:12",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 1983.33
+  },
+  {
+    "time": "2026-08-05T22:58:00",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 1983.33
+  },
+  {
+    "time": "2026-08-05T22:57:48",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T22:57:29",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T22:26:00",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T22:25:48",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2100.0
+  },
+  {
+    "time": "2026-08-05T22:25:33",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OUT",
+    "net": 1000.0
+  },
+  {
+    "time": "2026-08-05T22:25:10",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2100.0
+  },
+  {
+    "time": "2026-08-05T22:24:50",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": 4,
+    "point_after": null,
+    "note": "OUT",
+    "net": -29000.0
+  },
+  {
+    "time": "2026-08-05T22:24:38",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 4,
+    "point_after": 4,
+    "note": "ON",
+    "net": 1983.33
+  },
+  {
+    "time": "2026-08-05T22:24:24",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": null,
+    "point_after": 4,
+    "note": "ON",
+    "net": 2340.0
+  },
+  {
+    "time": "2026-08-05T22:23:59",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": -9000.0
+  },
+  {
+    "time": "2026-08-05T22:23:47",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T21:28:49",
+    "dice": [
+      3,
+      5
+    ],
+    "total": 8,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OFF",
+    "net": -300.0
+  },
+  {
+    "time": "2026-08-05T21:28:36",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": -300.0
+  },
+  {
+    "time": "2026-08-05T21:19:16",
+    "dice": [
+      2,
+      5
+    ],
+    "total": 7,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OUT",
+    "net": -14600.0
+  },
+  {
+    "time": "2026-08-05T21:18:53",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 3500.0
+  },
+  {
+    "time": "2026-08-05T21:18:41",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T21:18:26",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": -14000.0
+  },
+  {
+    "time": "2026-08-05T21:10:20",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 4,
+    "point_after": null,
+    "note": "OUT",
+    "net": 7333.33
+  },
+  {
+    "time": "2026-08-05T21:10:08",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 4,
+    "point_after": 4,
+    "note": "ON",
+    "net": -3000.0
+  },
+  {
+    "time": "2026-08-05T21:09:56",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": null,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T21:09:45",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 6,
+    "point_after": null,
+    "note": "OFF",
+    "net": -1000.0
+  },
+  {
+    "time": "2026-08-05T21:09:34",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": null,
+    "point_after": 6,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T21:09:22",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": 4,
+    "point_after": null,
+    "note": "OFF",
+    "net": -3000.0
+  },
+  {
+    "time": "2026-08-05T21:09:11",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": null,
+    "point_after": 4,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T21:08:34",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OFF",
+    "net": -2000.0
+  },
+  {
+    "time": "2026-08-05T21:08:21",
+    "dice": [
+      1,
+      1
+    ],
+    "total": 2,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T21:08:09",
+    "dice": [
+      1,
+      3
+    ],
+    "total": 4,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": -3000.0
+  },
+  {
+    "time": "2026-08-05T21:08:01",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T21:07:35",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T21:07:23",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OUT",
+    "net": -12000.0
+  },
+  {
+    "time": "2026-08-05T21:06:19",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T21:06:01",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T21:05:42",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OUT",
+    "net": 17500.0
+  },
+  {
+    "time": "2026-08-05T21:05:15",
+    "dice": [
+      3,
+      5
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 583.33
+  },
+  {
+    "time": "2026-08-05T21:05:03",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OFF",
+    "net": 1400.0
+  },
+  {
+    "time": "2026-08-05T21:04:51",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 583.33
+  },
+  {
+    "time": "2026-08-05T21:04:40",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 1400.0
+  },
+  {
+    "time": "2026-08-05T21:04:28",
+    "dice": [
+      5,
+      5
+    ],
+    "total": 10,
+    "point_before": 10,
+    "point_after": null,
+    "note": "OFF",
+    "net": 2700.0
+  },
+  {
+    "time": "2026-08-05T20:54:01",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 583.33
+  },
+  {
+    "time": "2026-08-05T20:53:50",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T20:53:38",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 1400.0
+  },
+  {
+    "time": "2026-08-05T20:26:12",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 1400.0
+  },
+  {
+    "time": "2026-08-05T20:26:00",
+    "dice": [
+      6,
+      6
+    ],
+    "total": 12,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T20:25:32",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 583.33
+  },
+  {
+    "time": "2026-08-05T20:14:12",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 583.33
+  },
+  {
+    "time": "2026-08-05T20:14:01",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 583.33
+  },
+  {
+    "time": "2026-08-05T20:13:49",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": null,
+    "point_after": 10,
+    "note": "ON",
+    "net": 2700.0
+  },
+  {
+    "time": "2026-08-05T20:13:05",
+    "dice": [
+      1,
+      1
+    ],
+    "total": 2,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T19:47:07",
+    "dice": [
+      1,
+      6
+    ],
+    "total": 7,
+    "point_before": 9,
+    "point_after": null,
+    "note": "OUT",
+    "net": -12000.0
+  },
+  {
+    "time": "2026-08-05T19:46:56",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 4400.0
+  },
+  {
+    "time": "2026-08-05T19:46:12",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 1166.67
+  },
+  {
+    "time": "2026-08-05T19:46:00",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T19:45:34",
+    "dice": [
+      1,
+      1
+    ],
+    "total": 2,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T19:45:22",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": null,
+    "point_after": 9,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:45:01",
+    "dice": [
+      3,
+      4
+    ],
+    "total": 7,
+    "point_before": null,
+    "point_after": null,
+    "note": "OFF",
+    "net": -2000.0
+  },
+  {
+    "time": "2026-08-05T19:44:41",
+    "dice": [
+      5,
+      5
+    ],
+    "total": 10,
+    "point_before": 10,
+    "point_after": null,
+    "note": "OFF",
+    "net": 5400.0
+  },
+  {
+    "time": "2026-08-05T19:44:30",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:44:18",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": 10,
+    "point_after": 10,
+    "note": "ON",
+    "net": 1166.67
+  },
+  {
+    "time": "2026-08-05T19:44:06",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": null,
+    "point_after": 10,
+    "note": "ON",
+    "net": 5400.0
+  },
+  {
+    "time": "2026-08-05T19:43:55",
+    "dice": [
+      5,
+      5
+    ],
+    "total": 10,
+    "point_before": 10,
+    "point_after": null,
+    "note": "OFF",
+    "net": 5400.0
+  },
+  {
+    "time": "2026-08-05T19:43:43",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": null,
+    "point_after": 10,
+    "note": "ON",
+    "net": 5400.0
+  },
+  {
+    "time": "2026-08-05T19:43:31",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 9,
+    "point_after": null,
+    "note": "OFF",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:43:20",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T19:43:08",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 1166.67
+  },
+  {
+    "time": "2026-08-05T19:42:55",
+    "dice": [
+      2,
+      4
+    ],
+    "total": 6,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 1166.67
+  },
+  {
+    "time": "2026-08-05T19:42:43",
+    "dice": [
+      3,
+      3
+    ],
+    "total": 6,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 1166.67
+  },
+  {
+    "time": "2026-08-05T19:42:31",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": 9,
+    "point_after": 9,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:42:20",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": null,
+    "point_after": 9,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:42:05",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OFF",
+    "net": 1166.67
+  },
+  {
+    "time": "2026-08-05T19:41:54",
+    "dice": [
+      3,
+      6
+    ],
+    "total": 9,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:41:41",
+    "dice": [
+      1,
+      2
+    ],
+    "total": 3,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T19:41:29",
+    "dice": [
+      4,
+      6
+    ],
+    "total": 10,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 5400.0
+  },
+  {
+    "time": "2026-08-05T19:41:18",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 8,
+    "point_after": 8,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:41:06",
+    "dice": [
+      4,
+      4
+    ],
+    "total": 8,
+    "point_before": null,
+    "point_after": 8,
+    "note": "ON",
+    "net": 1166.67
+  },
+  {
+    "time": "2026-08-05T19:40:54",
+    "dice": [
+      2,
+      3
+    ],
+    "total": 5,
+    "point_before": 5,
+    "point_after": null,
+    "note": "OFF",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:40:42",
+    "dice": [
+      2,
+      2
+    ],
+    "total": 4,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 5400.0
+  },
+  {
+    "time": "2026-08-05T19:40:30",
+    "dice": [
+      4,
+      5
+    ],
+    "total": 9,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:40:19",
+    "dice": [
+      5,
+      6
+    ],
+    "total": 11,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 0.0
+  },
+  {
+    "time": "2026-08-05T19:40:07",
+    "dice": [
+      1,
+      5
+    ],
+    "total": 6,
+    "point_before": 5,
+    "point_after": 5,
+    "note": "ON",
+    "net": 1166.67
+  },
+  {
+    "time": "2026-08-05T19:39:55",
+    "dice": [
+      1,
+      4
+    ],
+    "total": 5,
+    "point_before": null,
+    "point_after": 5,
+    "note": "ON",
+    "net": 2800.0
+  },
+  {
+    "time": "2026-08-05T19:39:43",
+    "dice": [
+      2,
+      6
+    ],
+    "total": 8,
+    "point_before": 8,
+    "point_after": null,
+    "note": "OFF",
+    "net": 1166.67
+  },
+  {
     "time": "2026-08-05T19:02:21",
     "dice": [
       2,
@@ -2528,966 +5996,6 @@
     "total": 9,
     "point_before": 8,
     "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:46:52",
-    "dice": [
-      2,
-      6
-    ],
-    "total": 8,
-    "point_before": null,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:46:49",
-    "dice": [
-      1,
-      6
-    ],
-    "total": 7,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:46:44",
-    "dice": [
-      2,
-      5
-    ],
-    "total": 7,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:45:13",
-    "dice": [
-      2,
-      5
-    ],
-    "total": 7,
-    "point_before": 4,
-    "point_after": null,
-    "note": "OUT",
-    "net": -600.0
-  },
-  {
-    "time": "2026-08-05T11:45:09",
-    "dice": [
-      1,
-      5
-    ],
-    "total": 6,
-    "point_before": 4,
-    "point_after": 4,
-    "note": "ON",
-    "net": 116.67
-  },
-  {
-    "time": "2026-08-05T11:45:05",
-    "dice": [
-      3,
-      6
-    ],
-    "total": 9,
-    "point_before": 4,
-    "point_after": 4,
-    "note": "ON",
-    "net": 140.0
-  },
-  {
-    "time": "2026-08-05T11:45:02",
-    "dice": [
-      2,
-      6
-    ],
-    "total": 8,
-    "point_before": 4,
-    "point_after": 4,
-    "note": "ON",
-    "net": 116.67
-  },
-  {
-    "time": "2026-08-05T11:44:59",
-    "dice": [
-      4,
-      5
-    ],
-    "total": 9,
-    "point_before": 4,
-    "point_after": 4,
-    "note": "ON",
-    "net": 140.0
-  },
-  {
-    "time": "2026-08-05T11:44:55",
-    "dice": [
-      1,
-      5
-    ],
-    "total": 6,
-    "point_before": 4,
-    "point_after": 4,
-    "note": "ON",
-    "net": 116.67
-  },
-  {
-    "time": "2026-08-05T11:44:52",
-    "dice": [
-      1,
-      3
-    ],
-    "total": 4,
-    "point_before": null,
-    "point_after": 4,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:44:43",
-    "dice": [
-      3,
-      4
-    ],
-    "total": 7,
-    "point_before": 9,
-    "point_after": null,
-    "note": "OUT",
-    "net": -600.0
-  },
-  {
-    "time": "2026-08-05T11:44:35",
-    "dice": [
-      4,
-      5
-    ],
-    "total": 9,
-    "point_before": null,
-    "point_after": 9,
-    "note": "ON",
-    "net": 140.0
-  },
-  {
-    "time": "2026-08-05T11:44:24",
-    "dice": [
-      3,
-      4
-    ],
-    "total": 7,
-    "point_before": 6,
-    "point_after": null,
-    "note": "OUT",
-    "net": -600.0
-  },
-  {
-    "time": "2026-08-05T11:44:20",
-    "dice": [
-      1,
-      5
-    ],
-    "total": 6,
-    "point_before": null,
-    "point_after": 6,
-    "note": "ON",
-    "net": -283.33
-  },
-  {
-    "time": "2026-08-05T11:43:47",
-    "dice": [
-      3,
-      4
-    ],
-    "total": 7,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:43",
-    "dice": [
-      2,
-      5
-    ],
-    "total": 7,
-    "point_before": 6,
-    "point_after": null,
-    "note": "OUT",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:40",
-    "dice": [
-      3,
-      5
-    ],
-    "total": 8,
-    "point_before": 6,
-    "point_after": 6,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:36",
-    "dice": [
-      4,
-      4
-    ],
-    "total": 8,
-    "point_before": 6,
-    "point_after": 6,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:33",
-    "dice": [
-      2,
-      4
-    ],
-    "total": 6,
-    "point_before": null,
-    "point_after": 6,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:29",
-    "dice": [
-      1,
-      6
-    ],
-    "total": 7,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:26",
-    "dice": [
-      1,
-      2
-    ],
-    "total": 3,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:23",
-    "dice": [
-      4,
-      6
-    ],
-    "total": 10,
-    "point_before": 10,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:20",
-    "dice": [
-      5,
-      6
-    ],
-    "total": 11,
-    "point_before": 10,
-    "point_after": 10,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:17",
-    "dice": [
-      3,
-      3
-    ],
-    "total": 6,
-    "point_before": 10,
-    "point_after": 10,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:13",
-    "dice": [
-      3,
-      5
-    ],
-    "total": 8,
-    "point_before": 10,
-    "point_after": 10,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:09",
-    "dice": [
-      4,
-      5
-    ],
-    "total": 9,
-    "point_before": 10,
-    "point_after": 10,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:04",
-    "dice": [
-      1,
-      4
-    ],
-    "total": 5,
-    "point_before": 10,
-    "point_after": 10,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:43:00",
-    "dice": [
-      1,
-      1
-    ],
-    "total": 2,
-    "point_before": 10,
-    "point_after": 10,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:42:55",
-    "dice": [
-      5,
-      5
-    ],
-    "total": 10,
-    "point_before": null,
-    "point_after": 10,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:42:50",
-    "dice": [
-      1,
-      6
-    ],
-    "total": 7,
-    "point_before": 6,
-    "point_after": null,
-    "note": "OUT",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:32:42",
-    "dice": [
-      4,
-      2
-    ],
-    "total": 6,
-    "point_before": null,
-    "point_after": 6,
-    "note": "ON",
-    "net": -1.0
-  },
-  {
-    "time": "2026-08-05T11:30:48",
-    "dice": [
-      5,
-      6
-    ],
-    "total": 11,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:30:38",
-    "dice": [
-      2,
-      5
-    ],
-    "total": 7,
-    "point_before": 5,
-    "point_after": null,
-    "note": "OUT",
-    "net": -2.33
-  },
-  {
-    "time": "2026-08-05T11:30:35",
-    "dice": [
-      4,
-      6
-    ],
-    "total": 10,
-    "point_before": 5,
-    "point_after": 5,
-    "note": "ON",
-    "net": 1.8
-  },
-  {
-    "time": "2026-08-05T11:30:30",
-    "dice": [
-      1,
-      4
-    ],
-    "total": 5,
-    "point_before": null,
-    "point_after": 5,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:25:36",
-    "dice": [
-      1,
-      6
-    ],
-    "total": 7,
-    "point_before": 8,
-    "point_after": null,
-    "note": "OUT",
-    "net": -5.0
-  },
-  {
-    "time": "2026-08-05T11:25:30",
-    "dice": [
-      6,
-      3
-    ],
-    "total": 9,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:25:26",
-    "dice": [
-      1,
-      1
-    ],
-    "total": 2,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:25:20",
-    "dice": [
-      5,
-      4
-    ],
-    "total": 9,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:20:38",
-    "dice": [
-      5,
-      3
-    ],
-    "total": 8,
-    "point_before": null,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:20:27",
-    "dice": [
-      6,
-      1
-    ],
-    "total": 7,
-    "point_before": 6,
-    "point_after": null,
-    "note": "OUT",
-    "net": -6.0
-  },
-  {
-    "time": "2026-08-05T11:20:17",
-    "dice": [
-      3,
-      3
-    ],
-    "total": 6,
-    "point_before": null,
-    "point_after": 6,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:20:13",
-    "dice": [
-      1,
-      1
-    ],
-    "total": 2,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:20:05",
-    "dice": [
-      2,
-      1
-    ],
-    "total": 3,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:11:37",
-    "dice": [
-      6,
-      5
-    ],
-    "total": 11,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 1000.0
-  },
-  {
-    "time": "2026-08-05T11:09:09",
-    "dice": [
-      4,
-      3
-    ],
-    "total": 7,
-    "point_before": 9,
-    "point_after": null,
-    "note": "OUT",
-    "net": -3000.0
-  },
-  {
-    "time": "2026-08-05T11:09:05",
-    "dice": [
-      2,
-      2
-    ],
-    "total": 4,
-    "point_before": 9,
-    "point_after": 9,
-    "note": "ON",
-    "net": 900.0
-  },
-  {
-    "time": "2026-08-05T11:09:00",
-    "dice": [
-      2,
-      6
-    ],
-    "total": 8,
-    "point_before": 9,
-    "point_after": 9,
-    "note": "ON",
-    "net": 583.33
-  },
-  {
-    "time": "2026-08-05T11:08:56",
-    "dice": [
-      3,
-      3
-    ],
-    "total": 6,
-    "point_before": 9,
-    "point_after": 9,
-    "note": "ON",
-    "net": 583.33
-  },
-  {
-    "time": "2026-08-05T11:08:53",
-    "dice": [
-      5,
-      6
-    ],
-    "total": 11,
-    "point_before": 9,
-    "point_after": 9,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:08:47",
-    "dice": [
-      1,
-      4
-    ],
-    "total": 5,
-    "point_before": 9,
-    "point_after": 9,
-    "note": "ON",
-    "net": 700.0
-  },
-  {
-    "time": "2026-08-05T11:08:38",
-    "dice": [
-      6,
-      3
-    ],
-    "total": 9,
-    "point_before": null,
-    "point_after": 9,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:08:14",
-    "dice": [
-      4,
-      6
-    ],
-    "total": 10,
-    "point_before": null,
-    "point_after": 10,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:08:09",
-    "dice": [
-      5,
-      3
-    ],
-    "total": 8,
-    "point_before": 8,
-    "point_after": null,
-    "note": "OFF",
-    "net": -500.0
-  },
-  {
-    "time": "2026-08-05T11:08:04",
-    "dice": [
-      6,
-      6
-    ],
-    "total": 12,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:08:00",
-    "dice": [
-      5,
-      5
-    ],
-    "total": 10,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:07:54",
-    "dice": [
-      2,
-      4
-    ],
-    "total": 6,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": -500.0
-  },
-  {
-    "time": "2026-08-05T11:07:45",
-    "dice": [
-      4,
-      4
-    ],
-    "total": 8,
-    "point_before": null,
-    "point_after": 8,
-    "note": "ON",
-    "net": -500.0
-  },
-  {
-    "time": "2026-08-05T11:07:37",
-    "dice": [
-      1,
-      6
-    ],
-    "total": 7,
-    "point_before": 8,
-    "point_after": null,
-    "note": "OUT",
-    "net": -500.0
-  },
-  {
-    "time": "2026-08-05T11:07:33",
-    "dice": [
-      4,
-      5
-    ],
-    "total": 9,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:07:22",
-    "dice": [
-      4,
-      5
-    ],
-    "total": 9,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T11:07:17",
-    "dice": [
-      3,
-      5
-    ],
-    "total": 8,
-    "point_before": null,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:29:30",
-    "dice": [
-      1,
-      6
-    ],
-    "total": 7,
-    "point_before": 8,
-    "point_after": null,
-    "note": "OUT",
-    "net": -1000.0
-  },
-  {
-    "time": "2026-08-05T10:29:26",
-    "dice": [
-      3,
-      2
-    ],
-    "total": 5,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:29:23",
-    "dice": [
-      6,
-      4
-    ],
-    "total": 10,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:29:20",
-    "dice": [
-      4,
-      1
-    ],
-    "total": 5,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:29:16",
-    "dice": [
-      1,
-      3
-    ],
-    "total": 4,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:29:12",
-    "dice": [
-      2,
-      1
-    ],
-    "total": 3,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:29:09",
-    "dice": [
-      4,
-      1
-    ],
-    "total": 5,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:29:05",
-    "dice": [
-      3,
-      2
-    ],
-    "total": 5,
-    "point_before": 8,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:29:01",
-    "dice": [
-      6,
-      2
-    ],
-    "total": 8,
-    "point_before": null,
-    "point_after": 8,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:28:57",
-    "dice": [
-      6,
-      3
-    ],
-    "total": 9,
-    "point_before": 9,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:28:52",
-    "dice": [
-      6,
-      3
-    ],
-    "total": 9,
-    "point_before": null,
-    "point_after": 9,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:28:47",
-    "dice": [
-      6,
-      5
-    ],
-    "total": 11,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:28:41",
-    "dice": [
-      3,
-      4
-    ],
-    "total": 7,
-    "point_before": null,
-    "point_after": null,
-    "note": "OFF",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:28:32",
-    "dice": [
-      2,
-      5
-    ],
-    "total": 7,
-    "point_before": 9,
-    "point_after": null,
-    "note": "OUT",
-    "net": -1166.67
-  },
-  {
-    "time": "2026-08-05T10:28:27",
-    "dice": [
-      5,
-      4
-    ],
-    "total": 9,
-    "point_before": null,
-    "point_after": 9,
-    "note": "ON",
-    "net": 0.0
-  },
-  {
-    "time": "2026-08-05T10:28:10",
-    "dice": [
-      4,
-      3
-    ],
-    "total": 7,
-    "point_before": 9,
-    "point_after": null,
-    "note": "OUT",
-    "net": -1583.33
-  },
-  {
-    "time": "2026-08-05T10:28:05",
-    "dice": [
-      2,
-      4
-    ],
-    "total": 6,
-    "point_before": 9,
-    "point_after": 9,
-    "note": "ON",
-    "net": -500.0
-  },
-  {
-    "time": "2026-08-05T10:27:47",
-    "dice": [
-      4,
-      5
-    ],
-    "total": 9,
-    "point_before": null,
-    "point_after": 9,
     "note": "ON",
     "net": 0.0
   }

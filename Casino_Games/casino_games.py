@@ -44,6 +44,7 @@ EMBEDDED_GAME_MODULES = {
     "Casino_Games.Auto_Texas_Holdem",
     "Casino_Games.Auto_Stud_Poker",
     "Casino_Games.Craps",
+    "Casino_Games.Sicbo",
 }
 
 GAME_SECTIONS = {
