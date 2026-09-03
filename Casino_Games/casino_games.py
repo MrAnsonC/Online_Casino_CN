@@ -14,6 +14,8 @@ except ImportError:
 from typing import Callable, Optional
 
 
+CASINO_GAMES_VERSION = "V25"
+
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(THIS_DIR)
 DATA_FILE = os.path.join(PROJECT_DIR, "saving_data.json")
@@ -27,6 +29,7 @@ EMBEDDED_GAME_MODULES = {
     "Casino_Games.Criss_Cross_Poker",
     "Casino_Games.Three_Card_Poker",
     "Casino_Games.Ultimate_Omaha_Holdem",
+    "Casino_Games.Mini_Ultimate_Texas_Holdem",
     "Casino_Games.Ultimate_Texas_Holdem",
     "Casino_Games.Ultimate_Three_Card_Poker",
     "Casino_Games.Video_Poker",
@@ -45,11 +48,42 @@ EMBEDDED_GAME_MODULES = {
     "Casino_Games.Auto_Stud_Poker",
     "Casino_Games.Craps",
     "Casino_Games.Sicbo",
+    "Casino_Games.Sicbo_Super",
+    "Casino_Games.Baccarat",
+    "Casino_Games.Dragon_Tiger",
+    "Casino_Games.Blackjack_Classic",
+    "Casino_Games.Blackjack_Spanish",
+    "Casino_Games.Blackjack_Double",
+    "Casino_Games.Blackjack_Free_Double",
+    "Casino_Games.Blackjack_Premiere",
+    "Casino_Games.Pai_Gow_Poker",
+    "Casino_Games.Texas_Holdem_Ticket",
+    "Casino_Games.Blackjack_Double_Up",
+    "Casino_Games.Blackjack_Double_Deck",
+    "Casino_Games.Classic_Pai_Gow",
+    "Casino_Games.Classic_Fan_Tan",
+    "Casino_Games.Blackjack_Lightning",
+    "Casino_Games.Sangong"
+}
+
+
+# Embedded blackjack pages that use the shared Tk root.  For these games the
+# window-manager X button is a page-level Back action to casino_games.
+CLOSE_RETURNS_TO_CASINO_MODULES = {
+    "Casino_Games.Blackjack_Classic",
+    "Casino_Games.Blackjack_Spanish",
+    "Casino_Games.Blackjack_Double",
+    "Casino_Games.Blackjack_Free_Double",
+    "Casino_Games.Blackjack_Premiere",
+    "Casino_Games.Blackjack_Double_Up",
+    "Casino_Games.Blackjack_Double_Deck",
+    "Casino_Games.Blackjack_Lightning"
 }
 
 GAME_SECTIONS = {
     "扑克": [
         ("三张牌扑克", "Casino_Games.Three_Card_Poker", False),
+        ("三公", "Casino_Games.Sangong", False),
         ("视频扑克", "Casino_Games.Video_Poker", False),
         ("加勒比梭哈扑克", "Casino_Games.Caribbean_Stud_Poker", False),
         ("月亮梭哈扑克", "Casino_Games.Lunar_Poker", False),
@@ -60,6 +94,7 @@ GAME_SECTIONS = {
         ("纵横交叉扑克", "Casino_Games.Criss_Cross_Poker", False),
         ("任逍遥扑克", "Casino_Games.Let_It_Ride", False),
         ("单挑扑克", "Casino_Games.Heads_Up_Holdem", False),
+        ("迷你终极德州扑克", "Casino_Games.Mini_Ultimate_Texas_Holdem", False),
         ("终极德州扑克", "Casino_Games.Ultimate_Texas_Holdem", False),
         ("终极奥马哈扑克", "Casino_Games.Ultimate_Omaha_Holdem", False),
         ("内外注", "Casino_Games.In_Or_Out", False),
@@ -77,26 +112,35 @@ GAME_SECTIONS = {
     "21点": [
         ("简单21点", "Casino_Games.Blackjack_Easy", False),
         ("经典21点", "Casino_Games.Blackjack_Classic", False),
+        ("双副牌21点", "Casino_Games.Blackjack_Double_Deck", False),
         ("西班牙式21点", "Casino_Games.Blackjack_Spanish", False),
         ("豪赢21点", "Casino_Games.Blackjack_Multiply", False),
         ("免牌加倍21点", "Casino_Games.Blackjack_Double_Up", False),
+        ("免费21点", "Casino_Games.Blackjack_Free_Double", False),
         ("双向21点", "Casino_Games.Blackjack_Premiere", False),
         ("无限加倍21点", "Casino_Games.Blackjack_Double", False),
+        ("闪电21点", "Casino_Games.Blackjack_Lightning", False),
     ],
     "骰子": [
+        ("骰宝", "Casino_Games.Sicbo", False),
+        ("超级骰宝", "Casino_Games.Sicbo_Super", False),
         ("花旗骰", "Casino_Games.Craps", False),
         ("克朗代克（维护）", "Casino_Games.Klondike_Dice", True),
-        ("骰宝", "Casino_Games.Sicbo", False),
         ("骰子百家乐", "Casino_Games.BacBo", False),
     ],
-    "二人对决": [
+    "对决": [
         ("德州扑克双人对决", "Casino_Games.Auto_Texas_Holdem", False),
         ("梭哈扑克双人对决", "Casino_Games.Auto_Stud_Poker", False),
+        ("德州扑克彩票购买", "Casino_Games.Texas_Holdem_Ticket", False),
     ],
     "轮盘赌": [
         ("美式轮盘", "Casino_Games.Roulette_American", False),
         ("欧式轮盘", "Casino_Games.Roulette_Europe", False),
         ("幸运之轮", "Casino_Games.Big_Six_Wheel", False),
+    ],
+    "其他": [
+        ("经典牌九", "Casino_Games.Classic_Pai_Gow", False),
+        ("经典翻摊", "Casino_Games.Classic_Fan_Tan", False),
     ],
 }
 
@@ -856,7 +900,16 @@ class CasinoGamesPage(tk.Frame):
             parent_back = self.on_back
             balance_callback = self.on_balance_change
 
+            returned_to_casino = False
+
             def return_to_casino(final_balance: float) -> None:
+                # 同一个关闭动作只允许执行一次，避免 WM_DELETE_WINDOW、Escape
+                # 或游戏内部返回按钮在同一时刻重复触发 replace_page()。
+                nonlocal returned_to_casino
+                if returned_to_casino:
+                    return
+                returned_to_casino = True
+
                 new_balance = float(final_balance)
                 update_balance(username, new_balance)
 
@@ -875,13 +928,20 @@ class CasinoGamesPage(tk.Frame):
                     raise RuntimeError("父窗口没有 replace_page(page) 方法。")
                 replace_page(new_page)
 
-            game_page = game_main(
-                parent=master,
-                balance=self.balance,
-                user=username,
-                on_back=return_to_casino,
-                on_balance_change=balance_callback,
-            )
+            game_kwargs = {
+                "parent": master,
+                "balance": self.balance,
+                "user": username,
+                "on_back": return_to_casino,
+                "on_balance_change": balance_callback,
+            }
+
+            # 这些 Blackjack 模块从 casino_games 进入时，右上角 X
+            # 被解释为“返回赌场游戏中心”，而不是关闭整个 Tk 根窗口。
+            if module_name in CLOSE_RETURNS_TO_CASINO_MODULES:
+                game_kwargs["close_returns_to_parent"] = True
+
+            game_page = game_main(**game_kwargs)
 
             if not isinstance(game_page, tk.Widget):
                 raise TypeError(
@@ -889,6 +949,20 @@ class CasinoGamesPage(tk.Frame):
                 )
 
             self._replace_root_page(game_page)
+
+            # Install the shared-root close protocol only AFTER replace_page().
+            # This prevents index.py from overwriting WM_DELETE_WINDOW during the swap.
+            if module_name in CLOSE_RETURNS_TO_CASINO_MODULES:
+                install_close = getattr(game_page, "_install_embedded_close_handler", None)
+                if callable(install_close):
+                    install_close()
+
+                    # Re-assert once when Tk becomes idle.  This catches hosts that
+                    # defer their own window-protocol setup until after replace_page().
+                    try:
+                        master.after_idle(lambda: install_close(force=True))
+                    except tk.TclError:
+                        pass
 
         except Exception as exc:
             messagebox.showerror(

@@ -274,13 +274,13 @@ class BigSixHistory:
 # ---------------------------
 
 class BigSixWheelGUI(tk.Tk):
-    BETTING_SECONDS = 0
+    BETTING_SECONDS = 30
     TIMER_TICK_MS = 250
 
     def __init__(self, initial_balance=1_000_000, username="Guest"):
         super().__init__()
         self.title("幸运之轮")
-        self.geometry("1350x700+50+10")
+        self.geometry("1350x770+50+10")
         self.resizable(False, False)
         self.configure(bg="#35654d")
 
@@ -294,10 +294,14 @@ class BigSixWheelGUI(tk.Tk):
         self.marker_rows = 6
         self.marker_cols = 9
 
-        self.bet_buttons = {}
         self.chip_buttons = []
-        self.current_bets = {k: 0 for k in OUTCOME_DISPLAY}
+        self.current_bets = {}
+        self.current_bet_colors = {}
+        self.last_bets = {}
+        self.last_bet_colors = {}
+        self.bet_spots = self._build_bet_spots()
         self.selected_bet_amount = 1000
+        self.selected_chip_color = "#ab0058"
         self.selected_chip = None
 
         self.round_state = "betting"
@@ -309,6 +313,9 @@ class BigSixWheelGUI(tk.Tk):
         self.current_wheel_offset = 0.0      # 当前轮盘旋转角度（度）
         self.wheel_velocity = 0.0            # 角速度（度/秒）
         self.wheel_acceleration = 0.0        # 角加速度（度/秒²），负值表示减速
+        self.pointer_angle = 0.0
+        self.pointer_velocity = 0.0
+        self.pointer_acceleration = 0.0
         self._last_physics_time = None
         self.is_spinning = False
 
@@ -324,7 +331,7 @@ class BigSixWheelGUI(tk.Tk):
         self.bind('<Return>', lambda event: self.start_game())
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
-    # ------------------- UI build (保持不变) -------------------
+    # ------------------- UI build -------------------
     def _build_ui(self):
         main = ttk.Frame(self)
         main.pack(fill=tk.BOTH, expand=True)
@@ -346,60 +353,33 @@ class BigSixWheelGUI(tk.Tk):
         self.wheel_canvas.pack(fill=tk.X)
         self._draw_wheel()
 
-        betting_area = tk.Frame(parent, bg="#D0E7FF", height=200)
+        betting_area = tk.Frame(parent, bg="#D0E7FF", height=280)
         betting_area.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 
-        betting_left = tk.Frame(betting_area, bg="#D0E7FF")
-        betting_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2)
+        betting_left = tk.Frame(betting_area, bg="#D0E7FF", width=510)
+        betting_left.pack(side=tk.LEFT, fill=tk.BOTH, padx=2)
+        betting_left.pack_propagate(False)
 
-        betting_center = tk.Frame(betting_area, bg="#D0E7FF")
-        betting_center.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=2)
+        betting_center = tk.Frame(betting_area, bg="#D0E7FF", width=185)
+        betting_center.pack(side=tk.LEFT, fill=tk.Y, padx=2)
+        betting_center.pack_propagate(False)
 
-        betting_right = tk.Frame(betting_area, bg="#D0E7FF")
-        betting_right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=2)
+        betting_right = tk.Frame(betting_area, bg="#D0E7FF", width=190)
+        betting_right.pack(side=tk.RIGHT, fill=tk.Y, padx=2)
+        betting_right.pack_propagate(False)
 
         self._populate_betting_left(betting_left)
         self._populate_betting_center(betting_center)
         self._populate_betting_right(betting_right)
 
     def _populate_betting_left(self, parent):
-        title_label = tk.Label(
-            parent,
-            text="下注区域",
-            font=("Arial", 16, "bold"),
-            bg="#D0E7FF",
-            fg="#000000"
-        )
-        title_label.pack(side=tk.TOP, fill=tk.X, pady=(5, 0))
-
-        rows = [
-            (0, ["👑", "💵"]),
-            (1, ["12", "25"]),
-            (2, ["1", "3", "6"]),
-        ]
-        for row_idx, symbols in rows:
-            row_frame = tk.Frame(parent, bg="#D0E7FF")
-            row_frame.pack(fill=tk.BOTH, expand=True, pady=2)
-            for col, symbol in enumerate(symbols):
-                row_frame.columnconfigure(col, weight=1)
-                btn = tk.Button(
-                    row_frame,
-                    text=f"{symbol}\n$0",
-                    font=("Arial", 14, "bold"),
-                    bg=OUTCOME_COLORS[symbol],
-                    fg=OUTCOME_TEXT_COLORS[symbol],
-                    height=2,
-                    width=10,
-                    relief=tk.RAISED,
-                    bd=3,
-                    command=lambda s=symbol: self.place_bet(s),
-                )
-                btn.bet_symbol = symbol
-                btn.original_bg = OUTCOME_COLORS[symbol]
-                btn.disabled_bg = "#AAAAAA"
-                btn.grid(row=0, column=col, padx=4, pady=1, sticky="nsew")
-                btn.bind('<Button-3>', lambda e, s=symbol: self.clear_single_bet(s))
-                self.bet_buttons[symbol] = btn
+        self.board_canvas = tk.Canvas(
+            parent, width=500, height=260, bg="#0b4f39",
+            highlightthickness=0, cursor="hand2")
+        self.board_canvas.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        self.board_canvas.bind("<Button-1>", self.on_board_click)
+        self.board_canvas.bind("<Button-3>", self.on_board_right_click)
+        self._draw_betting_board()
 
     def _populate_betting_center(self, parent):
         balance_frame = tk.Frame(parent, bg="#D0E7FF")
@@ -422,6 +402,8 @@ class BigSixWheelGUI(tk.Tk):
         btn_frame.pack(fill=tk.X, pady=5)
         self.reset_button = tk.Button(btn_frame, text="清除下注", command=self.clear_bets, bg="#ff4444", fg="white", font=("微软雅黑", 14, "bold"))
         self.reset_button.pack(side=tk.TOP, fill=tk.X, padx=10, pady=2)
+        self.repeat_button = tk.Button(btn_frame, text="重复下注", command=self._repeat_last_bet, bg="#4B8BBE", fg="white", font=("微软雅黑", 14, "bold"))
+        self.repeat_button.pack(side=tk.TOP, fill=tk.X, padx=10, pady=2)
         self.deal_button = tk.Button(btn_frame, text="开始游戏 (Enter)", command=self.start_game, bg="gold", fg="black", font=("微软雅黑", 14, "bold"))
         self.deal_button.pack(side=tk.TOP, fill=tk.X, padx=10, pady=2)
 
@@ -463,7 +445,7 @@ class BigSixWheelGUI(tk.Tk):
                 chip_canvas = self._create_chip_button(row_frame, text, bg_color)
                 chip_canvas.pack(side=tk.LEFT, padx=2)
 
-        self.current_chip_label = tk.Label(parent, text="筹码: $1,000", font=("Arial", 14, "bold"), bg="#D0E7FF")
+        self.current_chip_label = tk.Label(parent, text="筹码: $1,000", font=("Arial", 13, "bold"), bg="#D0E7FF")
         self.current_chip_label.pack(pady=5)
 
         self._set_default_chip()
@@ -481,17 +463,18 @@ class BigSixWheelGUI(tk.Tk):
             text_color = "black"
 
         canvas.create_text(size/2, size/2, text=text, fill=text_color, font=("Arial", 14, "bold"))
-        canvas.bind("<Button-1>", lambda e, t=text, c=canvas, cid=chip_id: self._set_bet_amount(t, c, cid))
+        canvas.bind("<Button-1>", lambda e, t=text, c=canvas, cid=chip_id, bg=bg_color: self._set_bet_amount(t, c, cid, bg))
 
-        self.chip_buttons.append({"canvas": canvas, "chip_id": chip_id, "text": text})
+        self.chip_buttons.append({"canvas": canvas, "chip_id": chip_id, "text": text, "bg_color": bg_color})
         return canvas
 
-    def _set_bet_amount(self, chip_text, clicked_canvas, clicked_chip_id):
+    def _set_bet_amount(self, chip_text, clicked_canvas, clicked_chip_id, bg_color=None):
         for chip in self.chip_buttons:
             chip["canvas"].itemconfig(chip["chip_id"], outline="", width=0)
             chip["canvas"].delete("glow")
         clicked_canvas.itemconfig(clicked_chip_id, outline="yellow", width=4)
         self.selected_chip = next((c for c in self.chip_buttons if c["canvas"] == clicked_canvas), None)
+        self.selected_chip_color = bg_color or (self.selected_chip or {}).get("bg_color", "#ffffff")
 
         if "千" in chip_text:
             amount = int(chip_text.replace("千", "")) * 1000
@@ -508,8 +491,80 @@ class BigSixWheelGUI(tk.Tk):
                 chip["canvas"].itemconfig(chip["chip_id"], outline="yellow", width=4)
                 self.selected_chip = chip
                 self.selected_bet_amount = 1000
+                self.selected_chip_color = chip.get("bg_color", "#ab0058")
                 self.current_chip_label.config(text="筹码: $1,000")
                 break
+
+    # ---------- 美式轮盘风格 Canvas 下注台 ----------
+    def _build_bet_spots(self):
+        """Return the seven Big Six betting areas laid out like a roulette felt."""
+        return {
+            "👑": (18, 42, 247, 92), "💵": (253, 42, 482, 92),
+            "12": (18, 98, 247, 148), "25": (253, 98, 482, 148),
+            "1": (18, 154, 170, 238), "3": (174, 154, 326, 238),
+            "6": (330, 154, 482, 238),
+        }
+
+    def _board_spot_at(self, x, y):
+        for symbol, (x1, y1, x2, y2) in self.bet_spots.items():
+            if x1 <= x <= x2 and y1 <= y <= y2:
+                return symbol
+        return None
+
+    def _draw_betting_board(self):
+        if not hasattr(self, "board_canvas"):
+            return
+        c = self.board_canvas
+        c.delete("all")
+        c.create_rectangle(4, 4, 496, 256, fill="#073b2b", outline="#d8b46a", width=3)
+        c.create_text(250, 23, text="BIG SIX WHEEL · 下注区", fill="#f7df96",
+                      font=("Arial", 14, "bold"))
+        for symbol, bounds in self.bet_spots.items():
+            x1, y1, x2, y2 = bounds
+            fill = OUTCOME_COLORS[symbol]
+            c.create_rectangle(x1, y1, x2, y2, fill=fill, outline="#f5e8b0", width=2,
+                               tags=("bet_spot", f"spot_{symbol}"))
+            odds = OUTCOME_MULTIPLIERS[symbol] - 1
+            font = ("Segoe UI Emoji", 20, "bold") if symbol in ("👑", "💵") else ("Arial", 22, "bold")
+            c.create_text((x1 + x2) / 2, (y1 + y2) / 2 - 10, text=symbol,
+                          fill=OUTCOME_TEXT_COLORS[symbol], font=font, tags=("bet_spot",))
+            c.create_text((x1 + x2) / 2, (y1 + y2) / 2 + 16, text=f"{odds}:1",
+                          fill=OUTCOME_TEXT_COLORS[symbol], font=("Arial", 10, "bold"),
+                          tags=("bet_spot",))
+        self._draw_placed_chips()
+
+    def _draw_placed_chips(self):
+        if not hasattr(self, "board_canvas"):
+            return
+        c = self.board_canvas
+        c.delete("placed_chip")
+        for symbol, amount in self.current_bets.items():
+            if amount <= 0 or symbol not in self.bet_spots:
+                continue
+            x1, y1, x2, y2 = self.bet_spots[symbol]
+            cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
+            radius = 19
+            fill = self.current_bet_colors.get(symbol, "#ffffff")
+            text_color = "white" if fill.lower() in {"#000000", "#ab0058", "#ff0000", "#800080", "#006400", "#0000ff"} else "black"
+            c.create_oval(cx - radius - 2, cy - radius + 3, cx + radius - 2, cy + radius + 3,
+                          fill="#10261e", outline="", tags=("placed_chip",))
+            c.create_oval(cx - radius, cy - radius, cx + radius, cy + radius,
+                          fill=fill, outline="#f7df96", width=2, tags=("placed_chip",))
+            label = f"{amount / 1000:g}K" if amount >= 1000 else str(int(amount))
+            c.create_text(cx, cy, text=label, fill=text_color, font=("Arial", 8, "bold"),
+                          tags=("placed_chip",))
+
+    def on_board_click(self, event):
+        if self.round_state == "betting":
+            symbol = self._board_spot_at(event.x, event.y)
+            if symbol:
+                self.place_bet(symbol)
+
+    def on_board_right_click(self, event):
+        if self.round_state == "betting":
+            symbol = self._board_spot_at(event.x, event.y)
+            if symbol:
+                self.clear_single_bet(symbol)
 
     # ---------- 右侧面板：统计 + 标记路 ----------
     def _build_right_side(self, parent):
@@ -824,14 +879,35 @@ class BigSixWheelGUI(tk.Tk):
     def _draw_wheel(self):
         self.wheel_canvas.delete("all")
         w, h = 900, 430
-        cx, cy = 450, 215
+        cx, cy = w / 2, h / 2 - 2
         outer_r, inner_r = 174, 70
 
+        # Match the American Roulette presentation: a dark casino stage,
+        # metallic wheel bezel, gold trim and an orbiting pointer.
+        self.wheel_canvas.create_rectangle(0, 0, w, h, fill="#1B3D31", outline="")
+        for radius, outline in ((220, "#173F66"), (205, "#0E241E")):
+            self.wheel_canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
+                                          outline=outline, width=2)
+        self.wheel_canvas.create_oval(cx-outer_r-28, cy-outer_r-28, cx+outer_r+28, cy+outer_r+28,
+                                      fill="#2D2214", outline="#D4AF37", width=6)
+        self.wheel_canvas.create_oval(cx-outer_r-18, cy-outer_r-18, cx+outer_r+18, cy+outer_r+18,
+                                      outline="#8B6B24", width=2)
+        self.wheel_canvas.create_oval(cx-outer_r-8, cy-outer_r-8, cx+outer_r+8, cy+outer_r+8,
+                                      fill="#1A1A1A", outline="")
         self._draw_wheel_segments(cx, cy, outer_r, inner_r, self.current_wheel_offset)
         self.wheel_canvas.create_oval(
             cx - inner_r, cy - inner_r, cx + inner_r, cy + inner_r,
-            fill="#FFFFFF", outline="#222222", width=3, tags=("wheel",)
+            outline="#E6C15A", width=2, tags=("wheel",)
         )
+        for i in range(len(WHEEL_SEQUENCE)):
+            angle = math.radians(i * (360.0 / len(WHEEL_SEQUENCE)))
+            x1, y1 = cx + (outer_r+6)*math.sin(angle), cy - (outer_r+6)*math.cos(angle)
+            x2, y2 = cx + (outer_r+14)*math.sin(angle), cy - (outer_r+14)*math.cos(angle)
+            self.wheel_canvas.create_line(x1, y1, x2, y2, fill="#C9A24A", width=2)
+        self.wheel_canvas.create_oval(cx-inner_r-15, cy-inner_r-15, cx+inner_r+15, cy+inner_r+15,
+                                      fill="#6B4D1B", outline="#E6C15A", width=3)
+        self.wheel_canvas.create_oval(cx-inner_r-7, cy-inner_r-7, cx+inner_r+7, cy+inner_r+7,
+                                      fill="#F3E8C9", outline="#1A1A1A", width=2)
 
         if self.center_display_result is not None:
             symbol = self.center_display_result
@@ -849,8 +925,8 @@ class BigSixWheelGUI(tk.Tk):
             )
         else:
             self.wheel_canvas.create_text(
-                cx, cy - 6, text="幸运之轮", font=("Arial", 22, "bold"),
-                fill="#000000", tags=("wheel",)
+                cx, cy - 10, text="BIG SIX WHEEL", font=("Arial", 22, "bold"),
+                fill="#2A1B08", tags=("wheel",)
             )
             if self.round_state == "betting" and self.betting_deadline is not None:
                 remaining = max(0, int(math.ceil(self.betting_deadline - time.time())))
@@ -860,18 +936,13 @@ class BigSixWheelGUI(tk.Tk):
             else:
                 timer_text = "等待开奖"
             self.wheel_timer_id = self.wheel_canvas.create_text(
-                cx, cy + 24, text=timer_text, font=("Arial", 16, "bold"),
-                fill="#000000", tags=("timer",)
+                cx, cy + 28, text=timer_text, font=("Arial", 16, "bold"),
+                fill="#2A1B08", tags=("timer",)
             )
-
-        self.wheel_canvas.create_polygon(
-            cx - 16, 24, cx + 16, 24, cx, 60,
-            fill="#FFFFFF", outline="#000000", width=2, tags=("pointer",)
-        )
-        self.wheel_canvas.tag_raise("pointer")
+        self._draw_orbiting_pointer(cx, cy, outer_r)
 
     def _draw_wheel_segments(self, cx, cy, outer_r, inner_r, offset_deg):
-        self.wheel_canvas.delete("wheel")
+        self.wheel_canvas.delete("wheel_segments")
         n = len(WHEEL_SEQUENCE)
         step = 360.0 / n
         for i, symbol in enumerate(WHEEL_SEQUENCE):
@@ -888,10 +959,16 @@ class BigSixWheelGUI(tk.Tk):
             self.wheel_canvas.create_polygon(
                 points,
                 fill=OUTCOME_COLORS[symbol],
-                outline="#444444",
+                outline="#2A2A2A",
                 width=1,
-                tags=("wheel",),
+                tags=("wheel_segments",),
             )
+
+            boundary = math.radians(start)
+            self.wheel_canvas.create_line(
+                cx + inner_r * math.sin(boundary), cy - inner_r * math.cos(boundary),
+                cx + outer_r * math.sin(boundary), cy - outer_r * math.cos(boundary),
+                fill="#F6F1D0", width=1, tags=("wheel_segments",))
 
             mid = (start + end) / 2.0
             rad = math.radians(mid)
@@ -903,17 +980,32 @@ class BigSixWheelGUI(tk.Tk):
                 text=symbol,
                 font=label_font,
                 fill=OUTCOME_TEXT_COLORS[symbol],
-                tags=("wheel",),
+                tags=("wheel_segments",),
             )
 
         self.wheel_canvas.create_oval(
             cx - outer_r, cy - outer_r, cx + outer_r, cy + outer_r,
-            outline="#222222", width=4, tags=("wheel",),
+            outline="#E6C15A", width=3, tags=("wheel_segments",),
         )
         self.wheel_canvas.create_oval(
             cx - inner_r, cy - inner_r, cx + inner_r, cy + inner_r,
-            outline="#222222", width=3, tags=("wheel",),
+            outline="#F3E8C9", width=2, tags=("wheel_segments",),
         )
+
+    def _draw_orbiting_pointer(self, cx, cy, outer_r):
+        angle = math.radians(self.pointer_angle % 360.0)
+        ux, uy = math.sin(angle), -math.cos(angle)
+        tx, ty = math.cos(angle), math.sin(angle)
+        pcx, pcy = cx + ux * (outer_r + 2), cy + uy * (outer_r + 2)
+        tip_x, tip_y = pcx - ux * 18, pcy - uy * 18
+        base_x, base_y = pcx + ux * 19, pcy + uy * 19
+        left_x, left_y = base_x + tx * 15, base_y + ty * 15
+        right_x, right_y = base_x - tx * 15, base_y - ty * 15
+        self.wheel_canvas.create_polygon(left_x+3, left_y+3, right_x+3, right_y+3,
+                                        tip_x+3, tip_y+3, fill="#000000", outline="")
+        self.wheel_canvas.create_polygon(left_x, left_y, right_x, right_y, tip_x, tip_y,
+                                        fill="#F8F4E8", outline="#B08B2D", width=2, tags=("pointer",))
+        self.wheel_canvas.create_line(base_x, base_y, tip_x, tip_y, fill="#FFFFFF", width=1, tags=("pointer",))
 
     def _segment_angle(self):
         return 360.0 / len(WHEEL_SEQUENCE)
@@ -943,6 +1035,7 @@ class BigSixWheelGUI(tk.Tk):
         self._enable_amount_buttons()
         self._set_control_buttons_state(tk.NORMAL)
         self._refresh_bet_button_texts()
+        self._update_repeat_button_state()
 
         self.betting_deadline = time.time() + self.BETTING_SECONDS
         self._update_countdown()
@@ -960,6 +1053,7 @@ class BigSixWheelGUI(tk.Tk):
         self._countdown_job = self.after(self.TIMER_TICK_MS, self._update_countdown)
 
     def _lock_bets_and_spin(self):
+        self._store_current_bets_as_last()
         self.round_state = "spinning"
         self._set_bet_buttons_state(tk.DISABLED)
         self._disable_amount_buttons()
@@ -968,9 +1062,11 @@ class BigSixWheelGUI(tk.Tk):
 
     # ------------------- 物理旋转核心 -------------------
     def _start_physical_spin(self):
-        """启动物理模拟旋转：随机初速度，随机减速度"""
+        """Use the American Roulette-style wheel and orbiting-pointer spin."""
         self.wheel_velocity = random.uniform(450, 750)
         self.wheel_acceleration = -random.uniform(70, 125)
+        self.pointer_velocity = random.uniform(675, 1075)
+        self.pointer_acceleration = -random.uniform(115, 180)
         self.is_spinning = True
         self._last_physics_time = time.time()
         self._physics_update()
@@ -980,13 +1076,15 @@ class BigSixWheelGUI(tk.Tk):
         dt = min(0.05, now - self._last_physics_time)  # 限制最大步长
         self._last_physics_time = now
 
-        self.wheel_velocity += self.wheel_acceleration * dt
+        self.wheel_velocity = max(0.0, self.wheel_velocity + self.wheel_acceleration * dt)
         self.wheel_angle_delta = self.wheel_velocity * dt
         self.current_wheel_offset = (self.current_wheel_offset + self.wheel_angle_delta) % 360.0
+        self.pointer_velocity = max(0.0, self.pointer_velocity + self.pointer_acceleration * dt)
+        self.pointer_angle = (self.pointer_angle - self.pointer_velocity * dt) % 360.0
 
         self._draw_wheel()
 
-        if self.wheel_velocity <= 0 and dt > 0:
+        if self.wheel_velocity <= 0 and self.pointer_velocity <= 0 and dt > 0:
             self._finish_physical_spin()
             return
 
@@ -995,11 +1093,13 @@ class BigSixWheelGUI(tk.Tk):
     def _finish_physical_spin(self):
         self.is_spinning = False
         self.wheel_velocity = 0.0
+        self.pointer_velocity = 0.0
         self.current_wheel_offset %= 360.0
+        self.pointer_angle %= 360.0
         self._draw_wheel()
 
         step = 360.0 / len(WHEEL_SEQUENCE)
-        raw_index = ((-self.current_wheel_offset) / step - 0.5) % len(WHEEL_SEQUENCE)
+        raw_index = ((self.pointer_angle - self.current_wheel_offset) / step - 0.5) % len(WHEEL_SEQUENCE)
         self.current_round_index = int(round(raw_index)) % len(WHEEL_SEQUENCE)
         self.current_round_result = WHEEL_SEQUENCE[self.current_round_index]
 
@@ -1020,7 +1120,8 @@ class BigSixWheelGUI(tk.Tk):
         self._refresh_bet_button_texts()
         self.last_win_label.config(text=f"${int(payout)}")
 
-        self.current_bets = {k: 0 for k in OUTCOME_DISPLAY}
+        self.current_bets.clear()
+        self.current_bet_colors.clear()
         self.current_bet_label.config(text="$0")
         self.round_state = "result"
         self._disable_amount_buttons()
@@ -1028,6 +1129,7 @@ class BigSixWheelGUI(tk.Tk):
         self.center_display_result = result
         self._draw_wheel()
 
+        self._draw_betting_board()
         self.after(2500, self._start_new_round)
 
     # ------------------- 下注相关 -------------------
@@ -1055,10 +1157,12 @@ class BigSixWheelGUI(tk.Tk):
             return
 
         self.balance -= actual_amount
-        self.current_bets[symbol] += actual_amount
+        self.current_bets[symbol] = existing + actual_amount
+        self.current_bet_colors[symbol] = self.selected_chip_color
 
         self._refresh_balance_display()
         self._refresh_bet_button_texts()
+        self._update_repeat_button_state()
         total_bet = sum(self.current_bets.values())
         self.current_bet_label.config(text=f"${total_bet:,}")
 
@@ -1068,10 +1172,12 @@ class BigSixWheelGUI(tk.Tk):
         refund = sum(self.current_bets.values())
         if refund > 0:
             self.balance += refund
-        self.current_bets = {k: 0 for k in OUTCOME_DISPLAY}
+        self.current_bets.clear()
+        self.current_bet_colors.clear()
         self._refresh_balance_display()
         self.current_bet_label.config(text="$0")
         self._refresh_bet_button_texts()
+        self._update_repeat_button_state()
 
     def clear_single_bet(self, symbol):
         if self.round_state != "betting":
@@ -1079,11 +1185,13 @@ class BigSixWheelGUI(tk.Tk):
         amount = self.current_bets.get(symbol, 0)
         if amount > 0:
             self.balance += amount
-            self.current_bets[symbol] = 0
+            self.current_bets.pop(symbol, None)
+            self.current_bet_colors.pop(symbol, None)
             self._refresh_balance_display()
             total_bet = sum(self.current_bets.values())
             self.current_bet_label.config(text=f"${total_bet:,}")
             self._refresh_bet_button_texts()
+            self._update_repeat_button_state()
 
     def _settle_bets(self, result: str) -> float:
         total_payout = 0.0
@@ -1100,12 +1208,11 @@ class BigSixWheelGUI(tk.Tk):
         return total_payout
 
     def _refresh_bet_button_texts(self):
-        for symbol, btn in self.bet_buttons.items():
-            btn.config(text=f"{symbol}\n${self.current_bets[symbol]:,}")
+        self._draw_betting_board()
 
     def _set_bet_buttons_state(self, state):
-        for btn in self.bet_buttons.values():
-            btn.config(state=state)
+        if hasattr(self, "board_canvas"):
+            self.board_canvas.configure(cursor="hand2" if state == tk.NORMAL else "watch")
 
     def _enable_bet_buttons(self):
         self._set_bet_buttons_state(tk.NORMAL)
@@ -1123,6 +1230,35 @@ class BigSixWheelGUI(tk.Tk):
     def _set_control_buttons_state(self, state):
         self.deal_button.config(state=state)
         self.reset_button.config(state=state)
+        self.repeat_button.config(state=state)
+
+    def _store_current_bets_as_last(self):
+        if self.current_bets:
+            self.last_bets = self.current_bets.copy()
+            self.last_bet_colors = self.current_bet_colors.copy()
+
+    def _update_repeat_button_state(self):
+        if not hasattr(self, "repeat_button"):
+            return
+        enabled = self.round_state == "betting" and bool(self.last_bets) and sum(self.last_bets.values()) <= self.balance
+        self.repeat_button.config(state=tk.NORMAL if enabled else tk.DISABLED)
+
+    def _repeat_last_bet(self):
+        if self.round_state != "betting" or not self.last_bets:
+            return
+        total = sum(self.last_bets.values())
+        if total > self.balance:
+            messagebox.showwarning("余额不足", f"重复下注需要 ${total:,.0f}。")
+            return
+        self.clear_bets()
+        for symbol, amount in self.last_bets.items():
+            self.balance -= amount
+            self.current_bets[symbol] = amount
+            self.current_bet_colors[symbol] = self.last_bet_colors.get(symbol, "#ffffff")
+        self._refresh_balance_display()
+        self.current_bet_label.config(text=f"${sum(self.current_bets.values()):,}")
+        self._refresh_bet_button_texts()
+        self._update_repeat_button_state()
 
     def _refresh_balance_display(self):
         self.balance_label.config(text=f"余额: ${self.balance:,.2f}")

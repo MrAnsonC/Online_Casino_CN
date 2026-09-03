@@ -312,7 +312,6 @@ class BubbleSicboGame(tk.Frame):
         try:
             top.geometry('1150x750+50+10')
             top.resizable(False, False)
-            top.title('骰宝 Sic Bo')
         except tk.TclError:
             pass
 
@@ -479,7 +478,7 @@ class BubbleSicboGame(tk.Frame):
             self.draw_history_table_layout()
         self.update_history_table()
 
-    def recent_history_dice(self, limit=200):
+    def recent_history_dice(self, limit=500):
         dice_rows = []
         for record in self.history_data[:limit]:
             dice = record.get('dice', [])
@@ -496,7 +495,7 @@ class BubbleSicboGame(tk.Frame):
     def draw_history_statistics(self):
         c = self.canvas
         x0, y0, x1, y1 = self.history_panel_bounds
-        dice_rows = self.recent_history_dice(200)
+        dice_rows = self.recent_history_dice(500)
         round_count = len(dice_rows)
 
         face_counts = [0] * 6
@@ -1800,7 +1799,7 @@ class BubbleSicboGame(tk.Frame):
         self.settlement_running = False
         self.animation_running = False
         self.accept_bets = True
-        self.canvas.itemconfigure(self.animation_phase_text, text='骰宝 SIC BO')
+        self.canvas.itemconfigure(self.animation_phase_text, text='骰宝')
         self.canvas.itemconfigure(
             self.animation_status_bubble, fill='#0b2723', outline='#c8efe7'
         )
@@ -2230,7 +2229,7 @@ def main(
     root = tk.Tk()
     root.geometry('1150x750+50+10')
     root.resizable(False, False)
-    root.title('骰宝 Sic Bo')
+    root.title('骰宝')
     result = {'balance': float(balance)}
 
     def close_standalone(final_balance):

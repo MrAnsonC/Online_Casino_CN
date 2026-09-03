@@ -92,7 +92,7 @@ def get_data_file_path() -> str:
 def get_log_file_path() -> str:
     return os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "../A_Logs/small_g_dice.json",
+        "../A_Logs/Json/small_g_dice.json",
     )
 
 

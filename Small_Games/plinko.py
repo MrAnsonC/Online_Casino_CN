@@ -122,7 +122,7 @@ def get_data_file_path() -> str:
 def get_plinko_log_path() -> str:
     return os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "../A_Logs/Plinko.json",
+        "../A_Logs/Json/Plinko.json",
     )
 
 

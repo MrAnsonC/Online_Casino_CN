@@ -511,7 +511,6 @@ class BubbleCrapsGame(tk.Frame):
         try:
             top.geometry('1150x750+50+10')
             top.resizable(False, False)
-            top.title('花摇骰')
         except tk.TclError:
             pass
         self._enter_bindings = []

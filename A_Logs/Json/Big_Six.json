@@ -1,27 +1,27 @@
 {
-    "Total": 8907,
-    "1": 4324,
-    "3": 2135,
-    "6": 1100,
-    "12": 692,
-    "25": 332,
-    "👑": 169,
-    "💵": 155,
+    "Total": 8961,
+    "1": 4353,
+    "3": 2146,
+    "6": 1104,
+    "12": 697,
+    "25": 333,
+    "👑": 170,
+    "💵": 158,
     "54_Record": {
         "01_Data": {
-            "result": "3"
+            "result": "1"
         },
         "02_Data": {
-            "result": "12"
+            "result": "👑"
         },
         "03_Data": {
-            "result": "3"
+            "result": "1"
         },
         "04_Data": {
             "result": "25"
         },
         "05_Data": {
-            "result": "25"
+            "result": "1"
         },
         "06_Data": {
             "result": "1"
@@ -33,13 +33,13 @@
             "result": "1"
         },
         "09_Data": {
-            "result": "6"
+            "result": "1"
         },
         "10_Data": {
             "result": "3"
         },
         "11_Data": {
-            "result": "👑"
+            "result": "1"
         },
         "12_Data": {
             "result": "3"
@@ -48,13 +48,13 @@
             "result": "1"
         },
         "14_Data": {
-            "result": "3"
+            "result": "1"
         },
         "15_Data": {
             "result": "3"
         },
         "16_Data": {
-            "result": "3"
+            "result": "1"
         },
         "17_Data": {
             "result": "1"
@@ -66,13 +66,13 @@
             "result": "1"
         },
         "20_Data": {
-            "result": "6"
-        },
-        "21_Data": {
             "result": "3"
         },
-        "22_Data": {
+        "21_Data": {
             "result": "1"
+        },
+        "22_Data": {
+            "result": "3"
         },
         "23_Data": {
             "result": "1"
@@ -87,46 +87,46 @@
             "result": "1"
         },
         "27_Data": {
-            "result": "6"
+            "result": "💵"
         },
         "28_Data": {
-            "result": "3"
+            "result": "1"
         },
         "29_Data": {
-            "result": "1"
+            "result": "3"
         },
         "30_Data": {
             "result": "3"
         },
         "31_Data": {
-            "result": "6"
+            "result": "12"
         },
         "32_Data": {
-            "result": "3"
+            "result": "1"
         },
         "33_Data": {
-            "result": "3"
+            "result": "6"
         },
         "34_Data": {
             "result": "1"
         },
         "35_Data": {
-            "result": "3"
+            "result": "1"
         },
         "36_Data": {
-            "result": "6"
+            "result": "1"
         },
         "37_Data": {
-            "result": "1"
+            "result": "6"
         },
         "38_Data": {
-            "result": "1"
+            "result": "12"
         },
         "39_Data": {
-            "result": "1"
+            "result": "💵"
         },
         "40_Data": {
-            "result": "1"
+            "result": "3"
         },
         "41_Data": {
             "result": "6"
@@ -138,19 +138,19 @@
             "result": "1"
         },
         "44_Data": {
-            "result": "1"
+            "result": "12"
         },
         "45_Data": {
-            "result": "3"
+            "result": "1"
         },
         "46_Data": {
-            "result": "1"
+            "result": "12"
         },
         "47_Data": {
             "result": "1"
         },
         "48_Data": {
-            "result": "12"
+            "result": "6"
         },
         "49_Data": {
             "result": "1"
@@ -159,7 +159,7 @@
             "result": "3"
         },
         "51_Data": {
-            "result": "1"
+            "result": "3"
         }
     }
 }

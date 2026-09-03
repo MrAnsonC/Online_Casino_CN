@@ -2330,7 +2330,7 @@ def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, 
         )
 
     root = tk.Tk()
-    root.title("Three Card Poker")
+    root.title("三张牌扑克")
     root.geometry("1150x750+50+10")
     root.resizable(False, False)
     page = ThreeCardPokerGUI(root, actual_balance, actual_user)

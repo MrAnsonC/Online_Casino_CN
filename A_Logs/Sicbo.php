@@ -20,6 +20,10 @@
                     <div class="stat-value" id="s-triple">0</div>
                     <div class="stat-label">★ 围骰</div>
                 </div>
+                <div class="stat-item latest-triple-item">
+                    <div class="stat-value latest-triple-value" id="s-latest-triple">暂无记录</div>
+                    <div class="stat-label">最新的围骰及多少局前</div>
+                </div>
             </div>
         </div>
 
@@ -54,12 +58,12 @@
                 <h2>围骰分布</h2>
             </div>
             <div class="triple-grid" id="s-triple-dist">
-                <div class="triple-item t1"><i class="fas fa-dice-one dice-icon"></i><div class="stat-value" id="s-t1">0</div><div class="stat-label">1</div></div>
-                <div class="triple-item t2"><i class="fas fa-dice-two dice-icon"></i><div class="stat-value" id="s-t2">0</div><div class="stat-label">2</div></div>
-                <div class="triple-item t3"><i class="fas fa-dice-three dice-icon"></i><div class="stat-value" id="s-t3">0</div><div class="stat-label">3</div></div>
-                <div class="triple-item t4"><i class="fas fa-dice-four dice-icon"></i><div class="stat-value" id="s-t4">0</div><div class="stat-label">4</div></div>
-                <div class="triple-item t5"><i class="fas fa-dice-five dice-icon"></i><div class="stat-value" id="s-t5">0</div><div class="stat-label">5</div></div>
-                <div class="triple-item t6"><i class="fas fa-dice-six dice-icon"></i><div class="stat-value" id="s-t6">0</div><div class="stat-label">6</div></div>
+                <div class="triple-item t1"><i class="fas fa-dice-one dice-icon"></i><div class="stat-value" id="s-t1">0</div><div class="stat-label"></div></div>
+                <div class="triple-item t2"><i class="fas fa-dice-two dice-icon"></i><div class="stat-value" id="s-t2">0</div><div class="stat-label"></div></div>
+                <div class="triple-item t3"><i class="fas fa-dice-three dice-icon"></i><div class="stat-value" id="s-t3">0</div><div class="stat-label"></div></div>
+                <div class="triple-item t4"><i class="fas fa-dice-four dice-icon"></i><div class="stat-value" id="s-t4">0</div><div class="stat-label"></div></div>
+                <div class="triple-item t5"><i class="fas fa-dice-five dice-icon"></i><div class="stat-value" id="s-t5">0</div><div class="stat-label"></div></div>
+                <div class="triple-item t6"><i class="fas fa-dice-six dice-icon"></i><div class="stat-value" id="s-t6">0</div><div class="stat-label"></div></div>
             </div>
         </div>
     </div>
@@ -68,7 +72,7 @@
     <div class="card" style="margin-bottom:30px;">
         <div class="card-header">
             <i class="fas fa-history"></i>
-            <h2>最近开奖记录</h2>
+            <h2>最近170局开奖记录</h2>
         </div>
         <div class="history-grid" id="s-history-container">
             <div class="loading-placeholder"><i class="fas fa-spinner fa-pulse"></i> 加载中...</div>
@@ -107,8 +111,17 @@
     }
     .sicbo-content .stats-grid-4 {
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(2, 1fr);
         gap: 16px;
+    }
+    .sicbo-content .latest-triple-item {
+        grid-column: 1 / -1;
+        padding-top: 13px;
+        padding-bottom: 13px;
+    }
+    .sicbo-content .latest-triple-value {
+        font-size: 1.8rem;
+        letter-spacing: 1px;
     }
     .sicbo-content .stat-item {
         background: rgba(40,55,75,0.5);
@@ -145,7 +158,7 @@
         border-radius: 15px;
         padding: 24px;
         box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-        backdrop-filter: blur(5px);
+        backdrop-filter: blur(0px);
         border: 1px solid rgba(255,255,255,0.07);
         transition: transform 0.25s ease;
     }
@@ -172,7 +185,7 @@
     /* 围骰网格 */
     .sicbo-content .triple-grid {
         display: grid;
-        grid-template-columns: repeat(6, 1fr);
+        grid-template-columns: repeat(3, 1fr);
         gap: 14px;
     }
     .sicbo-content .triple-item {
@@ -311,8 +324,8 @@
         .sicbo-content .history-grid { grid-template-columns: repeat(auto-fill, minmax(60px,1fr)); }
     }
     @media (max-width: 480px) {
-        .sicbo-content .stats-grid-4 { grid-template-columns: 1fr; }
-        .sicbo-content .triple-grid { grid-template-columns: repeat(2,1fr); }
+        .sicbo-content .stats-grid-4 { grid-template-columns: repeat(2,1fr); }
+        .sicbo-content .triple-grid { grid-template-columns: repeat(3,1fr); }
         .sicbo-content .history-item .dice-value { font-size: 1.1rem; }
     }
 </style>
@@ -322,12 +335,13 @@
     (function() {
         const SICBO_URL = './Json/Sicbo.json';
         
-        // 计算最近最多100局的统计（小、大、围骰）
+        // 计算最新100局的统计（小、大、围骰）
         function computeRecentStats(records) {
             let small = 0, big = 0, triple = 0;
             const entries = Object.entries(records || {});
-            entries.sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
-            const recent = entries.slice(-107);
+            // 记录键以 01_Data 为最新，编号越大代表越旧。
+            entries.sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10));
+            const recent = entries.slice(0, 100);
 
             for (const [key, val] of recent) {
                 if (!Array.isArray(val) || val.length < 3) continue;
@@ -342,6 +356,29 @@
                 }
             }
             return { small, big, triple };
+        }
+
+        // 从最新开奖记录开始查找围骰，并显示该围骰距今多少局。
+        // 最新一局记为“1局前”，再往前依次为“2局前”“3局前”……
+        function findLatestTriple(records) {
+            const entries = Object.entries(records || {});
+            // 01_Data 是最新一局，因此按编号由小到大查找。
+            entries.sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10));
+
+            let roundsAgo = 0;
+            for (const [key, val] of entries) {
+                if (!Array.isArray(val) || val.length < 3) continue;
+                const d1 = Number(val[0]);
+                const d2 = Number(val[1]);
+                const d3 = Number(val[2]);
+                if (![d1, d2, d3].every(Number.isFinite)) continue;
+
+                roundsAgo++;
+                if (d1 === d2 && d2 === d3) {
+                    return `${d1}${d2}${d3} · ${roundsAgo}局前`;
+                }
+            }
+            return '暂无记录';
         }
 
         function renderSicboPointStats(data) {
@@ -378,8 +415,9 @@
                 container.innerHTML = '<div class="loading-placeholder" style="grid-column:1/-1;">暂无历史数据</div>';
                 return;
             }
-            entries.sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
-            const recent = entries.slice(-105);
+            // 01_Data 是最新一局，页面从最新到较旧依次显示。
+            entries.sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10));
+            const recent = entries.slice(0, 170);
             for (const [key, val] of recent) {
                 if (!Array.isArray(val) || val.length < 3) continue;
                 const [d1, d2, d3] = val;
@@ -401,10 +439,12 @@
                 if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 const data = await resp.json();
 
-                const recentStats = computeRecentStats(data['500_Record'] || {});
+                const records = data['500_Record'] || {};
+                const recentStats = computeRecentStats(records);
                 document.getElementById('s-small').textContent = recentStats.small;
                 document.getElementById('s-big').textContent = recentStats.big;
                 document.getElementById('s-triple').textContent = recentStats.triple;
+                document.getElementById('s-latest-triple').textContent = findLatestTriple(records);
 
                 document.getElementById('s-h-small').textContent = data.H_Small ?? 0;
                 document.getElementById('s-h-big').textContent = data.H_Big ?? 0;
@@ -417,7 +457,7 @@
                 }
 
                 renderSicboPointStats(data);
-                renderSicboHistory(data['500_Record'] || {});
+                renderSicboHistory(records);
 
             } catch (err) {
                 console.error('Sicbo load error:', err);

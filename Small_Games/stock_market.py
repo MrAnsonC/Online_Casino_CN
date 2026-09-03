@@ -100,7 +100,7 @@ def get_data_file_path() -> str:
 
 
 def get_history_file_path() -> str:
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "../A_Logs/stock_market.json")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "../A_Logs/Json/stock_market.json")
 
 
 def load_user_data() -> list:

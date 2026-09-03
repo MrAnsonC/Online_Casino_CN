@@ -10,6 +10,20 @@ import webbrowser
 from itertools import combinations, product
 from collections import Counter
 
+# =========================================================
+# UI 颜色（沿用 I_Love_Flush）
+# =========================================================
+ROOT_BG = "#1B3D31"
+CYAN = "#007502"
+TEXT = "#ffffff"
+RED = "#ff2a23"
+BLACK = "#050505"
+DARK_BLUE = "#173f66"
+GOLD = "#D4AF37"
+PANEL_BG = "#F2E6C9"
+HEADER_BG = "#D8B46A"
+TITLE_FG = "#2A1B08"
+
 # ------------------------- 基础数据 -------------------------
 SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
@@ -906,22 +920,6 @@ def dealer_way_split(hand7):
 
     # =========================================================
     # 1) Five Aces
-    # =========================================================
-    ace_total = len(groups.get(14, []))
-    if ace_total >= 5:
-        ace_cards = groups[14]
-
-        if len(ace_cards) >= 2:
-            front = ace_cards[:2]
-            back = [c for c in hand7 if c not in front]
-            return front, back
-
-        front = choose_top_two(hand7)
-        back = [c for c in hand7 if c not in front]
-        return front, back
-
-    # =========================================================
-    # 2) Five Aces
     #    4 张A + 1张Joker 时，按“五条A”处理
     #    前道优先放两张自然A，Joker 留后道
     # =========================================================
@@ -941,6 +939,18 @@ def dealer_way_split(hand7):
             return front, back
 
         return find_best_exhaustive_legal_split()
+
+    # =========================================================
+    # 2) Royal Flush / Straight Flush
+    #    若整手属于“两对”结构，按 House Way 的两对规则处理；
+    #    否则优先把皇家同花顺 / 同花顺保留在后道。
+    # =========================================================
+    if pair_count != 2:
+        sf_split = find_best_royal_or_straight_flush_split()
+        if sf_split is not None:
+            front, back = sf_split
+            if split_is_legal(front, back):
+                return front, back
 
     # =========================================================
     # 3) Four of a Kind
@@ -1434,9 +1444,9 @@ def emperor_treasure_payout(hand7, bet):
         if len(set(suits)) == 1:
             values = sorted([c.value for c in hand7])
             if values[-1] - values[0] == 6 and len(set(values)) == 7:
-                return bet * 5000
+                return bet * 5001
             if values == [2, 3, 4, 5, 6, 7, 14]:
-                return bet * 5000
+                return bet * 5001
 
     # 7 cards straight flush with Joker
     joker_cnt = sum(1 for c in hand7 if c.is_joker)
@@ -1450,16 +1460,16 @@ def emperor_treasure_payout(hand7, bet):
                 for start in range(2, 15 - 6 + 1):
                     needed = set(range(start, start + 7))
                     if all(v in needed for v in real_values) and len(needed - set(real_values)) == joker_cnt:
-                        return bet * 1000
+                        return bet * 1001
                 needed = {14, 2, 3, 4, 5, 6, 7}
                 if all(v in needed for v in real_values) and len(needed - set(real_values)) == joker_cnt:
-                    return bet * 1000
+                    return bet * 1001
 
     # 5 cards A
     aces = [c for c in hand7 if c.rank == 'A']
     jokers = [c for c in hand7 if c.is_joker]
     if len(aces) + len(jokers) >= 5:
-        return bet * 500
+        return bet * 501
 
     # best 5-card hand
     best = None
@@ -1576,16 +1586,15 @@ class PaiGowPoker:
         self.dealer_hand = self.deck.deal(7)
 
 # ------------------------- GUI -------------------------
-class PaiGowPokerGUI(tk.Tk):
-    def __init__(self, initial_balance, username):
-        super().__init__()
-        self.title("牌九扑克")
-        self.geometry("1320x790+40+10")
-        self.resizable(False, False)
-        self.configure(bg='#35654d')
+class PaiGowPokerGUI(tk.Frame):
+    def __init__(self, parent, initial_balance, username, on_back=None, on_balance_change=None):
+        super().__init__(parent, bg=ROOT_BG)
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
+        self.configure(bg=ROOT_BG)
 
         self.username = username
-        self.balance = initial_balance
+        self.balance = float(initial_balance)
         self.game = PaiGowPoker()
 
         self.card_images = {}
@@ -1603,23 +1612,22 @@ class PaiGowPokerGUI(tk.Tk):
         self.commission_free = tk.BooleanVar(value=False)
         self.animation_in_progress = False
         self.selected_low_indices = []
-        self.removing_cards = False      # 新增：卡片移除动画标志
+        self.removing_cards = False
 
-        self.last_bet = None          # 新增：存储上次下注记录
-        self.repeat_bet_btn = None    # 新增：重复下注按钮引用
+        self.last_bet = None
+        self.repeat_bet_btn = None
 
-        # 新增边注金额
         self.johor_bet_amount = 0
         self.ace_high_push_bet_amount = 0
 
         self.card_width = 100
         self.card_height = 150
         self.card_spacing = 5
+        self.card_area_width = 730
+        self.card_area_height = 310
 
         self._load_assets()
         self._create_widgets()
-        ## self.after(100, self._show_startup_warning)
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # ------------------------- 生命周期 -------------------------
     def cancel_auto_reset_timer(self):
@@ -1632,8 +1640,18 @@ class PaiGowPokerGUI(tk.Tk):
 
     def on_close(self):
         self.cancel_auto_reset_timer()
-        self.destroy()
-        self.quit()
+        try:
+            update_balance_in_json(self.username, self.balance)
+        except Exception:
+            pass
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
+        if callable(self.on_back):
+            self.on_back(float(self.balance))
+            return
+        root = getattr(self, "_standalone_root", None)
+        if root is not None and root.winfo_exists():
+            root.destroy()
 
     # ------------------------- 资源 -------------------------
     def _load_assets(self):
@@ -1680,6 +1698,13 @@ class PaiGowPokerGUI(tk.Tk):
                         self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
                 except:
                     pass
+
+        # Card 对象中的 Joker 键是 ("JOKER", "JOKER")；原版循环只生成了
+        # ("JOKER", rank) 键，导致 Joker 翻开时仍显示牌背。补上真实键映射。
+        if ('JOKER', 'A') in self.card_images:
+            self.card_images[('JOKER', 'JOKER')] = self.card_images[('JOKER', 'A')]
+        if ('JOKER', 'A') in self.original_images:
+            self.original_images[('JOKER', 'JOKER')] = self.original_images[('JOKER', 'A')]
 
     def _show_startup_warning(self):
         """游戏启动时显示自定义提示窗口（带可点击链接），两行显示。"""
@@ -1762,259 +1787,363 @@ class PaiGowPokerGUI(tk.Tk):
         self._update_ace_push_visibility()   # 新增：根据免佣状态显示/隐藏A高平手边注
 
     def _update_commission_free_state(self):
-        """根据游戏阶段启用/禁用免佣开关"""
-        if self.game.stage == "betting":
-            self.commission_check.config(state=tk.NORMAL)
-        else:
-            self.commission_check.config(state=tk.DISABLED)
+        """根据游戏阶段启用/禁用模式选择。"""
+        state = tk.NORMAL if self.game.stage == "betting" else tk.DISABLED
+        if hasattr(self, "classic_mode_radio"):
+            self.classic_mode_radio.config(state=state)
+        if hasattr(self, "commission_check"):
+            self.commission_check.config(state=state)
 
     def _update_commission_rule_label(self):
-        """根据免佣开关状态更新规则说明文本"""
+        """根据模式选择更新主注赔率、提交顺序与特殊规则。"""
         if self.commission_free.get():
-            rule_text = "庄家牌型为高牌A时，底注平局处理"
+            values = ("1：1", "庄家提交后再玩家提交", "庄家A高，主注平局")
         else:
-            rule_text = "当前底注以0.95:1结算"
-        self.commission_rule_label.config(text=rule_text)
+            values = ("0.95：1", "玩家提交后再庄家提交", "无")
+
+        labels = getattr(self, "commission_rule_value_labels", ())
+        for lbl, value in zip(labels, values):
+            lbl.config(text=value)
+
+    @staticmethod
+    def _format_settlement_amount(value):
+        """结算金额：整数不显示小数；非整数保留两位小数。"""
+        value = float(value)
+        if value.is_integer():
+            return f"{value:.0f}"
+        return f"{value:.2f}"
 
     def _update_ace_push_visibility(self):
-        """根据免佣模式显示/隐藏A高平手边注控件（使用grid_remove保持布局宽度）"""
+        """
+        A高平手边注的固定可用状态：
+        - 经典模式：控件始终保留显示，但金额框保持灰色禁用；左/右键均无效，鼠标为禁止光标。
+        - 免佣模式：恢复正常显示与鼠标操作。
+
+        经典模式的灰色状态不会被重置下注、重新开局、结算或重复下注改回白色；
+        只有切换到免佣模式时才解除禁用。
+        """
+        if not hasattr(self, "ace_push_display"):
+            return
+
+        disabled_bg = "#D0D0D0"
+        disabled_fg = "#777777"
+
         if self.commission_free.get():
-            self.ace_push_frame.grid()
+            # 从经典模式切换过来时，才把禁用灰色恢复成正常白色。
+            # 若当前因结算中奖而是 gold，则保留结算颜色。
+            if self.ace_push_display.cget("bg").lower() == disabled_bg.lower():
+                self.ace_push_display.config(bg="white")
+            self.ace_push_display.config(fg="black", cursor="")
+
+            self.ace_push_display.bind(
+                "<Button-1>",
+                lambda e: self.add_chip_to_bet("ace_push")
+            )
+            self.ace_push_display.bind(
+                "<Button-3>",
+                lambda e: self.reset_single_bet("ace_push")
+            )
         else:
-            self.ace_push_frame.grid_remove()
-            # 同时将下注金额清零（避免残留）
+            # 经典模式下永远不允许保留A高平手金额。
             self.ace_push_var.set("0")
             self.ace_high_push_bet_amount = 0
 
+            self.ace_push_display.unbind("<Button-1>")
+            self.ace_push_display.unbind("<Button-3>")
+            self.ace_push_display.config(bg=disabled_bg, fg=disabled_fg)
+
+            # Windows 通常支持 "no"；其他Tk环境做兼容回退。
+            for cursor_name in ("no", "X_cursor", "arrow"):
+                try:
+                    self.ace_push_display.config(cursor=cursor_name)
+                    break
+                except tk.TclError:
+                    continue
+
     # ------------------------- UI -------------------------
     def _create_widgets(self):
-        main_frame = tk.Frame(self, bg='#35654d')
+        # I_Love_Flush 风格：左侧牌桌 + 右侧卡片式控制面板。
+        main_frame = tk.Frame(self, bg=ROOT_BG)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        table_canvas = tk.Canvas(main_frame, bg='#35654d', highlightthickness=0)
+        table_canvas = tk.Canvas(main_frame, bg=ROOT_BG, highlightthickness=0)
         table_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        table_canvas.create_rectangle(0, 0, 790, 720, fill=ROOT_BG, outline=GOLD, width=5)
 
-        # 庄家区 - 高度350
+        # 牌九需要 5+2 两行牌，因此在 720px 牌桌内给庄家/玩家各约350px。
         dealer_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        dealer_frame.place(x=35, y=10, width=785, height=370)
-        self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial', 18),
-                                    bg='#2a4a3c', fg='white')
-        self.dealer_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
-
-        dealer_body = tk.Frame(dealer_frame, bg='#2a4a3c')
-        dealer_body.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        self.dealer_cards_area = tk.Frame(dealer_body, bg='#2a4a3c', width=700, height=290)
-        self.dealer_cards_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        dealer_frame.place(x=15, y=5, width=760, height=350)
+        self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial', 16, 'bold'),
+                                     bg='#2a4a3c', fg='white')
+        self.dealer_label.place(x=10, y=4)
+        self.dealer_cards_area = tk.Frame(dealer_frame, bg='#2a4a3c',
+                                          width=self.card_area_width, height=self.card_area_height)
+        self.dealer_cards_area.place(x=13, y=34, width=self.card_area_width, height=self.card_area_height)
         self.dealer_cards_area.pack_propagate(False)
 
-        # 玩家区 - 高度350
         player_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        player_frame.place(x=35, y=390, width=785, height=370)
-        self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 18),
-                                    bg='#2a4a3c', fg='white')
-        self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
-
-        player_body = tk.Frame(player_frame, bg='#2a4a3c')
-        player_body.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        self.player_cards_area = tk.Frame(player_body, bg='#2a4a3c', width=700, height=290)
-        self.player_cards_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        player_frame.place(x=15, y=365, width=760, height=350)
+        self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 16, 'bold'),
+                                     bg='#2a4a3c', fg='white')
+        self.player_label.place(x=10, y=4)
+        self.player_cards_area = tk.Frame(player_frame, bg='#2a4a3c',
+                                          width=self.card_area_width, height=self.card_area_height)
+        self.player_cards_area.place(x=13, y=34, width=self.card_area_width, height=self.card_area_height)
         self.player_cards_area.pack_propagate(False)
 
-        # 控制区（右侧）
-        control_frame = tk.Frame(main_frame, bg='#2a4a3c', width=440, padx=10, pady=5)
-        control_frame.pack(side=tk.RIGHT, fill=tk.Y)
-        control_frame.pack_propagate(False)
+        # 右侧控制面板：沿用 I_Love_Flush 的 PANEL/HEADER 卡片体系。
+        right_panel = tk.Frame(main_frame, bg=ROOT_BG, width=340)
+        right_panel.pack(side=tk.RIGHT, fill=tk.Y)
+        right_panel.pack_propagate(False)
 
-        info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        info_frame.pack(fill=tk.X, pady=5)
-        self.balance_label = tk.Label(info_frame, text=f"余额: ${self.balance:.2f}",
-                                    font=('Arial', 18), bg='#2a4a3c', fg='white')
-        self.balance_label.pack(side=tk.LEFT, padx=20, pady=5)
-        self.stage_label = tk.Label(info_frame, text="下注阶段", font=('Arial', 18, 'bold'),
-                                    bg='#2a4a3c', fg='#FFD700')
-        self.stage_label.pack(side=tk.RIGHT, padx=20, pady=5)
+        # 1. 信息卡片
+        info_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        info_card.pack(fill=tk.X, pady=3)
+        header_info = tk.Frame(info_card, bg=HEADER_BG)
+        header_info.pack(fill=tk.X)
+        tk.Label(header_info, text="牌九扑克", font=('Arial', 13, 'bold'),
+                 bg=HEADER_BG, fg=TITLE_FG).pack(pady=3)
+        body_info = tk.Frame(info_card, bg=PANEL_BG)
+        body_info.pack(fill=tk.X, padx=10, pady=5)
+        self.balance_label = tk.Label(body_info, text=f"余额: ${self.balance:,.2f}",
+                                      font=('Arial', 14, 'bold'), bg=PANEL_BG, fg='black')
+        self.balance_label.pack(side=tk.LEFT)
+        self.stage_label = tk.Label(body_info, text="下注阶段", font=('Arial', 14, 'bold'),
+                                    bg=PANEL_BG, fg='#A88100')
+        self.stage_label.pack(side=tk.RIGHT)
 
-        # 筹码区域
-        chips_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        chips_frame.pack(fill=tk.X, pady=5)
-        self.chips_label = tk.Label(chips_frame, text="筹码:", font=('Arial', 14), bg='#2a4a3c', fg='white')
-        self.chips_label.pack(anchor='w', padx=10, pady=5)
-        self.chip_container = tk.Frame(chips_frame, bg='#2a4a3c')
-        self.chip_container.pack(fill=tk.X, pady=5, padx=5)
-        self._rebuild_chips()
+        # 2. 下注上限：这里只保留限红，不再混入模式选择。
+        limit_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        limit_card.pack(fill=tk.X, pady=3)
+        header_limit = tk.Frame(limit_card, bg=HEADER_BG)
+        header_limit.pack(fill=tk.X)
+        tk.Label(header_limit, text="下注上限", font=('Arial', 12, 'bold'),
+                 bg=HEADER_BG, fg=TITLE_FG).pack(pady=3)
+        body_limit = tk.Frame(limit_card, bg=PANEL_BG)
+        body_limit.pack(fill=tk.X, padx=8, pady=5)
+        limit_table = tk.Frame(body_limit, bg=PANEL_BG)
+        limit_table.pack(fill=tk.X)
+        for c, title in enumerate(("底注最低", "底注最高", "边注最高")):
+            tk.Label(limit_table, text=title, font=('Arial', 9, 'bold'), bg=PANEL_BG,
+                     relief=tk.SOLID, borderwidth=1).grid(row=0, column=c, sticky='nsew')
+        for c, value in enumerate(("$10", "$25,000", "$2,500")):
+            tk.Label(limit_table, text=value, font=('Arial', 10, 'bold'), bg=PANEL_BG,
+                     fg='#A88100', relief=tk.SOLID, borderwidth=1).grid(row=1, column=c, sticky='nsew')
+            limit_table.columnconfigure(c, weight=1)
 
-        limits_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        limits_frame.pack(fill=tk.X, pady=5)
-        header_frame = tk.Frame(limits_frame, bg='#2a4a3c')
-        header_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
-        for text in ("底注最高", "底注最高", "边注最高"):
-            tk.Label(header_frame, text=text, font=('Arial', 12, 'bold'),
-                    bg='#2a4a3c', fg='white', width=10).pack(side=tk.LEFT, expand=True)
-        value_frame = tk.Frame(limits_frame, bg='#2a4a3c')
-        value_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
-        for text in ("$10", "$25,000", "$2,500"):
-            tk.Label(value_frame, text=text, font=('Arial', 12, 'bold'),
-                    bg='#2a4a3c', fg='#FFD700', width=10).pack(side=tk.LEFT, expand=True)
+        # 3. 模式选择：选择模式，并以三行参数表显示对应规则。
+        mode_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        mode_card.pack(fill=tk.X, pady=3)
+        header_mode = tk.Frame(mode_card, bg=HEADER_BG)
+        header_mode.pack(fill=tk.X)
+        tk.Label(header_mode, text="模式选择", font=('Arial', 12, 'bold'),
+                 bg=HEADER_BG, fg=TITLE_FG).pack(pady=3)
+        body_mode = tk.Frame(mode_card, bg=PANEL_BG)
+        body_mode.pack(fill=tk.X, padx=8, pady=4)
 
-        # ----- 免佣开关（动态规则说明）-----
-        commission_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        commission_frame.pack(fill=tk.X, pady=5)
-
-        self.commission_check = tk.Checkbutton(
-            commission_frame,
-            text="免佣模式",
-            variable=self.commission_free,
-            font=('Arial', 16),
-            bg='#2a4a3c',
-            fg='white',
-            selectcolor='#2a4a3c',
-            activebackground='#2a4a3c',
-            command=self._on_commission_toggle
+        mode_row = tk.Frame(body_mode, bg=PANEL_BG)
+        mode_row.pack(fill=tk.X, pady=(0, 3))
+        self.classic_mode_radio = tk.Radiobutton(
+            mode_row, text="经典模式", variable=self.commission_free, value=False,
+            font=('Arial', 10, 'bold'), bg=PANEL_BG, fg=TITLE_FG,
+            selectcolor=PANEL_BG, activebackground=PANEL_BG, command=self._on_commission_toggle
         )
-        self.commission_check.pack(side=tk.LEFT, padx=(10, 5), pady=5)
-
-        self.commission_rule_label = tk.Label(
-            commission_frame,
-            text="",
-            font=('Arial', 12),
-            bg='#2a4a3c',
-            fg='#FFD700'
+        self.classic_mode_radio.pack(side=tk.LEFT, expand=True)
+        self.commission_check = tk.Radiobutton(
+            mode_row, text="免佣模式", variable=self.commission_free, value=True,
+            font=('Arial', 10, 'bold'), bg=PANEL_BG, fg=TITLE_FG,
+            selectcolor=PANEL_BG, activebackground=PANEL_BG, command=self._on_commission_toggle
         )
-        self.commission_rule_label.pack(side=tk.LEFT, padx=5, pady=5)
+        self.commission_check.pack(side=tk.LEFT, expand=True)
 
+        mode_table = tk.Frame(body_mode, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        mode_table.pack(fill=tk.X)
+        mode_table.columnconfigure(0, weight=0, minsize=86)
+        mode_table.columnconfigure(1, weight=1)
+        self.commission_rule_value_labels = []
+        for r, title in enumerate(("主注赔率", "开牌顺序", "特殊规则")):
+            tk.Label(
+                mode_table, text=title, font=('Arial', 9, 'bold'),
+                bg='#E2D2AA', fg=TITLE_FG, anchor='center',
+                relief=tk.SOLID, borderwidth=1, padx=4, pady=2
+            ).grid(row=r, column=0, sticky='nsew')
+            value_label = tk.Label(
+                mode_table, text="", font=('Arial', 9, 'bold'),
+                bg='#FFF9EA', fg='#5B4200', anchor='center', justify=tk.CENTER,
+                relief=tk.SOLID, borderwidth=1, padx=4, pady=2,
+                wraplength=215
+            )
+            value_label.grid(row=r, column=1, sticky='nsew')
+            self.commission_rule_value_labels.append(value_label)
         self._update_commission_rule_label()
 
-        # 下注区域
-        bet_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_frame.pack(fill=tk.X, pady=8)
+        # 4. 筹码与下注：两列边注整齐对齐，底注独立居中并加宽结算显示。
+        combined_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        combined_card.pack(fill=tk.X, pady=3)
+        header_combined = tk.Frame(combined_card, bg=HEADER_BG)
+        header_combined.pack(fill=tk.X)
+        tk.Label(header_combined, text="筹码与下注", font=('Arial', 12, 'bold'),
+                 bg=HEADER_BG, fg=TITLE_FG).pack(pady=3)
+        body_combined = tk.Frame(combined_card, bg=PANEL_BG)
+        body_combined.pack(fill=tk.X, padx=7, pady=5)
 
-        # 第一行：皇帝之财 和 牌九保险
-        row_top = tk.Frame(bet_frame, bg='#2a4a3c')
-        row_top.pack(fill=tk.X, padx=10, pady=3)
+        self.chip_container = tk.Frame(body_combined, bg=PANEL_BG)
+        self.chip_container.pack(fill=tk.X, pady=(0, 5))
+        for i in range(6):
+            self.chip_container.columnconfigure(i, weight=1)
+        self._rebuild_chips()
 
-        tk.Label(row_top, text="皇帝之财:", font=('Arial', 14), bg='#2a4a3c', fg='white').pack(side=tk.LEFT, padx=(0,5))
-        self.emperor_var = tk.StringVar(value="0")
-        self.emperor_display = tk.Label(row_top, textvariable=self.emperor_var, font=('Arial', 14),
-                                        bg='white', width=7, relief=tk.SUNKEN)
-        self.emperor_display.pack(side=tk.LEFT, padx=5)
-        self.emperor_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("emperor"))
-        self.bet_widgets["emperor"] = self.emperor_display
-
-        tk.Label(row_top, text="牌九保险:", font=('Arial', 14), bg='#2a4a3c', fg='white').pack(side=tk.LEFT, padx=(15,5))
         self.insurance_var = tk.StringVar(value="0")
-        self.insurance_display = tk.Label(row_top, textvariable=self.insurance_var, font=('Arial', 14),
-                                        bg='white', width=7, relief=tk.SUNKEN)
-        self.insurance_display.pack(side=tk.LEFT, padx=5)
-        self.insurance_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("insurance"))
-        self.bet_widgets["insurance"] = self.insurance_display
-
-        # ========== 新增行：柔佛州 和 A高平手 ==========
-        row_mid = tk.Frame(bet_frame, bg='#2a4a3c')
-        row_mid.pack(fill=tk.X, padx=10, pady=3)
-        # 设置两列等权重，确保宽度不因某列隐藏而变化
-        row_mid.columnconfigure(0, weight=1)
-        row_mid.columnconfigure(1, weight=1)
-
-        # 柔佛州（始终显示）
-        johor_frame = tk.Frame(row_mid, bg='#2a4a3c')
-        johor_frame.grid(row=0, column=0, sticky='ew', padx=(9,5))
-        tk.Label(johor_frame, text="  柔佛州:", font=('Arial', 14), bg='#2a4a3c', fg='white').pack(side=tk.LEFT, padx=(0,5))
+        self.emperor_var = tk.StringVar(value="0")
         self.johor_var = tk.StringVar(value="0")
-        self.johor_display = tk.Label(johor_frame, textvariable=self.johor_var, font=('Arial', 14),
-                                      bg='white', width=7, relief=tk.SUNKEN)
-        self.johor_display.pack(side=tk.LEFT, padx=5)
-        self.johor_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("johor"))
-        self.bet_widgets["johor"] = self.johor_display
-
-        # A高平手（根据免佣模式动态显示）
-        self.ace_push_frame = tk.Frame(row_mid, bg='#2a4a3c')
-        self.ace_push_frame.grid(row=0, column=1, sticky='ew', padx=(10,0))
-        tk.Label(self.ace_push_frame, text="A高平手:", font=('Arial', 14), bg='#2a4a3c', fg='white').pack(side=tk.LEFT, padx=(0,5))
         self.ace_push_var = tk.StringVar(value="0")
-        self.ace_push_display = tk.Label(self.ace_push_frame, textvariable=self.ace_push_var, font=('Arial', 14),
-                                         bg='white', width=7, relief=tk.SUNKEN)
-        self.ace_push_display.pack(side=tk.LEFT, padx=5)
-        self.ace_push_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ace_push"))
-        self.bet_widgets["ace_push"] = self.ace_push_display
-
-        # 根据初始免佣状态决定是否显示（使用 grid_remove 保持列宽）
-        if not self.commission_free.get():
-            self.ace_push_frame.grid_remove()
-        # =============================================
-
-        # 第二行：底注
-        row_bottom = tk.Frame(bet_frame, bg='#2a4a3c')
-        row_bottom.pack(fill=tk.X, padx=80, pady=3)
-
-        tk.Label(row_bottom, text="底注:", font=('Arial', 22), bg='#2a4a3c', fg='white').pack(side=tk.LEFT)
         self.ante_var = tk.StringVar(value="0")
-        self.ante_display = tk.Label(row_bottom, textvariable=self.ante_var, font=('Arial', 22),
-                                    bg='white', width=7, relief=tk.SUNKEN)
-        self.ante_display.pack(side=tk.LEFT)
+
+        wager_rows = tk.Frame(body_combined, bg=PANEL_BG)
+        wager_rows.pack(fill=tk.X)
+        wager_rows.columnconfigure(0, weight=1, uniform='wager_col')
+        wager_rows.columnconfigure(1, weight=1, uniform='wager_col')
+
+        def create_side_bet_cell(parent, row, col, title, variable, bet_type):
+            cell = tk.Frame(parent, bg=PANEL_BG)
+            cell.grid(row=row, column=col, sticky='ew', padx=2, pady=2)
+            cell.columnconfigure(0, weight=1)
+            tk.Label(cell, text=title, font=('Arial', 11, 'bold'), bg=PANEL_BG,
+                     anchor='e').grid(row=0, column=0, sticky='e', padx=(0, 5))
+            display = tk.Label(cell, textvariable=variable, font=('Arial', 11, 'bold'),
+                               bg='white', fg='black', width=7, relief=tk.SUNKEN,
+                               anchor='center')
+            display.grid(row=0, column=1, sticky='e')
+            display.bind("<Button-1>", lambda e, b=bet_type: self.add_chip_to_bet(b))
+            display.bind("<Button-3>", lambda e, b=bet_type: self.reset_single_bet(b))
+            self.bet_widgets[bet_type] = display
+            return cell, display
+
+        _, self.emperor_display = create_side_bet_cell(
+            wager_rows, 0, 0, "皇帝之财:", self.emperor_var, "emperor")
+        _, self.insurance_display = create_side_bet_cell(
+            wager_rows, 0, 1, "牌九保险:", self.insurance_var, "insurance")
+        _, self.johor_display = create_side_bet_cell(
+            wager_rows, 1, 0, "柔佛州:", self.johor_var, "johor")
+        self.ace_push_frame, self.ace_push_display = create_side_bet_cell(
+            wager_rows, 1, 1, "A高平手:", self.ace_push_var, "ace_push")
+
+        # A高平手始终保留布局位置；经典模式仅禁用并置灰，不隐藏。
+        self._update_ace_push_visibility()
+
+        # 底注（主注）保持在中间；加宽显示框以容纳经典模式结算后的非整数返还。
+        row_bottom = tk.Frame(body_combined, bg=PANEL_BG)
+        row_bottom.pack(fill=tk.X, pady=(5, 1))
+        ante_inner = tk.Frame(row_bottom, bg=PANEL_BG)
+        ante_inner.pack(anchor='center')
+        tk.Label(ante_inner, text="底注:", font=('Arial', 15, 'bold'), bg=PANEL_BG).pack(side=tk.LEFT)
+        self.ante_display = tk.Label(
+            ante_inner, textvariable=self.ante_var, font=('Arial', 15, 'bold'),
+            bg='white', fg='black', width=11, relief=tk.SUNKEN, anchor='center'
+        )
+        self.ante_display.pack(side=tk.LEFT, padx=(6, 0))
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
+        self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante"))
         self.bet_widgets["ante"] = self.ante_display
 
-        self.action_frame = tk.Frame(control_frame, bg='#2a4a3c')
-        self.action_frame.pack(fill=tk.X)
+        # 5. 操作卡片：固定高度，游戏阶段变化时不再上下跳动。
+        action_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID, height=134)
+        action_card.pack(fill=tk.X, pady=3)
+        action_card.pack_propagate(False)
+        header_action = tk.Frame(action_card, bg=HEADER_BG, height=26)
+        header_action.pack(fill=tk.X)
+        header_action.pack_propagate(False)
+        tk.Label(header_action, text="操作", font=('Arial', 12, 'bold'),
+                 bg=HEADER_BG, fg=TITLE_FG).pack(expand=True)
+        body_action = tk.Frame(action_card, bg=PANEL_BG)
+        body_action.pack(fill=tk.BOTH, expand=True, padx=7, pady=4)
+        self.status_label = tk.Label(body_action, text="设置下注金额并开始游戏", font=('Arial', 10, 'bold'),
+                                     bg=PANEL_BG, fg=TITLE_FG, wraplength=310, justify=tk.CENTER,
+                                     height=3)
+        self.status_label.pack(fill=tk.X, pady=(0, 2))
+        self.action_frame = tk.Frame(body_action, bg=PANEL_BG, height=42)
+        self.action_frame.pack(fill=tk.X, pady=1)
+        self.action_frame.pack_propagate(False)
+        self.add_main_buttons()
 
-        start_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_frame.pack(pady=5)
+        # 6. 底部信息卡片
+        info_bottom_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
+        info_bottom_card.pack(fill=tk.X, pady=3)
+        body_bottom = tk.Frame(info_bottom_card, bg=PANEL_BG)
+        body_bottom.pack(fill=tk.X, padx=8, pady=4)
+        self.current_bet_label = tk.Label(body_bottom, text="本局下注: $0.00", font=('Arial', 10),
+                                          bg=PANEL_BG, fg='black')
+        self.current_bet_label.pack(anchor='w')
+        bottom_row = tk.Frame(body_bottom, bg=PANEL_BG)
+        bottom_row.pack(fill=tk.X)
+        self.last_win_label = tk.Label(bottom_row, text="上局获胜: $0.00", font=('Arial', 10),
+                                       bg=PANEL_BG, fg='black')
+        self.last_win_label.pack(side=tk.LEFT)
+        tk.Button(bottom_row, text="ℹ️", command=self.show_game_instructions, bg='#4B8BBE', fg='white',
+                  font=('Arial', 9), width=2, relief=tk.FLAT).pack(side=tk.RIGHT)
 
-        # 重置金额按钮
-        self.reset_bets_button = tk.Button(start_frame, text="重置金额", command=self.reset_bets,
-                                           font=('Arial', 14), bg='#F44336', fg='white', width=10)
-        self.reset_bets_button.pack(side=tk.LEFT, padx=(10, 10))
+    def reset_single_bet(self, bet_type):
+        # 经典模式下A高平手是永久禁用控件，右键也不执行任何动作。
+        if bet_type == "ace_push" and not self.commission_free.get():
+            self.ace_push_var.set("0")
+            self._update_ace_push_visibility()
+            return
 
-        # 重复上局下注按钮（初始禁用）
-        self.repeat_bet_btn = tk.Button(start_frame, text="重复上局下注", command=self.apply_last_bet,
-                                        font=('Arial', 14), bg='#4A90E2', fg='white',
-                                        activebackground='#3A7BC8', width=12, state=tk.DISABLED)
-        self.repeat_bet_btn.pack(side=tk.LEFT, padx=(0, 10))
+        var_map = {
+            "ante": self.ante_var, "insurance": self.insurance_var, "emperor": self.emperor_var,
+            "johor": self.johor_var, "ace_push": self.ace_push_var,
+        }
+        var = var_map.get(bet_type)
+        if var is not None and self.betting_enabled:
+            var.set("0")
+            widget = self.bet_widgets.get(bet_type)
+            if widget is not None:
+                widget.config(bg='#FFCDD2')
+                self.after(300, lambda w=widget: w.winfo_exists() and w.config(bg='white'))
 
-        # 开始游戏按钮
-        self.start_button = tk.Button(start_frame, text="开始游戏", command=self.start_game,
-                                      font=('Arial', 14), bg='#4CAF50', fg='white', width=10)
-        self.start_button.pack(side=tk.LEFT, padx=(0, 10))
-
-        self.status_label = tk.Label(control_frame, text="设置下注金额并开始游戏",
-                                    font=('Arial', 14), bg='#2a4a3c', fg='white')
-        self.status_label.pack(pady=5, fill=tk.X)
-
-        bet_info_frame = tk.Frame(control_frame, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        bet_info_frame.pack(side=tk.BOTTOM, fill=tk.X)
-        self.current_bet_label = tk.Label(bet_info_frame, text="本局下注: $0.00",
-                                        font=('Arial', 12), bg='#2a4a3c', fg='white')
-        self.current_bet_label.pack(pady=5, padx=10, anchor='w')
-        self.last_win_label = tk.Label(bet_info_frame, text="上局获胜: $0.00",
-                                    font=('Arial', 12), bg='#2a4a3c', fg='#FFD700')
-        self.last_win_label.pack(pady=5, padx=10, anchor='w', side=tk.LEFT)
-        rules_btn = tk.Button(bet_info_frame, text="ℹ️", command=self.show_game_instructions,
-                            font=('Arial', 8), bg='#4B8BBE', fg='white')
-        rules_btn.pack(side=tk.RIGHT, padx=10, pady=5)
+    def add_main_buttons(self):
+        for w in self.action_frame.winfo_children():
+            w.destroy()
+        row = tk.Frame(self.action_frame, bg=PANEL_BG)
+        row.pack(fill=tk.X)
+        for i in range(3):
+            row.columnconfigure(i, weight=1)
+        self.reset_bets_button = tk.Button(row, text="重置金额", command=self.reset_bets,
+                                           font=('Arial', 10, 'bold'), bg='#F44336', fg='white')
+        self.reset_bets_button.grid(row=0, column=0, padx=2, sticky='ew')
+        self.repeat_bet_btn = tk.Button(row, text="重复上局下注", command=self.apply_last_bet,
+                                        font=('Arial', 10, 'bold'), bg='#FFC107', fg='black',
+                                        state=tk.NORMAL if self.last_bet else tk.DISABLED)
+        self.repeat_bet_btn.grid(row=0, column=1, padx=2, sticky='ew')
+        self.start_button = tk.Button(row, text="开始游戏", command=self.start_game,
+                                      font=('Arial', 10, 'bold'), bg='#4CAF50', fg='white')
+        self.start_button.grid(row=0, column=2, padx=2, sticky='ew')
 
     def _rebuild_chips(self):
         for widget in self.chip_container.winfo_children():
             widget.destroy()
         self.chip_buttons = []
+        self.chip_texts = {}
         self.selected_chip = None
         chip_configs = [
-            ('$10', 'orange', 'black'),
+            ('$10', '#ffa500', 'black'),
             ('$25', '#00ff00', 'black'),
-            ('$100', 'black', 'white'),
+            ('$100', '#000000', 'white'),
             ('$500', '#FF7DDA', 'black'),
-            ('$1K', 'white', 'black'),
-            ('$2.5K', 'red', 'white')
+            ('$1K', '#ffffff', 'black'),
+            ('$2.5K', '#ff0000', 'white'),
         ]
-        default = "$10"
-        for text, bg, fg in chip_configs:
-            chip_canvas = tk.Canvas(self.chip_container, width=57, height=57, bg='#2a4a3c', highlightthickness=0)
-            chip_canvas.create_oval(2, 2, 55, 55, fill=bg, outline='black')
-            chip_canvas.create_text(27.5, 27.5, text=text, fill=fg, font=('Arial', 14, 'bold'))
+        for i, (text, bg_color, fg_color) in enumerate(chip_configs):
+            cell = tk.Frame(self.chip_container, bg=PANEL_BG)
+            cell.grid(row=0, column=i, padx=1, pady=1, sticky='nsew')
+            chip_canvas = tk.Canvas(cell, width=48, height=48, bg=PANEL_BG, highlightthickness=0)
+            chip_canvas.pack(anchor='center')
+            chip_canvas.create_oval(2, 2, 46, 46, fill=bg_color, outline='black')
+            chip_canvas.create_text(24, 24, text=text, fill=fg_color, font=('Arial', 9, 'bold'))
             chip_canvas.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
-            chip_canvas.pack(side=tk.LEFT, padx=5)
             self.chip_buttons.append(chip_canvas)
             self.chip_texts[chip_canvas] = text
-        self.select_chip(default)
+        self.select_chip('$10')
 
     def select_chip(self, chip_text):
         self.selected_chip = chip_text
@@ -2030,10 +2159,15 @@ class PaiGowPokerGUI(tk.Tk):
                 if chip.type(item) == 'text' and chip.itemcget(item, 'text') == chip_text:
                     oval = [i for i in chip.find_all() if chip.type(i) == 'oval'][0]
                     x1, y1, x2, y2 = chip.coords(oval)
-                    chip.create_oval(x1, y1, x2, y2, outline='gold', width=3, tags="highlight")
+                    chip.create_oval(x1, y1, x2, y2, outline='#2f00ff', width=3, tags="highlight")
                     break
 
     def add_chip_to_bet(self, bet_type):
+        # 双保险：经典模式下即使未来其他代码误触发，也不能给A高平手加注。
+        if bet_type == "ace_push" and not self.commission_free.get():
+            self.ace_push_var.set("0")
+            self._update_ace_push_visibility()
+            return
         if not self.betting_enabled:
             return
         if not self.selected_chip:
@@ -2099,9 +2233,9 @@ class PaiGowPokerGUI(tk.Tk):
     def animate_deal(self):
         self.animation_queue = []
         total_width = 7 * self.card_width + 6 * self.card_spacing
-        start_x = (700 - total_width) // 2
+        start_x = (self.card_area_width - total_width) // 2
         if start_x < 0:
-            start_x = 20
+            start_x = 0
         for i, card in enumerate(self.game.player_hand):
             x = start_x + i * (self.card_width + self.card_spacing)
             y = 160   # 玩家区内Y坐标
@@ -2221,9 +2355,9 @@ class PaiGowPokerGUI(tk.Tk):
             info = lbl.place_info()
             start_positions[lbl] = (float(info.get('x', 0)), float(info.get('y', 0)))
         total_width = 7 * self.card_width + 6 * self.card_spacing
-        start_x = (700 - total_width) // 2
+        start_x = (self.card_area_width - total_width) // 2
         if start_x < 0:
-            start_x = 20
+            start_x = 0
         target_positions = {}
         for idx, card in enumerate(sorted_hand):
             lbl = card_to_label[card]
@@ -2275,9 +2409,9 @@ class PaiGowPokerGUI(tk.Tk):
             info = lbl.place_info()
             start_positions[lbl] = (float(info.get('x', 0)), float(info.get('y', 0)))
         total_width = 7 * self.card_width + 6 * self.card_spacing
-        start_x = (700 - total_width) // 2
+        start_x = (self.card_area_width - total_width) // 2
         if start_x < 0:
-            start_x = 20
+            start_x = 0
         target_positions = {}
         for idx, card in enumerate(sorted_hand):
             lbl = card_to_label[card]
@@ -2323,7 +2457,7 @@ class PaiGowPokerGUI(tk.Tk):
             lbl.base_y = y
             lbl.bind("<Button-1>", lambda e, idx=i: self.toggle_card_selection(idx))
 
-        action_bar = tk.Frame(self.action_frame, bg='#2a4a3c')
+        action_bar = tk.Frame(self.action_frame, bg=PANEL_BG)
         action_bar.pack(pady=5)
         self.auto_split_button = tk.Button(action_bar, text="自动分牌", command=self.auto_split,
                                            font=('Arial', 14), bg='#2196F3', fg='white', width=12)
@@ -2405,7 +2539,8 @@ class PaiGowPokerGUI(tk.Tk):
                     return True
                 if h < l:
                     return False
-            return True
+            # 与庄家 House Way 的 split_is_legal 保持一致：后道必须严格大于前道。
+            return False
 
         # 记录玩家分牌是否合法（合法为 True）
         valid_split = check_valid()
@@ -2446,9 +2581,9 @@ class PaiGowPokerGUI(tk.Tk):
             info = lbl.place_info()
             start_positions[lbl] = (float(info.get('x', 0)), float(info.get('y', 0)))
         total_width = 7 * self.card_width + 6 * self.card_spacing
-        start_x = (700 - total_width) // 2
+        start_x = (self.card_area_width - total_width) // 2
         if start_x < 0:
-            start_x = 20
+            start_x = 0
 
         # 第一行（2张）y=60，第二行（5张）y=220
         row1_y = 0
@@ -2516,9 +2651,9 @@ class PaiGowPokerGUI(tk.Tk):
             info = lbl.place_info()
             start_positions[lbl] = (float(info.get('x', 0)), float(info.get('y', 0)))
         total_width = 7 * self.card_width + 6 * self.card_spacing
-        start_x = (700 - total_width) // 2
+        start_x = (self.card_area_width - total_width) // 2
         if start_x < 0:
-            start_x = 20
+            start_x = 0
 
         # 第一行（5张高牌）y=60，第二行（2张低牌）y=220
         row1_y = 0
@@ -2621,7 +2756,7 @@ class PaiGowPokerGUI(tk.Tk):
                     ante_win_amount = ante * 2          # 免佣模式赢时赔率 1:1（净赢1倍）
                 else:
                     # 非免佣模式赔率 0.95:1（净赢0.95倍）
-                    ante_win_amount = ante + int(ante * 0.95)   # 或 ante * 1.95
+                    ante_win_amount = ante * 1.95   # 本金 + 0.95倍净赢，保留小数
             elif push:
                 ante_win_amount = ante
             else:
@@ -2661,12 +2796,14 @@ class PaiGowPokerGUI(tk.Tk):
             result_text = "分牌无效，底注直接判负"
         else:
             if player_win:
-                self.ante_display.config(bg='gold', text=str(int(ante_win_amount)))
-                self.ante_var.set(str(int(ante_win_amount)))
+                ante_text = self._format_settlement_amount(ante_win_amount)
+                self.ante_display.config(bg='gold', text=ante_text)
+                self.ante_var.set(ante_text)
                 result_text = "本局您赢了"
             elif push:
-                self.ante_display.config(bg='light blue', text=str(ante))
-                self.ante_var.set(str(ante))
+                ante_text = self._format_settlement_amount(ante)
+                self.ante_display.config(bg='light blue', text=ante_text)
+                self.ante_var.set(ante_text)
                 if self.commission_free.get() and is_dealer_ace_high:
                     result_text = '庄家最大牌型为高牌A，底注平局'
                 else:
@@ -2707,6 +2844,9 @@ class PaiGowPokerGUI(tk.Tk):
         else:
             self.ace_push_display.config(bg='white', text='0')
             self.ace_push_var.set('0')
+
+        # 经典模式必须立即恢复为固定灰色禁用状态。
+        self._update_ace_push_visibility()
 
         self.status_label.config(text=result_text)
         self.last_win_label.config(text=f"上局获胜: ${total_win:.2f}")
@@ -2807,7 +2947,7 @@ class PaiGowPokerGUI(tk.Tk):
             w.destroy()
         self.stage_label.config(text="结算")
         self.restart_btn = tk.Button(self.action_frame, text="再来一局", command=self.reset_game,
-                                     font=('Arial', 14), bg='#2196F3', fg='white', width=15)
+                                     font=('Arial', 10, 'bold'), bg='#2196F3', fg='white', width=15)
         self.restart_btn.pack(pady=5)
         self.restart_btn.bind("<Button-3>", self.show_card_sequence)
         self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
@@ -2920,25 +3060,7 @@ class PaiGowPokerGUI(tk.Tk):
         for w in self.action_frame.winfo_children():
             w.destroy()
 
-        start_frame = tk.Frame(self.action_frame, bg='#2a4a3c')
-        start_frame.pack(pady=5)
-
-        # 重置金额按钮
-        self.reset_bets_button = tk.Button(start_frame, text="重置金额", command=self.reset_bets,
-                                           font=('Arial', 14), bg='#F44336', fg='white', width=10)
-        self.reset_bets_button.pack(side=tk.LEFT, padx=(10, 10))
-
-        # 重复上局下注按钮（根据是否有历史下注决定启用状态）
-        self.repeat_bet_btn = tk.Button(start_frame, text="重复上局下注", command=self.apply_last_bet,
-                                        font=('Arial', 14), bg='#4A90E2', fg='white',
-                                        activebackground='#3A7BC8', width=12,
-                                        state=tk.NORMAL if self.last_bet is not None else tk.DISABLED)
-        self.repeat_bet_btn.pack(side=tk.LEFT, padx=(0, 10))
-
-        # 开始游戏按钮
-        self.start_button = tk.Button(start_frame, text="开始游戏", command=self.start_game,
-                                      font=('Arial', 14), bg='#4CAF50', fg='white', width=10)
-        self.start_button.pack(side=tk.LEFT, padx=(0, 10))
+        self.add_main_buttons()
 
         self.betting_enabled = True
         self._update_commission_free_state()
@@ -2960,6 +3082,7 @@ class PaiGowPokerGUI(tk.Tk):
         self.emperor_display.config(bg='white')
         self.johor_display.config(bg='white')
         self.ace_push_display.config(bg='white')
+        self._update_ace_push_visibility()
         self.status_label.config(text="已重置所有下注金额")
 
     def update_balance(self):
@@ -2979,6 +3102,12 @@ class PaiGowPokerGUI(tk.Tk):
             return
 
         min_ante, max_ante, max_side = 10, 25000, 2500
+
+        # 所有边注必须为非负数，防止负下注令 total_bet 变成负数并反向增加余额。
+        if any(v < 0 for v in (insurance, emperor, johor, ace_push)):
+            messagebox.showerror("错误", "边注金额不能为负数")
+            return
+
         if ante < min_ante:
             messagebox.showerror("错误", f"底注至少需要{min_ante}")
             return
@@ -3049,9 +3178,10 @@ class PaiGowPokerGUI(tk.Tk):
         self.status_label.config(text="正在发牌...")
         self.animate_deal()
 
-        self._update_commission_free_state() 
+        self._update_commission_free_state()
         for w in self.bet_widgets.values():
             w.config(bg='white')
+        self._update_ace_push_visibility()
 
     def apply_last_bet(self):
         """将上次存储的下注金额填充到各个输入框，注意免佣模式限制"""
@@ -3069,14 +3199,17 @@ class PaiGowPokerGUI(tk.Tk):
         ace_push_value = self.last_bet['ace_push']
         if self.commission_free.get():
             self.ace_push_var.set(str(ace_push_value))
+        else:
+            self.ace_push_var.set("0")
 
         self.status_label.config(text="已应用上局下注金额")
-        # 刷新显示背景为白色
+        # 刷新显示背景；A高平手随后按模式恢复正确状态。
         self.ante_display.config(bg='white')
         self.insurance_display.config(bg='white')
         self.emperor_display.config(bg='white')
         self.johor_display.config(bg='white')
         self.ace_push_display.config(bg='white')
+        self._update_ace_push_visibility()
 
     def show_game_instructions(self):
         """显示牌九扑克游戏规则 + 庄家分牌规则"""
@@ -3105,7 +3238,7 @@ class PaiGowPokerGUI(tk.Tk):
 
         1. 游戏目标：
         将7张牌分成“前道”（2张）和“后道”（5张），后道牌型必须大于前道。
-        与庄家比较两手牌，两手全赢才算赢；一赢一输或平局均为庄家赢。
+        与庄家分别比较前道和后道：两手全赢玩家赢，两手全输玩家输，一赢一输为平局（Push）；单道平手按庄家赢该道。
 
         2. 下注阶段：
         - 底注：必须下注
@@ -3128,7 +3261,7 @@ class PaiGowPokerGUI(tk.Tk):
 
         5. 比牌：
         - 分别比较前道和后道。前道只比对子或高牌点数；后道按标准扑克牌型（含Joker）。
-        - 玩家必须前后两道都大于庄家才获胜，否则庄家获胜（平局庄家赢）。
+        - 玩家前后两道都赢则获胜；两道都输则庄家获胜；一赢一输为Push退还底注；单道完全平手按庄家赢该道。
 
         6. 赔付规则：
         - 主游戏：赢则底注1:1（例如下注$10，赢$10，共收回$20。
@@ -3376,29 +3509,29 @@ class PaiGowPokerGUI(tk.Tk):
             "1.剩下3张里有对子，对子放前道。\n2.拆成两对。",
             "A♠ A♥ A♦ A♣ K♠ Q♦ 3♣",
             "前：K♠ Q♦\n后：A♠ A♥ A♦ A♣ 3♣",
-            "A♠ A♥ A♦ A♣ Joker K♠ Q♦",
-            "前：K♠ Q♦\n后：A♠ A♥ A♦ A♣ Joker(A)"],
+            "A♠ A♥ A♦ Joker K♠ Q♦ 3♣",
+            "前：K♠ Q♦\n后：A♠ A♥ A♦ Joker(A) 3♣"],
 
             ["四条 J/10/9",
             "1.剩下3张里有对子，对子放前道。\n2.剩下3张里有K/A/Joker，前道放最大两张散牌\n 3.拆成两对。",
             "9♠ 9♥ 9♦ 9♣ K♠ Q♦ 3♣",
             "前：K♠ Q♦\n后：9♠ 9♥ 9♦ 9♣ 3♣",
             "9♠ 9♥ 9♦ 9♣ Joker K♠ Q♦",
-            "前：K♠ Q♦\n后：9♠ 9♥ 9♦ 9♣ Joker(A)"],
+            "前：Joker(A) K♠\n后：9♠ 9♥ 9♦ 9♣ Q♦"],
 
             ["四条 8/7/6",
             "1.剩下3张里有对子，对子放前道。\n2.剩下3张里有Q/K/A/Joker，前道放最大两张散牌\n 3.拆成两对。",
             "8♠ 8♥ 8♦ 8♣ Q♠ J♦ 3♣",
             "前：Q♠ J♦\n后：8♠ 8♥ 8♦ 8♣ 3♣",
             "8♠ 8♥ 8♦ 8♣ Joker Q♠ J♦",
-            "前：Q♠ J♦\n后：8♠ 8♥ 8♦ 8♣ Joker(A)"],
+            "前：Joker(A) Q♠\n后：8♠ 8♥ 8♦ 8♣ J♦"],
 
             ["四条 5/4/3/2",
             "1.剩下3张里有对子，对子放前道。\n2.前道放最大两张散牌。",
             "5♠ 5♥ 5♦ 5♣ A♠ K♦ 3♣",
             "前：A♠ K♦\n后：5♠ 5♥ 5♦ 5♣ 3♣",
             "5♠ 5♥ 5♦ 5♣ Joker K♠ Q♦",
-            "前：K♠ Q♦\n后：5♠ 5♥ 5♦ 5♣ Joker(A)"],
+            "前：Joker(A) K♠\n后：5♠ 5♥ 5♦ 5♣ Q♦"],
 
             ["葫芦 + 对子",
             "最大的对子放前道，后道保留其余5张。",
@@ -3426,7 +3559,7 @@ class PaiGowPokerGUI(tk.Tk):
             "A♠ K♠ Q♠ J♠ 9♠ 6♠ 3♠",
             "前：A♠ K♠\n后：Q♠ J♠ 9♠ 6♠ 3♠",
             "A♠ K♠ Q♠ J♠ 9♠ Joker 3♣",
-            "前：3♣ A♠\n后：K♠ Q♠ J♠ 9♠ Joker(6♠)"],
+            "前：9♠ 3♣\n后：A♠ K♠ Q♠ J♠ Joker(10♠)"],
 
             ["同花（6张同花）",
             "1.能组成对子，前道放对子\n2.前道放同花中最大1张+散牌。",
@@ -3461,14 +3594,14 @@ class PaiGowPokerGUI(tk.Tk):
             "2♠ 3♥ 4♦ 5♣ 6♠ K♦ Q♣",
             "前：K♦ Q♣\n后：2♠ 3♥ 4♦ 5♣ 6♠",
             "2♠ 3♥ 4♦ 5♣ 6♠ 6♦ K♣",
-            "前：6♠ 6♦\n后：2♠ 3♥ 4♦ 5♣ 6♠"],
+            "前：K♣ 6♦\n后：2♠ 3♥ 4♦ 5♣ 6♠"],
 
             ["三条 A",
             "前道放1张A+最大散牌，剩下5张放后道。",
             "A♠ A♥ A♦ K♣ Q♦ 7♠ 3♦",
             "前：A♠ K♣\n后：A♥ A♦ Q♦ 7♠ 3♦",
-            "A♠ A♥ A♦ Joker K♣ 7♠ 3♦",
-            "前：A♠ K♣\n后：A♥ A♦ Joker(A) 7♠ 3♦"],
+            "A♠ A♥ 10♦ Joker K♣ 7♠ 3♦",
+            "前：A♠ K♣\n后：A♥ Joker(A) 10♦ 7♠ 3♦"],
 
             ["三条（其他）",
             "前道放最大的2张散牌，后道保留三条。",
@@ -3494,23 +3627,23 @@ class PaiGowPokerGUI(tk.Tk):
             ["两对 J/10/9",
             "1.剩下3张里有A/Joker，后道保留两对\n 2.前道放最小对子。",
             "J♠ J♥ 10♣ 10♦ A♠ 8♣ 3♦",
-            "前：10♣ 10♦\n后：J♠ J♥ A♠ 8♣ 3♦",
+            "前：A♠ 8♣\n后：J♠ J♥ 10♣ 10♦ 3♦",
             "J♠ J♥ 10♣ 10♦ Joker 8♣ 3♦",
-            "前：10♣ 10♦\n后：J♠ J♥ Joker(A) 8♣ 3♦"],
+            "前：Joker(A) 8♣\n后：J♠ J♥ 10♣ 10♦ 3♦"],
 
             ["两对 8/7/6",
             "1.剩下3张里有K/A/Joker，后道保留两对\n 2.前道放最小对子。",
             "8♠ 8♥ 7♣ 7♦ K♠ 5♣ 3♦",
-            "前：7♣ 7♦\n后：8♠ 8♥ K♠ 5♣ 3♦",
+            "前：K♠ 5♣\n后：8♠ 8♥ 7♣ 7♦ 3♦",
             "8♠ 8♥ 7♣ 7♦ Joker 5♣ 3♦",
-            "前：7♣ 7♦\n后：8♠ 8♥ Joker(A) 5♣ 3♦"],
+            "前：Joker(A) 5♣\n后：8♠ 8♥ 7♣ 7♦ 3♦"],
 
             ["两对 5/4/3",
             "1.剩下3张里有Q/K/A/Joker，后道保留两对\n 2.前道放最小对子。",
             "5♠ 5♥ 4♣ 4♦ Q♠ 8♣ 2♦",
-            "前：4♣ 4♦\n后：5♠ 5♥ Q♠ 8♣ 2♦",
+            "前：Q♠ 8♣\n后：5♠ 5♥ 4♣ 4♦ 2♦",
             "5♠ 5♥ 4♣ 4♦ Joker 8♣ 2♦",
-            "前：4♣ 4♦\n后：5♠ 5♥ Joker(A) 8♣ 2♦"],
+            "前：Joker(A) 8♣\n后：5♠ 5♥ 4♣ 4♦ 2♦"],
 
             ["一对",
             "前道放最大的2张散牌，对子和剩下3张放后道。",
@@ -3523,8 +3656,8 @@ class PaiGowPokerGUI(tk.Tk):
             "前道放第2和第3高散牌，后道保留最大牌+其余4张。",
             "A♠ K♥ Q♦ J♣ 9♠ 6♥ 3♦",
             "前：K♥ Q♦\n后：A♠ J♣ 9♠ 6♥ 3♦",
-            "Joker K♥ Q♦ J♣ 9♠ 6♥ 3♦",
-            "前：K♥ Q♦\n后：Joker(A) J♣ 9♠ 6♥ 3♦"]
+            "Joker K♥ Q♦ 10♣ 8♠ 6♥ 3♦",
+            "前：K♥ Q♦\n后：Joker(A) 10♣ 8♠ 6♥ 3♦"]
         ]
 
         for col, header in enumerate(headers):
@@ -3621,11 +3754,31 @@ class PaiGowPokerGUI(tk.Tk):
 
         win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
 
-# ------------------------- 入口 -------------------------
-def main(initial_balance=10000, username="Guest"):
-    app = PaiGowPokerGUI(initial_balance, username)
-    app.mainloop()
-    return app.balance
+# =========================================================
+# 主入口：支持内嵌；独立运行严格 1150x750+50+10
+# =========================================================
+def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, user=None,
+         on_back=None, on_balance_change=None):
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        return PaiGowPokerGUI(
+            parent, actual_balance, actual_user,
+            on_back=on_back, on_balance_change=on_balance_change,
+        )
+
+    root = tk.Tk()
+    root.title("牌九扑克")
+    root.geometry("1150x750+50+10")
+    root.resizable(False, False)
+    page = PaiGowPokerGUI(root, actual_balance, actual_user)
+    page._standalone_root = root
+    page.pack(fill="both", expand=True)
+    root.protocol("WM_DELETE_WINDOW", page.on_close)
+    root.mainloop()
+    return page.balance
+
 
 if __name__ == "__main__":
     final_balance = main()
