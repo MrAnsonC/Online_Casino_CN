@@ -1,3 +1,14 @@
+import sys as _account_sys
+from pathlib import Path as _AccountPath
+_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
+if _account_root is None:
+    raise RuntimeError("Cannot locate encrypted account storage")
+if str(_account_root) not in _account_sys.path:
+    _account_sys.path.insert(0, str(_account_root))
+from A_Tools.Account import install_secure_json as _install_secure_json
+_install_secure_json()
+del _install_secure_json, _account_root, _AccountPath, _account_sys
+
 import json
 import os
 import random
@@ -27,7 +38,7 @@ SILVER_PALETTE = ("#D7D9D8", "#C8CCCA", "#B8BDBB", "#A9AEAC", "#D0D3D2")
 # =========================================================
 def get_data_file_path() -> str:
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(parent_dir, "saving_data.json")
+    return os.path.join(parent_dir, "A_Tools/Account/saving_data.json")
 
 
 def load_user_data() -> list:

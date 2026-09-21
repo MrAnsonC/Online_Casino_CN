@@ -1,7 +1,19 @@
+import sys as _account_sys
+from pathlib import Path as _AccountPath
+_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
+if _account_root is None:
+    raise RuntimeError("Cannot locate encrypted account storage")
+if str(_account_root) not in _account_sys.path:
+    _account_sys.path.insert(0, str(_account_root))
+from A_Tools.Account import install_secure_json as _install_secure_json
+_install_secure_json()
+del _install_secure_json, _account_root, _AccountPath, _account_sys
+
 # Evolution Lightning Blackjack — ENHC/OBO house variant
 import json
 import math
 import os
+import sys
 import random
 import tkinter as tk
 from functools import lru_cache
@@ -19,11 +31,28 @@ except ImportError:
     ImageFont = None
 
 
+# Project layout:
+#   A_Tools/Card/CSM_Shuffler.py
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_CSM_CANDIDATES = [
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'A_Tools', 'Card')),
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'Card')),
+    _THIS_DIR,
+]
+_CARD_TOOLS_DIR = next((p for p in _CSM_CANDIDATES
+                        if os.path.isfile(os.path.join(p, 'CSM_Shuffler.py'))), None)
+if _CARD_TOOLS_DIR is None:
+    raise ModuleNotFoundError('找不到 CSM_Shuffler.py，已檢查：' + '; '.join(_CSM_CANDIDATES))
+if _CARD_TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _CARD_TOOLS_DIR)
+
+from CSM_Shuffler import CSMError, ContinuousShuffleMachine  # type: ignore
+
 # -----------------------------------------------------------------------------
 # Balance compatibility with the Baccarat module
 # -----------------------------------------------------------------------------
 def get_data_file_path():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../saving_data.json')
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../A_Tools/Account/saving_data.json')
 
 
 def load_user_data():
@@ -59,48 +88,90 @@ class BlackjackEngine:
     SUITS = ('Club', 'Diamond', 'Heart', 'Spade')
     RANKS = ('A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K')
 
-    def __init__(self, decks=8):
-        self.decks = int(decks)
-        self.deck = []
-        self.current_index = 0
-        self.cut_threshold = random.SystemRandom().randint(155, 180)
-        self.shuffle_count = 0
-        self.new_shoe()
+    def __init__(self, csm, game_id):
+        self.decks = 8
+        self.csm = csm
+        self.game_id = str(game_id)
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
+        self.round_open = False
+        self.round_id = None
 
-    def new_shoe(self, deck=None):
-        if deck is None:
-            deck = [
-                (suit, rank)
-                for _ in range(self.decks)
-                for suit in self.SUITS
-                for rank in self.RANKS
-            ]
-            random.SystemRandom().shuffle(deck)
-        self.deck = [tuple(card) for card in deck]
-        self.current_index = 0
-        self.cut_threshold = random.SystemRandom().randint(155, 180)
-        self.shuffle_count += 1
+    def _clear_local_csm_state(self):
+        self.round_id = None
+        self.round_open = False
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
 
-    def cut_shoe(self, cut_position):
-        if not self.deck:
-            self.new_shoe()
-        cut_position = max(0, min(int(cut_position), len(self.deck) - 1))
-        self.deck = self.deck[cut_position:] + self.deck[:cut_position]
-        self.current_index = 0
-        self.cut_threshold = random.SystemRandom().randint(155, 180)
+    def start_round(self):
+        if self.round_open:
+            raise RuntimeError('上一局尚未结束。')
+        try:
+            self.round_id = self.csm.begin_round(
+                self.game_id, self.current_batch_id if self.card_buffer else None)
+            self.used_by_batch = {}
+            self.round_open = True
+            if not self.card_buffer:
+                self._request_next_chamber()
+        except Exception:
+            # CSM may already have rebuilt all warehouses after the primary error.
+            # Drop every local lease/round reference so stale IDs are never reused.
+            self._clear_local_csm_state()
+            raise
+
+    def _request_next_chamber(self):
+        packet = self.csm.acquire_chamber(self.game_id, self.round_id)
+        self.current_batch_id = packet['batch_id']
+        self.card_buffer = list(packet['cards'])
+        if not self.card_buffer:
+            raise CSMError('自动洗牌机返回了空仓。')
 
     def remaining_cards(self):
-        return max(0, len(self.deck) - self.current_index)
+        return len(self.card_buffer) + self.csm.available_cards()
 
     def needs_shuffle(self):
-        return self.remaining_cards() <= self.cut_threshold
+        return False
 
     def draw_card(self):
-        if self.current_index >= len(self.deck):
-            raise RuntimeError('牌靴已用完，请重新切牌。')
-        card = self.deck[self.current_index]
-        self.current_index += 1
-        return card
+        if not self.round_open:
+            raise RuntimeError('牌局尚未开始。')
+        if len(self.card_buffer) <= 3:
+            self._request_next_chamber()
+        record = self.card_buffer.pop(0)
+        self.used_by_batch.setdefault(self.current_batch_id, []).append(record['card_id'])
+        return record['suit'], record['rank']
+
+    def finish_round(self):
+        if not self.round_open:
+            return
+        rid = self.round_id
+        try:
+            for batch_id in list(self.used_by_batch):
+                card_ids = self.used_by_batch[batch_id]
+                if card_ids:
+                    self.csm.return_cards(self.game_id, batch_id, card_ids)
+                del self.used_by_batch[batch_id]
+        except Exception:
+            # Do not call end_round with a round ID that may have been erased by
+            # CSM automatic recovery; preserve the primary error instead.
+            self._clear_local_csm_state()
+            raise
+        try:
+            self.csm.end_round(self.game_id, rid)
+        finally:
+            self.round_id = None
+            self.round_open = False
+
+    def close(self):
+        try:
+            self.csm.release_game(self.game_id, force_shuffle=True)
+        except Exception:
+            # Closing must never resurrect or reuse stale CSM identifiers.
+            pass
+        finally:
+            self._clear_local_csm_state()
 
     @staticmethod
     def burn_value(card):
@@ -241,7 +312,10 @@ class BubbleBlackjackGame(tk.Frame):
             'Microsoft YaHei UI', 'Microsoft YaHei', '微软雅黑', 'Noto Sans CJK SC',
             'SimHei', '黑体', 'Arial Unicode MS') if name in families), 'Arial')
 
-        self.engine = BlackjackEngine(8)
+        import uuid
+        self.csm_game_id = f"Lightning_Blackjack:{self.username or 'local'}:{uuid.uuid4().hex}"
+        self.csm = ContinuousShuffleMachine()
+        self.engine = BlackjackEngine(self.csm, self.csm_game_id)
         self.selected_chip = 1000.0
         self.current_bet = 0.0
         self.current_side_bets = {key: 0.0 for key in self.SIDE_BET_KEYS}
@@ -312,7 +386,7 @@ class BubbleBlackjackGame(tk.Frame):
                 '..',
                 'A_Logs',
                 'Json',
-                'Lightning_Blackack.json'
+                'Blackjack_Lightning.json'
             )
         )
         self.shoe_resumed = False
@@ -1714,68 +1788,42 @@ class BubbleBlackjackGame(tk.Frame):
     # -------------------------------------------------------------- Lightning_Blackack.json
     def save_runtime_store(self, burn_complete=True):
         data = {
-            'version': 1,
+            'version': 2,
+            'variant': 'Lightning_Blackjack',
             'shoe': {
-                'decks': self.engine.decks,
-                'deck': [list(card) for card in self.engine.deck],
-                'current_index': int(self.engine.current_index),
-                'shuffle_threshold': int(self.engine.cut_threshold),
-                'shuffle_count': int(self.engine.shuffle_count),
-                'burn_complete': bool(burn_complete),
-            }
+                'mode': 'CSM',
+                'decks': 8,
+                'chambers': 15,
+                'game_id': self.csm_game_id,
+            },
         }
-        # Interface mode only: append the one-use carry-over record after the
-        # shoe data. Standalone launches intentionally omit this section.
-        if self.interface_mode and self.persist_player_carryover:
-            data['player_last_round'] = {
-                'username': self.username,
-                'last_multiplier': int(self.next_lightning_multiplier),
-                'last_bet': float(self.next_lightning_coverage),
-            }
-
         try:
             os.makedirs(os.path.dirname(self.runtime_data_file), exist_ok=True)
-
             with open(self.runtime_data_file, 'w', encoding='utf-8') as handle:
                 json.dump(data, handle, ensure_ascii=False, indent=2)
         except OSError:
             pass
 
     def load_runtime_store(self):
+        # CSM 的加密状态是唯一牌序来源，不在游戏存档复制独立牌靴。
         try:
-            with open(self.runtime_data_file, 'r', encoding='utf-8') as handle:
-                data = json.load(handle)
-            shoe = data.get('shoe', {}) if isinstance(data, dict) else {}
-            deck = shoe.get('deck')
-            index = int(shoe.get('current_index', 0))
-            threshold = int(shoe.get('shuffle_threshold', 0))
-            if not shoe.get('burn_complete', False) or not isinstance(deck, list) or len(deck) != self.engine.decks * 52:
-                return False
-            if not (155 <= threshold <= 180) or not (0 <= index <= len(deck)):
-                return False
-            self.engine.deck = [tuple(card) for card in deck]
-            self.engine.current_index = index
-            self.engine.cut_threshold = threshold
-            self.engine.shuffle_count = int(shoe.get('shuffle_count', self.engine.shuffle_count))
-            if self.engine.needs_shuffle():
-                return False
-            if self.interface_mode:
-                carry=data.get('player_last_round')
-                if isinstance(carry,dict) and carry.get('username')==self.username:
-                    multiplier=int(carry.get('last_multiplier',1))
-                    last_bet=float(carry.get('last_bet',0.0))
-                    if multiplier>=1 and last_bet>=0:
-                        self.next_lightning_multiplier=multiplier
-                        self.next_lightning_coverage=last_bet
-                        self.persist_player_carryover=True
+            self.csm.status()
             return True
-        except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError, ValueError):
+        except (OSError, TypeError, ValueError, CSMError):
             return False
 
     def draw_round_card(self):
-        card = self.engine.draw_card()
+        try:
+            card = self.engine.draw_card()
+        except (CSMError, OSError) as exc:
+            self.accept_bets = False
+            self.animation_running = True
+            self.update_display()
+            messagebox.showerror('自动洗牌机',
+                                 f'本局发牌已暂停：{exc}\n请退出本局以归还牌张；系统不会放宽取仓规则。',
+                                 parent=self.winfo_toplevel())
+            raise
         self.round_deal_sequence.append(card)
-        self.save_runtime_store(burn_complete=True)
         return card
 
     def _show_cut_dialog(self, second=False):
@@ -1942,19 +1990,13 @@ class BubbleBlackjackGame(tk.Frame):
         return int(result[0] if result[0] is not None else selected['value'])
 
     def start_new_shoe_cut(self):
-        if self._closing or self.animation_running or self.round_active:
+        """兼容旧主程序的入口；连续洗牌机不需要切牌或烧牌。"""
+        if self._closing or self.round_active:
             return
-        self.accept_bets = False
-        self.animation_running = True
-        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_PLAYING)
+        self.animation_running = False
+        self.accept_bets = True
+        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_BETTING)
         self.update_display()
-        cut_position = self._show_cut_dialog(second=self.engine.shuffle_count > 1)
-        self.engine.new_shoe()
-        self.engine.cut_shoe(cut_position)
-        self.save_runtime_store(burn_complete=False)
-        self.clear_card_display()
-        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_PLAYING)
-        self._start_initial_burn()
 
     def _face_photo(self, card):
         return self.external_card_images.get(tuple(card))
@@ -2747,8 +2789,14 @@ class BubbleBlackjackGame(tk.Frame):
         if self.balance + 1e-9 < self.current_bet:
             messagebox.showwarning('余额不足', '还需要支付与主注等额的 Lightning Fee。',
                                    parent=self.winfo_toplevel()); return
-        if self.engine.needs_shuffle() or self.engine.remaining_cards() < 30:
-            self.start_new_shoe_cut(); return
+        if self.engine.remaining_cards() < 30:
+            messagebox.showerror('自动洗牌机', '目前可用牌不足 30 张，请稍后再试。',
+                                 parent=self.winfo_toplevel()); return
+        try:
+            self.engine.start_round()
+        except (CSMError, OSError, RuntimeError) as exc:
+            messagebox.showerror('自动洗牌机', f'无法开始牌局：{exc}',
+                                 parent=self.winfo_toplevel()); return
 
         # The loaded carry-over is one-use. Erase it from JSON immediately when
         # the player commits to dealing, while keeping the in-memory values for
@@ -3539,13 +3587,13 @@ class BubbleBlackjackGame(tk.Frame):
         # Card 0 is a 7: 5:1 is already secured, but it is provisional until
         # target card 2 is known.
         self.side_bet_hit_odds[key] = 5.0
-        self.side_bet_hit_labels[key] = '第0张7'
+        self.side_bet_hit_labels[key] = '第一目标7'
         if len(seq) < 3:
             return
 
         c2 = seq[2]
         if c2[1] != '7':
-            self._credit_side_bet(key, 5, '第0张7')
+            self._credit_side_bet(key, 5, '第一目标7')
             self.save_balance()
             return
 
@@ -3563,9 +3611,9 @@ class BubbleBlackjackGame(tk.Frame):
         c3 = seq[3]
         if c3[1] == '7':
             if c0[0] == c2[0] == c3[0]:
-                result = (2000, '三张同花7')
+                result = (2000, '目标三张同花7')
             else:
-                result = (500, '三张7')
+                result = (500, '目标三张7')
         else:
             result = (provisional_odds, provisional_label)
 
@@ -3968,6 +4016,13 @@ class BubbleBlackjackGame(tk.Frame):
 
     def _reset_after_round(self):
         if self._closing: return
+        try:
+            self.engine.finish_round()
+        except (CSMError, OSError) as exc:
+            self.accept_bets = False
+            messagebox.showerror('自动洗牌机', f'本局牌张归还失败，游戏已暂停：{exc}',
+                                 parent=self.winfo_toplevel())
+            return
         # Preserve the visible dealer/player cards exactly as they finished.
         # They are removed only on the NEXT 开牌 via the 0.20 s upper-left exit.
         self.previous_round_cards_present = bool(self.canvas.find_withtag('dealt_card'))
@@ -3997,12 +4052,8 @@ class BubbleBlackjackGame(tk.Frame):
             self._set_round_control_visibility(False); self.canvas.itemconfigure('chip_selector',state='normal')
             self._raise_visible_bottom_controls(False); self.select_chip(self.selected_chip)
             self.save_runtime_store(burn_complete=True)
-            if self.engine.needs_shuffle():
-                self.accept_bets=False; self.update_display()
-                self._queue(300,self.start_new_shoe_cut)
-            else:
-                self.accept_bets=True; self.canvas.itemconfigure(self.phase_text,text=self.PHASE_BETTING)
-                self.update_display(); self._set_round_control_visibility(False); self._raise_visible_bottom_controls(False)
+            self.accept_bets=True; self.canvas.itemconfigure(self.phase_text,text=self.PHASE_BETTING)
+            self.update_display(); self._set_round_control_visibility(False); self._raise_visible_bottom_controls(False)
         self._animate_betting_station(False,on_complete=after_layout)
 
     def _hand_short_status(self, hand):
@@ -4135,7 +4186,7 @@ class BubbleBlackjackGame(tk.Frame):
             font=(font_name, FONT_TITLE, 'bold'), fg=GOLD, bg=HEADER
         ).place(x=24, y=10)
         tk.Label(
-            header, text='玩法 · 切牌 · 决策按钮 · 下注区域 · 赔付表',
+            header, text='玩法 · 连续洗牌 · 决策按钮 · 下注区域 · 赔付表',
             font=(font_name, FONT_SMALL), fg=MUTED, bg=HEADER
         ).place(x=25, y=48)
 
@@ -4252,7 +4303,7 @@ class BubbleBlackjackGame(tk.Frame):
         # 01 游戏玩法 / 切牌
         # ================================================================
         rules_card = make_card(
-            '01  游戏玩法与切牌说明',
+            '01  游戏玩法与连续洗牌说明',
             '8副完整牌 · ENHC / OBO · S17')
         columns = tk.Frame(rules_card, bg=PANEL)
         columns.pack(fill=tk.X, padx=6, pady=(0, 14))
@@ -4282,21 +4333,20 @@ class BubbleBlackjackGame(tk.Frame):
             '玩家天然黑杰克也使用同一保险选择，不提供1:1的条件。')
 
         add_rule(
-            right_rules, '① 新牌靴',
-            '使用8副完整52张牌，共416张。进入新牌靴时重新洗牌。',
+            right_rules, '① 连续洗牌机',
+            '使用8副完整52张牌，共416张；所有牌局均由CSM_Shuffler连续洗牌机发牌。',
             accent='#7cc8aa')
         add_rule(
-            right_rules, '② 切牌',
-            '切牌窗口内拖动黄色切牌卡选择位置；确认后将两叠牌交换位置。'
-            '也可按ENTER让系统在允许范围内随机完成切牌。',
+            right_rules, '② 连续发牌',
+            '牌张跨局保留在连续洗牌系统中，不建立或切换独立牌靴。',
             accent='#7cc8aa')
         add_rule(
-            right_rules, '③ 烧牌',
-            '切牌后翻开烧牌值牌：A=1；2–9按牌面；10/J/Q/K=10。随后烧掉对应数量的牌。',
+            right_rules, '③ 牌张回收',
+            '每局结束后，已发出的牌进入弃牌区，由连续洗牌机按规则重新混入牌仓。',
             accent='#7cc8aa')
         add_rule(
-            right_rules, '④ 自动换新牌靴',
-            '剩余牌数进入随机155–180张阈值时，在下一局开始前进入新的洗牌、切牌与烧牌流程。',
+            right_rules, '④ 无需换靴',
+            '不使用剩余牌阈值、切牌或烧牌流程；下一局直接由连续洗牌机供牌。',
             accent='#7cc8aa')
         add_rule(
             right_rules, '⑤ 闪电手续费',
@@ -4631,6 +4681,10 @@ class BubbleBlackjackGame(tk.Frame):
             return
         self._closing = True
         self.cancel_pending_callbacks()
+        try:
+            self.engine.close()
+        except (CSMError, OSError):
+            pass
 
         # Refund only unresolved escrow on a forced exit. Already-settled cashouts
         # already-settled cashouts are not refunded again.

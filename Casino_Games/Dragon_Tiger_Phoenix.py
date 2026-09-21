@@ -1,1796 +1,2657 @@
-import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
-from PIL import Image, ImageTk, ImageColor
-import random
+import sys as _account_sys
+from pathlib import Path as _AccountPath
+_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
+if _account_root is None:
+    raise RuntimeError("Cannot locate encrypted account storage")
+if str(_account_root) not in _account_sys.path:
+    _account_sys.path.insert(0, str(_account_root))
+from A_Tools.Account import install_secure_json as _install_secure_json
+_install_secure_json()
+del _install_secure_json, _account_root, _AccountPath, _account_sys
+
+import copy
 import json
-import os, sys
+import math
+import os
+import random
+import re
+import sys
+import tempfile
 import time
+import tkinter as tk
+from datetime import datetime
+from tkinter import messagebox, ttk
 
+# Project layout (same CSM discovery strategy as Blackjack_Classic.py):
+#   A_Tools/Card/CSM_Shuffler.py
+#   A_Tools/Casino_Games/Dragon_Tiger.py
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_CSM_CANDIDATES = [
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'A_Tools', 'Card')),
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'Card')),
+    _THIS_DIR,
+]
+_CARD_TOOLS_DIR = next((p for p in _CSM_CANDIDATES
+                        if os.path.isfile(os.path.join(p, 'CSM_Shuffler.py'))), None)
+if _CARD_TOOLS_DIR is None:
+    raise ModuleNotFoundError('找不到 CSM_Shuffler.py，已檢查：' + '; '.join(_CSM_CANDIDATES))
+if _CARD_TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _CARD_TOOLS_DIR)
+
+from CSM_Shuffler import CSMError, ContinuousShuffleMachine  # type: ignore
+
+DRAGON_TIGER_VERSION = 'V29-DTP-CLEAN'
+
+try:
+    from PIL import Image, ImageTk, ImageDraw, ImageFont
+except ImportError:  # external artwork fallback still works with Canvas primitives
+    Image = None
+    ImageTk = None
+    ImageDraw = None
+    ImageFont = None
+
+
+# -----------------------------------------------------------------------------
+# Account-data compatibility with the original project
+# -----------------------------------------------------------------------------
 def get_data_file_path():
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(parent_dir, 'saving_data.json')
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../A_Tools/Account/saving_data.json')
 
-def save_user_data(users):
-    file_path = get_data_file_path()
-    with open(file_path, 'w', encoding='utf-8') as f:
-        json.dump(users, f, ensure_ascii=False, indent=4)
 
 def load_user_data():
-    file_path = get_data_file_path()
-    with open(file_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    try:
+        with open(get_data_file_path(), 'r', encoding='utf-8') as handle:
+            data = json.load(handle)
+            return data if isinstance(data, list) else []
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return []
+
+
+def save_user_data(users):
+    try:
+        with open(get_data_file_path(), 'w', encoding='utf-8') as handle:
+            json.dump(users, handle, ensure_ascii=False, indent=4)
+    except OSError:
+        pass
+
 
 def update_balance_in_json(username, new_balance):
     users = load_user_data()
     for user in users:
-        if user['user_name'] == username:
-            user['cash'] = f"{new_balance:.2f}"
+        if user.get('user_name') == username:
+            user['cash'] = f'{new_balance:.2f}'
             break
     save_user_data(users)
 
-class DragonTigerPhoenixGame:
-    def __init__(self, decks=8, external_deck=None):
-        if external_deck:
-            self.deck = [(card['suit'], card['rank']) for card in external_deck]
-        else:
-            self.deck = self.create_deck(decks)
-            random.shuffle(self.deck)
 
-        self.dragon_hand = []
-        self.tiger_hand = []
-        self.phoenix_hand = []
-        self.dragon_score = 0
-        self.tiger_score = 0
-        self.phoenix_score = 0
-        self.outcome = None
-        self.cut_position = 0
-        self.used_cards = 0
-        self.total_cards = 0
-        self.create_deck(decks)
-        random.shuffle(self.deck)
+# -----------------------------------------------------------------------------
+# Dragon/Tiger/Phoenix rules / CSM / bet settlement
+# -----------------------------------------------------------------------------
+class DragonTigerEngine:
+    SUITS = ('Club', 'Diamond', 'Heart', 'Spade')
+    RANKS = ('A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K')
+    RED_SUITS = {'Diamond', 'Heart'}
+    BLACK_SUITS = {'Club', 'Spade'}
 
-    def create_deck(self, decks=8):
-        suits = ['Club', 'Diamond', 'Heart', 'Spade']
-        ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
-        self.deck = [(suit, rank) for _ in range(decks) for suit in suits for rank in ranks]
-        random.shuffle(self.deck)
-        self.total_cards = len(self.deck)
-        return self.deck
+    MODE_NAMES = {
+        'classic': '龙虎凤',
+    }
 
-    def advanced_shuffle(self, cut_pos):
-        self.deck = self.deck[cut_pos:] + self.deck[:cut_pos]
-        first_card = self.deck[0]
-        deduct_map = {
-            'A':1, 'J':10, 'Q':10, 'K':10,
-            '10':10, '2':2, '3':3, '4':4, '5':5,
-            '6':6, '7':7, '8':8, '9':9
-        }
-        deduct = deduct_map.get(first_card[1], 0)
-        end_pos = (1 + deduct) % self.total_cards
-        self.deck = self.deck[end_pos:] + self.deck[:end_pos]
-        self.used_cards = random.randint(28, 48)
-        self.cut_position = 0
+    DISPLAY_NAMES = {
+        'Dragon': '龙',
+        'Tie': '和局',
+        'Tiger': '虎',
+        'Phoenix': '凤',
+        'Three Black': '三黑',
+        'One Red Two Black': '一红二黑',
+        'Two Red One Black': '二红一黑',
+        'Three Red': '三红',
+        'Gap 0-6': '差距0-6',
+        'Gap 7-12': '差距7-12',
+    }
 
-    def card_value(self, card):
+    ODDS_TEXT = {
+        'classic': {
+            'Three Black': '6.9:1', 'One Red Two Black': '1.6:1',
+            'Two Red One Black': '1.6:1', 'Three Red': '6.9:1',
+            'Gap 0-6': '0.95:1', 'Gap 7-12': '0.95:1',
+            'Dragon': '1-1.8:1', 'Tie': '7-20:1',
+            'Tiger': '1-1.8:1', 'Phoenix': '1-1.8:1',
+        },
+    }
+
+    MODE_ROWS = {
+        'classic': (
+            ('Three Black', 'One Red Two Black', 'Two Red One Black', 'Three Red'),
+            ('Gap 0-6', 'Tie', 'Gap 7-12'),
+        ),
+    }
+
+    def __init__(self, csm, game_id):
+        self.decks = 8
+        self.csm = csm
+        self.game_id = str(game_id)
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
+        self.round_open = False
+        self.round_id = None
+
+    def _clear_local_csm_state(self):
+        self.round_id = None
+        self.round_open = False
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
+
+    def start_round(self):
+        if self.round_open:
+            raise RuntimeError('上一局尚未结束。')
+        try:
+            self.round_id = self.csm.begin_round(
+                self.game_id, self.current_batch_id if self.card_buffer else None)
+            self.used_by_batch = {}
+            self.round_open = True
+            if not self.card_buffer:
+                self._request_next_chamber()
+        except Exception:
+            # CSM may already have rebuilt all warehouses after the primary error.
+            # Drop every local lease/round reference so stale IDs are never reused.
+            self._clear_local_csm_state()
+            raise
+
+    def _request_next_chamber(self):
+        packet = self.csm.acquire_chamber(self.game_id, self.round_id)
+        self.current_batch_id = packet['batch_id']
+        self.card_buffer = list(packet['cards'])
+        if not self.card_buffer:
+            raise CSMError('自动洗牌机返回了空仓。')
+
+    def remaining_cards(self):
+        return len(self.card_buffer) + self.csm.available_cards()
+
+    def needs_shuffle(self):
+        return False
+
+    @classmethod
+    def rank_value(cls, card):
         rank = card[1]
-        value_map = {
-            'A':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':7,
-            '8':8, '9':9, '10':10, 'J':11, 'Q':12, 'K':13
-        }
-        return value_map.get(rank, 0)
+        if rank == 'A':
+            return 1
+        if rank == 'J':
+            return 11
+        if rank == 'Q':
+            return 12
+        if rank == 'K':
+            return 13
+        return int(rank)
 
-    def deal_initial(self):
-        indices = [(self.cut_position + i) % self.total_cards for i in range(3)]
-        self.dragon_hand = [self.deck[indices[0]]]
-        self.tiger_hand = [self.deck[indices[1]]]
-        self.phoenix_hand = [self.deck[indices[2]]]
-        self.cut_position = (self.cut_position + 3) % self.total_cards
+    @classmethod
+    def card_value(cls, card):
+        """Compatibility helper for the inherited cut/burn animation code.
 
-    def calculate_score(self, hand):
-        if hand:
-            return self.card_value(hand[0])
-        return 0
+        Dragon-Tiger compares full card ranks (A=1 ... K=13), so this simply
+        aliases rank_value().  The burn routine clamps face cards to 10.
+        """
+        return cls.rank_value(card)
 
-    def play_game(self):
-        self.deal_initial()
-        self.dragon_score = self.calculate_score(self.dragon_hand)
-        self.tiger_score = self.calculate_score(self.tiger_hand)
-        self.phoenix_score = self.calculate_score(self.phoenix_hand)
+    @classmethod
+    def score(cls, hand):
+        return cls.rank_value(hand[0]) if hand else 0
 
+    @classmethod
+    def rank_label(cls, value):
+        value = int(value)
+        return {1: 'A', 11: 'J', 12: 'Q', 13: 'K'}.get(value, str(value))
+
+    def draw_card(self):
+        if not self.round_open:
+            raise RuntimeError('牌局尚未开始。')
+        if not self.card_buffer:
+            self._request_next_chamber()
+        record = self.card_buffer.pop(0)
+        self.used_by_batch.setdefault(self.current_batch_id, []).append(record['card_id'])
+        return record['suit'], record['rank']
+
+    def deal_round(self):
+        if not self.round_open:
+            raise RuntimeError('牌局尚未开始。')
+        dragon = [self.draw_card()]
+        tiger = [self.draw_card()]
+        phoenix = [self.draw_card()]
+        dragon_score = self.score(dragon)
+        tiger_score = self.score(tiger)
+        phoenix_score = self.score(phoenix)
         scores = {
-            'Dragon': self.dragon_score,
-            'Tiger': self.tiger_score,
-            'Phoenix': self.phoenix_score
+            'Dragon': dragon_score, 'Tiger': tiger_score, 'Phoenix': phoenix_score,
         }
-        max_score = max(scores.values())
-        winners = [hand for hand, score in scores.items() if score == max_score]
-        num_winners = len(winners)
-
-        if num_winners == 1:
-            self.outcome = {'type': 'single', 'winner': winners[0]}
-        elif num_winners == 2:
-            self.outcome = {'type': 'two_tie', 'tied_hands': winners}
-        else:  # num_winners == 3
-            self.outcome = {'type': 'three_tie'}
-
-class DragonTigerPhoenixGUI(tk.Tk):
-    def __init__(self, initial_balance, username):
-        super().__init__()
-        self.title("龙虎凤")
-        self.geometry("1350x700+50+10")
-        self.configure(bg='#35654d')
-
-        self.bet_buttons = []
-        self.selected_chip = None
-        self.chip_buttons = []
-        self.result_text_id = None
-        self.result_bg_id = None
-
-        self.game_mode = "dragontigerphoenix"
-        self.game = DragonTigerPhoenixGame()
-        self.balance = initial_balance
-        self.current_bets = {}
-        self.card_images = {}
-
-        self.current_streak = 0
-        self.current_streak_type = None
-        self.longest_streaks = {
-            'Dragon': 0, 'Tiger': 0, 'Phoenix': 0,
-            'two_tie': 0, 'three_tie': 0
+        high_score = max(scores.values())
+        tied_winners = [name for name, value in scores.items() if value == high_score]
+        winner = tied_winners[0] if len(tied_winners) == 1 else 'Tie'
+        return {
+            'dragon_hand': dragon,
+            'tiger_hand': tiger,
+            'phoenix_hand': phoenix,
+            'dragon_score': dragon_score,
+            'tiger_score': tiger_score,
+            'phoenix_score': phoenix_score,
+            'winner': winner,
+            'tied_winners': tied_winners,
+            'tie_count': len(tied_winners) if winner == 'Tie' else 0,
+            'natural': False,
+            'reshuffled': False,
+            'shoe_remaining': self.remaining_cards(),
         }
 
-        self.stats_counts = {
-            'Dragon': 0, 'Tiger': 0, 'Phoenix': 0,
-            'two_tie': 0, 'three_tie': 0
-        }
-
-        self.marker_results = []
-        self.marker_counts = {
-            'Dragon': 0, 'Tiger': 0, 'Phoenix': 0,
-            'two_tie': 0, 'three_tie': 0
-        }
-        self.max_marker_rows = 6
-        self.max_marker_cols = 9
-        self.view_mode = "marker"
-        self.bigroad_results = []
-        self._max_rows = 6
-        self._max_cols = 150
-        self._bigroad_occupancy = [[False]*self._max_cols for _ in range(self._max_rows)]
-
-        self._load_assets()
-        self._create_widgets()
-        self._setup_bindings()
-        self.point_labels = {}
-        # 调整扑克牌区域位置：龙左，虎中，凤右
-        self._dragon_area = (310, 150, 310, 350)      # 中心约250
-        self._tiger_area = (560, 150, 560, 350)       # 中心500
-        self._phoenix_area = (810, 150, 810, 350)     # 中心750
-        self.selected_bet_amount = 1000
-        self.current_bet = 0
-        self.last_win = 0
-        self.username = username
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
-
-        self._initialize_game(False)
-
-    def on_close(self):
-        self.destroy()
-        self.quit()
-
-    def disable_all_buttons(self):
-        for btn in self.bet_buttons:
-            btn.config(state=tk.DISABLED, bg=btn.disabled_bg)
-        self.deal_button.config(state=tk.DISABLED)
-        self.reset_button.config(state=tk.DISABLED)
-        self.unbind('<Return>')
-
-    def enable_all_buttons(self):
-        for btn in self.bet_buttons:
-            btn.config(state=tk.NORMAL, bg=btn.original_bg)
-        self.deal_button.config(state=tk.NORMAL)
-        self.reset_button.config(state=tk.NORMAL)
-        for chip in self.chip_buttons:
-            chip['canvas'].bind('<Button-1>',
-                lambda e, t=chip['text'], c=chip['canvas'], cid=chip['chip_id']: self._set_bet_amount(t, c, cid))
-        self.bind('<Return>', lambda e: self.start_game())
-
-    def enable_buttons_except_deal(self):
-        for btn in self.bet_buttons:
-            btn.config(state=tk.NORMAL, bg=btn.original_bg)
-        self.reset_button.config(state=tk.NORMAL)
-        for chip in self.chip_buttons:
-            chip['canvas'].bind('<Button-1>',
-                lambda e, t=chip['text'], c=chip['canvas'], cid=chip['chip_id']: self._set_bet_amount(t, c, cid))
-
-    def _load_assets(self):
-        card_size = (120, 170)
-        suits = ['Club', 'Diamond', 'Heart', 'Spade']
-        ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
-
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
-
-        for suit in suits:
-            for rank in ranks:
-                filename = f"{suit}{rank}.png"
-                path = os.path.join(card_dir, filename)
-                try:
-                    img = Image.open(path).resize(card_size)
-                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img)
-                except Exception as e:
-                    print(f"Error loading {path}: {e}")
-
-        back_path = os.path.join(card_dir, 'Background.png')
+    def finish_round(self):
+        if not self.round_open:
+            return
+        rid = self.round_id
         try:
-            self.back_image = ImageTk.PhotoImage(Image.open(back_path).resize(card_size))
-        except Exception as e:
-            print(f"Error loading back image: {e}")
-
-    def _initialize_game(self, second):
-        self.unbind('<Return>')
-        dialog_w, dialog_h = 360, 190
-
-        dialog = tk.Toplevel(self)
-        dialog.title("切牌")
-        dialog.resizable(False, False)
-        dialog.transient(self)
-        dialog.grab_set()
-
-        dialog.update_idletasks()
-        try:
-            parent_x = self.winfo_rootx()
-            parent_y = self.winfo_rooty()
-            parent_w = self.winfo_width()
-            parent_h = self.winfo_height()
+            for batch_id in list(self.used_by_batch):
+                card_ids = self.used_by_batch[batch_id]
+                if card_ids:
+                    self.csm.return_cards(self.game_id, batch_id, card_ids)
+                del self.used_by_batch[batch_id]
         except Exception:
-            parent_x = parent_y = 0
-            parent_w = parent_h = 0
+            # Do not call end_round with a round ID that may have been erased by
+            # CSM automatic recovery; preserve the primary error instead.
+            self._clear_local_csm_state()
+            raise
+        try:
+            self.csm.end_round(self.game_id, rid)
+        finally:
+            self.round_id = None
+            self.round_open = False
 
-        if parent_w <= 1 or parent_h <= 1:
-            screen_w = dialog.winfo_screenwidth()
-            screen_h = dialog.winfo_screenheight()
-            x = (screen_w - dialog_w) // 2
-            y = (screen_h - dialog_h) // 2
+    def close(self):
+        try:
+            self.csm.release_game(self.game_id, force_shuffle=True)
+        except Exception:
+            # Closing must never resurrect or reuse stale CSM identifiers.
+            pass
+        finally:
+            self._clear_local_csm_state()
+
+    @classmethod
+    def result_rank(cls, result):
+        winner = result.get('winner')
+        if winner == 'Dragon':
+            return int(result.get('dragon_score', 0))
+        if winner == 'Tiger':
+            return int(result.get('tiger_score', 0))
+        if winner == 'Phoenix':
+            return int(result.get('phoenix_score', 0))
+        return max(int(result.get('dragon_score', 0)), int(result.get('tiger_score', 0)),
+                   int(result.get('phoenix_score', 0)))
+
+    @classmethod
+    def side_return_factors(cls, result, mode, current_bets=None):
+        """Return total-return factors for colour-count and rank-gap wagers."""
+        del mode, current_bets
+        cards = (result['dragon_hand'][0], result['tiger_hand'][0],
+                 result['phoenix_hand'][0])
+        red_count = sum(card[0] in cls.RED_SUITS for card in cards)
+        colour_bet = {
+            0: ('Three Black', 7.9),
+            1: ('One Red Two Black', 2.6),
+            2: ('Two Red One Black', 2.6),
+            3: ('Three Red', 7.9),
+        }[red_count]
+        factors = {colour_bet[0]: colour_bet[1]}
+
+        scores = (int(result['dragon_score']), int(result['tiger_score']),
+                  int(result['phoenix_score']))
+        gap = max(scores) - min(scores)
+        factors['Gap 0-6' if gap <= 6 else 'Gap 7-12'] = 1.95
+        return factors
+
+    @classmethod
+    def main_return_factor(cls, bet_type, result, mode):
+        del mode
+        winner = result['winner']
+        if bet_type == 'Tie':
+            if winner != 'Tie':
+                return 0.0
+            return 21.0 if int(result.get('tie_count', 0)) == 3 else 8.0
+        if bet_type in ('Dragon', 'Tiger', 'Phoenix'):
+            if winner == bet_type:
+                return 2.8  # 独赢：本金 + 1.8 倍利润。
+            tied = result.get('tied_winners', [])
+            if winner == 'Tie' and len(tied) == 2 and bet_type in tied:
+                return 2.0  # 两家同为最高：本金 + 1 倍利润。
+            return 0.0
+        return 0.0
+
+    @classmethod
+    def resolve_bets(cls, bets, result, mode, jackpot_amount=0.0):
+        del jackpot_amount
+        side_factors = cls.side_return_factors(result, mode, bets)
+        outcomes = []
+        credit = 0.0
+        gross_profit = 0.0
+        lost_stake = 0.0
+
+        for bet_type, stake in bets.items():
+            stake = float(stake)
+            if stake <= 0:
+                continue
+            if bet_type in ('Dragon', 'Tie', 'Tiger', 'Phoenix'):
+                factor = cls.main_return_factor(bet_type, result, mode)
+            else:
+                factor = float(side_factors.get(bet_type, 0.0))
+
+            returned = stake * factor
+            if factor > 1.0:
+                status = 'win'
+                profit = returned - stake
+                gross_profit += profit
+            elif abs(factor - 1.0) < 1e-9:
+                status = 'push'
+                profit = 0.0
+            elif factor > 0.0:
+                status = 'half_loss' if abs(factor - 0.5) < 1e-9 else 'partial_loss'
+                profit = returned - stake
+                lost_stake += stake - returned
+            else:
+                status = 'lose'
+                profit = -stake
+                lost_stake += stake
+
+            credit += returned
+            outcomes.append({
+                'key': (bet_type, None),
+                'label': cls.DISPLAY_NAMES.get(bet_type, bet_type),
+                'status': status,
+                'stake': stake,
+                'return_factor': factor,
+                'profit': profit,
+                'return_amount': returned,
+            })
+
+        return {
+            'credit': credit,
+            'gross_profit': gross_profit,
+            'lost_stake': lost_stake,
+            'net': gross_profit - lost_stake,
+            'outcomes': outcomes,
+            'side_factors': side_factors,
+            'jackpot_win': 0.0,
+        }
+
+
+class DragonTigerBetState:
+    def __init__(self):
+        self.bets = {}
+
+    def total_at_risk(self):
+        return sum(float(value) for value in self.bets.values())
+
+    def current_area_bet(self, bet_type, _param=None):
+        return float(self.bets.get(bet_type, 0.0))
+
+    def add_bet(self, bet_type, amount, _param=None):
+        if amount <= 0:
+            return False
+        self.bets[bet_type] = self.current_area_bet(bet_type) + float(amount)
+        return True
+
+    def remove_amount(self, bet_type, amount, _param=None):
+        current = self.current_area_bet(bet_type)
+        removed = min(current, max(0.0, float(amount)))
+        left = current - removed
+        if left > 1e-9:
+            self.bets[bet_type] = left
         else:
-            x = parent_x + (parent_w - dialog_w) // 2
-            y = parent_y + (parent_h - dialog_h) // 2
+            self.bets.pop(bet_type, None)
+        return removed
 
-        dialog.geometry(f"{dialog_w}x{dialog_h}+{int(x)}+{int(y)}")
+    def clear_area(self, bet_type, _param=None):
+        return float(self.bets.pop(bet_type, 0.0))
 
+    def clear_all(self):
+        amount = self.total_at_risk()
+        self.bets.clear()
+        return amount
+
+
+# -----------------------------------------------------------------------------
+# Canvas interface adapted for Dragon/Tiger
+# -----------------------------------------------------------------------------
+class BubbleDragonTigerGame(tk.Frame):
+    # V25-CSM: temp_finish_data remains the full 300-round history source;
+    # last_72_record is a matching rolling cache used only by the Bead Plate.
+    WIDTH = 1150
+    HEIGHT = 750
+
+    # V12 layout: column-scrolling bead plate and 70% larger Big Road viewport.
+    GAME_X0 = 12
+    GAME_X1 = 770
+    HISTORY_X0 = 778
+    HISTORY_X1 = 1138
+    BOARD_INNER_X0 = 22
+    BOARD_INNER_X1 = 760
+
+    BG = '#17120f'
+    PANEL = '#211811'
+    PANEL_LINE = '#665240'
+    FELT = '#083f38'
+    FELT_2 = '#0c5148'
+    LINE = '#c3d5ca'
+    GOLD = '#e7d36c'
+    DRAGON_RED = '#d94a4e'
+    TIGER_YELLOW = '#d3a202'
+    PHOENIX_BLUE = '#2878d0'
+    TIE_GREEN = '#43a665'
+
+    # Result-area flash palette.  The dealing panels flash independently from
+    # the betting spots so the winning hand is obvious even with no wager.
+    DRAGON_ZONE_BASE = '#4b1e22'
+    DRAGON_ZONE_RED = '#c93643'
+    DRAGON_ZONE_LIGHT = '#ff9ca2'
+    TIGER_ZONE_BASE = '#514514'
+    TIGER_ZONE_YELLOW = '#d5ae20'
+    TIGER_ZONE_LIGHT = '#ffe98b'
+    PHOENIX_ZONE_BASE = '#173b66'
+    PHOENIX_ZONE_BLUE = '#2878d0'
+    PHOENIX_ZONE_LIGHT = '#9bcaff'
+    TIE_FLASH_DARK = '#23874b'
+    TIE_FLASH_LIGHT = '#78e49a'
+
+    MIN_BET = 100.0
+    MAX_TABLE_BET = 2_000_000.0
+    MAX_RECORDS = 300
+    BEAD_MAX_RECORDS = 72
+    HISTORY_DROP_COUNT = 6
+
+    CHIP_SPECS = [
+        (100, '#202020', '100'),
+        (500, '#d780c0', '500'),
+        (1000, '#ab0058', '1K'),
+        (5000, '#ba3438', '5K'),
+        (10000, '#70439a', '10K'),
+        (30000, '#d0a347', '30K'),
+        (50000, '#2e7542', '50K'),
+    ]
+
+    MODE_ORDER = ('classic',)
+
+    BET_COLORS = {
+        'Dragon': '#d94a4e', 'Tie': '#43a665', 'Tiger': '#a57900',
+        'Phoenix': '#2878d0',
+        'Three Black': '#222222', 'One Red Two Black': '#5b3133',
+        'Two Red One Black': '#8c3238', 'Three Red': '#bd2632',
+        'Gap 0-6': '#6d4aa2', 'Gap 7-12': '#8d6632',
+    }
+
+    def __init__(self, parent, balance=10000, user=None, on_back=None,
+                 on_balance_change=None, game_mode='classic'):
+        super().__init__(parent, bg=self.BG, width=self.WIDTH, height=self.HEIGHT)
+        self.pack_propagate(False)
+        self.root = self
+        self.username = user
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
+        self.balance = float(balance)
+        self.final_balance = float(balance)
+        self.summary_mode = 'bet'
+        self.last_win_amount = 0.0
+        self.last_net = 0.0
+
+        self.game_mode = 'classic'
+        import uuid
+        self.csm_game_id = f"DragonTigerPhoenix:{self.username or 'local'}:{uuid.uuid4().hex}"
+        self.csm = ContinuousShuffleMachine()
+        self.engine = DragonTigerEngine(self.csm, self.csm_game_id)
+        self.bet_state = DragonTigerBetState()
+        self.selected_chip = 1000.0
+        self.undo_stack = []
+        self.last_round_bets = []
+        self.bet_spots = {}
+        self.chip_selector_items = {}
+        self.control_buttons = {}
+
+        self.accept_bets = True
+        self.animation_running = False
+        self.settlement_running = False
+        self.animation_after_ids = []
+        self.settlement_after_id = None
+        self.flash_mode = None
+        self.flash_winning_keys = set()
+        self.flash_winner_amounts = {}
+        self.flash_original_amounts = {}
+        self.flash_original_text_colors = {}
+        self.pre_deal_bets = None
+        self.current_result = None
+        self.settlement_flash_step = 0
+        # Keep any tied winning wager chips visible during settlement.
+        self.settlement_hold_amounts = {}
+        self.result_panel_flash_winner = None
+        self._closing = False
+
+        self.history_panel_mode = 'roads'
+        # V12: Big Road is a 50-column logical board viewed through a
+        # horizontally scrollable window.  New results follow the right edge
+        # until the dragon manually moves the scrollbar.
+        self.big_road_scroll_col = 0
+        self.big_road_auto_follow = True
+        self.big_road_virtual_cols = 50
+        # V12: 14 visible columns makes each Big Road cell ~71% larger than V11's 24-column viewport.
+        self.big_road_view_cols = 14
+        self.runtime_json_dir = self.get_runtime_json_dir()
+        # CSM owns all card/shoe state. temp_finish_data drives every history
+        # view except the Bead Plate, which alone uses last_72_record.
+        self.runtime_data_file = os.path.join(self.runtime_json_dir, 'Dragon_Tiger_Phoenix.json')
+        self.runtime_store = self.load_runtime_store()
+        self.history_file = self.runtime_data_file
+        self.history_store = self.load_history_store()
+        self.history_data = self.history_records_from_store()
+        self.last_72_store = self.load_last_72_store()
+        self.last_72_data = self.last_72_records_from_store()
+        self.statistic_data = self.load_statistic_data()
+        self.runtime_store['temp_finish_data'] = copy.deepcopy(self.history_store)
+        self.runtime_store['last_72_record'] = copy.deepcopy(self.last_72_store)
+        self._write_runtime_store()
+        # Bead Plate text can be toggled between result labels/special marks and
+        # the winning point value by clicking anywhere on the bead grid.
+        self.bead_show_scores = False
+
+        self.jackpot_file = self.get_jackpot_file()
+        self.jackpot_amount = self.load_jackpot()
+
+        # Prefer the original external card artwork. If the project
+        # assets are unavailable, draw the temporary V4-style cards instead.
+        self.external_card_images = {}
+        self.external_card_images_rotated = {}
+        self.external_back_image = None
+        self.card_asset_dir = None
+        self.load_original_card_assets()
+
+        top = self.winfo_toplevel()
         try:
-            self.window.protocol("WM_DELETE_WINDOW", self.do_nothing)
-        except Exception:
+            top.geometry('1150x750+50+10')
+            top.resizable(False, False)
+        except tk.TclError:
             pass
 
-        if second:
-            tk.Label(dialog, text="牌靴已经用完 \n请老板切牌 切牌位置在103-299之间",
-                    font=('微软雅黑', 10)).pack(pady=(8, 4))
-        else:
-            tk.Label(dialog, text="请老板切牌 切牌位置在103-299之间",
-                    font=('微软雅黑', 10)).pack(pady=(8, 4))
+        top.bind('<Return>', self.handle_enter_deal)
+        self.bind('<Escape>', lambda _event: self.exit_game())
 
-        entry_frame = tk.Frame(dialog)
-        entry_frame.pack(pady=(2, 6))
+        self.create_ui()
+        self.select_chip(self.selected_chip)
+        self.update_display()
 
-        tk.Label(entry_frame, text="切牌位置:", font=('微软雅黑', 10)).pack(side=tk.LEFT, padx=(6, 8))
+    # ------------------------------------------------------------------ UI base
+    def create_ui(self):
+        self.canvas = tk.Canvas(self, width=self.WIDTH, height=self.HEIGHT,
+                                bg=self.BG, highlightthickness=0)
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+        self.canvas.create_rectangle(0, 0, self.WIDTH, self.HEIGHT,
+                                     fill=self.BG, outline='', tags='static')
+        self.draw_history_panel()
+        self.draw_animation_panel()
+        self.draw_board()
+        self.draw_bottom_controls()
+        self.canvas.bind('<Button-1>', self._handle_bead_click, add='+')
 
-        entry_var = tk.StringVar()
-        entry = tk.Entry(entry_frame, font=('Arial', 12), width=8, textvariable=entry_var)
-        entry.pack(side=tk.LEFT)
-        entry.focus_set()
+    def draw_history_panel(self):
+        """Right-side Big Road, Bead Plate and the four-result pie chart."""
+        c = self.canvas
+        x0, y0, x1, y1 = self.HISTORY_X0, 4, self.HISTORY_X1, 620
+        c.create_rectangle(x0, y0, x1, y1, fill=self.PANEL,
+                           outline=self.PANEL_LINE, width=2, tags='static')
+        self.history_panel_bounds = (x0, y0, x1, y1)
+        c.create_text((x0 + x1) / 2, 20, text='历史记录',
+                      font=('Arial', 15, 'bold'), fill='#d4c3a9', tags='static')
+        self.history_tab_items = {}
+        self._draw_history_content()
 
-        scale_var = tk.IntVar(value=200)
-        scale = tk.Scale(dialog, from_=103, to=299, orient=tk.HORIZONTAL, length=240,
-                        variable=scale_var, showvalue=False)
-        scale.pack(pady=(4, 4))
-
-        result = [None]
-        self.bigroad_results = []
-
-        def on_scale_change(v):
-            try:
-                vi = int(float(v))
-            except Exception:
-                return
-            entry_var.set(str(vi))
-        scale.configure(command=on_scale_change)
-
-        def on_entry_change(event=None):
-            s = entry_var.get().strip()
-            if s == "":
-                return
-            try:
-                v = int(s)
-            except Exception:
-                return
-        entry.bind('<KeyRelease>', on_entry_change)
-
-        def on_ok():
-            s = entry_var.get().strip()
-            if s == "":
-                result[0] = None
-            else:
-                try:
-                    v = int(s)
-                except Exception:
-                    result[0] = None
-                    dialog.destroy()
-                    return
-                if v < 103:
-                    v = 103
-                elif v > 299:
-                    v = 299
-                entry_var.set(str(v))
-                scale_var.set(v)
-                result[0] = v
-            dialog.destroy()
-
-        def on_cancel():
-            result[0] = None
-            dialog.destroy()
-
-        btn_frame = tk.Frame(dialog)
-        btn_frame.pack(pady=8)
-
-        tk.Button(btn_frame, text="随机", width=8, command=on_cancel).pack(side=tk.LEFT, padx=10)
-        tk.Button(btn_frame, text="确认", width=8, command=on_ok).pack(side=tk.LEFT, padx=10)
-
-        dialog.bind('<Return>', lambda e: on_ok())
-        self.wait_window(dialog)
-
-        cut_position = result[0]
-
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        tools_dir = os.path.join(os.path.dirname(current_dir), 'A_Tools')
-        card_dir = os.path.join(tools_dir, 'Card')
-        shuffle_py = os.path.join(card_dir, 'shuffle.py')
-
-        external_deck = None
-        external_cut_position = None
-
-        try:
-            import importlib.util
-            import secrets as _secrets
-            spec = importlib.util.spec_from_file_location("shuffle_mod", shuffle_py)
-            if spec and spec.loader:
-                shuffle_mod = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(shuffle_mod)
-                try:
-                    external_deck = shuffle_mod.generate_shuffled_deck(has_joker=False, deck_count=8)
-                    if isinstance(external_deck, (list, tuple)):
-                        total_cards = len(external_deck)
-                        lower = 103
-                        upper = min(299, total_cards - 1)
-                        if upper >= lower:
-                            external_cut_position = int(_secrets.randbelow(upper - lower + 1)) + lower
-                        else:
-                            external_cut_position = min(max(total_cards // 2, lower), max(lower, total_cards - 1))
-                    else:
-                        external_deck = None
-                        external_cut_position = None
-                except Exception as e:
-                    print(f"调用 shuffle.generate_shuffled_deck 出错: {e}")
-                    external_deck = None
-                    external_cut_position = None
-            else:
-                print("无法加载 shuffle.py 模块")
-        except Exception as e:
-            print(f"载入 shuffle.py 时出错: {e}")
-            external_deck = None
-            external_cut_position = None
-
-        if cut_position is None:
-            if external_cut_position is not None and 103 <= external_cut_position <= 299:
-                cut_position = external_cut_position
-            else:
-                cut_position = random.randint(103, 299)
-
-        self.game = DragonTigerPhoenixGame(external_deck=external_deck)
-        self.game.advanced_shuffle(cut_position)
-
-        self.marker_results = []
-        self.marker_counts = {
-            'Dragon':0, 'Tiger':0, 'Phoenix':0, 'two_tie':0, 'three_tie':0
-        }
-        self.stats_counts = {
-            'Dragon':0, 'Tiger':0, 'Phoenix':0, 'two_tie':0, 'three_tie':0
-        }
-        self.reset_marker_road()
-        self.reset_bigroad()
-
-        self._initial_draw_and_discard()
-
-    def _initial_draw_and_discard(self):
-        self.disable_all_buttons()
-        self.table_canvas.delete('all')
-        self._draw_table_labels()
-
-        first_card = self.game.deck[0]
-        self.game.deck = self.game.deck[1:]
-
-        first_card_id = self.table_canvas.create_image(500, 0, image=self.back_image)
-
-        def move_first_card(step=0):
-            if step <= 30:
-                x = 500 + (120 - 500) * (step / 30)
-                y = 0 + (225 - 0) * (step / 30)
-                self.table_canvas.coords(first_card_id, x, y)
-                self.after(10, move_first_card, step+1)
-            else:
-                self._flip_first_card(first_card_id, first_card)
-        move_first_card()
-
-    def _flip_first_card(self, card_id, card):
-        def flip_step(step=0):
-            steps = 12
-            if step > steps:
-                try:
-                    self.table_canvas.itemconfig(card_id, image=self.card_images[card])
-                except Exception:
-                    pass
-                deduct_map = {
-                    'A':1, 'J':10, 'Q':10, 'K':10,
-                    '10':10, '2':2, '3':3, '4':4, '5':5,
-                    '6':6, '7':7, '8':8, '9':9
-                }
-                discard_count = deduct_map.get(card[1], 0)
-                self.after(500, lambda: self._discard_cards_animation(discard_count))
-                return
-
-            half = steps // 2
-            if step <= half:
-                ratio = 1 - (step / float(half))
-                use_back = True
-            else:
-                ratio = (step - half) / float(half)
-                use_back = False
-
-            orig_w, orig_h = 120, 170
-            w = max(1, int(orig_w * ratio))
-            img = self._create_scaled_image(card, w, orig_h, use_back=use_back)
-            if not hasattr(self, '_temp_flip_images'):
-                self._temp_flip_images = {}
-            self._temp_flip_images[card_id] = img
-            try:
-                self.table_canvas.itemconfig(card_id, image=img)
-            except Exception:
-                pass
-            self.after(20, lambda: flip_step(step+1))
-        flip_step()
-
-    def _discard_cards_animation(self, discard_count):
-        if discard_count == 0:
-            self._finish_initial_discard()
+    def switch_history_panel(self, mode):
+        if mode not in ('roads', 'data') or mode == self.history_panel_mode:
             return
-        self.discard_cards = []
-        self.current_discard_index = 0
-        self._animate_single_discard_card(discard_count)
+        self.history_panel_mode = mode
+        if mode == 'roads':
+            self.big_road_auto_follow = True
+        self._draw_history_content()
+        self.update_history_table()
 
-    def _animate_single_discard_card(self, total_discard_count):
-        if self.current_discard_index >= total_discard_count:
-            self.after(5000, self._remove_discard_cards)
+    def _update_history_tab_style(self):
+        for mode, (rect, txt) in getattr(self, 'history_tab_items', {}).items():
+            selected = mode == self.history_panel_mode
+            self.canvas.itemconfigure(rect,
+                                      fill='#a57e38' if selected else '#30271f',
+                                      outline='#f2d77c' if selected else '#8d765e',
+                                      width=2 if selected else 1)
+            self.canvas.itemconfigure(txt, fill='#111111' if selected else '#d9c8af')
+
+    def _draw_history_content(self):
+        self.canvas.delete('history_panel_content')
+        self.canvas.delete('history_dynamic')
+        self._draw_roads_page()
+
+    def _draw_roads_page(self):
+        """Draw only Big Road and Bead Plate; summary sits under the beads."""
+        c = self.canvas
+        panel_x0, panel_x1 = 786, 1130
+        panel_w = panel_x1 - panel_x0
+
+        # ----- Row 1: Big Road.  The logical board is 50 columns wide, while
+        # a 14-column viewport enlarges each Big Road mark by about 70% vs V11.
+        big_x0 = panel_x0
+        big_y0 = 42
+        big_cell = panel_w / self.big_road_view_cols
+        self.road_geometries = {
+            'big': (big_x0, big_y0, big_cell, 6, self.big_road_view_cols),
+        }
+        self._draw_road_grid(*self.road_geometries['big'])
+        self._draw_big_road_scrollbar(big_x0, big_y0 + 6 * big_cell + 5, panel_w)
+
+        # ----- Bead Plate.
+        bead_cell = 27
+        bead_cols = 12
+        bead_w = bead_cell * bead_cols
+        bead_x0 = panel_x0 + (panel_w - bead_w) / 2
+        bead_y0 = 218
+        self.road_geometries['bead'] = (bead_x0, bead_y0, bead_cell, 6, bead_cols)
+        self._draw_road_grid(*self.road_geometries['bead'])
+
+        self.history_chart_geometry = {'winner': (panel_x0, 392, panel_x1, 610)}
+        c.create_rectangle(panel_x0, 392, panel_x1, 610, fill='#15110f',
+                           outline='#7c6754', width=1, tags='history_panel_content')
+
+    def _asterisk_note_text(self):
+        return '* 两家同为最高时同大者 1:1；三家同点通杀'
+
+    def _draw_big_road_scrollbar(self, x0, y0, width):
+        """Draw a functional horizontal scrollbar for the 50-column Big Road."""
+        c = self.canvas
+        self.big_road_scroll_track = (x0, y0, x0 + width, y0 + 10)
+        c.create_rectangle(*self.big_road_scroll_track, fill='#30271f',
+                           outline='#7c6754', width=1,
+                           tags=('history_panel_content', 'bigroad_scroll'))
+        # The thumb represents the visible fraction of the 50-column logical road.
+        ratio = min(1.0, self.big_road_view_cols / self.big_road_virtual_cols)
+        thumb_w = max(28, width * ratio)
+        self.big_road_scroll_thumb_width = thumb_w
+        self.big_road_scroll_thumb = c.create_rectangle(
+            x0, y0 + 1, x0 + thumb_w, y0 + 9,
+            fill='#a57e38', outline='#f2d77c', width=1,
+            tags=('history_panel_content', 'bigroad_scroll'))
+        c.tag_bind('bigroad_scroll', '<Button-1>', self._set_big_road_scroll_from_event)
+        c.tag_bind('bigroad_scroll', '<B1-Motion>', self._set_big_road_scroll_from_event)
+        c.tag_bind('bigroad_scroll', '<Enter>', lambda _e: c.configure(cursor='sb_h_double_arrow'))
+        c.tag_bind('bigroad_scroll', '<Leave>', lambda _e: c.configure(cursor=''))
+        self._update_big_road_scroll_thumb()
+
+    def _set_big_road_scroll_from_event(self, event):
+        track = getattr(self, 'big_road_scroll_track', None)
+        if not track:
             return
-        start_x, start_y = 500, 0
-        card_id = self.table_canvas.create_image(start_x, start_y, image=self.back_image)
-        self.discard_cards.append(card_id)
-        i = self.current_discard_index
-        row = i // 5
-        col = i % 5
-        if total_discard_count <= 5:
-            target_x = 260 + col * 120
-            target_y = 225
-        else:
-            target_x = 260 + col * 120
-            target_y = 130 + row * 170
+        x0, _y0, x1, _y1 = track
+        width = x1 - x0
+        thumb_w = getattr(self, 'big_road_scroll_thumb_width', width)
+        movable = max(1.0, width - thumb_w)
+        # Centre the thumb under the pointer for both click and drag.
+        thumb_left = min(max(event.x - thumb_w / 2, x0), x1 - thumb_w)
+        fraction = (thumb_left - x0) / movable
+        max_start = max(0, self.big_road_virtual_cols - self.big_road_view_cols)
+        self.big_road_scroll_col = int(round(fraction * max_start))
+        self.big_road_auto_follow = False
+        self._update_big_road_scroll_thumb()
+        self.update_history_table()
 
-        def move_single_card(step=0):
-            if step <= 30:
-                x = start_x + (target_x - start_x) * (step / 30)
-                y = start_y + (target_y - start_y) * (step / 30)
-                self.table_canvas.coords(card_id, x, y)
-                self.after(10, move_single_card, step+1)
-            else:
-                self.current_discard_index += 1
-                self.after(200, lambda: self._animate_single_discard_card(total_discard_count))
-        move_single_card()
-
-    def _remove_discard_cards(self):
-        for card_id in self.discard_cards:
-            self.table_canvas.delete(card_id)
-        discard_count = len(self.discard_cards)
-        if discard_count > 0:
-            self.game.deck = self.game.deck[discard_count:]
-        self.discard_cards = []
-        self._finish_initial_discard()
-
-    def _finish_initial_discard(self):
-        self.table_canvas.delete('all')
-        self._draw_table_labels()
-        self.enable_all_buttons()
-
-    def do_nothing(self):
-        pass
-
-    def reset_bigroad(self):
-        self.bigroad_results.clear()
-        self._bigroad_occupancy = [
-            [False] * self._max_cols for _ in range(self._max_rows)
-        ]
-        if hasattr(self, 'bigroad_canvas'):
-            self.bigroad_canvas.delete('data')
-
-    def _create_stats_display(self, parent):
-        self.stats_frame = tk.Frame(parent, bg='#D0E7FF', height=200)
-        self.stats_frame.pack(fill=tk.X, pady=(0,0))
-        self.stats_frame.pack_propagate(False)
-
-        title_label = tk.Label(
-            self.stats_frame,
-            text="统计结果",
-            font=('Arial', 16, 'bold'),
-            bg='#D0E7FF',
-            fg='#000000'
-        )
-        title_label.pack(pady=(3,0))
-
-        table_frame = tk.Frame(self.stats_frame, bg='#D0E7FF')
-        table_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=2)
-
-        headers = ['赢家', '图标', '数量']
-        for i, header in enumerate(headers):
-            header_label = tk.Label(
-                table_frame,
-                text=header,
-                font=('Arial', 12, 'bold'),
-                bg='#4B8BBE',
-                fg='white',
-                width=12,
-                height=1,
-                relief=tk.RAISED,
-                bd=2
-            )
-            header_label.grid(row=0, column=i, padx=1, pady=1, sticky='nsew')
-
-        stats_items = [
-            {'key':'dragon', 'text':'龙', 'color':'#FF0000', 'icon_text':'龙', 'text_color':'white'},
-            {'key':'tiger', 'text':'虎', 'color':'#FFA600', 'icon_text':'虎', 'text_color':'black'},
-            {'key':'phoenix', 'text':'凤', 'color':'#007BFF', 'icon_text':'凤', 'text_color':'white'},
-            {'key':'two_tie', 'text':'两家和', 'color':'#00FF00', 'icon_text':'和', 'text_color':'black'},
-            {'key':'three_tie', 'text':'三家和', 'color':'#FFFFFF', 'icon_text':'和', 'text_color':'black'}
-        ]
-
-        self.stats_rows = {}
-        for row_idx, item in enumerate(stats_items, 1):
-            name_label = tk.Label(
-                table_frame,
-                text=item['text'],
-                font=('Arial', 12),
-                bg='#FFFFFF',
-                fg='#000000',
-                width=10,
-                height=1,
-                relief=tk.RIDGE,
-                bd=1
-            )
-            name_label.grid(row=row_idx, column=0, padx=1, pady=1, sticky='nsew')
-
-            icon_frame = tk.Frame(table_frame, bg='#FFFFFF', width=40, height=30)
-            icon_frame.grid(row=row_idx, column=1, padx=1, pady=1, sticky='nsew')
-            icon_frame.grid_propagate(False)
-
-            icon_canvas = tk.Canvas(
-                icon_frame,
-                width=22,
-                height=22,
-                bg='#FFFFFF',
-                highlightthickness=0
-            )
-            icon_canvas.place(relx=0.5, rely=0.5, anchor='center')
-
-            center_x, center_y = 11, 11
-            radius = 8
-            icon_canvas.create_oval(
-                center_x - radius, center_y - radius,
-                center_x + radius, center_y + radius,
-                fill=item['color'],
-                outline='#000000',
-                width=1
-            )
-            icon_canvas.create_text(
-                center_x, center_y,
-                text=item['icon_text'],
-                fill=item['text_color'],
-                font=('Arial', 8, 'bold')
-            )
-
-            count_label = tk.Label(
-                table_frame,
-                text="0",
-                font=('Arial', 12, 'bold'),
-                bg='#FFFFFF',
-                fg='#000000',
-                width=6,
-                height=1,
-                relief=tk.RIDGE,
-                bd=1
-            )
-            count_label.grid(row=row_idx, column=2, padx=1, pady=1, sticky='nsew')
-
-            self.stats_rows[item['key']] = {
-                'name_label': name_label,
-                'icon_canvas': icon_canvas,
-                'count_label': count_label
-            }
-
-        for i in range(3):
-            table_frame.columnconfigure(i, weight=1)
-        for i in range(6):
-            table_frame.rowconfigure(i, weight=1, minsize=25)
-
-    def reset_marker_road(self):
-        self.marker_results = []
-        self.stats_counts = {
-            'Dragon':0, 'Tiger':0, 'Phoenix':0, 'two_tie':0, 'three_tie':0
-        }
-        self.marker_counts = {
-            'Dragon':0, 'Tiger':0, 'Phoenix':0, 'two_tie':0, 'three_tie':0
-        }
-        self._update_stats_display()
-        self._draw_marker_grid()
-
-    def _create_widgets(self):
-        main_frame = ttk.Frame(self)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-
-        left_frame = ttk.Frame(main_frame, width=900)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        right_frame = ttk.Frame(main_frame, width=450)
-        right_frame.pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.table_canvas = tk.Canvas(left_frame, bg='#35654d', highlightthickness=0, height=400)
-        self.table_canvas.pack(fill=tk.BOTH, expand=False)
-        self._draw_table_labels()
-
-        betting_area = tk.Frame(left_frame, bg='#D0E7FF', height=180)
-        betting_area.pack(fill=tk.BOTH, expand=True, pady=5)
-
-        betting_left = tk.Frame(betting_area, bg='#D0E7FF', width=500)
-        betting_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
-
-        betting_center = tk.Frame(betting_area, bg='#D0E7FF', width=200)
-        betting_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
-
-        betting_right = tk.Frame(betting_area, bg='#D0E7FF', width=200)
-        betting_right.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
-
-        self._populate_betting_area(betting_left, betting_center, betting_right)
-
-        self._create_control_panel(right_frame)
-
-    def _draw_table_labels(self):
-        # 清除原有内容
-        self.table_canvas.delete('all')
-        # 绘制分割线：在龙与虎之间，虎与凤之间
-        self.table_canvas.create_line(375, 50, 375, 350, width=3, fill='white', tags='divider')
-        self.table_canvas.create_line(625, 50, 625, 350, width=3, fill='white', tags='divider')
-        # 标签：龙左，虎中，凤右
-        self.table_canvas.create_text(250, 30, text="龙", font=('Arial', 30, 'bold'), fill='white')
-        self.table_canvas.create_text(500, 30, text="虎", font=('Arial', 30, 'bold'), fill='white')
-        self.table_canvas.create_text(750, 30, text="凤", font=('Arial', 30, 'bold'), fill='white')
-
-        self.result_text_id = self.table_canvas.create_text(
-            500, 370,
-            text="",
-            font=('Arial', 34, 'bold'),
-            fill='white',
-            tags=('result_text')
-        )
-        self.result_bg_id = self.table_canvas.create_rectangle(
-            0,0,0,0,
-            fill='',
-            outline='',
-            tags=('result_bg')
-        )
-
-    def _get_card_positions(self, hand_type):
-        if hand_type == "dragon":
-            area = self._dragon_area
-        elif hand_type == "tiger":
-            area = self._tiger_area
-        else:  # phoenix
-            area = self._phoenix_area
-        hand = getattr(self.game, hand_type + '_hand', [])
-        card_count = len(hand)
-        base_x = area[0] + (area[2]-area[0]-120)/2
-        positions = []
-        for i in range(card_count):
-            x = base_x + i*120
-            y = area[1]
-            positions.append((int(round(x)), int(round(y))))
-        return positions
-
-    def _create_chip_button(self, parent, text, bg_color):
-        size = 60
-        canvas = tk.Canvas(parent, width=size, height=size,
-                        highlightthickness=0, background='#D0E7FF')
-        chip_id = canvas.create_oval(2,2, size-2, size-2,
-                                    fill=bg_color, outline='', width=0)
-        rgb = ImageColor.getrgb(bg_color)
-        luminance = 0.299*rgb[0] + 0.587*rgb[1] + 0.114*rgb[2]
-        text_color = 'white' if luminance < 140 else 'black'
-        canvas.create_text(size/2, size/2, text=text,
-                        fill=text_color, font=('Arial', 16, 'bold'))
-        canvas.bind('<Button-1>', lambda e, t=text, c=canvas, cid=chip_id: self._set_bet_amount(t, c, cid))
-        self.chip_buttons.append({
-            'canvas': canvas,
-            'chip_id': chip_id,
-            'text': text
-        })
-        return canvas
-
-    def _set_bet_amount(self, chip_text, clicked_canvas, clicked_chip_id):
-        for chip in self.chip_buttons:
-            if chip['canvas'] != clicked_canvas:
-                chip['canvas'].itemconfig(chip['chip_id'], outline='', width=0)
-                chip['canvas'].delete('glow')
-        clicked_canvas.itemconfig(clicked_chip_id, outline='yellow', width=4)
-        for chip in self.chip_buttons:
-            if chip['canvas'] == clicked_canvas:
-                self.selected_chip = chip
-                self.selected_canvas = chip['canvas']
-                self.selected_id = chip['chip_id']
-                break
-        if '千' in chip_text:
-            amount = int(chip_text.replace('千', '')) * 1000
-        elif '万' in chip_text:
-            amount = int(chip_text.replace('万', '')) * 10000
-        else:
-            amount = int(chip_text)
-        self.selected_bet_amount = amount
-        if hasattr(self, 'current_chip_label'):
-            self.current_chip_label.config(text=f"筹码: ${amount:,}")
-
-    def reset_bets(self):
-        for bet_type, amt in self.current_bets.items():
-            self.balance += amt
-        self.current_bets.clear()
-        self.current_bet = 0
-        self.update_balance()
-        self.current_bet_label.config(text=f"${0:,}")
-        for btn in self.bet_buttons:
-            if hasattr(btn, 'bet_type'):
-                original_text = btn.cget("text").split('\n')
-                new_text = f"{original_text[0]}\n{original_text[1]}\n~~"
-                btn.config(text=new_text)
-
-    def _create_control_panel(self, parent):
-        control_frame = tk.Frame(parent, bg='#D0E7FF', width=300)
-        control_frame.pack(pady=12, padx=10, fill=tk.BOTH, expand=True)
-        control_frame.pack_propagate(False)
-
-        self.view_container = tk.Frame(control_frame, bg='#D0E7FF', height=300)
-        self.view_container.pack(fill=tk.BOTH, expand=True, pady=(0,10))
-        self.view_container.pack_propagate(False)
-
-        self.marker_view = tk.Frame(self.view_container, bg='#D0E7FF')
-        self.marker_view.pack(fill=tk.BOTH, expand=True)
-
-        self._create_marker_road()
-        self.enable_bigroad_navigation()
-
-    def show_bigroad_view(self):
-        self.marker_view.pack_forget()
-        self.bigroad_view.pack(fill=tk.BOTH, expand=True)
-        self.marker_view_btn.config(relief=tk.FLAT, bg='#888888')
-        self.bigroad_view_btn.config(relief=tk.RAISED, bg='#4B8BBE')
-        self.view_mode = "bigroad"
-
-    def show_marker_view(self):
-        self.bigroad_view.pack_forget()
-        self.marker_view.pack(fill=tk.BOTH, expand=True)
-        self.marker_view_btn.config(relief=tk.RAISED, bg='#4B8BBE')
-        self.bigroad_view_btn.config(relief=tk.FLAT, bg='#888888')
-        self.view_mode = "marker"
-
-    def _create_marker_road(self):
+    def _update_big_road_scroll_thumb(self):
+        if not getattr(self, 'big_road_scroll_thumb', None):
+            return
+        track = getattr(self, 'big_road_scroll_track', None)
+        if not track:
+            return
+        x0, y0, x1, _y1 = track
+        width = x1 - x0
+        thumb_w = getattr(self, 'big_road_scroll_thumb_width', width)
+        max_start = max(0, self.big_road_virtual_cols - self.big_road_view_cols)
+        start = min(max(0, int(self.big_road_scroll_col)), max_start)
+        fraction = (start / max_start) if max_start else 0.0
+        left = x0 + fraction * max(0.0, width - thumb_w)
         try:
-            self.bigroad_results.clear()
-        except Exception:
+            self.canvas.coords(self.big_road_scroll_thumb,
+                               left, y0 + 1, left + thumb_w, y0 + 9)
+        except tk.TclError:
             pass
-        self.bigroad_results = []
-        self._max_rows = 6
-        self._max_cols = 150
-        self._bigroad_occupancy = [[False]*self._max_cols for _ in range(self._max_rows)]
 
-        cell = 25
-        pad = 2
-        label_w = 30
-        label_h = 20
-        total_w = label_w + self._max_cols * (cell + pad) + pad
-        total_h = label_h + self._max_rows * (cell + pad) + pad
+    def _draw_data_page(self):
+        c = self.canvas
+        x0, x1 = 786, 1130
+        c.create_text((x0 + x1) / 2, 82, text='最近 300 局分布',
+                      font=('Arial', 13, 'bold'), fill=self.GOLD,
+                      tags='history_panel_content')
+        for bx0, by0, bx1, by1 in (
+            (x0, 102, x1, 310), (x0, 324, x1, 484), (x0, 500, x1, 590),
+        ):
+            c.create_rectangle(bx0, by0, bx1, by1, fill='#15110f',
+                               outline='#7c6754', width=1,
+                               tags='history_panel_content')
+        self.history_chart_geometry = {
+            'winner': (x0, 102, x1, 310),
+            'size': (x0, 324, x1, 484),
+            'perfect': (x0, 500, x1, 590),
+        }
 
-        marker_frame = tk.Frame(self.marker_view, bg='#D0E7FF')
-        marker_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=2)
+    def _draw_road_grid(self, x0, y0, cell, rows, cols):
+        c = self.canvas
+        x1, y1 = x0 + cols * cell, y0 + rows * cell
+        c.create_rectangle(x0, y0, x1, y1, fill='#f3efe7', outline='#8d8377',
+                           width=1, tags='history_panel_content')
+        for r in range(1, rows):
+            y = y0 + r * cell
+            c.create_line(x0, y, x1, y, fill='#d2cbc1', tags='history_panel_content')
+        for col in range(1, cols):
+            x = x0 + col * cell
+            c.create_line(x, y0, x, y1, fill='#d2cbc1', tags='history_panel_content')
 
-        self._create_stats_display(marker_frame)
+    @staticmethod
+    def _place_road_sequence(sequence, rows=6):
+        """Lay a logical streak sequence onto a six-row baccarat road.
 
-        big_title = tk.Label(
-            marker_frame,
-            text="大路",
-            font=('Arial', 14, 'bold'),
-            bg='#D0E7FF'
+        ``sequence`` contains ``(value, payload)`` pairs.  Equal consecutive
+        values continue downward until the next cell is blocked or the sixth
+        row is reached; the streak then turns right on the same row (the
+        standard dragon-tail rule).  A changed value starts a new logical
+        column at the top.
+        """
+        placed = []
+        occupied = set()
+        last_value = None
+        row = col = 0
+        streak_start_col = -1
+
+        for value, payload in sequence:
+            if last_value is None:
+                streak_start_col = 0
+                row, col = 0, 0
+            elif value == last_value:
+                below = (row + 1, col)
+                if row + 1 < rows and below not in occupied:
+                    row += 1
+                else:
+                    # Dragon tail, or a collision with an earlier tail.
+                    next_col = col + 1
+                    while (row, next_col) in occupied:
+                        next_col += 1
+                    col = next_col
+            else:
+                # A new Dragon/Tiger (or red/blue derived-road) streak starts
+                # one logical column to the right of the previous streak.
+                streak_start_col += 1
+                row, col = 0, streak_start_col
+                while (row, col) in occupied:
+                    col += 1
+                    streak_start_col = col
+
+            occupied.add((row, col))
+            placed.append({
+                'row': row, 'col': col, 'value': value, 'payload': payload
+            })
+            last_value = value
+
+        return placed
+
+    def _build_big_road(self, records):
+        """Build Big Road streaks from the colours shared by every cell.
+
+        A two-way tie continues a streak only while it contains a colour still
+        shared by the complete streak.  A three-way tie is isolated: it only
+        continues another three-way tie and forces the following non-triple
+        result to start a new column.
+        """
+        sequence = []
+        streak_id = -1
+        common_colors = set()
+        previous_triple = False
+        for record in records:
+            winner = record.get('winner')
+            if winner not in ('Dragon', 'Tiger', 'Phoenix', 'Tie'):
+                continue
+            tied = tuple(record.get('tied_winners', ()))
+            colors = set(tied) if winner == 'Tie' else {winner}
+            triple = winner == 'Tie' and len(colors) == 3
+
+            if triple:
+                if not previous_triple:
+                    streak_id += 1
+                common_colors = set()
+            elif previous_triple or not common_colors:
+                streak_id += 1
+                common_colors = set(colors)
+            else:
+                shared = common_colors.intersection(colors)
+                if shared:
+                    common_colors = shared
+                else:
+                    streak_id += 1
+                    common_colors = set(colors)
+
+            road_value = winner if winner != 'Tie' else 'Tie:' + '+'.join(tied)
+            sequence.append((streak_id, {
+                'record': record, 'tied_winners': tied, 'road_value': road_value,
+            }))
+            previous_triple = triple
+
+        cells = self._place_road_sequence(sequence)
+        for cell in cells:
+            cell['value'] = cell['payload']['road_value']
+        return cells
+
+    def _record_specials_for_mode(self, record, mode):
+        by_mode = record.get('special_by_mode', {})
+        if isinstance(by_mode, dict):
+            values = by_mode.get(mode, [])
+            if isinstance(values, list):
+                return values
+        # Backward compatibility with older records that only stored the mode
+        # in which the hand was originally played.
+        if record.get('mode', 'classic') == mode:
+            values = record.get('specials', [])
+            return values if isinstance(values, list) else []
+        return []
+
+    def _special_marker(self, record):
+        """Compact marker used by the Bead Plate only.
+
+        The marker is intentionally mode-specific.  Switching from Lucky 7 to
+        Tiger therefore re-renders the same historical hand with the marker
+        for the newly selected mode instead of leaking another mode's symbol.
+        """
+        selected = set(self._record_specials_for_mode(record, self.game_mode))
+        priority = (
+            ('Super 7', '7'), ('Lucky 7', '7'), ('Dragon 7', '7'),
+            ('Big Lucky 6', '6'), ('Small Lucky 6', '6'), ('Lucky 6', '6'),
+            ('Big Tiger', '大'), ('Small Tiger', '小'), ('Tiger Tie', '虎'),
+            # Pair outcomes never replace the bead text; pair dots are enough.
+            ('Panda 8', '8'),
+            ('Big Monkey', '猴'), ('Monkey 7', '7'), ('Monkey 6', '6'),
+            ('Lucky Monkey', '猴'),
         )
-        big_title.pack(pady=(0,2))
+        for name, marker in priority:
+            if name in selected:
+                return marker
+        return ''
 
-        big_frame = tk.Frame(marker_frame, bg='#D0E7FF')
-        big_frame.pack(fill=tk.BOTH, expand=False, padx=5, pady=5)
+    def _derive_road(self, records, offset):
+        """Build Big-Eye Boy / Small Road / Cockroach Pig correctly.
 
-        hbar = tk.Scrollbar(big_frame, orient=tk.HORIZONTAL)
-        hbar.pack(side=tk.BOTTOM, fill=tk.X)
+        ``offset`` is 1, 2 or 3 respectively.  The calculation uses the
+        *logical* Big-Road streak columns with unlimited depth, not the
+        six-row rendered cells.  This distinction is essential when a streak
+        forms a dragon tail.
 
-        self.bigroad_canvas = tk.Canvas(
-            big_frame,
-            bg='#FFFFFF',
-            width=290,
-            height=total_h,
-            xscrollcommand=hbar.set,
-            scrollregion=(0,0,total_w,total_h),
-            highlightthickness=0
-        )
-        self.bigroad_canvas.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-        hbar.config(command=self.bigroad_canvas.xview)
+        For a new Big-Road column, compare the depth of the immediately
+        previous streak with the streak ``offset + 1`` columns back.  For a
+        continuation within the same streak, compare the two cells reached by
+        moving ``offset`` logical columns left and then one row up.  In the
+        unlimited-depth representation that comparison is blue only when the
+        reference streak length is exactly one less than the current streak
+        length; otherwise it is red.
+        """
+        if offset not in (1, 2, 3):
+            raise ValueError('derived-road offset must be 1, 2 or 3')
 
-        for c in range(self._max_cols):
-            x = label_w + pad + c * (cell + pad) + cell/2
-            y = label_h/2
-            self.bigroad_canvas.create_text(x, y, text=str(c+1), font=('Arial',8), tags=('grid',))
-        for r in range(self._max_rows):
-            x = label_w/2
-            y = label_h + pad + r * (cell + pad) + cell/2
-            self.bigroad_canvas.create_text(x, y, text=str(r+1), font=('Arial',8), tags=('grid',))
-        for c in range(self._max_cols):
-            for r in range(self._max_rows):
-                x1 = label_w + pad + c * (cell + pad)
-                y1 = label_h + pad + r * (cell + pad)
-                x2 = x1 + cell
-                y2 = y1 + cell
-                self.bigroad_canvas.create_rectangle(x1,y1,x2,y2, outline='#888888', fill='#FFFFFF', tags=('grid',))
+        streaks = []
+        derived_sequence = []
 
-        marker_title = tk.Label(marker_frame, text="标记路", font=('Arial',14,'bold'), bg='#D0E7FF')
-        marker_title.pack(pady=(6,4))
+        for record in records:
+            winner = record.get('winner')
+            if winner not in ('Dragon', 'Tiger'):
+                # Ties do not create marks in any derived road.
+                continue
 
-        self.marker_canvas = tk.Canvas(marker_frame, bg='#D0E7FF', highlightthickness=0)
-        self.marker_canvas.pack(fill=tk.BOTH, expand=True, padx=3, pady=(0,0))
+            if not streaks or streaks[-1]['winner'] != winner:
+                streaks.append({'winner': winner, 'length': 1})
+                column = len(streaks) - 1
 
-    def _update_bigroad(self):
-        """按照百家乐大路规则绘制：连续相同的结果在同一列向下，结果改变则新起一列；列满（6行）时相同结果新起一列继续向下。
-           同时绘制连线：向下连竖线，向右连横线，颜色与获胜方相同（Tie用绿色）。"""
-        if not hasattr(self, 'bigroad_canvas'):
+                # Big Eye starts on the first hand of column 3 when column 2
+                # has only one hand; Small Road on column 4; Cockroach on 5.
+                if column < offset + 1:
+                    continue
+
+                previous_depth = streaks[column - 1]['length']
+                comparison_depth = streaks[column - offset - 1]['length']
+                color = 'red' if previous_depth == comparison_depth else 'blue'
+            else:
+                streaks[-1]['length'] += 1
+                column = len(streaks) - 1
+                current_depth = streaks[-1]['length']
+
+                # The other possible starting point is row 2 of the minimum
+                # required column: col2 for Big Eye, col3 for Small, col4 for
+                # Cockroach.
+                if column < offset:
+                    continue
+
+                reference_depth = streaks[column - offset]['length']
+                color = 'blue' if reference_depth == current_depth - 1 else 'red'
+
+            derived_sequence.append((color, {'source': record}))
+
+        return self._place_road_sequence(derived_sequence)
+
+    def _visible_road_cells(self, cells, cols):
+        if not cells:
+            return [], 0
+        max_col = max(cell['col'] for cell in cells)
+        shift = max(0, max_col - cols + 1)
+        return [cell for cell in cells if shift <= cell['col'] < shift + cols], shift
+
+    def _handle_bead_click(self, event):
+        """Toggle Bead Plate labels between result text and winning points."""
+        if getattr(self, 'history_panel_mode', None) != 'roads':
             return
+        geometry = getattr(self, 'road_geometries', {}).get('bead')
+        if not geometry:
+            return
+        x0, y0, cell, rows, cols = geometry
+        x1, y1 = x0 + cols * cell, y0 + rows * cell
+        if x0 <= event.x <= x1 and y0 <= event.y <= y1:
+            self.bead_show_scores = not bool(getattr(self, 'bead_show_scores', False))
+            self.update_history_table()
 
-        cell = 25
-        pad = 2
-        label_w = 32
-        label_h = 22
-        max_rows = self._max_rows  # 6
+    def _draw_bead_plate(self, records):
+        x0, y0, cell, rows, cols = self.road_geometries['bead']
+        capacity = rows * cols
 
-        self.bigroad_canvas.delete('data')
+        # V12: a real bead plate scrolls by a complete 6-hand column, not by
+        # one hand.  With a 12 x 6 board, hands 1..72 fill the board.  Hand 73
+        # hides hands 1..6, shifts hands 7..72 one column left, and enters at
+        # the top of the newest column.  The next shift occurs at hand 79.
+        total = len(records)
+        if total <= capacity:
+            start = 0
+        else:
+            overflow = total - capacity
+            hidden_columns = (overflow + rows - 1) // rows  # ceil(overflow / 6)
+            start = hidden_columns * rows
+        visible = records[start:start + capacity]
 
-        # 辅助函数：根据行列获取中心坐标
-        def center_of(r, c):
-            x1 = label_w + c * (cell + pad)
-            y1 = label_h + r * (cell + pad)
-            cx = x1 + cell / 2
-            cy = y1 + cell / 2
-            return cx, cy
+        for index, record in enumerate(visible):
+            row = index % rows
+            col = index // rows
+            cx = x0 + col * cell + cell / 2
+            cy = y0 + row * cell + cell / 2
+            winner = record.get('winner')
+            color = self.result_color(winner)
+            radius = max(6, cell * 0.39)
+            self.canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius,
+                                    fill=color, outline='#ffffff', width=1,
+                                    tags='history_dynamic')
+            if getattr(self, 'bead_show_scores', False):
+                if winner == 'Dragon':
+                    text = str(int(record.get('dragon_score', 0)))
+                elif winner == 'Tiger':
+                    text = str(int(record.get('tiger_score', 0)))
+                elif winner == 'Phoenix':
+                    text = str(int(record.get('phoenix_score', 0)))
+                elif winner == 'Tie':
+                    text = str(max(int(record.get('dragon_score', 0)),
+                                   int(record.get('tiger_score', 0)),
+                                   int(record.get('phoenix_score', 0))))
+                else:
+                    text = ''
+            else:
+                marker = self._special_marker(record)
+                text = marker or {'Dragon': '龙', 'Tiger': '虎', 'Phoenix': '凤',
+                                  'Tie': '和'}.get(winner, '')
+            bead_text_color = '#111111' if winner == 'Tiger' else 'white'
+            self.canvas.create_text(cx, cy, text=text, font=('Arial', 12, 'bold'),
+                                    fill=bead_text_color, tags='history_dynamic')
 
-        # 绘制单个赢家的圆
-        def draw_single(r, c, winner):
-            cx, cy = center_of(r, c)
-            radius = cell * 0.4
-            color_map = {'Dragon': '#FF0000', 'Tiger': '#FFA600', 'Phoenix': '#007BFF'}
-            color = color_map[winner]
-            self.bigroad_canvas.create_oval(
-                cx - radius, cy - radius, cx + radius, cy + radius,
-                fill=color, outline='', tags=('data', 'circle')
-            )
-            return cx, cy, radius
+            # Pair markers remain dots only (never text), with stronger colour,
+            # a larger radius and a white rim so they remain visible on the bead.
+            pair_r = max(4.0, cell * 0.155)
+            inset = radius * 0.76
+            if record.get('dragon_pair'):
+                px, py = cx - inset, cy - inset
+                self.canvas.create_oval(px - pair_r, py - pair_r, px + pair_r, py + pair_r,
+                                        fill='#145dff', outline='#ffffff', width=2,
+                                        tags='history_dynamic')
+            if record.get('tiger_pair'):
+                px, py = cx + inset, cy + inset
+                self.canvas.create_oval(px - pair_r, py - pair_r, px + pair_r, py + pair_r,
+                                        fill='#ff2238', outline='#ffffff', width=2,
+                                        tags='history_dynamic')
 
-        # 绘制二家和：两个半圆，中间写绿色“和”
-        def draw_two_tie(r, c, hands):
-            cx, cy = center_of(r, c)
-            radius = cell * 0.4
-            colors = [{'Dragon': '#FF0000', 'Tiger': '#FFA600', 'Phoenix': '#007BFF'}[h] for h in hands]
-            # 两个半圆，角度从0到180，180到360
-            self.bigroad_canvas.create_arc(
-                cx - radius, cy - radius, cx + radius, cy + radius,
-                start=0, extent=180, fill=colors[0], outline='', tags=('data', 'circle')
-            )
-            self.bigroad_canvas.create_arc(
-                cx - radius, cy - radius, cx + radius, cy + radius,
-                start=180, extent=180, fill=colors[1], outline='', tags=('data', 'circle')
-            )
-            self.bigroad_canvas.create_text(
-                cx, cy, text="和", fill='#00FF00', font=('Arial', 10, 'bold'), tags=('data', 'text')
-            )
-            return cx, cy, radius
+    def _draw_big_road(self, cells):
+        x0, y0, cell, rows, _view_cols = self.road_geometries['big']
+        virtual_cols = self.big_road_virtual_cols
+        view_cols = self.big_road_view_cols
 
-        # 绘制三家和：三个120°扇形，中间写白色“和”
-        def draw_three_tie(r, c):
-            cx, cy = center_of(r, c)
-            radius = cell * 0.4
-            colors = ['#FF0000', '#FFA600', '#007BFF']
-            angles = [0, 120, 240, 360]
-            for i in range(3):
-                self.bigroad_canvas.create_arc(
+        # A shoe virtually owns 50 columns.  In the unlikely event the logical
+        # road exceeds 50 columns, retain the newest 50 rather than drawing over
+        # neighbouring panels.
+        max_data_col = max((item['col'] for item in cells), default=-1)
+        base_col = max(0, max_data_col - virtual_cols + 1)
+        local_cells = []
+        for item in cells:
+            local_col = item['col'] - base_col
+            if 0 <= local_col < virtual_cols:
+                copied = dict(item)
+                copied['local_col'] = local_col
+                local_cells.append(copied)
+
+        latest_local = max((item['local_col'] for item in local_cells), default=0)
+        max_start = max(0, virtual_cols - view_cols)
+        if self.big_road_auto_follow:
+            self.big_road_scroll_col = min(max_start, max(0, latest_local - view_cols + 1))
+        else:
+            self.big_road_scroll_col = min(max_start, max(0, int(self.big_road_scroll_col)))
+        start_col = self.big_road_scroll_col
+        self._update_big_road_scroll_thumb()
+
+        for item in local_cells:
+            if not (start_col <= item['local_col'] < start_col + view_cols):
+                continue
+            row = item['row']
+            col = item['local_col'] - start_col
+            cx = x0 + col * cell + cell / 2
+            cy = y0 + row * cell + cell / 2
+            payload = item['payload']
+            winner = item['value']
+            radius = cell * 0.37
+
+            if winner in ('Dragon', 'Tiger', 'Phoenix'):
+                color = {'Dragon': self.DRAGON_RED, 'Tiger': self.TIGER_YELLOW,
+                         'Phoenix': self.PHOENIX_BLUE}[winner]
+                self.canvas.create_oval(
                     cx - radius, cy - radius, cx + radius, cy + radius,
-                    start=angles[i], extent=120, fill=colors[i], outline='', tags=('data', 'circle')
-                )
-            self.bigroad_canvas.create_text(
-                cx, cy, text="和", fill='#FFFFFF', font=('Arial', 10, 'bold'), tags=('data', 'text')
-            )
-            return cx, cy, radius
-
-        if not self.bigroad_results:
-            return
-
-        # 当前列和当前行
-        cur_col = 0
-        cur_row = 0
-        prev_road_type = None
-        prev_row = None
-        prev_col = None
-        prev_center = None
-        prev_radius = None
-
-        for idx, res in enumerate(self.bigroad_results):
-            # 生成用于连续性判断的 road_type
-            if res['type'] == 'single':
-                road_type = ('single', res['winner'])
-            elif res['type'] == 'two_tie':
-                # 将两家排序以保证顺序一致
-                hands = sorted(res['tied_hands'])
-                road_type = ('two_tie', tuple(hands))
-            elif res['type'] == 'three_tie':
-                road_type = ('three_tie',)
-            else:
-                road_type = None
-
-            if idx == 0:
-                # 第一个结果放在(0,0)
-                cur_col, cur_row = 0, 0
-            else:
-                # 判断是否与上一个相同
-                if road_type == prev_road_type:
-                    # 相同：尝试向下
-                    if cur_row + 1 < max_rows:
-                        cur_row += 1
-                    else:
-                        # 已满，新起一列
-                        cur_col += 1
-                        cur_row = 0
+                    fill='', outline=color, width=2, tags='history_dynamic')
+            elif winner.startswith('Tie:'):
+                tied = tuple(payload.get('tied_winners', ()))
+                palette = {'Dragon': self.DRAGON_RED, 'Tiger': self.TIGER_YELLOW,
+                           'Phoenix': self.PHOENIX_BLUE}
+                if len(tied) == 3:
+                    self.canvas.create_oval(
+                        cx - radius, cy - radius, cx + radius, cy + radius,
+                        fill='', outline=self.TIE_GREEN, width=3,
+                        tags='history_dynamic')
                 else:
-                    # 不同，新起一列
-                    cur_col += 1
-                    cur_row = 0
+                    colors = [palette[name] for name in tied if name in palette]
+                    if len(colors) == 2:
+                        self.canvas.create_arc(
+                            cx - radius, cy - radius, cx + radius, cy + radius,
+                            start=90, extent=180, style=tk.ARC,
+                            outline=colors[0], width=3, tags='history_dynamic')
+                        self.canvas.create_arc(
+                            cx - radius, cy - radius, cx + radius, cy + radius,
+                            start=270, extent=180, style=tk.ARC,
+                            outline=colors[1], width=3, tags='history_dynamic')
+                self.canvas.create_line(
+                    cx - radius + 1, cy + radius - 1,
+                    cx + radius - 1, cy - radius + 1,
+                    fill=self.TIE_GREEN, width=2, tags='history_dynamic')
 
-            # 绘制当前结果，并获取圆心坐标和半径
-            if res['type'] == 'single':
-                cx, cy, radius = draw_single(cur_row, cur_col, res['winner'])
-            elif res['type'] == 'two_tie':
-                cx, cy, radius = draw_two_tie(cur_row, cur_col, res['tied_hands'])
-            elif res['type'] == 'three_tie':
-                cx, cy, radius = draw_three_tie(cur_row, cur_col)
+    def _draw_derived_road(self, key, cells, style):
+        x0, y0, cell, rows, cols = self.road_geometries[key]
+        visible, shift = self._visible_road_cells(cells, cols)
+        for item in visible:
+            row, col = item['row'], item['col'] - shift
+            cx = x0 + col * cell + cell / 2
+            cy = y0 + row * cell + cell / 2
+            # 龙虎派生路配色：原百家乐蓝色改为龙红，原百家乐红色改为虎黄。
+            color = self.TIGER_YELLOW if item['value'] == 'red' else self.DRAGON_RED
+            radius = max(2.5, cell * 0.32)
+            if style == 'ring':
+                self.canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius,
+                                        fill='', outline=color, width=2, tags='history_dynamic')
+            elif style == 'dot':
+                # Small Road uses a true solid circle (not a diamond/square).
+                dot_r = max(3.0, cell * 0.30)
+                self.canvas.create_oval(cx - dot_r, cy - dot_r, cx + dot_r, cy + dot_r,
+                                        fill=color, outline=color, width=1,
+                                        tags='history_dynamic')
             else:
-                continue
+                self.canvas.create_line(cx - radius, cy + radius, cx + radius, cy - radius,
+                                        fill=color, width=2, tags='history_dynamic')
 
-            # 如果与上一个结果相同，绘制连线
-            if prev_road_type is not None and road_type == prev_road_type:
-                # 确定连线颜色
-                if res['type'] == 'single':
-                    color_map = {'Dragon': '#FF0000', 'Tiger': '#FFA600', 'Phoenix': '#007BFF'}
-                    line_color = color_map[res['winner']]
-                else:
-                    line_color = '#00FF00'  # 绿色用于 Tie
+    def _draw_round_statistics(self, records):
+        counts = {'Dragon': 0, 'Tiger': 0, 'Phoenix': 0, 'Tie': 0}
+        for record in records:
+            winner = record.get('winner')
+            if winner in counts:
+                counts[winner] += 1
+        geometry = self.history_chart_geometry
+        self._draw_pie_chart(
+            geometry['winner'], '過去300局出現百分比',
+            [('龙', counts['Dragon'], self.DRAGON_RED),
+             ('虎', counts['Tiger'], self.TIGER_YELLOW),
+             ('凤', counts['Phoenix'], self.PHOENIX_BLUE),
+             ('和', counts['Tie'], self.TIE_GREEN)])
 
-                # 判断相对位置
-                if cur_col == prev_col and cur_row == prev_row + 1:
-                    # 向下：从 prev 底部到当前顶部
-                    start_x, start_y = prev_cx, prev_cy + prev_radius
-                    end_x, end_y = cx, cy - radius
-                    self.bigroad_canvas.create_line(
-                        start_x, start_y, end_x, end_y,
-                        fill=line_color, width=3, tags=('data', 'line')
-                    )
-                elif cur_col == prev_col + 1 and cur_row == 0:
-                    # 向右（新列）：从 prev 右侧到当前左侧
-                    start_x, start_y = prev_cx + prev_radius, prev_cy
-                    end_x, end_y = cx - radius, cy
-                    self.bigroad_canvas.create_line(
-                        start_x, start_y, end_x, end_y,
-                        fill=line_color, width=3, tags=('data', 'line')
-                    )
-                # 其他情况（理论上不会出现）忽略
-
-            # 更新前一个结果信息
-            prev_road_type = road_type
-            prev_row, prev_col = cur_row, cur_col
-            prev_cx, prev_cy, prev_radius = cx, cy, radius
-
-        # 调整滚动区域
-        self.bigroad_canvas.configure(scrollregion=self.bigroad_canvas.bbox('all'))
-
-    def enable_bigroad_navigation(self, debug=False):
-        canvas = getattr(self, 'bigroad_canvas', None)
-        if canvas is None:
-            return
-        try:
-            canvas.unbind("<MouseWheel>")
-            canvas.unbind("<Button-4>")
-            canvas.unbind("<Button-5>")
-            root = canvas.winfo_toplevel()
-            root.unbind_all("<MouseWheel>")
-            root.unbind_all("<Button-4>")
-            root.unbind_all("<Button-5>")
-        except Exception:
-            pass
-        try:
-            canvas.unbind("<KeyPress-Left>")
-            canvas.unbind("<KeyPress-Right>")
-        except Exception:
-            pass
-        try:
-            self._bigroad_key_scroll_units = 5
-        except Exception:
-            pass
-        canvas.bind("<KeyPress-Left>", lambda e: self._on_bigroad_key(e, canvas))
-        canvas.bind("<KeyPress-Right>", lambda e: self._on_bigroad_key(e, canvas))
-        canvas.bind("<Button-1>", lambda e: canvas.focus_set())
-        canvas.bind("<Enter>", lambda e: canvas.focus_set())
-
-    def _on_bigroad_key(self, event, canvas):
-        try:
-            units = getattr(self, "_bigroad_key_scroll_units", 5)
-            keysym = getattr(event, 'keysym', '')
-            if keysym == 'Left':
-                canvas.xview_scroll(-units, "units")
-            elif keysym == 'Right':
-                canvas.xview_scroll(units, "units")
-        except Exception:
-            pass
-
-    def disable_bigroad_mouse_navigation(self, debug=False):
-        canvas = getattr(self, 'bigroad_canvas', None)
-        if canvas is None:
-            return
-        try:
-            canvas.unbind("<MouseWheel>")
-            canvas.unbind("<Button-4>")
-            canvas.unbind("<Button-5>")
-            root = canvas.winfo_toplevel()
-            root.unbind_all("<MouseWheel>")
-            root.unbind_all("<Button-4>")
-            root.unbind_all("<Button-5>")
-        except Exception:
-            pass
-
-    def _create_stats_panel(self, parent):
-        stats_frame = tk.Frame(parent, bg='#D0E7FF')
-        stats_frame.pack(fill=tk.BOTH, expand=True, pady=(10,0), padx=10)
-        ttk.Separator(stats_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(10,10))
-
-    def _update_stats_display(self):
-        if hasattr(self, 'stats_rows'):
-            mapping = {
-                'Dragon': 'dragon',
-                'Tiger': 'tiger',
-                'Phoenix': 'phoenix',
-                'two_tie': 'two_tie',
-                'three_tie': 'three_tie'
-            }
-            for key, display_key in mapping.items():
-                if display_key in self.stats_rows:
-                    count = self.stats_counts.get(key, 0)
-                    self.stats_rows[display_key]['count_label'].config(text=str(count))
-
-    def _draw_marker_grid(self):
-        self.marker_canvas.delete('all')
-        rows, cols = 6, 9
-        cell_size = 30
-        padding = 0
-        self.max_marker_rows = rows
-        self.max_marker_cols = cols
-        width = cols * (cell_size + padding) + padding
-        height = rows * (cell_size + padding) + padding
-        self.marker_canvas.config(width=width, height=height)
-        for col in range(cols):
-            for row in range(rows):
-                x1 = padding + col * (cell_size + padding)
-                y1 = padding + row * (cell_size + padding)
-                x2 = x1 + cell_size
-                y2 = y1 + cell_size
-                self.marker_canvas.create_rectangle(
-                    x1, y1, x2, y2,
-                    outline='#888888',
-                    fill='#D0E7FF'
-                )
-
-    def add_marker_result(self, result_dict):
-        if result_dict['type'] == 'single':
-            marker_type = result_dict['winner']
-        elif result_dict['type'] == 'two_tie':
-            marker_type = 'two_tie'
-        elif result_dict['type'] == 'three_tie':
-            marker_type = 'three_tie'
+    def _draw_pie_chart(self, bounds, title, items):
+        c = self.canvas
+        x0, y0, x1, y1 = bounds
+        c.create_text((x0 + x1) / 2, y0 + 18, text=title,
+                      font=('Arial', 13, 'bold'), fill='#f2eadf',
+                      tags='history_dynamic')
+        height = y1 - y0
+        radius = min(62, max(38, (height - 52) / 2))
+        cx = x0 + 78
+        cy = (y0 + y1) / 2 + 10
+        bbox = (cx - radius, cy - radius, cx + radius, cy + radius)
+        total = sum(max(0, int(value)) for _label, value, _color in items)
+        if total <= 0:
+            c.create_oval(*bbox, fill='#302a25', outline='#75695d', width=2,
+                          tags='history_dynamic')
+            c.create_text(cx, cy, text='0', font=('Arial', 18, 'bold'),
+                          fill='#8f857b', tags='history_dynamic')
         else:
+            start = 90.0
+            for label, value, color in items:
+                value = max(0, int(value))
+                if not value:
+                    continue
+                extent = 360.0 * value / total
+                c.create_arc(*bbox, start=start, extent=-extent, fill=color,
+                             outline='#15110f', width=2, style=tk.PIESLICE,
+                             tags='history_dynamic')
+                middle = math.radians(start - extent / 2.0)
+                label_radius = radius * (0.70 if extent < 38 else 0.55)
+                label_x = cx + math.cos(middle) * label_radius
+                label_y = cy - math.sin(middle) * label_radius
+                c.create_text(
+                    label_x, label_y, text=label,
+                    font=('Arial', 9 if extent < 38 else 12, 'bold'),
+                    fill=self.contrast_text_color(color),
+                    tags='history_dynamic')
+                start -= extent
+
+        legend_x = x0 + 166
+        row_gap = min(35, max(25, (height - 52) / max(1, len(items))))
+        legend_y = y0 + 48
+        for index, (label, value, color) in enumerate(items):
+            y = legend_y + index * row_gap
+            c.create_rectangle(legend_x, y - 6, legend_x + 13, y + 7,
+                               fill=color, outline='#e5ddd3', width=1,
+                               tags='history_dynamic')
+            percentage = (100.0 * int(value) / total) if total else 0.0
+            c.create_text(legend_x + 22, y, anchor='w',
+                          text=f'{label}  {int(value)}次  {percentage:.1f}%',
+                          font=('Arial', 14, 'bold'), fill='#e9e1d8',
+                          tags='history_dynamic')
+
+    def update_history_table(self):
+        if not hasattr(self, 'canvas'):
             return
+        self.canvas.delete('history_dynamic')
+        # Mode switching can change the meaning of the '*' shown beside main
+        # bet odds, so refresh the white note even when the road layout itself
+        # does not need to be rebuilt.
+        note_item = getattr(self, 'road_asterisk_note_item', None)
+        if note_item is not None:
+            try:
+                self.canvas.itemconfigure(note_item, text=self._asterisk_note_text())
+            except tk.TclError:
+                pass
+        # temp_finish_data drives Big Road + summary; Bead Plate uses last_72_record.
+        records = self._drawable_history_records(self.history_data)[-self.MAX_RECORDS:]
+        big_cells = self._build_big_road(records)
+        self._draw_big_road(big_cells)
+        bead_records = self._drawable_history_records(
+            self.last_72_data)[-self.BEAD_MAX_RECORDS:]
+        self._draw_bead_plate(bead_records)
+        self._draw_round_statistics(records)
 
-        if len(self.marker_results) >= self.max_marker_rows * self.max_marker_cols:
-            for _ in range(self.max_marker_rows):
-                if self.marker_results:
-                    self.marker_results.pop(0)
-
-        self.marker_results.append(marker_type)
-        self.marker_counts[marker_type] = self.marker_counts.get(marker_type,0) + 1
-        self.stats_counts[marker_type] = self.stats_counts.get(marker_type,0) + 1
-
-        self.bigroad_results.append(result_dict)
-        self._update_bigroad()
-
-        self._update_stats_display()
-        self._update_marker_road()
-
-    def _update_marker_road(self):
-        self.marker_canvas.delete('dot')
-        rows, cols = 6, 9
-        cell_size = 30
-        padding = 0
-        start_idx = max(0, len(self.marker_results) - rows * cols)
-        for idx, result in enumerate(self.marker_results[start_idx:]):
-            if idx >= rows * cols:
-                break
-            col = idx // rows
-            row = idx % rows
-            x1 = padding + col * (cell_size + padding)
-            y1 = padding + row * (cell_size + padding)
-            x2 = x1 + cell_size
-            y2 = y1 + cell_size
-            center_x = (x1 + x2)/2
-            center_y = (y1 + y2)/2
-            radius = cell_size * 0.4
-
-            if result == 'Dragon':
-                color = "#FF0000"
-                text = "龙"
-                text_color = 'white'
-            elif result == 'Tiger':
-                color = "#FFA600"
-                text = "虎"
-                text_color = 'black'
-            elif result == 'Phoenix':
-                color = "#007BFF"
-                text = "凤"
-                text_color = 'white'
-            elif result == 'two_tie':
-                color = "#00FF00"
-                text = "和"
-                text_color = 'black'
-            elif result == 'three_tie':
-                color = "#FFFFFF"
-                text = "和"
-                text_color = 'black'
-            else:
+    @staticmethod
+    def _drawable_history_records(records):
+        """Return only valid results that every road renderer can safely draw."""
+        drawable = []
+        for record in records if isinstance(records, list) else []:
+            if not isinstance(record, dict):
                 continue
+            winner = record.get('winner')
+            if winner not in ('Dragon', 'Tie', 'Tiger', 'Phoenix'):
+                continue
+            try:
+                dragon_score = int(record.get('dragon_score'))
+                tiger_score = int(record.get('tiger_score'))
+                phoenix_score = int(record.get('phoenix_score'))
+            except (TypeError, ValueError):
+                continue
+            if not (1 <= dragon_score <= 13 and 1 <= tiger_score <= 13
+                    and 1 <= phoenix_score <= 13):
+                continue
+            scores = {'Dragon': dragon_score, 'Tiger': tiger_score, 'Phoenix': phoenix_score}
+            leaders = [name for name, score in scores.items() if score == max(scores.values())]
+            expected = leaders[0] if len(leaders) == 1 else 'Tie'
+            if winner != expected:
+                continue
+            drawable.append(record)
+        return drawable
 
-            self.marker_canvas.create_oval(
-                center_x - radius, center_y - radius,
-                center_x + radius, center_y + radius,
-                fill=color,
-                outline='#000000',
-                width=2,
-                tags='dot'
-            )
-            self.marker_canvas.create_text(
-                center_x, center_y,
-                text=text,
-                fill=text_color,
-                font=('Arial', '12', 'bold'),
-                tags='dot'
-            )
+    def _next_road_color(self, records, candidate, offset):
+        simulated = list(records) + [{
+            'winner': candidate, 'dragon_pair': False, 'tiger_pair': False,
+            'mode': self.game_mode, 'specials': [],
+        }]
+        before = self._derive_road(records, offset)
+        after = self._derive_road(simulated, offset)
+        if len(after) <= len(before):
+            return None
+        return after[-1]['value']
 
-    def _populate_betting_area(self, left, center, right):
-        self.betting_left = left
-        self.betting_center = center
-        self.betting_right = right
+    def _draw_indicator_symbol(self, cx, cy, color_name, style):
+        if color_name not in ('red', 'blue'):
+            self.canvas.create_text(cx, cy, text='—', font=('Arial', 9), fill='#766d64',
+                                    tags='history_dynamic')
+            return
+        # 龙虎派生路/问路配色：blue -> Dragon red, red -> Tiger yellow.
+        color = self.TIGER_YELLOW if color_name == 'red' else self.DRAGON_RED
+        radius = 5
+        if style == 'ring':
+            self.canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
+                                    fill='', outline=color, width=2, tags='history_dynamic')
+        elif style == 'dot':
+            self.canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
+                                    fill=color, outline=color, width=1,
+                                    tags='history_dynamic')
+        else:
+            self.canvas.create_line(cx-radius, cy+radius, cx+radius, cy-radius,
+                                    fill=color, width=2, tags='history_dynamic')
 
-        self._populate_betting_left(left)
-        self._populate_betting_center(center)
-        self._populate_betting_right(right)
+    def _draw_next_round_indicator(self, records):
+        geo = self.next_indicator_geometry
+        # Fixed row order: Big Eye Boy, Small Road, Cockroach Pig.  V11 omits
+        # their text labels; the user sees only the predicted symbols under 龙/虎.
+        specs = [(1, 'ring'), (2, 'dot'), (3, 'slash')]
+        dragon_cx = (geo['x0'] + geo['mid_x']) / 2
+        tiger_cx = (geo['mid_x'] + geo['x1']) / 2
+        for row, (offset, style) in enumerate(specs):
+            cy = geo['top'] + geo['row_h'] * (row + 0.5)
+            self._draw_indicator_symbol(dragon_cx, cy,
+                                        self._next_road_color(records, 'Dragon', offset), style)
+            self._draw_indicator_symbol(tiger_cx, cy,
+                                        self._next_road_color(records, 'Tiger', offset), style)
 
-    def _populate_betting_left(self, parent):
-        bet_display_map = {
-            'DiamondFlush': '方片同花',
-            'ClubFlush': '梅花同花',
-            'HeartFlush': '红心同花',
-            'SpadeFlush': '黑桃同花',
-            'TripleRed': '三红',
-            'Flush': '同花',
-            'Tie': '平局',
-            'TripleBlack': '三黑',
-            'Dragon': '龙',
-            'Tiger': '虎',
-            'Phoenix': '凤'
+    def find_original_card_asset_dir(self):
+        """Locate the original card-asset project A_Tools/Card/Poker1 directory."""
+        current = os.path.dirname(os.path.abspath(__file__))
+        candidates = [
+            os.path.join(current, 'A_Tools', 'Card', 'Poker1'),
+            os.path.join(os.path.dirname(current), 'A_Tools', 'Card', 'Poker1'),
+            os.path.join(os.path.dirname(os.path.dirname(current)), 'A_Tools', 'Card', 'Poker1'),
+        ]
+        for directory in candidates:
+            if os.path.isdir(directory) and os.path.exists(os.path.join(directory, 'Background.png')):
+                return directory
+        return None
+
+    def load_original_card_assets(self):
+        """Use the original 100x140 external card artwork when available."""
+        if Image is None or ImageTk is None:
+            return
+        self.external_card_pil = {}
+        self.external_back_pil = None
+        card_size = (100, 140)
+        directory = self.find_original_card_asset_dir()
+        resample = getattr(Image, 'Resampling', Image).LANCZOS
+
+        if directory:
+            try:
+                for suit in DragonTigerEngine.SUITS:
+                    for rank in DragonTigerEngine.RANKS:
+                        path = os.path.join(directory, f'{suit}{rank}.png')
+                        if not os.path.exists(path):
+                            continue
+                        base = Image.open(path).convert('RGBA').resize(card_size, resample)
+                        self.external_card_pil[(suit, rank)] = base
+                        self.external_card_images[(suit, rank)] = ImageTk.PhotoImage(base, master=self)
+                        self.external_card_images_rotated[(suit, rank)] = ImageTk.PhotoImage(
+                            base.rotate(90, expand=True), master=self)
+                back_path = os.path.join(directory, 'Background.png')
+                if os.path.exists(back_path):
+                    back = Image.open(back_path).convert('RGBA').resize(card_size, resample)
+                    self.external_back_pil = back
+                    self.external_back_image = ImageTk.PhotoImage(back, master=self)
+                if self.external_card_images and self.external_back_image is not None:
+                    self.card_asset_dir = directory
+                    return
+            except Exception:
+                self.external_card_images.clear()
+                self.external_card_images_rotated.clear()
+                self.external_card_pil.clear()
+                self.external_back_image = None
+                self.external_back_pil = None
+                self.card_asset_dir = None
+
+        # Temporary fallback only when the original external images do not exist.
+        try:
+            self.external_back_pil = self._make_fallback_card_pil(None, face_up=False)
+            self.external_back_image = ImageTk.PhotoImage(self.external_back_pil, master=self)
+            for suit in DragonTigerEngine.SUITS:
+                for rank in DragonTigerEngine.RANKS:
+                    card = (suit, rank)
+                    base = self._make_fallback_card_pil(card, face_up=True)
+                    self.external_card_pil[card] = base
+                    self.external_card_images[card] = ImageTk.PhotoImage(base, master=self)
+                    self.external_card_images_rotated[card] = ImageTk.PhotoImage(
+                        base.rotate(90, expand=True), master=self)
+        except Exception:
+            self.external_card_images.clear()
+            self.external_card_images_rotated.clear()
+            self.external_card_pil = {}
+            self.external_back_image = None
+            self.external_back_pil = None
+
+    def _make_fallback_card_pil(self, card, face_up=True):
+        image = Image.new('RGBA', (100, 140), '#f4efe4' if face_up else '#253e66')
+        draw = ImageDraw.Draw(image)
+        draw.rounded_rectangle((2, 2, 97, 137), radius=8,
+                               outline='#d7cbb9' if face_up else '#d7c46a', width=3)
+        if not face_up:
+            draw.rectangle((12, 12, 87, 127), outline='#e4d490', width=2)
+            draw.line((16, 16, 83, 123), fill='#e4d490', width=2)
+            draw.line((83, 16, 16, 123), fill='#e4d490', width=2)
+            return image
+        suit, rank = card
+        suit_map = {'Club': '♣', 'Diamond': '♦', 'Heart': '♥', 'Spade': '♠'}
+        color = '#c22631' if suit in ('Diamond', 'Heart') else '#111111'
+        try:
+            font_big = ImageFont.truetype('DejaVuSans-Bold.ttf', 30)
+            font_suit = ImageFont.truetype('DejaVuSans.ttf', 28)
+        except Exception:
+            font_big = None
+            font_suit = None
+        draw.text((8, 6), str(rank), fill=color, font=font_big)
+        draw.text((9, 42), suit_map.get(suit, suit[:1]), fill=color, font=font_suit)
+        draw.text((50, 88), suit_map.get(suit, suit[:1]), fill=color, font=font_suit,
+                  anchor='mm')
+        return image
+
+    def card_position(self, hand_type, index):
+        """龙、虎、凤每家一张牌，依次横向显示。"""
+        x0, y0, _x1, _y1 = self.animation_panel
+        y = y0 + 90
+        if hand_type == 'Dragon':
+            return (x0 + 75, y)
+        if hand_type == 'Tiger':
+            return (x0 + 329, y)
+        return (x0 + 583, y)
+
+    def draw_animation_panel(self):
+        c = self.canvas
+        x0, y0, x1, y1 = self.GAME_X0, 4, self.GAME_X1, 310
+        c.create_rectangle(x0, y0, x1, y1, fill=self.PANEL,
+                           outline=self.PANEL_LINE, width=2, tags='static')
+        self.animation_panel = (x0, y0, x1, y1)
+        self.animation_phase_text = c.create_text(
+            (x0 + x1) / 2, y0 + 18, text='龙虎凤 DRAGON TIGER PHOENIX',
+            font=('Arial', 16, 'bold'), fill='#d4c3a9', tags='animation')
+
+        self.dragon_zone_rect = c.create_rectangle(
+            x0 + 10, y0 + 38, x0 + 246, y1 - 7,
+            fill=self.DRAGON_ZONE_BASE, outline='#a56a6d', width=2, tags='animation')
+        self.tiger_zone_rect = c.create_rectangle(
+            x0 + 256, y0 + 38, x0 + 502, y1 - 7,
+            fill=self.TIGER_ZONE_BASE, outline='#b89c45', width=2, tags='animation')
+        self.phoenix_zone_rect = c.create_rectangle(
+            x0 + 512, y0 + 38, x1 - 10, y1 - 7,
+            fill=self.PHOENIX_ZONE_BASE, outline='#4d87c5', width=2, tags='animation')
+        self.dragon_zone_label = c.create_text(
+            x0 + 24, y0 + 53, anchor='w', text='龙 DRAGON',
+            font=('Arial', 11, 'bold'), fill='#ffaaaa', tags='animation')
+        self.tiger_zone_label = c.create_text(
+            x0 + 270, y0 + 53, anchor='w', text='虎 TIGER',
+            font=('Arial', 11, 'bold'), fill='#ffe77a', tags='animation')
+        self.phoenix_zone_label = c.create_text(
+            x0 + 526, y0 + 53, anchor='w', text='凤 PHOENIX',
+            font=('Arial', 11, 'bold'), fill='#a9d4ff', tags='animation')
+
+        dx, dy = self.card_position('Dragon', 0)
+        tx, ty = self.card_position('Tiger', 0)
+        px, py = self.card_position('Phoenix', 0)
+        self.dragon_score_text = c.create_text(
+            dx + 50, dy + 174, text='—',
+            font=('Arial', 52, 'bold'), fill='white', tags='animation')
+        self.tiger_score_text = c.create_text(
+            tx + 50, ty + 174, text='—',
+            font=('Arial', 52, 'bold'), fill='white', tags='animation')
+        self.phoenix_score_text = c.create_text(
+            px + 50, py + 174, text='—',
+            font=('Arial', 52, 'bold'), fill='white', tags='animation')
+        self.tie_flash_rect = c.create_rectangle(
+            0, 0, 0, 0, fill=self.TIE_FLASH_DARK, outline='',
+            state='hidden', tags='animation')
+        self.card_item_ids = []
+        self.revealed_cards = {'Dragon': [], 'Tiger': [], 'Phoenix': []}
+        self._temp_flip_images = {}
+
+    def clear_card_display(self):
+        for item in self.card_item_ids:
+            try:
+                self.canvas.delete(item)
+            except tk.TclError:
+                pass
+        self.card_item_ids = []
+        self._temp_flip_images = {}
+        self.revealed_cards = {'Dragon': [], 'Tiger': [], 'Phoenix': []}
+        self.canvas.itemconfigure(self.dragon_score_text, text='—')
+        self.canvas.itemconfigure(self.tiger_score_text, text='—')
+        self.canvas.itemconfigure(self.phoenix_score_text, text='—')
+
+    @staticmethod
+    def card_text(card):
+        suit, rank = card
+        suit_map = {'Club': '♣', 'Diamond': '♦', 'Heart': '♥', 'Spade': '♠'}
+        return f'{rank}\n{suit_map.get(suit, suit[:1])}'
+
+    def draw_card(self, hand_type, index, card, face_up=True):
+        """Draw one card at the Dragon/Tiger 100x140 display size."""
+        x, y = self.card_position(hand_type, index)
+        rotated = index == 2
+        image = None
+        if face_up:
+            image = self._face_photo(card, rotated=rotated)
+        else:
+            if rotated and self.external_back_pil is not None and ImageTk is not None:
+                image = getattr(self, '_rotated_back_image', None)
+                if image is None:
+                    self._rotated_back_image = ImageTk.PhotoImage(
+                        self.external_back_pil.rotate(90, expand=True), master=self)
+                    image = self._rotated_back_image
+            else:
+                image = self.external_back_image
+        if image is not None:
+            item = self.canvas.create_image(x, y, image=image, anchor='nw',
+                                            tags=('animation_card', 'animation'))
+            self.card_item_ids.append(item)
+            return item
+
+        # Last resort if Pillow is unavailable.
+        w, h = (140, 100) if rotated else (100, 140)
+        fill = '#f4efe4' if face_up else '#253e66'
+        outline = '#d7cbb9' if face_up else '#d7c46a'
+        rect = self.canvas.create_rectangle(x, y, x + w, y + h, fill=fill,
+                                            outline=outline, width=2,
+                                            tags=('animation_card', 'animation'))
+        if face_up:
+            suit, _rank = card
+            fg = '#c22631' if suit in ('Diamond', 'Heart') else '#111111'
+            text = self.card_text(card)
+        else:
+            fg, text = '#e4d490', '◆\\n◆'
+        tid = self.canvas.create_text(x + w / 2, y + h / 2, text=text,
+                                      font=('Arial', 20, 'bold'), fill=fg,
+                                      justify='center', angle=90 if rotated else 0,
+                                      tags=('animation_card', 'animation'))
+        self.card_item_ids.extend((rect, tid))
+        return rect
+
+    def draw_board(self):
+        c = self.canvas
+        c.create_rectangle(self.GAME_X0, 316, self.GAME_X1, 620, fill=self.FELT,
+                           outline=self.LINE, width=2, tags='static')
+        self.draw_mode_betting_board()
+
+    def draw_mode_betting_board(self):
+        c = self.canvas
+        c.delete('board_dynamic')
+        c.delete('bet_chip_dynamic')
+        self.bet_spots = {}
+        odds = DragonTigerEngine.ODDS_TEXT[self.game_mode]
+
+        x0, x1 = self.BOARD_INNER_X0, self.BOARD_INNER_X1
+        self.draw_bet_row(DragonTigerEngine.MODE_ROWS[self.game_mode][0],
+                          x0, 322, 405, odds)
+        self.draw_bet_row(DragonTigerEngine.MODE_ROWS[self.game_mode][1],
+                          x0, 409, 502, odds)
+
+        main = ('Dragon', 'Tiger', 'Phoenix')
+        y0, y1 = 506, 602
+        width = (x1 - x0) / 3
+        for index, bet_type in enumerate(main):
+            bx0 = x0 + index * width
+            bx1 = x1 if index == 2 else bx0 + width
+            self.draw_bet_spot(
+                bet_type, bx0, y0, bx1, y1, odds.get(bet_type, ''), main=True)
+        self.update_bet_chips()
+
+    def draw_bet_row(self, bet_types, x0, y0, y1, odds):
+        count = len(bet_types)
+        if count <= 0:
+            return
+        width = (self.BOARD_INNER_X1 - x0) / count
+        for index, bet_type in enumerate(bet_types):
+            bx0 = x0 + index * width
+            bx1 = self.BOARD_INNER_X1 if index == count - 1 else bx0 + width
+            self.draw_bet_spot(bet_type, bx0, y0, bx1, y1, odds.get(bet_type, ''), main=False)
+
+    @staticmethod
+    def spot_tag(key):
+        bet_type, param = key
+        safe = 'none' if param is None else re.sub(r'[^0-9A-Za-z]+', '_', str(param))
+        safe_type = re.sub(r'[^0-9A-Za-z]+', '_', str(bet_type))
+        return f'betspot_{safe_type}_{safe}'
+
+    def register_spot(self, bet_type, x0, y0, x1, y1, chip_pos, label):
+        key = (bet_type, None)
+        self.bet_spots[key] = {
+            'bounds': (x0, y0, x1, y1), 'chip_pos': chip_pos,
+            'label': label, 'tag': self.spot_tag(key),
         }
 
-        odds_map = {
-            'DiamondFlush': ('60:1', '#B0E0E6', 'black', '#8FB0C0'),
-            'ClubFlush':    ('60:1', '#228B22', 'white', '#1B6B1B'),
-            'HeartFlush':   ('60:1', '#FF69B4', 'black', '#CC5490'),
-            'SpadeFlush':   ('60:1', '#000000', 'white', '#333333'),
-            'TripleRed':    ('3:1', '#FF0000', 'white', '#CC0000'),
-            'Flush':        ('12:1', '#800080', 'white', '#660066'),
-            'Tie':          ('7:1/20:1', '#00FF00', 'black', '#00CC00'),
-            'TripleBlack':  ('3:1', '#000000', 'white', '#333333'),
-            'Dragon':       ('1.8:1', '#FF0000', 'white', '#CC0000'),
-            'Tiger':        ('1.8:1', '#FFA600', 'black', '#CC8400'),
-            'Phoenix':      ('1.8:1', '#007BFF', 'white', '#0066CC')
+    def draw_bet_spot(self, bet_type, x0, y0, x1, y1, odds_text, main=False):
+        c = self.canvas
+        tag = self.spot_tag((bet_type, None))
+        fill = self.BET_COLORS.get(bet_type, '#45665c')
+        fg = '#111111' if bet_type == 'Panda 8' else 'white'
+        outline = '#d5cbbd'
+        outline_width = 1
+        rect_id = c.create_rectangle(
+            x0 + 2, y0 + 2, x1 - 2, y1 - 2,
+            fill=fill, outline=outline, width=outline_width,
+            tags=('board_dynamic', tag))
+
+        label = DragonTigerEngine.DISPLAY_NAMES.get(bet_type, bet_type)
+        mid_y = (y0 + y1) / 2
+        if main:
+            label_item = c.create_text(
+                (x0 + x1) / 2, mid_y - 14, text=label,
+                font=('Arial', 26, 'bold'), fill=fg,
+                tags=('board_dynamic', tag))
+            odds_item = c.create_text(
+                (x0 + x1) / 2, mid_y + 18, text=odds_text,
+                font=('Arial', 18, 'bold'), fill=fg,
+                tags=('board_dynamic', tag))
+            odds_y = mid_y + 18
+        else:
+            label_item = c.create_text(
+                (x0 + x1) / 2, mid_y - 12, text=label,
+                font=('Arial', 18, 'bold'), fill=fg,
+                tags=('board_dynamic', tag))
+            odds_item = c.create_text(
+                (x0 + x1) / 2, mid_y + 14, text=odds_text,
+                font=('Arial', 13, 'bold'), fill=fg,
+                tags=('board_dynamic', tag))
+            odds_y = mid_y + 14
+
+        chip_y = (y0 + y1) / 2
+        self.register_spot(
+            bet_type, x0 + 2, y0 + 2, x1 - 2, y1 - 2,
+            ((x0 + x1) / 2, chip_y), label)
+        spot = self.bet_spots[(bet_type, None)]
+        spot.update({
+            'rect_id': rect_id, 'label_item': label_item, 'odds_item': odds_item,
+            'base_odds': odds_text, 'odds_y': odds_y, 'odds_base_x': (x0 + x1) / 2, 'main': bool(main),
+            'normal_outline': outline, 'normal_outline_width': outline_width,
+        })
+        c.tag_bind(tag, '<Button-1>', lambda _e, bt=bet_type: self.place_bet(bt))
+        c.tag_bind(tag, '<Button-3>', lambda _e, bt=bet_type: self.clear_single_bet(bt))
+        c.tag_bind(tag, '<Enter>', lambda _e: c.configure(cursor='hand2'))
+        c.tag_bind(tag, '<Leave>', lambda _e: c.configure(cursor=''))
+
+    # ------------------------------------------------------------- bottom controls
+    def draw_bottom_controls(self):
+        c = self.canvas
+        y0, y1 = 625, 748
+        c.create_rectangle(0, y0, 1150, y1, fill=self.BG,
+                           outline=self.PANEL_LINE, width=2, tags='controls')
+        self.balance_text = c.create_text(10, 665, anchor='w', text='余额: $0.00',
+                                          font=('Arial', 18, 'bold'), fill='white',
+                                          tags=('dynamic', 'controls'))
+        self.total_bet_text = c.create_text(10, 710, anchor='w', text='本局下注: $0.00',
+                                            font=('Arial', 18, 'bold'), fill='white',
+                                            tags=('dynamic', 'controls'))
+
+        # Compact stacked utility buttons leave the true centre of the 1150px
+        # table free for the chip rack.
+        self.clear_button = self.create_control_button(
+            278, 650, 344, 704, '清除', self.clear_bets, '#7c3b40', font_size=11)
+
+        # Larger chips, with the whole seven-chip rack centred at x=575.
+        chip_diameter = 56
+        chip_gap = 8
+        chip_total_width = len(self.CHIP_SPECS) * chip_diameter + (len(self.CHIP_SPECS) - 1) * chip_gap
+        chip_x = (self.WIDTH - chip_total_width) / 2
+        chip_y = 646
+        for value, color, label in self.CHIP_SPECS:
+            tag = f'chip_select_{value}'
+            outer = c.create_oval(chip_x, chip_y, chip_x + chip_diameter, chip_y + chip_diameter,
+                                  fill='#292522', outline='#6d6259', width=3,
+                                  tags=(tag, 'chip_selector', 'controls'))
+            inner = c.create_oval(chip_x + 5, chip_y + 5,
+                                  chip_x + chip_diameter - 5, chip_y + chip_diameter - 5,
+                                  fill=color, outline='#eee3d6', width=2,
+                                  tags=(tag, 'chip_selector', 'controls'))
+            text_color = self.contrast_text_color(color)
+            label_id = c.create_text(chip_x + chip_diameter / 2,
+                                     chip_y + chip_diameter / 2, text=label,
+                                     font=('Arial', 10, 'bold'), fill=text_color,
+                                     tags=(tag, 'chip_selector', 'controls'))
+            c.tag_bind(tag, '<Button-1>', lambda _e, v=value: self.select_chip(v))
+            self.chip_selector_items[value] = (outer, inner, label_id)
+            chip_x += chip_diameter + chip_gap
+
+        self.info_button = self.create_control_button(
+            810, 650, 855, 695, '❓', self.show_game_instructions, '#315b72',
+            fg='white', font_size=17)
+        self.repeat_button = self.create_control_button(
+            862, 638, 1000, 708, '重复下注', self.repeat_last_bets, '#5b4938', font_size=11)
+        self.deal_button = self.create_control_button(
+            1012, 628, 1138, 720, '开牌', self.deal_cards, '#d5ad4d',
+            fg='#111', font_size=14, subtext='ENTER', subtext_font_size=10)
+        c.tag_raise('controls')
+        c.tag_raise('chip_selector')
+        self.update_control_states()
+
+    def show_game_instructions(self):
+        existing = getattr(self, '_intro_window', None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                return
+        except tk.TclError:
+            pass
+
+        window = tk.Toplevel(self.winfo_toplevel())
+        self._intro_window = window
+        window.title('龙虎凤 · 游戏简介')
+        window.configure(bg='#120f0d')
+        window.resizable(False, False)
+        window.transient(self.winfo_toplevel())
+
+        width, height = 860, 720
+        try:
+            parent = self.winfo_toplevel()
+            x = parent.winfo_rootx() + max(0, (parent.winfo_width() - width) // 2)
+            y = parent.winfo_rooty() + max(0, (parent.winfo_height() - height) // 2)
+            window.geometry(f'{width}x{height}+{x}+{y}')
+        except tk.TclError:
+            window.geometry(f'{width}x{height}')
+
+        header = tk.Frame(window, bg='#352417', height=96,
+                          highlightbackground='#a7844d', highlightthickness=1)
+        header.pack(fill='x', padx=12, pady=(12, 8))
+        header.pack_propagate(False)
+        tk.Label(header, text='龙  虎  凤', bg='#352417', fg='#f2d37b',
+                 font=('Arial', 28, 'bold')).place(x=24, y=14)
+        tk.Label(header, text='DRAGON  ·  TIGER  ·  PHOENIX', bg='#352417', fg='#bda98d',
+                 font=('Arial', 10, 'bold')).place(x=27, y=61)
+        mode_name = DragonTigerEngine.MODE_NAMES.get(self.game_mode, self.game_mode)
+        tk.Label(header, text=f'当前玩法  {mode_name}', bg='#a77a31', fg='#130f0b',
+                 padx=18, pady=7, font=('Arial', 12, 'bold')).place(x=630, y=28)
+
+        content = tk.Frame(window, bg='#120f0d')
+        content.pack(fill='both', expand=True, padx=12)
+        left = tk.Frame(content, bg='#120f0d')
+        right = tk.Frame(content, bg='#120f0d')
+        left.pack(side='left', fill='both', expand=True, padx=(0, 5))
+        right.pack(side='right', fill='both', expand=True, padx=(5, 0))
+
+        def section(parent, title, accent, body, height_px):
+            frame = tk.Frame(parent, bg='#201914', height=height_px,
+                             highlightbackground='#58483a', highlightthickness=1)
+            frame.pack(fill='x', pady=(0, 8))
+            frame.pack_propagate(False)
+            tk.Frame(frame, bg=accent, width=5).pack(side='left', fill='y')
+            inner = tk.Frame(frame, bg='#201914')
+            inner.pack(side='left', fill='both', expand=True, padx=14, pady=10)
+            tk.Label(inner, text=title, bg='#201914', fg=accent,
+                     font=('Arial', 13, 'bold'), anchor='w').pack(fill='x')
+            tk.Label(inner, text=body, bg='#201914', fg='#e9dfd4',
+                     font=('Arial', 10), justify='left', anchor='nw',
+                     wraplength=360).pack(fill='both', expand=True, pady=(7, 0))
+            return frame
+
+        section(
+            left, '一眼看懂', '#e25a60',
+            '龙、虎、凤各发 1 张牌，比较点数大小。\n'
+            'A 最小，依次到 K 最大。最高点数的一家获胜；\n'
+            '两家或三家同为最高点数时为和局。', 128)
+
+        rank_frame = tk.Frame(left, bg='#201914', height=92,
+                              highlightbackground='#58483a', highlightthickness=1)
+        rank_frame.pack(fill='x', pady=(0, 8))
+        rank_frame.pack_propagate(False)
+        tk.Label(rank_frame, text='牌面顺序', bg='#201914', fg='#f2d37b',
+                 font=('Arial', 12, 'bold')).pack(anchor='w', padx=14, pady=(8, 4))
+        ranks = tk.Frame(rank_frame, bg='#201914')
+        ranks.pack(fill='x', padx=12)
+        for rank in ('A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'):
+            tk.Label(ranks, text=rank, bg='#3b3028', fg='white', width=2,
+                     font=('Arial', 9, 'bold'), padx=1, pady=4).pack(side='left', padx=1)
+
+        section(
+            left, '胜方赔率', '#56b58b',
+            '独赢：龙／虎／凤获胜，利润赔率 1.8:1。\n'
+            '两家同为最高：同大两家各按 1:1 赔付。\n'
+            '三家同点：龙／虎／凤下注全部通杀。', 126)
+        section(
+            left, '操作与记录', '#70a9d6',
+            '左键下注 · 右键清除单区 · Enter 开牌\n'
+            '右方只显示大路及珠盘路，四项饼图在珠盘路下方。\n'
+            '珠盘独立保留 72 局；第 73 局时按整列移除最旧 6 局。', 120)
+
+        section(
+            right, '和局赔率', '#d6aa58',
+            '两家同为最高点数：7:1\n'
+            '三家同点：20:1\n'
+            '只有并列最高才算和局；两家较低同点不算。', 105)
+        section(
+            right, '花色下注', '#b884e0',
+            '三黑／三红：利润赔率 6.9:1\n'
+            '一红二黑／二红一黑：利润赔率 1.6:1\n'
+            '红色为红心、方块；黑色为黑桃、梅花。', 120)
+        section(
+            right, '点数差距', '#f0c84d',
+            '最大点数－最小点数：差距 0–6 或 7–12。\n'
+            '两区利润赔率均为 0.95:1。A=1、J=11、Q=12、K=13。\n'
+            '例：2/K/8→11；2/8/8→6；8/8/8→0。', 125)
+        section(
+            right, '大路连续规则', '#68c9c0',
+            '一般格按整列共同颜色的交集判断连续。\n'
+            '三家和只可与紧接的三家和连续；它前后的一般结果必须另开新列。', 105)
+
+        footer = tk.Frame(window, bg='#120f0d', height=54)
+        footer.pack(fill='x', padx=12, pady=(4, 10))
+        tk.Label(footer, text=f'版本 {DRAGON_TIGER_VERSION}', bg='#120f0d',
+                 fg='#756b62', font=('Arial', 9)).pack(side='left', padx=4)
+        tk.Button(footer, text='知道了', command=window.destroy,
+                  bg='#a77a31', fg='#130f0b', activebackground='#d1a750',
+                  relief='flat', padx=28, pady=7,
+                  font=('Arial', 11, 'bold')).pack(side='right')
+        window.protocol('WM_DELETE_WINDOW', window.destroy)
+        window.bind('<Escape>', lambda _event: window.destroy())
+        window.after(20, window.focus_force)
+
+    def show_help_window(self):
+        self.show_game_instructions()
+
+    @staticmethod
+    def shade_color(color, factor):
+        color = color.lstrip('#')
+        if len(color) != 6:
+            return '#555555'
+        values = [int(color[i:i + 2], 16) for i in (0, 2, 4)]
+        values = [max(0, min(255, int(value * factor))) for value in values]
+        return '#' + ''.join(f'{value:02x}' for value in values)
+
+    def create_control_button(self, x0, y0, x1, y1, text, command, fill,
+                              fg='white', font_size=11, subtext=None,
+                              subtext_font_size=10):
+        tag = f'control_button_{len(self.control_buttons)}'
+        shadow = self.canvas.create_rectangle(x0 + 5, y0 + 6, x1 + 5, y1 + 6,
+                                              fill='#070605', outline='#070605',
+                                              width=1, tags=(tag, 'controls'))
+        rim = self.canvas.create_rectangle(x0, y0, x1, y1,
+                                           fill=self.shade_color(fill, 0.55),
+                                           outline='#b7a58d', width=2,
+                                           tags=(tag, 'controls'))
+        face = self.canvas.create_rectangle(x0 + 4, y0 + 4, x1 - 4, y1 - 4,
+                                            fill=fill,
+                                            outline=self.shade_color(fill, 1.25),
+                                            width=2, tags=(tag, 'controls'))
+        highlight = self.canvas.create_line(x0 + 8, y0 + 8, x1 - 8, y0 + 8,
+                                            fill=self.shade_color(fill, 1.45), width=2,
+                                            tags=(tag, 'controls'))
+        center_y = (y0 + y1) / 2 - 1
+        text_y = center_y - 12 if subtext else center_y
+        text_id = self.canvas.create_text((x0 + x1) / 2, text_y, text=text,
+                                          font=('Arial', font_size, 'bold'), fill=fg,
+                                          tags=(tag, 'controls'))
+        subtext_id = None
+        subtext_center_y = None
+        if subtext:
+            subtext_center_y = center_y + 16
+            subtext_id = self.canvas.create_text((x0 + x1) / 2, subtext_center_y,
+                                                 text=subtext,
+                                                 font=('Arial', subtext_font_size, 'bold'),
+                                                 fill=fg, tags=(tag, 'controls'))
+        self.control_buttons[tag] = {
+            'shadow': shadow, 'rim': rim, 'face': face, 'highlight': highlight,
+            'text': text_id, 'subtext': subtext_id, 'command': command,
+            'fill': fill, 'fg': fg, 'enabled': True, 'pressed': False,
+            'center_y': text_y, 'subtext_center_y': subtext_center_y,
         }
 
-        row1_frame = tk.Frame(parent, bg='#D0E7FF', height=80)
-        row1_frame.pack(fill=tk.BOTH, expand=True, pady=3)
-        row1_frame.pack_propagate(False)
-        buttons_1 = ['DiamondFlush','ClubFlush','HeartFlush','SpadeFlush']
-        for bt in buttons_1:
-            odds, bg, fg, disabled = odds_map[bt]
-            display = bet_display_map[bt]
-            btn = tk.Button(
-                row1_frame,
-                text=f"{odds}\n{display}\n~~",
-                bg=bg, fg=fg,
-                font=('Arial', 10, 'bold'),
-                height=3, width=10,
-                wraplength=80,
-                disabledforeground=fg,
-                highlightthickness=0
-            )
-            btn.original_bg = bg
-            btn.disabled_bg = disabled
-            btn.config(command=lambda t=bt, b=btn: self.place_bet(t, b))
-            btn.bind('<Button-3>', lambda e, t=bt, b=btn: self._on_right_click_clear(e, t, b))
-            btn.bet_type = bt
-            btn.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=2)
-            self.bet_buttons.append(btn)
+        def enter(_event=None):
+            button = self.control_buttons.get(tag)
+            if button and button['enabled'] and not button['pressed']:
+                self.canvas.itemconfigure(button['face'], fill=self.shade_color(button['fill'], 1.12))
 
-        row2_frame = tk.Frame(parent, bg='#D0E7FF', height=80)
-        row2_frame.pack(fill=tk.BOTH, expand=True, pady=3)
-        row2_frame.pack_propagate(False)
-        buttons_2 = ['TripleRed','Flush','Tie','TripleBlack']
-        for bt in buttons_2:
-            odds, bg, fg, disabled = odds_map[bt]
-            display = bet_display_map[bt]
-            btn = tk.Button(
-                row2_frame,
-                text=f"{odds}\n{display}\n~~",
-                bg=bg, fg=fg,
-                font=('Arial', 10, 'bold'),
-                height=3, width=10,
-                wraplength=80,
-                disabledforeground=fg,
-                highlightthickness=0
-            )
-            btn.original_bg = bg
-            btn.disabled_bg = disabled
-            btn.config(command=lambda t=bt, b=btn: self.place_bet(t, b))
-            btn.bind('<Button-3>', lambda e, t=bt, b=btn: self._on_right_click_clear(e, t, b))
-            btn.bet_type = bt
-            btn.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=2)
-            self.bet_buttons.append(btn)
+        def leave(_event=None):
+            button = self.control_buttons.get(tag)
+            if button and button['enabled'] and not button['pressed']:
+                self.canvas.itemconfigure(button['face'], fill=button['fill'])
 
-        row3_frame = tk.Frame(parent, bg='#D0E7FF', height=80)
-        row3_frame.pack(fill=tk.BOTH, expand=True, pady=3)
-        row3_frame.pack_propagate(False)
-        buttons_3 = ['Dragon','Tiger','Phoenix']
-        for bt in buttons_3:
-            odds, bg, fg, disabled = odds_map[bt]
-            display = bet_display_map[bt]
-            btn = tk.Button(
-                row3_frame,
-                text=f"{odds}\n{display}\n~~",
-                bg=bg, fg=fg,
-                font=('Arial', 12, 'bold'),
-                height=3, width=10,
-                wraplength=80,
-                disabledforeground=fg,
-                highlightthickness=0
-            )
-            btn.original_bg = bg
-            btn.disabled_bg = disabled
-            btn.config(command=lambda t=bt, b=btn: self.place_bet(t, b))
-            btn.bind('<Button-3>', lambda e, t=bt, b=btn: self._on_right_click_clear(e, t, b))
-            btn.bet_type = bt
-            btn.pack(side=tk.LEFT, expand=True, fill=tk.BOTH, padx=2)
-            self.bet_buttons.append(btn)
+        def press(_event=None):
+            button = self.control_buttons.get(tag)
+            if not button or not button['enabled']:
+                return
+            button['pressed'] = True
+            self.canvas.itemconfigure(button['face'], fill=self.shade_color(button['fill'], 0.72))
+            self.canvas.itemconfigure(button['highlight'], fill=self.shade_color(button['fill'], 0.8))
+            x, _y = self.canvas.coords(button['text'])
+            self.canvas.coords(button['text'], x, button['center_y'] + 2)
+            if button.get('subtext'):
+                sx, _sy = self.canvas.coords(button['subtext'])
+                self.canvas.coords(button['subtext'], sx, button['subtext_center_y'] + 2)
 
-        explanation = "龙/虎/凤：独赢1.8倍，两家和局1倍，三家和局全输；平局：二家和7倍，三家和20倍"
-        explanation_frame = tk.Frame(parent, bg='#D0E7FF', height=40)
-        explanation_frame.pack(fill=tk.BOTH, expand=True, pady=2)
-        explanation_frame.pack_propagate(False)
-        tk.Label(
-            explanation_frame,
-            text=explanation,
-            font=('Arial', 10),
-            bg='#D0E7FF'
-        ).pack(expand=True)
+        def release(_event=None):
+            button = self.control_buttons.get(tag)
+            if not button or not button['enabled'] or not button['pressed']:
+                return
+            button['pressed'] = False
+            self.canvas.itemconfigure(button['face'], fill=button['fill'])
+            self.canvas.itemconfigure(button['highlight'], fill=self.shade_color(button['fill'], 1.45))
+            x, _y = self.canvas.coords(button['text'])
+            self.canvas.coords(button['text'], x, button['center_y'])
+            if button.get('subtext'):
+                sx, _sy = self.canvas.coords(button['subtext'])
+                self.canvas.coords(button['subtext'], sx, button['subtext_center_y'])
+            button['command']()
 
-    def clear_single_bet(self, bet_type):
-        if bet_type in self.current_bets:
-            bet_amount = self.current_bets[bet_type]
-            self.balance += bet_amount
-            self.current_bet -= bet_amount
-            del self.current_bets[bet_type]
-            self.update_balance()
-            self.current_bet_label.config(text=f"${self.current_bet:,}")
-            for btn in self.bet_buttons:
-                if hasattr(btn, 'bet_type') and btn.bet_type == bet_type:
-                    original_text = btn.cget("text").split('\n')
-                    new_text = f"{original_text[0]}\n{original_text[1]}\n~~"
-                    btn.config(text=new_text)
+        self.canvas.tag_bind(tag, '<Enter>', enter)
+        self.canvas.tag_bind(tag, '<Leave>', leave)
+        self.canvas.tag_bind(tag, '<ButtonPress-1>', press)
+        self.canvas.tag_bind(tag, '<ButtonRelease-1>', release)
+        return tag
 
-    def _populate_betting_center(self, parent):
-        balance_display_frame = tk.Frame(parent, bg='#D0E7FF')
-        balance_display_frame.pack(fill=tk.X)
+    def set_control_button_state(self, tag, enabled):
+        button = self.control_buttons.get(tag)
+        if not button:
+            return
+        button['enabled'] = bool(enabled)
+        button['pressed'] = False
+        x, _y = self.canvas.coords(button['text'])
+        self.canvas.coords(button['text'], x, button['center_y'])
+        if button.get('subtext'):
+            sx, _sy = self.canvas.coords(button['subtext'])
+            self.canvas.coords(button['subtext'], sx, button['subtext_center_y'])
+        if enabled:
+            self.canvas.itemconfigure(button['face'], fill=button['fill'])
+            self.canvas.itemconfigure(button['rim'], fill=self.shade_color(button['fill'], 0.55))
+            self.canvas.itemconfigure(button['highlight'], fill=self.shade_color(button['fill'], 1.45))
+            self.canvas.itemconfigure(button['text'], fill=button['fg'])
+            if button.get('subtext'):
+                self.canvas.itemconfigure(button['subtext'], fill=button['fg'])
+        else:
+            self.canvas.itemconfigure(button['face'], fill='#4a4743')
+            self.canvas.itemconfigure(button['rim'], fill='#262422')
+            self.canvas.itemconfigure(button['highlight'], fill='#66615b')
+            self.canvas.itemconfigure(button['text'], fill='#9b9690')
+            if button.get('subtext'):
+                self.canvas.itemconfigure(button['subtext'], fill='#9b9690')
 
-        self.balance_label = tk.Label(
-            balance_display_frame,
-            text=f"余额: ${int(round(self.balance)):,}",
-            font=('Arial', 22),
-            fg='black',
-            bg='#D0E7FF'
-        )
-        self.balance_label.pack(side=tk.LEFT)
+    def update_control_states(self):
+        enabled = self.accept_bets and not self.animation_running and not self.settlement_running
+        for attr in ('clear_button', 'repeat_button', 'deal_button'):
+            tag = getattr(self, attr, None)
+            if tag:
+                self.set_control_button_state(tag, enabled)
 
-        self.info_button = tk.Button(
-            balance_display_frame,
-            text="ℹ️",
-            command=self.show_game_instructions,
-            bg='#4B8BBE',
-            fg='white',
-            font=('Arial', 8)
-        )
-        self.info_button.pack(side=tk.RIGHT, padx=5)
-        self.info_button.bind('<Button-3>', self.show_remaining_cards)
+    # --------------------------------------------------------------- bet actions
+    def select_chip(self, amount):
+        self.selected_chip = float(amount)
+        for value, items in self.chip_selector_items.items():
+            outer, _inner, _text = items
+            selected = float(value) == float(amount)
+            self.canvas.itemconfigure(outer,
+                                      outline='#ffda42' if selected else '#6d6259',
+                                      width=5 if selected else 3)
+        self.canvas.tag_raise('chip_selector')
 
-        separator = ttk.Separator(parent, orient=tk.HORIZONTAL)
-        separator.pack(fill=tk.X, padx=2, pady=2)
+    def bet_limit_for(self, bet_type):
+        if bet_type in ('Dragon', 'Tiger', 'Phoenix'):
+            return 500_000.0
+        if bet_type == 'Tie':
+            return 100_000.0
+        return 30_000.0
 
-        minmax_frame = tk.Frame(parent, bg='#D0E7FF')
-        minmax_frame.pack(fill=tk.X)
+    def _current_round_total_cost(self):
+        return float(self.bet_state.total_at_risk())
 
-        table_border_color = "#d70000"
-        table_bg = '#f9f9f9'
+    def place_bet(self, bet_type, amount=None, record_undo=True):
+        if not self.accept_bets or self.animation_running or self.settlement_running:
+            return False
+        if (bet_type, None) not in self.bet_spots:
+            return False
+        requested = float(amount if amount is not None else self.selected_chip)
 
-        outer_frame = tk.Frame(minmax_frame, bg=table_border_color, bd=2, relief=tk.SOLID)
-        outer_frame.pack(padx=5, pady=2, fill=tk.X)
+        # V20: every wager must be exactly 100 or a multiple of 100.
+        if requested < 100.0 or abs(requested / 100.0 - round(requested / 100.0)) > 1e-9:
+            messagebox.showwarning('下注单位', '下注只接受100及100的倍数。',
+                                   parent=self.winfo_toplevel())
+            return False
 
-        header_frame = tk.Frame(outer_frame, bg=table_border_color)
-        header_frame.pack(fill=tk.X)
-        tk.Label(header_frame, text="边注最高", font=("Arial",12,"bold"),
-                 bg=table_border_color, fg='white', width=9, pady=2).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Label(header_frame, text="和局最高", font=("Arial",12,"bold"),
-                 bg=table_border_color, fg='white', width=9, pady=2).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Label(header_frame, text="主注最高", font=("Arial",12,"bold"),
-                 bg=table_border_color, fg='white', width=9, pady=2).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        area_current = self.bet_state.current_area_bet(bet_type)
+        table_current = self.bet_state.total_at_risk()
+        raw_allowed = min(requested,
+                          self.bet_limit_for(bet_type) - area_current,
+                          self.MAX_TABLE_BET - table_current,
+                          self.balance)
+        raw_allowed = max(0.0, raw_allowed)
 
-        content_frame = tk.Frame(outer_frame, bg=table_bg)
-        content_frame.pack(fill=tk.X)
-        tk.Label(content_frame, text="30,000", font=("Arial",12,"bold"),
-                 bg=table_bg, fg='black', width=9, pady=2).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Label(content_frame, text="100,000", font=("Arial",12,"bold"),
-                 bg=table_bg, fg='black', width=9, pady=2).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Label(content_frame, text="500,000", font=("Arial",12,"bold"),
-                 bg=table_bg, fg='black', width=9, pady=2).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # Auto-adjustment must also remain on a 100-unit boundary.  We floor
+        # rather than round upward so the adjusted bet never exceeds balance,
+        # area limit, or table limit.
+        allowed = float(int(raw_allowed // 100.0) * 100)
+        if allowed < 100.0:
+            return False
+        if allowed < requested:
+            messagebox.showwarning('下注限制', f'下注已自动调整为 {self.format_money(allowed)}。',
+                                   parent=self.winfo_toplevel())
+        self.bet_state.add_bet(bet_type, allowed)
+        self.balance -= allowed
+        if record_undo:
+            self.undo_stack.append((bet_type, None, allowed))
+        self.summary_mode = 'bet'
+        self.update_display()
+        self.save_balance()
+        return True
 
-        separator = ttk.Separator(parent, orient=tk.HORIZONTAL)
-        separator.pack(fill=tk.X, padx=5, pady=1)
+    def clear_single_bet(self, bet_type, _param=None):
+        if not self.accept_bets or self.animation_running or self.settlement_running:
+            return
+        refunded = self.bet_state.clear_area(bet_type)
+        if refunded <= 0:
+            return
+        self.balance += refunded
+        self.undo_stack = [item for item in self.undo_stack if item[0] != bet_type]
+        self.update_display()
+        self.save_balance()
 
-        btn_frame = tk.Frame(parent, bg='#D0E7FF')
-        btn_frame.pack(fill=tk.X, pady=2)
-        self.reset_button = tk.Button(
-            btn_frame, text="重设金额", command=self.reset_bets,
-            bg='#ff4444', fg='white',
-            font=('微软雅黑', 16, 'bold')
-        )
-        self.reset_button.pack(side=tk.TOP, expand=True, fill=tk.X, padx=10, pady=3)
-        self.deal_button = tk.Button(
-            btn_frame, text="开始游戏 (Enter)", command=self.start_game,
-            bg='gold', fg='black',
-            font=('微软雅黑', 16, 'bold')
-        )
-        self.deal_button.pack(side=tk.TOP, expand=True, fill=tk.X, padx=10, pady=1)
+    def undo_last_bet(self):
+        if not self.accept_bets or self.animation_running or self.settlement_running:
+            return
+        while self.undo_stack:
+            bet_type, _param, amount = self.undo_stack.pop()
+            removed = self.bet_state.remove_amount(bet_type, amount)
+            if removed > 0:
+                self.balance += removed
+                self.update_display()
+                self.save_balance()
+                return
 
-        separator = ttk.Separator(parent, orient=tk.HORIZONTAL)
-        separator.pack(fill=tk.X, pady=(3,0), padx=2)
+    def clear_bets(self):
+        if not self.accept_bets or self.animation_running or self.settlement_running:
+            return
+        refunded = self.bet_state.clear_all()
+        if refunded <= 0:
+            return
+        self.balance += refunded
+        self.undo_stack.clear()
+        self.update_display()
+        self.save_balance()
 
-        current_bet_frame = tk.Frame(parent, bg='#D0E7FF')
-        current_bet_frame.pack(pady=(0,1))
-        tk.Label(
-            current_bet_frame, text="当前下注:", width=12,
-            font=('微软雅黑', 16), bg='#D0E7FF'
-        ).pack(side=tk.LEFT)
-        self.current_bet_label = tk.Label(
-            current_bet_frame, text="$0", width=10,
-            font=('微软雅黑', 16), bg='#D0E7FF'
-        )
-        self.current_bet_label.pack(side=tk.RIGHT)
+    def snapshot_bets(self):
+        return [(bet_type, None, float(amount))
+                for bet_type, amount in self.bet_state.bets.items() if amount > 0]
 
-        last_win_frame = tk.Frame(parent, bg='#D0E7FF')
-        last_win_frame.pack()
-        tk.Label(
-            last_win_frame, text="上局获胜:", width=12,
-            font=('微软雅黑', 16), bg='#D0E7FF'
-        ).pack(side=tk.LEFT)
-        self.last_win_label = tk.Label(
-            last_win_frame, text="$0", width=10,
-            font=('微软雅黑', 16), bg='#D0E7FF'
-        )
-        self.last_win_label.pack(side=tk.RIGHT)
+    def repeat_last_bets(self):
+        if (not self.accept_bets or self.animation_running or self.settlement_running
+                or not self.last_round_bets):
+            return
+        if self.bet_state.total_at_risk() > 0:
+            messagebox.showwarning('重复下注', '请先清除当前下注，再重复上局下注。',
+                                   parent=self.winfo_toplevel())
+            return
+        active = {key[0] for key in self.bet_spots}
+        repeatable = [(bt, p, amt) for bt, p, amt in self.last_round_bets if bt in active]
+        required = sum(amt for _bt, _p, amt in repeatable)
+        if self.balance + 1e-9 < required:
+            messagebox.showwarning('余额不足',
+                                   f'重复上局下注需要 {self.format_money(required)}，当前余额为 {self.format_money(self.balance)}。',
+                                   parent=self.winfo_toplevel())
+            return
+        for bet_type, _param, amount in repeatable:
+            self.place_bet(bet_type, amount=amount, record_undo=True)
 
-    def show_remaining_cards(self, event=None):
-        SUITS = ['Club','Diamond','Heart','Spade']
-        RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
-        remaining_deck = self.game.deck[self.game.cut_position:]
-        remaining_cards = {suit:{rank:0 for rank in RANKS} for suit in SUITS}
-        for card in remaining_deck:
-            suit, rank = card
-            remaining_cards[suit][rank] += 1
+    # ------------------------------------------------------------ display update
+    @staticmethod
+    def format_money(value):
+        if abs(value - round(value)) < 0.005:
+            return f'${value:,.0f}'
+        return f'${value:,.2f}'
 
-        win = tk.Toplevel(self)
-        win.title("剩余牌堆统计")
-        win.geometry("600x400")
-        win.resizable(False,False)
-        win.configure(bg='#F0F0F0')
+    @staticmethod
+    def contrast_text_color(color):
+        value = color.lstrip('#')
+        if len(value) != 6:
+            return 'black'
+        red, green, blue = (int(value[i:i + 2], 16) for i in (0, 2, 4))
+        luminance = 0.299 * red + 0.587 * green + 0.114 * blue
+        return 'black' if luminance >= 150 else 'white'
+
+    @staticmethod
+    def _compact_amount(amount):
+        if amount >= 1000:
+            value = amount / 1000
+            return f'{value:.0f}K' if abs(value - round(value)) < 0.01 else f'{value:.1f}K'
+        return str(int(round(amount))) if abs(amount - round(amount)) < 0.01 else f'{amount:.1f}'
+
+    def update_display(self):
+        self.canvas.itemconfigure(self.balance_text, text=f'余额: {self.format_money(self.balance)}')
+        if self.summary_mode == 'win':
+            self.canvas.itemconfigure(self.total_bet_text,
+                                      text=f'上局返还: {self.format_money(self.last_win_amount)}')
+        else:
+            self.canvas.itemconfigure(self.total_bet_text,
+                                      text=f'本局下注: {self.format_money(self._current_round_total_cost())}')
+        self.update_bet_chips()
+        self.update_history_table()
+        self.update_control_states()
+
+    def update_bet_chips(self):
+        self.canvas.delete('bet_chip_dynamic')
+        for key, spot in self.bet_spots.items():
+            amount = self.bet_state.current_area_bet(key[0])
+            # Keep tied winning wagers on the felt until finish_settlement().
+            if self.settlement_running and key in self.settlement_hold_amounts:
+                amount = self.settlement_hold_amounts[key]
+            if key in self.flash_winner_amounts:
+                if self.flash_mode == 'win':
+                    amount = self.flash_winner_amounts[key]
+                elif self.flash_mode == 'original':
+                    amount = self.flash_original_amounts.get(key, amount)
+            if amount <= 0:
+                continue
+            x0, y0, x1, y1 = spot['bounds']
+            # Keep the wager chip in the geometric centre of its betting area.
+            x, y = (x0 + x1) / 2, (y0 + y1) / 2
+            radius = 20
+            x = max(x0 + radius + 1, min(x1 - radius - 1, x))
+            y = max(y0 + radius + 1, min(y1 - radius - 1, y))
+            chip_color = self.bet_chip_color(amount)
+            text_color = self.contrast_text_color(chip_color)
+            self.canvas.create_oval(x - radius, y - radius, x + radius, y + radius,
+                                    fill='#292522', outline='#151311', width=1,
+                                    tags=('bet_chip_dynamic', spot['tag']))
+            self.canvas.create_oval(x - radius + 3, y - radius + 3,
+                                    x + radius - 3, y + radius - 3,
+                                    fill=chip_color, outline='#e2ddd5', width=1,
+                                    tags=('bet_chip_dynamic', spot['tag']))
+            self.canvas.create_text(x, y, text=self._compact_amount(amount),
+                                    font=('Arial', 9, 'bold'), fill=text_color,
+                                    tags=('bet_chip_dynamic', spot['tag']))
+
+    @classmethod
+    def bet_chip_color(cls, amount):
+        color = cls.CHIP_SPECS[0][1]
+        for threshold, chip_color, _label in cls.CHIP_SPECS:
+            if amount >= threshold:
+                color = chip_color
+            else:
+                break
+        return color
+
+    def _show_cut_dialog(self, second=False):
+        """Casino-style visual cut with a physical packet-swap animation.
+
+        The dragon drags a yellow cut card anywhere in the valid 65..349
+        range.  Enter chooses a random legal position.  Confirming does not
+        immediately close the dialog: the shoe visibly separates into the two
+        packets created by the cut, the front packet is lifted, the packets
+        exchange positions, and the lifted packet is lowered back onto the
+        shoe.  Only after that animation finishes is the cut position returned
+        to start_new_shoe_cut(), which then starts the burn-card procedure.
+        """
+        dialog_w, dialog_h = 760, 410
+        dialog = tk.Toplevel(self.winfo_toplevel())
+        dialog.title('切牌')
+        dialog.resizable(False, False)
+        dialog.transient(self.winfo_toplevel())
+        dialog.grab_set()
+        dialog.configure(bg='#0b4038')
 
         self.update_idletasks()
-        main_x = self.winfo_x()
-        main_y = self.winfo_y()
-        main_width = self.winfo_width()
-        main_height = self.winfo_height()
-        popup_width = 600
-        popup_height = 400
-        x = main_x + (main_width - popup_width)//2
-        y = main_y + (main_height - popup_height)//2
-        win.geometry(f"{popup_width}x{popup_height}+{x}+{y}")
+        px, py = self.winfo_rootx(), self.winfo_rooty()
+        pw, ph = max(1, self.winfo_width()), max(1, self.winfo_height())
+        x = px + (pw - dialog_w) // 2
+        y = py + (ph - dialog_h) // 2
+        dialog.geometry(f'{dialog_w}x{dialog_h}+{x}+{y}')
 
-        main_frame = tk.Frame(win, bg='#F0F0F0')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        cv = tk.Canvas(dialog, width=760, height=338, bg='#0b4038',
+                       highlightthickness=0, cursor='hand2')
+        cv.pack(fill=tk.X, side=tk.TOP)
 
-        total_remaining = len(remaining_deck)
-        title_label = tk.Label(
-            main_frame,
-            text=f"剩余{total_remaining}张牌",
-            font=('Arial',16,'bold'),
-            bg='#F0F0F0',
-            fg='#333333'
-        )
-        title_label.pack(pady=(0,10))
+        cv.create_oval(34, 20, 726, 318, fill='#08352f', outline='#1a6e61', width=2,
+                       tags='cut_table_static')
+        cv.create_text(380, 48, text='拖动黄色切牌卡',
+                       font=('微软雅黑', 18, 'bold'), fill='white', tags='cut_instruction')
+        cv.create_text(380, 76,
+                       text='确认后会将两叠牌交换位置，再进入烧牌流程',
+                       font=('微软雅黑', 10), fill='#b7d7cf', tags='cut_instruction')
+        if second:
+            cv.create_text(380, 96, text='新牌靴', font=('微软雅黑', 10),
+                           fill='#e5dba4', tags='cut_instruction')
 
-        table_frame = tk.Frame(main_frame, bg='#F0F0F0')
-        table_frame.pack(fill=tk.BOTH, expand=True)
+        shoe_x0, shoe_x1 = 86.0, 674.0
+        shoe_y0, shoe_y1 = 132.0, 232.0
+        deck_width = shoe_x1 - shoe_x0
 
-        header_frame = tk.Frame(table_frame, bg='#F0F0F0')
-        header_frame.pack(fill=tk.X)
-        tk.Label(header_frame, text="", width=6, bg='#F0F0F0').pack(side=tk.LEFT, padx=3)
-        for rank in RANKS:
-            display_rank = 'X' if rank=='10' else rank
-            label = tk.Label(
-                header_frame,
-                text=display_rank,
-                width=4,
-                font=('Arial',10,'bold'),
-                bg='#F0F0F0',
-                relief=tk.RAISED,
-                bd=1
-            )
-            label.pack(side=tk.LEFT, padx=1)
-        total_label = tk.Label(
-            header_frame,
-            text="总计",
-            width=4,
-            font=('Arial',10,'bold'),
-            bg='#F0F0F0',
-            relief=tk.RAISED,
-            bd=1
-        )
-        total_label.pack(side=tk.LEFT, padx=1)
+        # Wooden shoe/frame remains still while the two card packets move.
+        cv.create_rectangle(shoe_x0 - 14, shoe_y0 - 16, shoe_x1 + 16, shoe_y1 + 17,
+                            fill='#2a211b', outline='#a48763', width=3,
+                            tags='shoe_frame')
 
-        for suit in SUITS:
-            row_frame = tk.Frame(table_frame, bg='#F0F0F0')
-            row_frame.pack(fill=tk.X)
-            suit_display = {'Club':'梅花','Diamond':'方块','Heart':'红心','Spade':'黑桃'}
-            suit_label = tk.Label(
-                row_frame,
-                text=suit_display[suit],
-                width=6,
-                font=('Arial',10,'bold'),
-                bg='#F0F0F0',
-                relief=tk.RAISED,
-                bd=1
-            )
-            suit_label.pack(side=tk.LEFT, padx=1)
-            suit_total = 0
-            for rank in RANKS:
-                count = remaining_cards[suit][rank]
-                suit_total += count
-                if count==0:
-                    bg_color = '#FFCCCC'
-                elif count<4:
-                    bg_color = '#FFFFCC'
+        def draw_full_shoe():
+            cv.delete('shoe_deck_static')
+            cv.create_rectangle(shoe_x0, shoe_y0, shoe_x1, shoe_y1,
+                                fill='#eee8dc', outline='#d0c5b2', width=2,
+                                tags='shoe_deck_static')
+            for i in range(105):
+                xx = shoe_x0 + deck_width * i / 104.0
+                shade = '#c7bca9' if i % 2 else '#e0d7c8'
+                cv.create_line(xx, shoe_y0 + 2, xx, shoe_y1 - 2, fill=shade,
+                               tags='shoe_deck_static')
+            # Back-design rails help the pack read as a physical shoe rather
+            # than a generic slider.
+            cv.create_rectangle(shoe_x0 + 8, shoe_y0 + 8, shoe_x1 - 8, shoe_y1 - 8,
+                                outline='#b61f2e', width=3, tags='shoe_deck_static')
+            cv.create_line(shoe_x0 + 13, shoe_y0 + 13, shoe_x1 - 13, shoe_y1 - 13,
+                           fill='#b61f2e', width=2, tags='shoe_deck_static')
+            cv.create_line(shoe_x1 - 13, shoe_y0 + 13, shoe_x0 + 13, shoe_y1 - 13,
+                           fill='#b61f2e', width=2, tags='shoe_deck_static')
+
+        draw_full_shoe()
+
+        valid_left = shoe_x0 + deck_width * 65 / 416.0
+        valid_right = shoe_x0 + deck_width * 349 / 416.0
+        cv.create_line(valid_left, shoe_y1 + 28, valid_right, shoe_y1 + 28,
+                       fill='#8ec8b8', width=4, tags='cut_rail')
+        cv.create_oval(valid_left-4, shoe_y1+24, valid_left+4, shoe_y1+32,
+                       fill='#d9eee8', outline='', tags='cut_rail')
+        cv.create_oval(valid_right-4, shoe_y1+24, valid_right+4, shoe_y1+32,
+                       fill='#d9eee8', outline='', tags='cut_rail')
+
+        rng = random.SystemRandom()
+        selected = {'value': rng.randint(120, 300)}
+        animating = {'value': False}
+        result = [None]
+
+        def value_to_x(value):
+            return shoe_x0 + deck_width * value / 416.0
+
+        def x_to_value(xx):
+            ratio = (xx - shoe_x0) / float(deck_width)
+            value = int(round(ratio * 416))
+            return max(65, min(349, value))
+
+        cut_tag = 'casino_cut_card'
+
+        def draw_cut_card():
+            cv.delete(cut_tag)
+            xx = value_to_x(selected['value'])
+            cv.create_rectangle(xx - 7, shoe_y0 - 31, xx + 7, shoe_y1 + 24,
+                                fill='#f3df42', outline='#75620b', width=2,
+                                tags=cut_tag)
+            cv.create_rectangle(xx - 4, shoe_y0 - 26, xx + 4, shoe_y0 - 6,
+                                fill='#fff59d', outline='', tags=cut_tag)
+            cv.tag_raise(cut_tag)
+
+        def move_cut(event):
+            if animating['value']:
+                return 'break'
+            selected['value'] = x_to_value(event.x)
+            draw_cut_card()
+
+        cv.bind('<Button-1>', move_cut)
+        cv.bind('<B1-Motion>', move_cut)
+        cv.tag_bind(cut_tag, '<B1-Motion>', move_cut)
+        cv.tag_bind(cut_tag, '<Button-1>', move_cut)
+        draw_cut_card()
+
+        cv.create_text(380, 292, text='ENTER = 随机切牌',
+                       font=('微软雅黑', 10, 'bold'), fill='#d9eee8',
+                       tags='cut_enter_hint')
+
+        # Packet drawing helpers -------------------------------------------------
+        def draw_packet(tag, x0, y0, width, height, edge_count=36):
+            width = max(18.0, float(width))
+            cv.create_rectangle(x0, y0, x0+width, y0+height,
+                                fill='#eee8dc', outline='#d0c5b2', width=2,
+                                tags=(tag, 'cut_packet'))
+            # Proportional card-edge lines; clamp the number so both packets
+            # visibly retain a card-stack texture even at extreme legal cuts.
+            lines = max(8, min(edge_count, int(width / 5.0)))
+            for i in range(1, lines):
+                xx = x0 + width * i / lines
+                cv.create_line(xx, y0+3, xx, y0+height-3,
+                               fill='#c6baa7' if i % 2 else '#ddd3c3',
+                               tags=(tag, 'cut_packet'))
+            cv.create_rectangle(x0+5, y0+6, x0+width-5, y0+height-6,
+                                outline='#b61f2e', width=2,
+                                tags=(tag, 'cut_packet'))
+
+        def ease(t):
+            # Smoothstep keeps the packets from looking like linear UI sliders.
+            t = max(0.0, min(1.0, float(t)))
+            return t*t*(3.0 - 2.0*t)
+
+        confirm_btn = None
+
+        def finish_cut_animation():
+            cv.delete('cut_packet')
+            cv.delete(cut_tag)
+            cv.delete('cut_rail')
+            # Show the reassembled shoe for a short beat before burn starts.
+            draw_full_shoe()
+            cv.itemconfigure('cut_instruction', state='hidden')
+            cv.create_text(380, 65, text='切牌完成',
+                           font=('微软雅黑', 20, 'bold'), fill='#ffe365',
+                           tags='cut_done')
+            cv.create_text(380, 292, text='准备烧牌…',
+                           font=('微软雅黑', 11, 'bold'), fill='white',
+                           tags='cut_done')
+            result[0] = int(selected['value'])
+            dialog.after(260, dialog.destroy)
+
+        def begin_cut_animation(value=None):
+            if animating['value']:
+                return 'break'
+            if value is not None:
+                selected['value'] = max(65, min(349, int(value)))
+                draw_cut_card()
+            animating['value'] = True
+            if confirm_btn is not None:
+                confirm_btn.config(state=tk.DISABLED, text='切牌中…')
+            cv.config(cursor='arrow')
+            cv.unbind('<Button-1>')
+            cv.unbind('<B1-Motion>')
+            cv.delete('shoe_deck_static')
+            cv.delete('cut_enter_hint')
+            cv.itemconfigure('cut_instruction', state='hidden')
+            cv.create_text(380, 55, text='正在切牌',
+                           font=('微软雅黑', 18, 'bold'), fill='white', tags='cut_anim_text')
+            cv.create_text(380, 82, text='分牌 → 调换 → 合并',
+                           font=('微软雅黑', 10), fill='#b7d7cf', tags='cut_anim_text')
+
+            split_x = value_to_x(selected['value'])
+            left_w = max(18.0, split_x - shoe_x0)
+            right_w = max(18.0, shoe_x1 - split_x)
+            # Avoid any visual gap caused by extreme width clamping. Legal
+            # 65..349 already guarantees useful widths, so this is defensive.
+            left_w = min(deck_width-18.0, left_w)
+            right_w = deck_width-left_w
+
+            tag_a, tag_b = 'cut_packet_A', 'cut_packet_B'
+            draw_packet(tag_a, shoe_x0, shoe_y0, left_w, shoe_y1-shoe_y0)
+            draw_packet(tag_b, shoe_x0+left_w, shoe_y0, right_w, shoe_y1-shoe_y0)
+            cv.delete(cut_tag)
+
+            # A = cards before the cut. In a casino cut this packet is lifted,
+            # the remaining packet slides into the front, then A is placed at
+            # the rear. The engine performs the identical rotation afterwards.
+            start_a = [shoe_x0, shoe_y0]
+            start_b = [shoe_x0+left_w, shoe_y0]
+            lift_y = shoe_y0 - 72.0
+            final_b_x = shoe_x0
+            final_a_x = shoe_x0 + right_w
+
+            def move_tag_to(tag, current, target_x, target_y):
+                dx, dy = target_x-current[0], target_y-current[1]
+                cv.move(tag, dx, dy)
+                current[0], current[1] = target_x, target_y
+
+            current_a = start_a[:]
+            current_b = start_b[:]
+
+            # Phase 1: lift the front packet clear of the shoe.
+            phase1_steps, phase1_ms = 14, 22
+            def phase1(step=0):
+                t = ease(step/phase1_steps)
+                move_tag_to(tag_a, current_a, shoe_x0, shoe_y0+(lift_y-shoe_y0)*t)
+                cv.tag_raise(tag_a)
+                if step < phase1_steps:
+                    dialog.after(phase1_ms, phase1, step+1)
                 else:
-                    bg_color = '#CCFFCC'
-                count_label = tk.Label(
-                    row_frame,
-                    text=str(count),
-                    width=4,
-                    font=('Arial',10),
-                    bg=bg_color,
-                    relief=tk.SUNKEN,
-                    bd=1
-                )
-                count_label.pack(side=tk.LEFT, padx=1)
-            total_label = tk.Label(
-                row_frame,
-                text=str(suit_total),
-                width=4,
-                font=('Arial',10,'bold'),
-                bg='#DDDDDD',
-                relief=tk.RAISED,
-                bd=1
-            )
-            total_label.pack(side=tk.LEFT, padx=1)
+                    phase2(0)
 
-        separator = tk.Frame(table_frame, height=2, bg='#333333')
-        separator.pack(fill=tk.X, pady=5)
+            # Phase 2: slide the remaining packet to the front while the lifted
+            # packet travels to the rear position above it.
+            phase2_steps, phase2_ms = 18, 22
+            def phase2(step=0):
+                t = ease(step/phase2_steps)
+                move_tag_to(tag_b, current_b,
+                            start_b[0] + (final_b_x-start_b[0])*t,
+                            shoe_y0)
+                move_tag_to(tag_a, current_a,
+                            shoe_x0 + (final_a_x-shoe_x0)*t,
+                            lift_y)
+                cv.tag_raise(tag_a)
+                if step < phase2_steps:
+                    dialog.after(phase2_ms, phase2, step+1)
+                else:
+                    phase3(0)
 
-        total_row_frame = tk.Frame(table_frame, bg='#F0F0F0')
-        total_row_frame.pack(fill=tk.X)
-        tk.Label(
-            total_row_frame,
-            text="总计",
-            width=6,
-            font=('Arial',10,'bold'),
-            bg='#F0F0F0',
-            relief=tk.RAISED,
-            bd=1
-        ).pack(side=tk.LEFT, padx=1)
+            # Phase 3: lower the first packet into the rear of the shoe.
+            phase3_steps, phase3_ms = 14, 22
+            def phase3(step=0):
+                t = ease(step/phase3_steps)
+                move_tag_to(tag_a, current_a, final_a_x,
+                            lift_y + (shoe_y0-lift_y)*t)
+                cv.tag_raise(tag_a)
+                if step < phase3_steps:
+                    dialog.after(phase3_ms, phase3, step+1)
+                else:
+                    # A small compression beat visually seals the two packets.
+                    cv.create_line(final_a_x, shoe_y0+3, final_a_x, shoe_y1-3,
+                                   fill='#9f927d', width=1, tags='cut_packet')
+                    dialog.after(180, finish_cut_animation)
 
-        rank_totals = {}
-        for rank in RANKS:
-            rank_totals[rank] = 0
-            for suit in SUITS:
-                rank_totals[rank] += remaining_cards[suit][rank]
-        grand_total = 0
-        for rank in RANKS:
-            total = rank_totals[rank]
-            grand_total += total
-            if total==0:
-                bg_color = '#FFCCCC'
-            elif total<16:
-                bg_color = '#FFFFCC'
+            phase1(0)
+            return 'break'
+
+        def confirm():
+            begin_cut_animation(selected['value'])
+
+        def random_confirm(_event=None):
+            if animating['value']:
+                return 'break'
+            selected['value'] = rng.randint(65, 349)
+            draw_cut_card()
+            # Enter is a complete random-cut action, not merely a random cursor
+            # move: immediately play the same physical packet-swap animation.
+            dialog.after(100, begin_cut_animation, selected['value'])
+            return 'break'
+
+        confirm_btn = tk.Button(
+            dialog, text='确认切牌', command=confirm, width=18,
+            font=('微软雅黑', 13, 'bold'), bg='#d8bd4b', fg='#15110d',
+            activebackground='#ead56f', relief=tk.FLAT, bd=0, pady=8)
+        confirm_btn.pack(pady=(4, 12))
+
+        dialog.bind('<Return>', random_confirm)
+        dialog.bind('<KP_Enter>', random_confirm)
+        dialog.after(20, dialog.focus_force)
+        # Closing the window is treated like confirming the currently selected
+        # cut, and still plays the physical cut animation first.
+        dialog.protocol('WM_DELETE_WINDOW', confirm)
+        self.wait_window(dialog)
+        return int(result[0] if result[0] is not None else selected['value'])
+
+    def start_new_shoe_cut(self, second=False):
+        """Legacy host entry point; CSM mode has no manual cut or burn flow."""
+        del second
+        if self._closing or self.engine.round_open:
+            return
+        self.animation_running = False
+        self.settlement_running = False
+        self.accept_bets = True
+        self.canvas.itemconfigure(self.animation_phase_text, text='龙虎凤 DRAGON TIGER PHOENIX')
+        self.update_display()
+
+    def _start_initial_burn_animation(self):
+        if self.engine.remaining_cards() <= 0:
+            self._finish_initial_burn()
+            return
+        first_card = self.engine.draw_card()
+        self.save_temp_data(burn_complete=False)
+        target_x = (self.GAME_X0 + self.GAME_X1) / 2 - 50
+        target_y = 100
+        back = self._back_photo(False)
+        card_id = self.canvas.create_image((self.GAME_X0 + self.GAME_X1) / 2 - 50, -150,
+                                           image=back, anchor='nw',
+                                           tags=('burn_card', 'animation'))
+        self.card_item_ids.append(card_id)
+        info = ('Burn', card_id, 0)
+        def arrive():
+            self._flip_burn_card(info, first_card, 0)
+        def move(step=0):
+            ratio = min(1.0, step / 30.0)
+            x = (self.GAME_X0 + self.GAME_X1) / 2 - 50
+            y = -150 + (target_y + 150) * ratio
+            self.canvas.coords(card_id, x, y)
+            if step < 30:
+                self._queue_animation(10, move, step + 1)
             else:
-                bg_color = '#CCFFCC'
-            total_label = tk.Label(
-                total_row_frame,
-                text=str(total),
-                width=4,
-                font=('Arial',10,'bold'),
-                bg=bg_color,
-                relief=tk.RAISED,
-                bd=1
-            )
-            total_label.pack(side=tk.LEFT, padx=1)
-        grand_total_label = tk.Label(
-            total_row_frame,
-            text=str(grand_total),
-            width=4,
-            font=('Arial',10,'bold'),
-            bg='#CCCCFF',
-            relief=tk.RAISED,
-            bd=1
-        )
-        grand_total_label.pack(side=tk.LEFT, padx=1)
+                arrive()
+        move()
 
-        close_btn = ttk.Button(win, text="关闭", command=win.destroy)
-        close_btn.pack(pady=10)
-
-    def _populate_betting_right(self, parent):
-        chips_frame = tk.Frame(parent, bg='#D0E7FF')
-        chips_frame.pack(pady=5)
-        row1 = tk.Frame(chips_frame, bg='#D0E7FF')
-        row1.pack()
-        for text, bg_color in [
-            ('100', '#000000'),
-            ('500', "#FF7DDA"),
-            ('1千', "#ab0058")
-        ]:
-            btn = self._create_chip_button(row1, text, bg_color)
-            btn.pack(side=tk.LEFT, padx=2)
-        row2 = tk.Frame(chips_frame, bg='#D0E7FF')
-        row2.pack(pady=3)
-        for text, bg_color in [
-            ('5千', '#ff0000'),
-            ('1万', '#800080'),
-            ('3万', '#ffa500')
-        ]:
-            btn = self._create_chip_button(row2, text, bg_color)
-            btn.pack(side=tk.LEFT, padx=2)
-        row3 = tk.Frame(chips_frame, bg='#D0E7FF')
-        row3.pack(pady=3)
-        for text, bg_color in [
-            ('5万', '#006400'),
-            ('10万', '#00ff00'),
-            ('50万', '#0000ff')
-        ]:
-            btn = self._create_chip_button(row3, text, bg_color)
-            btn.pack(side=tk.LEFT, padx=2)
-
-        self._set_default_chip()
-
-        self.current_chip_label = tk.Label(
-            parent,
-            text="筹码: $1,000",
-            font=('Arial', 18),
-            fg='black',
-            bg='#D0E7FF'
-        )
-        self.current_chip_label.pack(side=tk.LEFT, padx=0)
-
-    def _set_default_chip(self):
-        for chip in self.chip_buttons:
-            if chip['text'] == '1千':
-                chip['canvas'].itemconfig(chip['chip_id'], outline='yellow', width=4)
-                self.selected_canvas = chip['canvas']
-                self.selected_id = chip['chip_id']
-                self.selected_chip = chip
-                self.selected_bet_amount = 1000
-                if hasattr(self, 'current_chip_label'):
-                    self.current_chip_label.config(text="筹码: $1,000")
-                break
-
-    def _setup_bindings(self):
-        self.bind('<Return>', lambda e: self.start_game())
-
-    def place_bet(self, bet_type, btn_widget=None):
-        if btn_widget is not None and str(btn_widget.cget('state')) == 'disabled':
+    def _flip_burn_card(self, card_info, card, step=0):
+        _hand, card_id, _index = card_info
+        steps = 12
+        if step > steps:
+            image = self._face_photo(card, False)
+            if image is not None:
+                self.canvas.itemconfigure(card_id, image=image)
+            burn_value = min(10, DragonTigerEngine.card_value(card) or 10)
+            # 10/J/Q/K burn 10, A burn 1; numbered cards burn face value.
+            rank = card[1]
+            burn_value = 10 if rank in ('10', 'J', 'Q', 'K') else (1 if rank == 'A' else int(rank))
+            self._queue_animation(500, self._burn_back_cards, burn_value, 0, [])
             return
-        for b in getattr(self, 'bet_buttons', []):
-            if hasattr(b, 'bet_type') and b.bet_type == bet_type:
-                if str(b.cget('state')) == 'disabled':
-                    return
-                break
-
-        amount = int(self.selected_bet_amount)
-        existing = int(self.current_bets.get(bet_type, 0))
-
-        if bet_type in ('Dragon', 'Tiger', 'Phoenix'):
-            limit = 500_000
-        elif bet_type == 'Tie':
-            limit = 100_000
+        half = steps // 2
+        if step <= half:
+            ratio, use_back = 1 - step / float(half), True
         else:
-            limit = 30_000
+            ratio, use_back = (step - half) / float(half), False
+        width = max(1, int(100 * ratio))
+        image = self._create_scaled_flip_image(card, width, 140, use_back=use_back, rotated=False)
+        if image is not None:
+            self._temp_flip_images[card_id] = image
+            self.canvas.itemconfigure(card_id, image=image)
+            base_x = (self.GAME_X0 + self.GAME_X1) / 2 - 50
+            self.canvas.coords(card_id, base_x + (100 - width) / 2, 100)
+        self._queue_animation(20, self._flip_burn_card, card_info, card, step + 1)
 
-        allowed_remaining = limit - existing
-        if allowed_remaining <= 0:
-            messagebox.showwarning("投注上限", f"当前投注已达到上限${limit:,}，无法再下注。")
+    def _burn_back_cards(self, total, index, ids):
+        if index >= total or self.engine.remaining_cards() <= 0:
+            self._queue_animation(700, self._finish_initial_burn)
+            return
+        self.engine.draw_card()
+        self.save_temp_data(burn_complete=False)
+        start_x = (self.GAME_X0 + self.GAME_X1) / 2 - 50
+        start_y = -150
+        col = index % 5
+        row = index // 5
+        target_x = 105 + col * 112
+        target_y = 112 + row * 148
+        card_id = self.canvas.create_image(start_x, start_y, image=self._back_photo(False),
+                                           anchor='nw', tags=('burn_card', 'animation'))
+        self.card_item_ids.append(card_id)
+        ids.append(card_id)
+        def move(step=0):
+            ratio = min(1.0, step / 24.0)
+            self.canvas.coords(card_id,
+                               start_x + (target_x - start_x) * ratio,
+                               start_y + (target_y - start_y) * ratio)
+            if step < 24:
+                self._queue_animation(10, move, step + 1)
+            else:
+                self._queue_animation(100, self._burn_back_cards, total, index + 1, ids)
+        move()
+
+    def _finish_initial_burn(self):
+        self.canvas.delete('burn_card')
+        self.card_item_ids = [item for item in self.card_item_ids
+                              if self.canvas.type(item)]
+        self.clear_card_display()
+        self.save_temp_data(burn_complete=True)
+        self.animation_running = False
+        self.accept_bets = True
+        self.canvas.itemconfigure(self.animation_phase_text, text='龙虎凤 DRAGON TIGER PHOENIX')
+        self.update_display()
+
+    # ------------------------------------------------------------ dealing/settle
+    def handle_enter_deal(self, _event=None):
+        button = self.control_buttons.get(getattr(self, 'deal_button', None))
+        if button and button['enabled']:
+            button['command']()
+        return 'break'
+
+    def deal_cards(self):
+        if not self.accept_bets or self.animation_running or self.settlement_running:
+            return
+        try:
+            self.engine.start_round()
+        except (CSMError, OSError, RuntimeError) as exc:
+            messagebox.showerror('自动洗牌机', f'无法开始牌局：{exc}',
+                                 parent=self.winfo_toplevel())
             return
 
-        to_place = min(amount, allowed_remaining, self.balance)
-        if to_place <= 0:
-            if self.balance <= 0:
-                messagebox.showerror("Error", "余额不足")
+        self.accept_bets = False
+        self.animation_running = True
+        current_bets = self.snapshot_bets()
+        if current_bets:
+            self.last_round_bets = current_bets
+        self.undo_stack.clear()
+        self.pre_deal_bets = copy.deepcopy(self.bet_state.bets)
+        self.clear_card_display()
+        self.current_result = None
+        self.result_panel_flash_winner = None
+        self.restore_result_panel_colors()
+        self.canvas.itemconfigure(self.tie_flash_rect, state='hidden')
+        self.update_control_states()
+
+        self._begin_actual_round_deal()
+
+    def _begin_actual_round_deal(self):
+        if self._closing:
             return
-
-        self.balance -= to_place
-        self.current_bet += to_place
-        self.current_bets[bet_type] = self.current_bets.get(bet_type, 0) + to_place
-
-        self.update_balance()
-        self.current_bet_label.config(text=f"${self.current_bet:,}")
-
-        for btn in self.bet_buttons:
-            if hasattr(btn, 'bet_type') and btn.bet_type == bet_type:
-                original_text = btn.cget("text").split('\n')
-                top = original_text[0] if len(original_text)>=1 else btn.cget("text")
-                mid = original_text[1] if len(original_text)>=2 else ""
-                new_text = f"{top}\n{mid}\n${self.current_bets[bet_type]:,}"
-                btn.config(text=new_text)
-
-    def _on_right_click_clear(self, event, bet_type, btn_widget):
-        if str(btn_widget.cget('state')) == 'disabled':
+        try:
+            self.current_result = self.engine.deal_round()
+        except (CSMError, OSError, RuntimeError) as exc:
+            self.accept_bets = False
+            self.animation_running = False
+            self.update_display()
+            messagebox.showerror(
+                '自动洗牌机',
+                f'本局发牌已暂停：{exc}\n请退出本局以归还牌张；系统不会放宽取仓规则。',
+                parent=self.winfo_toplevel())
             return
-        self.clear_single_bet(bet_type)
+        self.canvas.itemconfigure(self.animation_phase_text, text='发牌中…')
+        self._deal_initial_sequence_original()
 
-    def start_game(self):
-        self.disable_all_buttons()
-        if len(self.game.deck) - self.game.cut_position < 60:
-            self._initialize_game(True)
-            return
+    def _queue_animation(self, delay, callback, *args):
+        after_id = self.after(delay, callback, *args)
+        self.animation_after_ids.append(after_id)
+        return after_id
 
-        self.game.play_game()
-        self.animate_dealing()
+    def _back_photo(self, rotated=False):
+        if not rotated:
+            return self.external_back_image
+        image = getattr(self, '_rotated_back_image', None)
+        if image is None and self.external_back_pil is not None and ImageTk is not None:
+            self._rotated_back_image = ImageTk.PhotoImage(
+                self.external_back_pil.rotate(90, expand=True), master=self)
+            image = self._rotated_back_image
+        return image or self.external_back_image
 
-    def animate_dealing(self):
-        self.table_canvas.delete('all')
-        self.point_labels.clear()
-        self._draw_table_labels()
+    def _face_photo(self, card, rotated=False):
+        card = tuple(card)
+        return self.external_card_images_rotated.get(card) if rotated else self.external_card_images.get(card)
 
-        self.revealed_cards = {'dragon':[], 'tiger':[], 'phoenix':[]}
-
-        self._deal_initial_cards()
-        self.after(1000, self._reveal_dragon_card)
-
-    def _deal_initial_cards(self):
+    def _deal_initial_sequence_original(self):
+        """龙、虎、凤各发一张，每张到位后翻开。"""
         self.initial_card_ids = []
-        # 派牌顺序：龙先，虎次，凤最后
-        for hand in ['dragon', 'tiger', 'phoenix']:
-            for i, pos in enumerate(self._get_card_positions(hand)[:1]):
-                self._animate_card_entrance(hand, i, pos)
+        sequence = (('Dragon', 0), ('Tiger', 0), ('Phoenix', 0))
 
-    def _animate_card_entrance(self, hand_type, index, target_pos):
-        start_x, start_y = 500, 0
-        card_id = self.table_canvas.create_image(start_x, start_y, image=self.back_image)
+        def deal_step(position=0):
+            if self._closing or not self.current_result:
+                return
+            if position >= len(sequence):
+                self._queue_animation(180, self.finish_deal)
+                return
+            hand_type, index = sequence[position]
+            hand_key = {'Dragon': 'dragon_hand', 'Tiger': 'tiger_hand',
+                        'Phoenix': 'phoenix_hand'}[hand_type]
+            real_card = self.current_result[hand_key][index]
+
+            def arrived(info):
+                self._flip_card_original(
+                    info, real_card,
+                    on_complete=lambda: self._queue_animation(100, deal_step, position + 1)
+                )
+            self._animate_card_entrance_original(hand_type, index, rotated=False, on_arrive=arrived)
+        deal_step(0)
+
+    def _deal_initial_cards_original(self):
+        # Backward-compatible helper retained for callers outside the main flow.
+        self.initial_card_ids = []
+        for hand_type in ('Dragon', 'Tiger', 'Phoenix'):
+            self._animate_card_entrance_original(hand_type, 0, rotated=False)
+
+    def _animate_card_entrance_original(self, hand_type, index, rotated=False, on_arrive=None):
+        target_x, target_y = self.card_position(hand_type, index)
+        base_w = 140 if rotated else 100
+        start_x = (self.GAME_X0 + self.GAME_X1) / 2 - base_w / 2
+        start_y = -110 if rotated else -150
+        back = self._back_photo(rotated=rotated)
+        card_id = self.canvas.create_image(start_x, start_y, image=back, anchor='nw',
+                                           tags=('animation_card', 'animation'))
+        self.card_item_ids.append(card_id)
+        info = (hand_type, card_id, index)
+        self.initial_card_ids.append(info)
 
         def move_step(step=0):
-            if step <= 30:
-                x = start_x + (target_pos[0]-start_x)*(step/30)
-                y = start_y + (target_pos[1]-start_y)*(step/30)
-                self.table_canvas.coords(card_id, x, y)
-                self.after(10, move_step, step+1)
-        move_step()
-        self.initial_card_ids.append((hand_type, card_id))
+            if self._closing:
+                return
+            ratio = min(1.0, step / 30.0)
+            x = start_x + (target_x - start_x) * ratio
+            y = start_y + (target_y - start_y) * ratio
+            self.canvas.coords(card_id, x, y)
+            if step < 30:
+                self._queue_animation(10, move_step, step + 1)
+            elif callable(on_arrive):
+                on_arrive(info)
 
-    def _reveal_dragon_card(self):
-        card_info = self.initial_card_ids[0]  # dragon
-        real_card = self.game.dragon_hand[0]
-        self._flip_card(card_info, real_card, 0)
-        self.after(500, self._reveal_tiger_card)
+        move_step(0)
+        return info
 
-    def _reveal_tiger_card(self):
-        card_info = self.initial_card_ids[1]  # tiger
-        real_card = self.game.tiger_hand[0]
-        self._flip_card(card_info, real_card, 1)
-        self.after(500, self._reveal_phoenix_card)
-
-    def _reveal_phoenix_card(self):
-        card_info = self.initial_card_ids[2]  # phoenix
-        real_card = self.game.phoenix_hand[0]
-        self._flip_card(card_info, real_card, 2)
-        self.after(750, self.resolve_bets)
-
-    def _flip_card(self, card_info, real_card, seq, step=0):
-        steps = 12
-        orig_w, orig_h = 120, 170
-        hand_type, card_id = card_info
-
-        if step > steps:
-            try:
-                self.table_canvas.itemconfig(card_id, image=self.card_images[real_card])
-            except Exception:
-                pass
-            try:
-                self.revealed_cards[hand_type].append(real_card)
-            except Exception:
-                if not hasattr(self,'revealed_cards'):
-                    self.revealed_cards = {'dragon':[],'tiger':[],'phoenix':[]}
-                self.revealed_cards[hand_type].append(real_card)
-
-            if card_id in getattr(self,'_temp_flip_images',{}):
-                try:
-                    del self._temp_flip_images[card_id]
-                except Exception:
-                    pass
+    def _reveal_initial_phase1_original(self):
+        if not self.current_result or len(self.initial_card_ids) < 4:
             return
+        # Dragon opens card #1 first.
+        self._flip_card_original(self.initial_card_ids[1], self.current_result['dragon_hand'][1])
+        self._queue_animation(500, self._reveal_initial_phase3_original)
 
+    def _reveal_initial_phase2_original(self):
+        # Dragon opens card #0 second.
+        self._flip_card_original(self.initial_card_ids[0], self.current_result['dragon_hand'][0])
+        self._queue_animation(500, self._reveal_initial_phase4_original)
+
+    def _reveal_initial_phase3_original(self):
+        self._flip_card_original(self.initial_card_ids[2], self.current_result['tiger_hand'][0])
+        self._queue_animation(500, self._reveal_initial_phase2_original)
+
+    def _reveal_initial_phase4_original(self):
+        self._flip_card_original(self.initial_card_ids[3], self.current_result['tiger_hand'][1])
+        self._queue_animation(160, self._process_extra_cards_original)
+
+    def _create_scaled_flip_image(self, card, width, height, use_back=False, rotated=False):
+        if Image is None or ImageTk is None:
+            return self._back_photo(rotated) if use_back else self._face_photo(card, rotated)
+        if use_back:
+            base = self.external_back_pil
+        else:
+            base = self.external_card_pil.get(tuple(card))
+        if base is None:
+            return self._back_photo(rotated) if use_back else self._face_photo(card, rotated)
+        if rotated:
+            base = base.rotate(90, expand=True)
+        resample = getattr(Image, 'Resampling', Image).LANCZOS
+        image = base.resize((max(1, int(width)), max(1, int(height))), resample)
+        return ImageTk.PhotoImage(image, master=self)
+
+    def _flip_card_original(self, card_info, real_card, step=0, on_complete=None):
+        hand_type, card_id, index = card_info
+        rotated = False
+        steps = 12
+        orig_w, orig_h = (100, 140)
+        if step > steps:
+            final_image = self._face_photo(real_card, rotated=False)
+            if final_image is not None:
+                self.canvas.itemconfigure(card_id, image=final_image)
+            self.revealed_cards.setdefault(hand_type, []).append(real_card)
+            target = {'Dragon': self.dragon_score_text, 'Tiger': self.tiger_score_text,
+                      'Phoenix': self.phoenix_score_text}[hand_type]
+            self.canvas.itemconfigure(target, text=real_card[1])
+            target_x, target_y = self.card_position(hand_type, index)
+            self.canvas.coords(card_id, target_x, target_y)
+            self._temp_flip_images.pop(card_id, None)
+            if callable(on_complete):
+                on_complete()
+            return
         half = steps // 2
         if step <= half:
             ratio = 1 - (step / float(half))
@@ -1798,301 +2659,745 @@ class DragonTigerPhoenixGUI(tk.Tk):
         else:
             ratio = (step - half) / float(half)
             use_back = False
+        width = max(1, int(orig_w * ratio))
+        image = self._create_scaled_flip_image(real_card, width, orig_h,
+                                               use_back=use_back, rotated=rotated)
+        if image is not None:
+            self._temp_flip_images[card_id] = image
+            self.canvas.itemconfigure(card_id, image=image)
+            target_x, target_y = self.card_position(hand_type, index)
+            self.canvas.coords(card_id, target_x + (orig_w - width) / 2, target_y)
+        self._queue_animation(20, self._flip_card_original, card_info, real_card, step + 1, on_complete)
 
-        w = max(1, int(orig_w * ratio))
-        img = self._create_scaled_image(real_card, w, orig_h, use_back=use_back)
-        if not hasattr(self, '_temp_flip_images'):
-            self._temp_flip_images = {}
-        self._temp_flip_images[card_id] = img
-
-        try:
-            self.table_canvas.itemconfig(card_id, image=img)
-        except Exception:
-            pass
-
-        self.after(20, lambda: self._flip_card(card_info, real_card, seq, step+1))
-
-    def _create_scaled_image(self, card, w, h, use_back=False):
-        from PIL import Image, ImageTk
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', 'Poker1')
-        try:
-            if use_back:
-                path = os.path.join(card_dir, 'Background.png')
-            else:
-                path = os.path.join(card_dir, f"{card[0]}{card[1]}.png")
-            img = Image.open(path).convert('RGBA')
-            w = max(1, int(w))
-            img = img.resize((w, int(h)), Image.LANCZOS)
-            return ImageTk.PhotoImage(img)
-        except Exception as e:
-            try:
-                from PIL import Image
-                placeholder = Image.new('RGBA', (max(1,int(w)), int(h)), (0,0,0,0))
-                return ImageTk.PhotoImage(placeholder)
-            except Exception:
-                return getattr(self, 'back_image', None)
-
-    def resolve_bets(self):
-        payouts = 0
-        outcome = self.game.outcome
-        dragon_suit = self.game.dragon_hand[0][0]
-        tiger_suit = self.game.tiger_hand[0][0]
-        phoenix_suit = self.game.phoenix_hand[0][0]
-        suits = [dragon_suit, tiger_suit, phoenix_suit]
-        red_suits = ['Diamond','Heart']
-        black_suits = ['Club','Spade']
-
-        all_red = all(s in red_suits for s in suits)
-        all_black = all(s in black_suits for s in suits)
-        all_same_suit = len(set(suits)) == 1
-        all_hearts = all(s == 'Heart' for s in suits)
-        all_diamonds = all(s == 'Diamond' for s in suits)
-        all_spades = all(s == 'Spade' for s in suits)
-        all_clubs = all(s == 'Club' for s in suits)
-
-        for bet_type, bet_amount in self.current_bets.items():
-            if bet_type == 'TripleRed' and all_red:
-                payouts += bet_amount * 4
-            elif bet_type == 'TripleBlack' and all_black:
-                payouts += bet_amount * 4
-            elif bet_type == 'Flush' and all_same_suit:
-                payouts += bet_amount * 13
-            elif bet_type == 'HeartFlush' and all_hearts:
-                payouts += bet_amount * 61
-            elif bet_type == 'DiamondFlush' and all_diamonds:
-                payouts += bet_amount * 61
-            elif bet_type == 'SpadeFlush' and all_spades:
-                payouts += bet_amount * 61
-            elif bet_type == 'ClubFlush' and all_clubs:
-                payouts += bet_amount * 61
-            elif bet_type in ('Dragon','Tiger','Phoenix'):
-                if outcome['type'] == 'single' and outcome['winner'] == bet_type:
-                    payouts += bet_amount * 2.8
-                elif outcome['type'] == 'two_tie' and bet_type in outcome['tied_hands']:
-                    payouts += bet_amount * 2
-            elif bet_type == 'Tie':
-                if outcome['type'] == 'two_tie':
-                    payouts += bet_amount * 8
-                elif outcome['type'] == 'three_tie':
-                    payouts += bet_amount * 21
-
-        self.balance += payouts
-        self.current_bets.clear()
-        self.update_balance()
-
-        for btn in getattr(self, 'bet_buttons', []):
-            if hasattr(btn, 'bet_type'):
-                original_text = btn.cget("text").split('\n')
-                top = original_text[0] if len(original_text)>=1 else ""
-                mid = original_text[1] if len(original_text)>=2 else ""
-                new_text = f"{top}\n{mid}\n~~"
-                try:
-                    btn.config(text=new_text)
-                except Exception:
-                    pass
-
-        self.current_bet = 0
-        if hasattr(self, 'current_bet_label'):
-            try:
-                self.current_bet_label.config(text="$0")
-            except Exception:
-                pass
-
-        try:
-            self.last_win = int(payouts)
-            if hasattr(self, 'last_win_label'):
-                self.last_win_label.config(text=f"${max(self.last_win,0):,}")
-        except Exception:
-            pass
-
-        self._animate_cards_result()
-        self._show_result_text()
-
-        self.add_marker_result(outcome)
-
-        if len(self.game.deck) - self.game.cut_position < 60:
-            self._initialize_game(True)
+    def _process_extra_cards_original(self):
+        if self.current_result and len(self.current_result['dragon_hand']) > 2:
+            self._deal_extra_card_original('Dragon', 2)
+            self._queue_animation(1200, self._process_tiger_extra_original)
         else:
-            self.after(100, self.enable_buttons_except_deal)
-            self.after(1800, lambda: self.deal_button.config(state=tk.NORMAL))
-            self.after(2000, lambda: self.bind('<Return>', lambda e: self.start_game()))
+            self._process_tiger_extra_original()
 
-    def _animate_cards_result(self):
-        dragon_id = None
-        tiger_id = None
-        phoenix_id = None
-        for hand_type, card_id in self.initial_card_ids:
-            if hand_type == 'dragon':
-                dragon_id = card_id
-            elif hand_type == 'tiger':
-                tiger_id = card_id
-            elif hand_type == 'phoenix':
-                phoenix_id = card_id
+    def _process_tiger_extra_original(self):
+        if self.current_result and len(self.current_result['tiger_hand']) > 2:
+            self._deal_extra_card_original('Tiger', 2)
+            self._queue_animation(1200, self.finish_deal)
+        else:
+            self.finish_deal()
 
-        if not dragon_id or not tiger_id or not phoenix_id:
+    def _deal_extra_card_original(self, hand_type, index):
+        hand_key = 'dragon_hand' if hand_type == 'Dragon' else 'tiger_hand'
+        card = self.current_result[hand_key][index]
+
+        def arrived(info):
+            self._flip_card_original(info, card)
+
+        self._animate_card_entrance_original(hand_type, index, rotated=True,
+                                             on_arrive=arrived)
+
+    def reveal_card(self, hand_type, index, card):
+        if self._closing:
             return
+        self.draw_card(hand_type, index, card, face_up=True)
+        self.revealed_cards.setdefault(hand_type, []).append(card)
+        target = {'Dragon': self.dragon_score_text, 'Tiger': self.tiger_score_text,
+                  'Phoenix': self.phoenix_score_text}[hand_type]
+        self.canvas.itemconfigure(target, text=card[1])
 
-        dragon_pos = self.table_canvas.coords(dragon_id)
-        tiger_pos = self.table_canvas.coords(tiger_id)
-        phoenix_pos = self.table_canvas.coords(phoenix_id)
-        if not dragon_pos or not tiger_pos or not phoenix_pos:
+    def finish_deal(self):
+        if self._closing or not self.current_result:
             return
+        self.animation_after_ids.clear()
+        result = self.current_result
+        self.canvas.itemconfigure(self.dragon_score_text, text=DragonTigerEngine.rank_label(result['dragon_score']))
+        self.canvas.itemconfigure(self.tiger_score_text, text=DragonTigerEngine.rank_label(result['tiger_score']))
+        self.canvas.itemconfigure(self.phoenix_score_text, text=DragonTigerEngine.rank_label(result['phoenix_score']))
 
-        dx, dy = dragon_pos
-        tx, ty = tiger_pos
-        px, py = phoenix_pos
 
-        outcome = self.game.outcome
-        if outcome['type'] == 'single':
-            winner = outcome['winner']
-            if winner == 'Dragon':
-                self._animate_card_move(dragon_id, dx, dy, dx, dy+20, 100)
-            elif winner == 'Tiger':
-                self._animate_card_move(tiger_id, tx, ty, tx, ty+20, 100)
-            elif winner == 'Phoenix':
-                self._animate_card_move(phoenix_id, px, py, px, py+20, 100)
-        elif outcome['type'] == 'two_tie':
-            hands = outcome['tied_hands']
-            if 'Dragon' in hands:
-                self._animate_card_move(dragon_id, dx, dy, dx, dy+20, 100)
-            if 'Tiger' in hands:
-                self._animate_card_move(tiger_id, tx, ty, tx, ty+20, 100)
-            if 'Phoenix' in hands:
-                self._animate_card_move(phoenix_id, px, py, px, py+20, 100)
-        elif outcome['type'] == 'three_tie':
-            # 三家和：所有牌向下移动
-            self._animate_card_move(dragon_id, dx, dy, dx, dy+20, 100)
-            self._animate_card_move(tiger_id, tx, ty, tx, ty+20, 100)
-            self._animate_card_move(phoenix_id, px, py, px, py+20, 100)
+        settle = DragonTigerEngine.resolve_bets(
+            self.pre_deal_bets, result, self.game_mode, self.jackpot_amount)
+        self.balance += settle['credit']
 
-    def _animate_card_move(self, card_id, start_x, start_y, end_x, end_y, duration):
-        steps = int(duration / 10)
-        dx = (end_x - start_x) / steps
-        dy = (end_y - start_y) / steps
+        self.last_win_amount = settle['credit']
+        self.last_net = settle['net']
+        self.add_history(result)
+        self.update_statistic_data(result)
 
-        def move_step(step=0):
-            if step < steps:
-                new_x = start_x + dx * step
-                new_y = start_y + dy * step
-                self.table_canvas.coords(card_id, new_x, new_y)
-                self.after(10, move_step, step+1)
-        move_step()
+        self.flash_winning_keys = set()
+        self.flash_winner_amounts = {}
+        self.flash_original_amounts = {}
+        for outcome in settle['outcomes']:
+            key = tuple(outcome['key'])
+            if outcome['return_factor'] > 1.0:
+                self.flash_winning_keys.add(key)
+                self.flash_winner_amounts[key] = float(outcome['return_amount'])
+                self.flash_original_amounts[key] = float(self.pre_deal_bets.get(key[0], 0.0))
 
-    def _show_result_text(self):
-        text = ""
-        text_color = "white"
-        bg_color = "#35654d"
-        outcome = self.game.outcome
+        # Flash every objectively winning active side area too, even without a chip.
+        for bet_type, factor in settle['side_factors'].items():
+            key = (bet_type, None)
+            if factor > 1.0 and key in self.bet_spots:
+                self.flash_winning_keys.add(key)
 
-        if outcome['type'] == 'single':
-            if outcome['winner'] == 'Dragon':
-                text = "龙获胜"
-                bg_color = '#FF0000'
-            elif outcome['winner'] == 'Tiger':
-                text = "虎获胜"
-                bg_color = '#FFA600'
-            elif outcome['winner'] == 'Phoenix':
-                text = "凤获胜"
-                bg_color = '#007BFF'
-            text_color = 'white' if outcome['winner']=='Dragon' else 'black'
-        elif outcome['type'] == 'two_tie':
-            # 将英文名映射为中文
-            name_map = {'Dragon': '龙', 'Tiger': '虎', 'Phoenix': '凤'}
-            chinese_names = [name_map[h] for h in outcome['tied_hands']]
-            text = f"{'/'.join(chinese_names)}平局"
-            bg_color = '#00FF00'
-            text_color = 'black'
-        elif outcome['type'] == 'three_tie':
-            text = "三家和局"
-            bg_color = '#FFFFFF'
-            text_color = 'black'
+        main_factor = DragonTigerEngine.main_return_factor(result['winner'], result, self.game_mode)
+        _ = main_factor  # compatibility no-op; winner area is handled explicitly below
+        winner_key = (result['winner'], None)
+        if result['winner'] in ('Dragon', 'Tie', 'Tiger', 'Phoenix') and winner_key in self.bet_spots:
+            factor = DragonTigerEngine.main_return_factor(result['winner'], result, self.game_mode)
+            if factor > 1.0:
+                self.flash_winning_keys.add(winner_key)
 
+        # When two hands share the highest rank, show both winning wagers.
+        self.settlement_hold_amounts = {}
+        if result.get('winner') == 'Tie':
+            for bet_type in result.get('tied_winners', ()):
+                amount = float(self.pre_deal_bets.get(bet_type, 0.0))
+                if amount > 0:
+                    self.settlement_hold_amounts[(bet_type, None)] = amount
+                key = (bet_type, None)
+                if len(result.get('tied_winners', ())) == 2 and key in self.bet_spots:
+                    self.flash_winning_keys.add(key)
+
+        self.bet_state.bets.clear()
+        self.summary_mode = 'win'
+        self.result_panel_flash_winner = result['winner']
+        self.canvas.itemconfigure(self.animation_phase_text, text='本局结果')
+        self.canvas.itemconfigure(self.tie_flash_rect, state='hidden')
+
+        self.accept_bets = False
+        self.settlement_running = True
+        self.animation_running = False
+        self.flash_mode = None
+        self.update_display()
+        self.save_balance()
+
+
+        # Always flash the winning card zone, even when the dragon placed no
+        # wager on the winning outcome. Betting areas still flash when applicable.
+        self.settlement_flash_step = 0
+        self.run_settlement_flash()
+
+    def run_settlement_flash(self):
+        if self._closing or not self.settlement_running:
+            return
+        if self.settlement_flash_step >= 6:
+            self.finish_settlement()
+            return
+        self.flash_mode = 'win' if self.settlement_flash_step % 2 == 0 else 'original'
+        self.flash_result_panels(self.settlement_flash_step % 2 == 0)
+        self.canvas.delete('win_flash_area')
+        if self.flash_mode == 'original':
+            self.restore_flash_text_colors()
+        else:
+            for key in self.flash_winning_keys:
+                spot = self.bet_spots.get(key)
+                if not spot:
+                    continue
+                x0, y0, x1, y1 = spot['bounds']
+                self.canvas.create_rectangle(x0, y0, x1, y1, fill='#ffffff',
+                                             outline='#111111', width=2,
+                                             tags=('win_flash_area', 'settlement_flash'))
+                self.raise_spot_content_above_flash(spot)
+        self.update_bet_chips()
+        self.canvas.tag_raise('bet_chip_dynamic')
+        self.canvas.tag_raise('controls')
+        self.settlement_flash_step += 1
+        self.settlement_after_id = self.after(450, self.run_settlement_flash)
+
+    def _set_zone_text_colors(self, dragon_color=None, tiger_color=None,
+                              phoenix_color=None):
+        """Set title + score colors together for each dealing zone."""
+        if dragon_color is not None:
+            for item in (getattr(self, 'dragon_zone_label', None),
+                         getattr(self, 'dragon_score_text', None)):
+                if item is not None:
+                    self.canvas.itemconfigure(item, fill=dragon_color)
+        if tiger_color is not None:
+            for item in (getattr(self, 'tiger_zone_label', None),
+                         getattr(self, 'tiger_score_text', None)):
+                if item is not None:
+                    self.canvas.itemconfigure(item, fill=tiger_color)
+        if phoenix_color is not None:
+            for item in (getattr(self, 'phoenix_zone_label', None),
+                         getattr(self, 'phoenix_score_text', None)):
+                if item is not None:
+                    self.canvas.itemconfigure(item, fill=phoenix_color)
+
+    def flash_result_panels(self, light_phase):
+        winner = self.result_panel_flash_winner
+        self.canvas.itemconfigure(self.tie_flash_rect, state='hidden')
+        self.canvas.itemconfigure(self.dragon_zone_rect, fill=self.DRAGON_ZONE_BASE,
+                                  outline='#a56a6d')
+        self.canvas.itemconfigure(self.tiger_zone_rect, fill=self.TIGER_ZONE_BASE,
+                                  outline='#b89c45')
+        self.canvas.itemconfigure(self.phoenix_zone_rect, fill=self.PHOENIX_ZONE_BASE,
+                                  outline='#4d87c5')
+        self._set_zone_text_colors('#ffaaaa', '#ffe77a', '#a9d4ff')
+        self.canvas.itemconfigure(self.dragon_score_text, fill='white')
+        self.canvas.itemconfigure(self.tiger_score_text, fill='white')
+        self.canvas.itemconfigure(self.phoenix_score_text, fill='white')
+        if winner == 'Dragon' and light_phase:
+            self.canvas.itemconfigure(self.dragon_zone_rect, fill=self.DRAGON_ZONE_LIGHT,
+                                      outline='#ffe8ea')
+            self._set_zone_text_colors(dragon_color='black')
+        elif winner == 'Tiger' and light_phase:
+            self.canvas.itemconfigure(self.tiger_zone_rect, fill=self.TIGER_ZONE_LIGHT,
+                                      outline='#fff2b4')
+            self._set_zone_text_colors(tiger_color='black')
+        elif winner == 'Phoenix' and light_phase:
+            self.canvas.itemconfigure(self.phoenix_zone_rect, fill=self.PHOENIX_ZONE_LIGHT,
+                                      outline='#e5f3ff')
+            self._set_zone_text_colors(phoenix_color='black')
+        elif winner == 'Tie' and light_phase:
+            tied = set((self.current_result or {}).get('tied_winners', ()))
+            for name, rect in (('Dragon', self.dragon_zone_rect),
+                               ('Tiger', self.tiger_zone_rect),
+                               ('Phoenix', self.phoenix_zone_rect)):
+                if name in tied:
+                    self.canvas.itemconfigure(rect, fill=self.TIE_FLASH_LIGHT,
+                                              outline='#dcffe6')
+            self._set_zone_text_colors(
+                'black' if 'Dragon' in tied else None,
+                'black' if 'Tiger' in tied else None,
+                'black' if 'Phoenix' in tied else None)
+
+    def restore_result_panel_colors(self):
+        if hasattr(self, 'dragon_zone_rect'):
+            self.canvas.itemconfigure(self.dragon_zone_rect, fill=self.DRAGON_ZONE_BASE,
+                                      outline='#a56a6d')
+        if hasattr(self, 'tiger_zone_rect'):
+            self.canvas.itemconfigure(self.tiger_zone_rect, fill=self.TIGER_ZONE_BASE,
+                                      outline='#b89c45')
+        if hasattr(self, 'phoenix_zone_rect'):
+            self.canvas.itemconfigure(self.phoenix_zone_rect, fill=self.PHOENIX_ZONE_BASE,
+                                      outline='#4d87c5')
+        if hasattr(self, 'dragon_zone_label'):
+            self.canvas.itemconfigure(self.dragon_zone_label, fill='#ffaaaa')
+        if hasattr(self, 'tiger_zone_label'):
+            self.canvas.itemconfigure(self.tiger_zone_label, fill='#ffe77a')
+        if hasattr(self, 'phoenix_zone_label'):
+            self.canvas.itemconfigure(self.phoenix_zone_label, fill='#a9d4ff')
+        if hasattr(self, 'dragon_score_text'):
+            self.canvas.itemconfigure(self.dragon_score_text, fill='white')
+        if hasattr(self, 'tiger_score_text'):
+            self.canvas.itemconfigure(self.tiger_score_text, fill='white')
+        if hasattr(self, 'phoenix_score_text'):
+            self.canvas.itemconfigure(self.phoenix_score_text, fill='white')
+        if hasattr(self, 'tie_flash_rect'):
+            self.canvas.itemconfigure(self.tie_flash_rect, state='hidden')
+
+    def raise_spot_content_above_flash(self, spot):
+        tag = spot.get('tag')
+        if not tag:
+            return
+        for item_id in self.canvas.find_withtag(tag):
+            try:
+                item_type = self.canvas.type(item_id)
+                tags = self.canvas.gettags(item_id)
+            except tk.TclError:
+                continue
+            if 'win_flash_area' in tags or 'bet_chip_dynamic' in tags:
+                continue
+            if item_type == 'text':
+                if item_id not in self.flash_original_text_colors:
+                    self.flash_original_text_colors[item_id] = self.canvas.itemcget(item_id, 'fill')
+                self.canvas.itemconfigure(item_id, fill='black')
+                self.canvas.tag_raise(item_id)
+
+    def restore_flash_text_colors(self):
+        for item_id, color in list(self.flash_original_text_colors.items()):
+            try:
+                self.canvas.itemconfigure(item_id, fill=color)
+            except tk.TclError:
+                pass
+        self.flash_original_text_colors.clear()
+
+    def finish_settlement(self):
+        if self._closing:
+            return
         try:
-            self.table_canvas.itemconfig(self.result_text_id, text=text, fill=text_color)
-        except Exception:
-            pass
+            self.engine.finish_round()
+        except (CSMError, OSError) as exc:
+            self.accept_bets = False
+            self.animation_running = False
+            self.settlement_running = False
+            self.update_display()
+            messagebox.showerror('自动洗牌机', f'本局牌张归还失败，游戏已暂停：{exc}',
+                                 parent=self.winfo_toplevel())
+            return
+        self.settlement_after_id = None
+        self.canvas.delete('win_flash_area')
+        self.restore_flash_text_colors()
+        self.restore_result_panel_colors()
+        self.canvas.itemconfigure(self.tie_flash_rect, state='hidden')
+        self.flash_mode = None
+        self.flash_winning_keys = set()
+        self.flash_winner_amounts = {}
+        self.flash_original_amounts = {}
+        self.settlement_hold_amounts = {}
+        self.pre_deal_bets = None
+        self.settlement_running = False
+        self.animation_running = False
+        self.canvas.itemconfigure(self.animation_phase_text, text='龙虎凤 DRAGON TIGER PHOENIX')
+        self.accept_bets = True
+        self.update_display()
 
-        try:
-            self.table_canvas.update_idletasks()
-        except Exception:
-            pass
+    @classmethod
+    def result_color(cls, winner):
+        return {'Dragon': cls.DRAGON_RED, 'Tiger': cls.TIGER_YELLOW,
+                'Phoenix': cls.PHOENIX_BLUE, 'Tie': cls.TIE_GREEN}.get(winner, '#888888')
 
+    @staticmethod
+    def result_description(result):
+        winner_text = {'Dragon': '龙胜', 'Tiger': '虎胜', 'Phoenix': '凤胜',
+                       'Tie': '和局'}.get(result['winner'], result['winner'])
+        ds = DragonTigerEngine.rank_label(result['dragon_score'])
+        ts = DragonTigerEngine.rank_label(result['tiger_score'])
+        ps = DragonTigerEngine.rank_label(result['phoenix_score'])
+        return f'{winner_text}  龙 {ds} : 虎 {ts} : 凤 {ps}'
+
+    # ------------------------------------------------------------------ history
+    def get_runtime_json_dir(self):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(current_dir)
+        target = os.path.join(project_root, 'A_Logs', 'Json')
         try:
-            text_bbox = self.table_canvas.bbox(self.result_text_id)
-            if text_bbox:
-                padding = 15
-                expanded_bbox = (
-                    text_bbox[0]-padding, text_bbox[1]-padding,
-                    text_bbox[2]+padding, text_bbox[3]+padding
-                )
+            os.makedirs(target, exist_ok=True)
+            return target
+        except OSError:
+            target = os.path.join(current_dir, 'A_Logs', 'Json')
+            os.makedirs(target, exist_ok=True)
+            return target
+
+    @staticmethod
+    def _default_statistic_data():
+        return {'total_game': 0, 'dragon_win': 0, 'tiger_win': 0,
+                'phoenix_win': 0, 'tie_win': 0}
+
+    @classmethod
+    def new_runtime_store(cls):
+        return {
+            'temp_finish_data': cls.new_history_store(),
+            'last_72_record': cls.new_history_store(),
+            'statistic_data': cls._default_statistic_data(),
+        }
+
+    def _write_runtime_store(self):
+        """Write both history stores safely, including the Windows fallback."""
+        temp_path = None
+        try:
+            self.runtime_store = {
+                'temp_finish_data': copy.deepcopy(
+                    self.runtime_store.get('temp_finish_data', self.new_history_store())),
+                'last_72_record': copy.deepcopy(
+                    self.runtime_store.get('last_72_record', self.new_history_store())),
+                'statistic_data': dict(
+                    self.runtime_store.get('statistic_data', self._default_statistic_data())),
+            }
+            payload = json.dumps(self.runtime_store, ensure_ascii=False, indent=4)
+            directory = os.path.dirname(self.runtime_data_file)
+            os.makedirs(directory, exist_ok=True)
+            descriptor, temp_path = tempfile.mkstemp(
+                prefix=os.path.basename(self.runtime_data_file) + '.',
+                suffix='.tmp', dir=directory)
+            with os.fdopen(descriptor, 'w', encoding='utf-8') as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+
+            replace_error = None
+            for attempt in range(6):
                 try:
-                    self.table_canvas.coords(self.result_bg_id, expanded_bbox)
-                    self.table_canvas.itemconfig(self.result_bg_id, fill=bg_color, outline=bg_color)
-                    self.table_canvas.tag_raise(self.result_text_id)
-                    self.table_canvas.tag_lower(self.result_bg_id)
-                except Exception:
+                    os.replace(temp_path, self.runtime_data_file)
+                    temp_path = None
+                    replace_error = None
+                    break
+                except OSError as exc:
+                    replace_error = exc
+                    if getattr(exc, 'winerror', None) != 5 and not isinstance(exc, PermissionError):
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
+
+            if replace_error is not None:
+                # Windows can deny replacement while still allowing the already
+                # existing file to be updated. This fallback avoids the repeated
+                # WinError 5 loop caused by os.replace().
+                with open(self.runtime_data_file, 'w', encoding='utf-8') as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+            self._last_runtime_save_error = None
+            return True
+        except OSError as exc:
+            message = f'{type(exc).__name__}: {exc}'
+            if message != getattr(self, '_last_runtime_save_error', None):
+                print(f'保存 Dragon_Tiger 失败：{exc}')
+                self._last_runtime_save_error = message
+            return False
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except OSError:
                     pass
-        except Exception:
+
+    def load_runtime_store(self):
+        """读取记录，并自动忽略旧版 JSON 中的牌靴/temp_data。"""
+        store = self.new_runtime_store()
+        last_72_missing = True
+        try:
+            with open(self.runtime_data_file, 'r', encoding='utf-8') as handle:
+                raw = json.load(handle)
+            if isinstance(raw, dict):
+                last_72_missing = not isinstance(raw.get('last_72_record'), dict)
+                for key in ('temp_finish_data', 'last_72_record', 'statistic_data'):
+                    if isinstance(raw.get(key), dict):
+                        store[key] = raw[key]
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            pass
+        self._last_72_missing = last_72_missing
+        return store
+
+    def get_history_file(self):
+        return getattr(self, 'runtime_data_file',
+                       os.path.join(self.get_runtime_json_dir(), 'Dragon_Tiger_Phoenix.json'))
+
+    def load_temp_data(self):
+        """Compatibility helper: CSM encrypted state is the sole shoe state."""
+        try:
+            self.csm.status()
+            return True
+        except (CSMError, OSError, TypeError, ValueError):
+            return False
+
+    def save_temp_data(self, burn_complete=True):
+        """Compatibility no-op: card state must never be duplicated in JSON."""
+        del burn_complete
+
+    @classmethod
+    def new_history_store(cls):
+        return {'records': []}
+
+    @classmethod
+    def normalize_history_store(cls, data):
+        normalized = cls.new_history_store()
+        if not isinstance(data, dict):
+            return normalized
+        raw_records = data.get('records', [])
+        if not isinstance(raw_records, list):
+            return normalized
+        for record in raw_records:
+            if not isinstance(record, dict):
+                continue
+            winner = record.get('winner')
+            if winner not in ('Dragon', 'Tie', 'Tiger', 'Phoenix'):
+                continue
+            try:
+                ps = int(record.get('dragon_score', 0))
+                bs = int(record.get('tiger_score', 0))
+                fs = int(record.get('phoenix_score', 0))
+            except (TypeError, ValueError):
+                continue
+            if not (1 <= ps <= 13 and 1 <= bs <= 13 and 1 <= fs <= 13):
+                continue
+            scores = {'Dragon': ps, 'Tiger': bs, 'Phoenix': fs}
+            leaders = [name for name, score in scores.items() if score == max(scores.values())]
+            expected = leaders[0] if len(leaders) == 1 else 'Tie'
+            if winner != expected:
+                continue
+            item = copy.deepcopy(record)
+            item['dragon_score'] = ps
+            item['tiger_score'] = bs
+            item['phoenix_score'] = fs
+            item['tied_winners'] = leaders if winner == 'Tie' else []
+            item['tie_count'] = len(leaders) if winner == 'Tie' else 0
+            normalized['records'].append(item)
+        if len(normalized['records']) > cls.MAX_RECORDS:
+            del normalized['records'][:-cls.MAX_RECORDS]
+        return normalized
+
+    def load_history_store(self):
+        raw = self.runtime_store.get('temp_finish_data', self.new_history_store())
+        return self.normalize_history_store(raw)
+
+    def load_last_72_store(self):
+        if getattr(self, '_last_72_missing', False):
+            seeded = self.new_history_store()
+            seeded['records'] = copy.deepcopy(
+                self.history_store.get('records', [])[-self.BEAD_MAX_RECORDS:])
+            return seeded
+        raw = self.runtime_store.get('last_72_record', self.new_history_store())
+        normalized = self.normalize_history_store(raw)
+        while len(normalized['records']) > self.BEAD_MAX_RECORDS:
+            del normalized['records'][:self.HISTORY_DROP_COUNT]
+        return normalized
+
+    def save_history_store(self):
+        self.runtime_store['temp_finish_data'] = copy.deepcopy(self.history_store)
+        self.runtime_store['last_72_record'] = copy.deepcopy(self.last_72_store)
+        self._write_runtime_store()
+
+    def history_records_from_store(self):
+        return list(self.history_store.get('records', []))
+
+    def last_72_records_from_store(self):
+        return list(self.last_72_store.get('records', []))
+
+    def clear_temp_finish_data(self):
+        """Clear both synchronized history stores while preserving statistics."""
+        self.history_store = self.new_history_store()
+        self.history_data = []
+        self.last_72_store = self.new_history_store()
+        self.last_72_data = []
+        self.runtime_store['temp_finish_data'] = self.new_history_store()
+        self.runtime_store['last_72_record'] = self.new_history_store()
+        self._write_runtime_store()
+        self.update_history_table()
+
+    def clear_shoe_temp_sections(self):
+        """Compatibility no-op: CSM has no shoe boundary and history is rolling."""
+        self._write_runtime_store()
+
+    def add_history(self, result):
+        special_by_mode = {}
+        for mode in self.MODE_ORDER:
+            factors = DragonTigerEngine.side_return_factors(result, mode)
+            special_by_mode[mode] = [name for name, factor in factors.items() if factor > 1.0]
+        record = {
+            'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'winner': result['winner'],
+            'dragon_score': int(result['dragon_score']),
+            'tiger_score': int(result['tiger_score']),
+            'phoenix_score': int(result['phoenix_score']),
+            'tied_winners': list(result.get('tied_winners', [])),
+            'tie_count': int(result.get('tie_count', 0)),
+            'natural': False,
+            'mode': self.game_mode,
+            'dragon_pair': False,
+            'tiger_pair': False,
+            'specials': special_by_mode.get(self.game_mode, []),
+            'special_by_mode': special_by_mode,
+            'dragon_hand': [list(card) for card in result.get('dragon_hand', [])],
+            'tiger_hand': [list(card) for card in result.get('tiger_hand', [])],
+            'phoenix_hand': [list(card) for card in result.get('phoenix_hand', [])],
+        }
+        records = self.history_store.setdefault('records', [])
+        records.append(record)
+        if len(records) > self.MAX_RECORDS:
+            del records[:-self.MAX_RECORDS]
+
+        bead_records = self.last_72_store.setdefault('records', [])
+        bead_records.append(copy.deepcopy(record))
+        while len(bead_records) > self.BEAD_MAX_RECORDS:
+            del bead_records[:self.HISTORY_DROP_COUNT]
+
+        self.big_road_auto_follow = True
+        self.save_history_store()
+        self.history_data = self.history_records_from_store()
+        self.last_72_data = self.last_72_records_from_store()
+
+    def load_statistic_data(self):
+        defaults = self._default_statistic_data()
+        raw = self.runtime_store.get('statistic_data', {})
+        if isinstance(raw, dict):
+            for key in ('total_game', 'dragon_win', 'tiger_win', 'phoenix_win', 'tie_win'):
+                try:
+                    defaults[key] = max(0, int(raw.get(key, 0)))
+                except (TypeError, ValueError):
+                    defaults[key] = 0
+        self.runtime_store['statistic_data'] = dict(defaults)
+        return defaults
+
+    def save_statistic_data(self):
+        self.runtime_store['statistic_data'] = {
+            'total_game': max(0, int(self.statistic_data.get('total_game', 0))),
+            'dragon_win': max(0, int(self.statistic_data.get('dragon_win', 0))),
+            'tiger_win': max(0, int(self.statistic_data.get('tiger_win', 0))),
+            'phoenix_win': max(0, int(self.statistic_data.get('phoenix_win', 0))),
+            'tie_win': max(0, int(self.statistic_data.get('tie_win', 0))),
+        }
+        self.statistic_data = dict(self.runtime_store['statistic_data'])
+        self._write_runtime_store()
+
+    def update_statistic_data(self, result):
+        self.statistic_data['total_game'] = int(self.statistic_data.get('total_game', 0)) + 1
+        if result['winner'] == 'Dragon':
+            self.statistic_data['dragon_win'] = int(self.statistic_data.get('dragon_win', 0)) + 1
+        elif result['winner'] == 'Tiger':
+            self.statistic_data['tiger_win'] = int(self.statistic_data.get('tiger_win', 0)) + 1
+        elif result['winner'] == 'Phoenix':
+            self.statistic_data['phoenix_win'] = int(self.statistic_data.get('phoenix_win', 0)) + 1
+        else:
+            self.statistic_data['tie_win'] = int(self.statistic_data.get('tie_win', 0)) + 1
+        self.save_statistic_data()
+
+    def get_jackpot_file(self):
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
+
+    def load_jackpot(self):
+        try:
+            with open(self.jackpot_file, 'r', encoding='utf-8') as handle:
+                data = json.load(handle)
+            if isinstance(data, list):
+                for item in data:
+                    if isinstance(item, dict) and item.get('Games') == 'BCT':
+                        return max(5_000_000.0, float(item.get('jackpot', 5_000_000)))
+            elif isinstance(data, dict) and data.get('Games') == 'BCT':
+                return max(5_000_000.0, float(data.get('jackpot', 5_000_000)))
+        except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError, ValueError):
+            pass
+        return 5_000_000.0
+
+    def save_jackpot(self):
+        try:
+            if os.path.exists(self.jackpot_file):
+                with open(self.jackpot_file, 'r', encoding='utf-8') as handle:
+                    data = json.load(handle)
+            else:
+                data = []
+            if not isinstance(data, list):
+                data = []
+            found = False
+            for item in data:
+                if isinstance(item, dict) and item.get('Games') == 'BCT':
+                    item['jackpot'] = float(self.jackpot_amount)
+                    found = True
+                    break
+            if not found:
+                data.append({'Games': 'BCT', 'jackpot': float(self.jackpot_amount)})
+            with open(self.jackpot_file, 'w', encoding='utf-8') as handle:
+                json.dump(data, handle, ensure_ascii=False, indent=4)
+        except (OSError, json.JSONDecodeError):
             pass
 
-    def update_balance(self):
-        self.balance_label.config(text=f"余额: ${int(round(self.balance)):,}")
-        update_balance_in_json(self.username, self.balance)
+    # ---------------------------------------------------------------- lifecycle
+    def save_balance(self):
+        if self.username:
+            update_balance_in_json(self.username, self.balance)
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
 
-    def show_game_instructions(self):
-        win = tk.Toplevel(self)
-        win.title("龙虎凤游戏说明")
-        win.geometry("600x400")
-        win.resizable(False,False)
-        self.update_idletasks()
-        main_x = self.winfo_x()
-        main_y = self.winfo_y()
-        main_width = self.winfo_width()
-        main_height = self.winfo_height()
-        popup_width = 600
-        popup_height = 400
-        x = main_x + (main_width - popup_width)//2
-        y = main_y + (main_height - popup_height)//2
-        win.geometry(f"{popup_width}x{popup_height}+{x}+{y}")
+    def cancel_pending_callbacks(self):
+        for after_id in list(self.animation_after_ids):
+            try:
+                self.after_cancel(after_id)
+            except (tk.TclError, ValueError):
+                pass
+        self.animation_after_ids.clear()
+        if self.settlement_after_id is not None:
+            try:
+                self.after_cancel(self.settlement_after_id)
+            except (tk.TclError, ValueError):
+                pass
+            self.settlement_after_id = None
 
-        text_frame = tk.Frame(win)
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+    def on_close(self):
+        self.exit_game()
 
-        instructions = """
-龙虎凤游戏规则：
+    def exit_game(self):
+        if self._closing:
+            return
+        self._closing = True
+        self.cancel_pending_callbacks()
+        self.animation_running = False
+        self.accept_bets = False
+        outstanding = self.bet_state.total_at_risk()
+        if outstanding > 0:
+            self.balance += outstanding
+        self.bet_state.bets.clear()
+        try:
+            self.engine.close()
+        except Exception as exc:
+            messagebox.showerror('自动洗牌机',
+                                 f'退出时归还或强制洗牌失败，牌仍保留在 CSM 记录中：{exc}',
+                                 parent=self.winfo_toplevel())
+        self.final_balance = float(self.balance)
+        try:
+            self.save_balance()
+        except Exception:
+            pass
+        if callable(self.on_back):
+            self.on_back(self.final_balance)
 
-1. 游戏发三张牌：龙、虎、凤各一张
-2. 比较牌面点数，K最大，A最小
-3. 下注选项：
-   - 独赢：所选手牌为唯一最大，赔率1.8:1
-   - 二家和：所选手牌为并列最大之一，赔率1:1
-   - 三家和：所有手牌点数相同，所有主注输，平局注赢20:1
-   - 平局注：二家和赢7:1，三家和赢20:1
 
-4. 边注：
-   - 三红：三张都是红心或方块，3:1
-   - 三黑：三张都是黑桃或梅花，3:1
-   - 同花：三张同一花色，12:1
-   - 红心同花/方片同花/黑桃同花/梅花同花：60:1
+# Backward-style wrapper for projects that expect a game class taking root.
+class DragonTigerGame(BubbleDragonTigerGame):
+    def __init__(self, root, username=None, initial_balance=10000,
+                 on_back=None, on_balance_change=None, game_mode='classic'):
+        super().__init__(
+            parent=root,
+            balance=initial_balance,
+            user=username,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+            game_mode=game_mode,
+        )
+        self.pack(fill=tk.BOTH, expand=True)
 
-5. 珠路图：
-   - 大路：独赢显示对应颜色圆，二家和显示半色圆加绿色“和”，三家和显示三色圆加白色“和”
-   - 标记路：独赢显示颜色和文字，二家和绿色“和”，三家和白色“和”
-        """
-        text_widget = tk.Text(text_frame, wrap=tk.WORD, font=('Arial',12), padx=10, pady=10)
-        text_widget.insert(tk.END, instructions)
-        text_widget.config(state=tk.DISABLED)
-        text_widget.pack(fill=tk.BOTH, expand=True)
 
-        close_btn = ttk.Button(win, text="关闭", command=win.destroy)
-        close_btn.pack(pady=10)
+# Compatibility aliases for Dragon/Tiger and new Dragon/Tiger/Phoenix integrations.
+DragonTigerV1 = BubbleDragonTigerGame
+DragonTigerV2 = BubbleDragonTigerGame
+DragonTigerPhoenixEngine = DragonTigerEngine
+BubbleDragonTigerPhoenixGame = BubbleDragonTigerGame
+DragonTigerPhoenixGame = DragonTigerGame
 
-def main(initial_balance=1000000, username="Guest"):
-    app = DragonTigerPhoenixGUI(initial_balance, username)
-    app.mainloop()
-    return app.balance
 
-if __name__ == "__main__":
-    final_balance = main()
-    print(f"Final balance: {final_balance}")
+def main(parent=None, balance=10000, user=None, on_back=None,
+         on_balance_change=None, username=None, game_mode='classic'):
+    """Open Dragon/Tiger/Phoenix embedded or in a standalone Tk window.
+
+    Embedded:
+        game = main(parent=parent_frame, balance=10000, user='name', on_back=callback)
+        game.pack(fill='both', expand=True)
+
+    Standalone:
+        main(balance=10000, user='name')
+    """
+    if username is not None and user is None:
+        user = username
+
+    # Compatibility with legacy main(balance, username) style calls.
+    if parent is not None and not isinstance(parent, tk.Misc):
+        legacy_balance = parent
+        legacy_user = balance if isinstance(balance, str) and user is None else user
+        parent = None
+        balance = legacy_balance
+        user = legacy_user
+
+    if parent is not None:
+        return BubbleDragonTigerGame(
+            parent=parent,
+            balance=balance,
+            user=user,
+            on_back=on_back,
+            on_balance_change=on_balance_change,
+            game_mode=game_mode,
+        )
+
+    root = tk.Tk()
+    root.title('龙虎凤 Dragon Tiger Phoenix')
+    root.geometry('1150x750+50+10')
+    root.resizable(False, False)
+
+    def close_standalone(final_balance):
+        _ = final_balance
+        try:
+            root.destroy()
+        except tk.TclError:
+            pass
+
+    game = BubbleDragonTigerGame(
+        parent=root,
+        balance=balance,
+        user=user,
+        on_back=on_back or close_standalone,
+        on_balance_change=on_balance_change,
+        game_mode=game_mode,
+    )
+    game.pack(fill=tk.BOTH, expand=True)
+    root.protocol('WM_DELETE_WINDOW', game.exit_game)
+    root.mainloop()
+    return game
+
+
+if __name__ == '__main__':
+    main()

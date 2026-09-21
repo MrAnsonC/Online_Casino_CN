@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "shoe": {
+    "mode": "CSM",
+    "decks": 8,
+    "chambers": 15,
+    "game_id": "ClassicBlackjack:root01:943de18916684f62a94a10f06081aa7e"
+  }
+}

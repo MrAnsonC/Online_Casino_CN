@@ -1,3 +1,14 @@
+import sys as _account_sys
+from pathlib import Path as _AccountPath
+_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
+if _account_root is None:
+    raise RuntimeError("Cannot locate encrypted account storage")
+if str(_account_root) not in _account_sys.path:
+    _account_sys.path.insert(0, str(_account_root))
+from A_Tools.Account import install_secure_json as _install_secure_json
+_install_secure_json()
+del _install_secure_json, _account_root, _AccountPath, _account_sys
+
 import importlib
 import json
 import os
@@ -5,6 +16,7 @@ import re
 import subprocess
 import sys
 import tkinter as tk
+from datetime import datetime
 from tkinter import messagebox
 
 try:
@@ -17,10 +29,21 @@ from typing import Callable, Optional
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(THIS_DIR)
-DATA_FILE = os.path.join(PROJECT_DIR, "saving_data.json")
+DATA_FILE = os.path.join(PROJECT_DIR, "A_Tools/Account/saving_data.json")
 
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
+
+
+def greeting_for(username: str) -> str:
+    hour = datetime.now().hour
+    period = "凌晨好" if hour < 6 else "早上好" if hour < 12 else "中午好" if hour < 18 else "晚上好"
+    return f"{period}，{username}！"
+
+
+def _ui_colour(master: tk.Misc, colour: str) -> str:
+    resolver = getattr(master.winfo_toplevel(), "theme_colour", None)
+    return resolver(colour) if callable(resolver) else colour
 
 
 # 所有小游戏统一使用单 Tk 窗口嵌入模式。
@@ -41,6 +64,8 @@ GAME_SECTIONS = {
         ("三杯球", "Small_Games.Thimbles", False),
         ("猜数字", "Small_Games.Guess_Number", False),
         ("基诺", "Small_Games.Keno", False),
+        ("宾果", "Small_Games.Bingo", False),
+        ("打地鼠", "Small_Games.Whack_A_Mole", False),
         ("剪刀石头布", "Small_Games.Rock_Paper_Scissors", False),
         ("红包雨", "Small_Games.Pocket_Rain", False),
         ("足球弹珠", "Small_Games.Football_Match", False),
@@ -97,6 +122,43 @@ def update_balance(username: str, balance: float) -> None:
             return
 
 
+def is_favorite(username: str, module_name: str) -> bool:
+    if username == "TEMP_ACCOUNT":
+        return False
+    for user in load_users():
+        if user.get("user_name") == username:
+            return any(item.get("module") == module_name
+                       for item in user.get("favorites", []) if isinstance(item, dict))
+    return False
+
+
+def toggle_favorite(username: str, display_name: str, module_name: str) -> tuple[bool, str]:
+    if username == "TEMP_ACCOUNT":
+        return False, "体验账号不会储存收藏。"
+    users = load_users()
+    for user in users:
+        if user.get("user_name") != username:
+            continue
+        favorites = [
+            {"module": str(item.get("module", "")).strip()}
+            for item in user.get("favorites", []) if isinstance(item, dict)
+            and str(item.get("module", "")).strip()
+        ]
+        existing = next((item for item in favorites if item.get("module") == module_name), None)
+        if existing:
+            favorites.remove(existing)
+            active, message = False, f"已从我的最爱移除：{display_name}"
+        elif len(favorites) >= 8:
+            return False, "我的最爱最多只能储存 8 个游戏。"
+        else:
+            favorites.append({"module": module_name})
+            active, message = True, f"已加入我的最爱：{display_name}"
+        user["favorites"] = favorites
+        save_users(users)
+        return active, message
+    return False, "找不到玩家资料，无法储存收藏。"
+
+
 def read_balance(username: str, fallback: float = 0.0) -> float:
     for user in load_users():
         if user.get("user_name") == username:
@@ -126,7 +188,7 @@ def child_run(module_name: str, result_file: str, balance_text: str, username: s
 
         returned_balance = game_main(balance, username)
         if returned_balance is None:
-            # 某些游戏直接写 saving_data.json，不返回余额。
+            # 某些游戏直接写 A_Tools/Account/saving_data.json，不返回余额。
             returned_balance = read_balance(username, balance)
 
         result["balance"] = float(returned_balance)
@@ -145,13 +207,46 @@ def child_run(module_name: str, result_file: str, balance_text: str, username: s
     return 0 if result["ok"] else 1
 
 
-ROOT_BG = "#1B3D31"
-PANEL_BG = "#102923"
-CARD_BG = "#17362e"
-CARD_HOVER = "#245246"
-GOLD = "#D4AF37"
-TEXT = "#ffffff"
-MUTED = "#afc3ba"
+ROOT_BG = "#F7F3EA"
+PANEL_BG = "#E6D9F2"
+CARD_BG = "#DDF2E5"
+CARD_HOVER = "#F6D0D8"
+GOLD = "#111111"
+TEXT = "#111111"
+MUTED = "#111111"
+
+
+def add_paper_art_ribbon(parent: tk.Misc, background: str) -> tk.Canvas:
+    """绘制紫罗兰、薄荷绿与蜜桃粉的层叠纸艺装饰带。"""
+    ribbon = tk.Canvas(parent, height=38, bg=background, highlightthickness=0, bd=0)
+    ribbon.pack(fill="x")
+
+    def redraw(event) -> None:
+        width = max(event.width, 1)
+        ribbon.delete("paper-art")
+        ribbon.create_polygon(0, 0, width, 0, width, 16, width*.78, 12,
+                              width*.58, 21, width*.34, 14, 0, 23,
+                              fill="#CDB7EB", outline="", tags="paper-art")
+        ribbon.create_polygon(0, 15, width*.25, 9, width*.49, 25,
+                              width*.73, 13, width, 22, width, 38, 0, 38,
+                              fill="#CDEEDD", outline="", tags="paper-art")
+        ribbon.create_polygon(0, 29, width*.20, 19, width*.42, 31,
+                              width*.66, 21, width*.84, 30, width, 24,
+                              width, 38, 0, 38,
+                              fill="#F7BEC9", outline="", tags="paper-art")
+        ribbon.create_line(0, 28, width, 23, fill="#FFFFFF", width=1,
+                           dash=(3, 5), tags="paper-art")
+        ribbon.create_line(0, 36, width, 31, fill="#9DB7D0", width=2,
+                           tags="paper-art")
+        suits = (("♠", "#684C9C"), ("♥", "#C76078"),
+                 ("♣", "#4E8A72"), ("♦", "#C76078"))
+        for index, (suit, colour) in enumerate(suits):
+            ribbon.create_text(width*(.16 + index*.22), 21 + (index % 2)*5,
+                               text=suit, fill=colour,
+                               font=("Segoe UI Symbol", 15, "bold"),
+                               tags="paper-art")
+    ribbon.bind("<Configure>", redraw)
+    return ribbon
 
 
 class EmbeddedGameHost(tk.Frame):
@@ -352,13 +447,13 @@ class EmbeddedGamePage(tk.Frame):
 class SmallGamesPage(tk.Frame):
     """嵌入 index.py 唯一根窗口的小游戏选择页面。"""
 
-    BG = "#081a16"
-    PANEL = "#102923"
-    PANEL_2 = "#17362e"
-    GOLD = "#e7be63"
-    TEXT = "#f5f1e8"
-    MUTED = "#afc3ba"
-    RED = "#b94d4d"
+    BG = "#F7F3EA"
+    PANEL = "#E6D9F2"
+    PANEL_2 = "#DDF2E5"
+    GOLD = "#111111"
+    TEXT = "#111111"
+    MUTED = "#111111"
+    RED = "#B84F6A"
 
     def __init__(
         self,
@@ -367,12 +462,24 @@ class SmallGamesPage(tk.Frame):
         balance: float,
         on_back: Callable[[float], None],
         on_balance_change: Optional[Callable[[float], None]] = None,
+        on_preferences: Optional[Callable[[], None]] = None,
+        translator: Optional[Callable[[str], str]] = None,
     ):
+        for name in ("BG", "PANEL", "PANEL_2", "GOLD", "TEXT", "MUTED", "RED"):
+            setattr(self, name, _ui_colour(master, getattr(type(self), name)))
+        self.SURFACE = _ui_colour(master, "#FFFFFF")
+        self.HOVER = _ui_colour(master, "#F6D0D8")
+        self.MAINTENANCE = _ui_colour(master, "#E7E1EC")
+        self.CARD_BORDER = _ui_colour(master, "#B69ADD")
+        self.MAINTENANCE_BORDER = _ui_colour(master, "#CEC5D5")
         super().__init__(master, bg=self.BG)
+        self._uploaded_scope = True
         self.username = username
         self.balance = float(balance)
         self.on_back = on_back
         self.on_balance_change = on_balance_change
+        self.on_preferences = on_preferences
+        self.translator = translator
 
         self.current_category = "街机动作"
         self.process: Optional[subprocess.Popen] = None
@@ -380,70 +487,85 @@ class SmallGamesPage(tk.Frame):
         self.running_game_name = ""
 
         self.balance_var = tk.StringVar()
-        self.status_var = tk.StringVar(value="请选择游戏 · 全部采用内嵌模式")
+        self.status_var = tk.StringVar(value=self._tr("请选择游戏"))
         self.category_buttons = {}
         self.game_cards = []
         self.game_images = {}
+        self._closing = False
+        self._scrollbar_job = None
+        self._wheel_bindings = []
+        self.bind("<Destroy>", self._on_page_destroy, add="+")
 
         self._build_ui()
         self.show_category(self.current_category)
+        self._preferences_ready = True
+
+    def _tr(self, text: str) -> str:
+        if callable(self.translator):
+            return self.translator(text)
+        translator = getattr(self.winfo_toplevel(), "translate_ui", None)
+        return translator(text) if callable(translator) else text
 
     def _build_ui(self) -> None:
         top = tk.Frame(self, bg=self.PANEL, height=82)
         top.pack(fill="x")
         top.pack_propagate(False)
 
+        title_text = self._tr("街机小游戏中心")
+        title_size = 19 if len(title_text) > 16 else 23
+        tk.Label(
+            top,
+            text=title_text,
+            font=("Microsoft YaHei UI", title_size, "bold"),
+            wraplength=250,
+            justify="left",
+            bg=self.PANEL,
+            fg=self.GOLD,
+        ).pack(side="left", padx=(22, 10))
+
         tk.Button(
             top,
-            text="← 返回主目录",
+            text=self._tr("← 返回主目录"),
             command=self.back_to_main,
             font=("Microsoft YaHei UI", 12, "bold"),
             bg=self.PANEL_2,
             fg=self.TEXT,
-            activebackground=self.GOLD,
-            activeforeground="#182018",
+            activebackground=self.HOVER,
+            activeforeground=self.TEXT,
             relief="flat",
-            padx=18,
+            padx=12,
             pady=9,
             cursor="hand2",
-        ).pack(side="left", padx=22, pady=18)
+            wraplength=155,
+            justify="center",
+        ).pack(side="left", padx=(0, 22), pady=18)
 
-        tk.Label(
-            top,
-            text="街机小游戏中心",
-            font=("Microsoft YaHei UI", 23, "bold"),
-            bg=self.PANEL,
-            fg=self.GOLD,
-        ).pack(side="left", padx=22)
+        tk.Label(top, text=self._tr(greeting_for(self.username)),
+                 font=("Microsoft YaHei UI", 11, "bold"),
+                 wraplength=220, justify="center",
+                 bg=self.PANEL, fg=self.TEXT).place(
+                     relx=0.62, rely=0.5, anchor="center"
+                 )
 
-        info = tk.Frame(top, bg=self.PANEL)
-        info.pack(side="right", padx=25)
-        tk.Label(
-            info,
-            text=f"玩家：{self.username}",
-            font=("Microsoft YaHei UI", 11),
-            bg=self.PANEL,
-            fg=self.MUTED,
-        ).pack(anchor="e")
-        tk.Label(
-            info,
-            textvariable=self.balance_var,
-            font=("Microsoft YaHei UI", 15, "bold"),
-            bg=self.PANEL,
-            fg=self.TEXT,
-        ).pack(anchor="e")
+        info = tk.Frame(top, bg=self.SURFACE, padx=18, pady=9,
+                        highlightbackground="#CBBBDD", highlightthickness=1)
+        info.pack(side="right", padx=25, pady=14)
+        tk.Label(info, textvariable=self.balance_var,
+                 font=("Microsoft YaHei UI", 14, "bold"),
+                 bg=self.SURFACE, fg=self.TEXT).pack()
         self._refresh_balance_label()
+        add_paper_art_ribbon(self, self.BG)
 
         body = tk.Frame(self, bg=self.BG)
         body.pack(fill="both", expand=True)
 
-        sidebar = tk.Frame(body, bg=self.PANEL, width=205)
+        sidebar = tk.Frame(body, bg=self.PANEL, width=230)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
 
         tk.Label(
             sidebar,
-            text="游戏分类",
+            text=self._tr("游戏分类"),
             font=("Microsoft YaHei UI", 14, "bold"),
             bg=self.PANEL,
             fg=self.GOLD,
@@ -452,16 +574,18 @@ class SmallGamesPage(tk.Frame):
         for category in GAME_SECTIONS:
             button = tk.Button(
                 sidebar,
-                text=category,
+                text=self._tr(category),
                 command=lambda name=category: self.show_category(name),
                 anchor="w",
+                justify="left",
+                wraplength=180,
                 font=("Microsoft YaHei UI", 12),
                 bg=self.PANEL,
                 fg=self.TEXT,
                 activebackground=self.PANEL_2,
                 activeforeground=self.GOLD,
                 relief="flat",
-                padx=22,
+                padx=16,
                 pady=13,
                 cursor="hand2",
             )
@@ -521,10 +645,19 @@ class SmallGamesPage(tk.Frame):
         )
 
         # Windows / macOS 鼠标滚轮。
-        self.bind_all("<MouseWheel>", self._on_mousewheel, add="+")
+        self._wheel_bindings.append((
+            "<MouseWheel>",
+            self.bind_all("<MouseWheel>", self._on_mousewheel, add="+"),
+        ))
         # Linux 鼠标滚轮。
-        self.bind_all("<Button-4>", self._on_mousewheel_linux, add="+")
-        self.bind_all("<Button-5>", self._on_mousewheel_linux, add="+")
+        self._wheel_bindings.append((
+            "<Button-4>",
+            self.bind_all("<Button-4>", self._on_mousewheel_linux, add="+"),
+        ))
+        self._wheel_bindings.append((
+            "<Button-5>",
+            self.bind_all("<Button-5>", self._on_mousewheel_linux, add="+"),
+        ))
 
         bottom = tk.Frame(self, bg=self.PANEL, height=45)
         bottom.pack(fill="x")
@@ -549,21 +682,61 @@ class SmallGamesPage(tk.Frame):
 
     def _on_games_frame_configure(self, event=None) -> None:
         """更新当前分类的实际滚动范围。"""
-        bbox = self.games_canvas.bbox("all")
-        if bbox is None:
-            self.games_canvas.configure(scrollregion=(0, 0, 0, 0))
-        else:
-            self.games_canvas.configure(scrollregion=bbox)
-
-        self.after_idle(self._update_scrollbar_visibility)
+        try:
+            if self._closing:
+                return
+            bbox = self.games_canvas.bbox("all")
+            self.games_canvas.configure(
+                scrollregion=(0, 0, 0, 0) if bbox is None else bbox
+            )
+            self._schedule_scrollbar_update()
+        except tk.TclError:
+            return
 
     def _on_games_canvas_configure(self, event) -> None:
         """Canvas 改变大小时，让内部列表宽度与可视区域保持一致。"""
-        self.games_canvas.itemconfigure(
-            self.games_canvas_window,
-            width=max(event.width, 1),
-        )
-        self.after_idle(self._update_scrollbar_visibility)
+        try:
+            if self._closing:
+                return
+            self.games_canvas.itemconfigure(
+                self.games_canvas_window,
+                width=max(event.width, 1),
+            )
+            self._schedule_scrollbar_update()
+        except tk.TclError:
+            return
+
+    def _schedule_scrollbar_update(self) -> None:
+        """合并重复的 idle 更新，并避免页面销毁后继续访问子控件。"""
+        try:
+            if self._closing or not self.winfo_exists():
+                return
+            if self._scrollbar_job is not None:
+                self.after_cancel(self._scrollbar_job)
+            self._scrollbar_job = self.after_idle(
+                self._update_scrollbar_visibility
+            )
+        except tk.TclError:
+            self._scrollbar_job = None
+
+    def _on_page_destroy(self, event) -> None:
+        if event.widget is not self:
+            return
+        self._closing = True
+        if self._scrollbar_job is not None:
+            try:
+                self.after_cancel(self._scrollbar_job)
+            except tk.TclError:
+                pass
+            self._scrollbar_job = None
+        for sequence, func_id in self._wheel_bindings:
+            if not func_id:
+                continue
+            try:
+                self._root()._unbind(("bind", "all", sequence), func_id)
+            except (tk.TclError, AttributeError):
+                pass
+        self._wheel_bindings.clear()
 
     def _update_scrollbar_visibility(self) -> None:
         """
@@ -572,35 +745,38 @@ class SmallGamesPage(tk.Frame):
         当前分类内容没有超过 Canvas 高度时隐藏滚动条；
         超过时显示，滚动终点正好是当前分类最后一行卡片的底部。
         """
-        if not self.games_canvas.winfo_exists():
-            return
+        self._scrollbar_job = None
+        try:
+            if self._closing or not self.winfo_exists():
+                return
+            if not (self.games_canvas.winfo_exists()
+                    and self.games_frame.winfo_exists()
+                    and self.games_scrollbar.winfo_exists()):
+                return
 
-        self.games_canvas.update_idletasks()
+            self.games_canvas.update_idletasks()
+            if self._closing or not self.games_frame.winfo_exists():
+                return
 
-        content_height = self.games_frame.winfo_reqheight()
-        canvas_height = self.games_canvas.winfo_height()
+            content_height = self.games_frame.winfo_reqheight()
+            canvas_height = self.games_canvas.winfo_height()
+            needs_scrollbar = canvas_height > 1 and content_height > canvas_height
 
-        needs_scrollbar = (
-            canvas_height > 1
-            and content_height > canvas_height
-        )
+            if needs_scrollbar and not self.scrollbar_visible:
+                self.games_scrollbar.pack(side="right", fill="y")
+                self.scrollbar_visible = True
+            elif not needs_scrollbar and self.scrollbar_visible:
+                self.games_scrollbar.pack_forget()
+                self.scrollbar_visible = False
+                self.games_canvas.yview_moveto(0)
 
-        if needs_scrollbar and not self.scrollbar_visible:
-            self.games_scrollbar.pack(side="right", fill="y")
-            self.scrollbar_visible = True
-
-        elif not needs_scrollbar and self.scrollbar_visible:
-            self.games_scrollbar.pack_forget()
-            self.scrollbar_visible = False
-            self.games_canvas.yview_moveto(0)
-
-        bbox = self.games_canvas.bbox("all")
-        if bbox is None:
-            self.games_canvas.configure(scrollregion=(0, 0, 0, 0))
-        else:
+            bbox = self.games_canvas.bbox("all")
             self.games_canvas.configure(
-                scrollregion=(0, 0, bbox[2], content_height)
+                scrollregion=(0, 0, 0, 0) if bbox is None
+                else (0, 0, bbox[2], content_height)
             )
+        except (tk.TclError, AttributeError):
+            return
 
     def _event_is_inside_games_area(self, event) -> bool:
         """判断滚轮事件是否来自游戏列表、卡片、图片或文字。"""
@@ -664,7 +840,7 @@ class SmallGamesPage(tk.Frame):
             return None
 
     def _refresh_balance_label(self) -> None:
-        self.balance_var.set(f"余额：${self.balance:,.2f}")
+        self.balance_var.set(self._tr(f"余额  ${self.balance:,.2f}"))
 
     def set_balance(self, balance: float) -> None:
         self.balance = float(balance)
@@ -805,16 +981,15 @@ class SmallGamesPage(tk.Frame):
 
     def _set_card_background(self, card: tk.Frame, colour: str) -> None:
         """同步修改卡片及其子控件的背景颜色。"""
-        try:
-            card.config(bg=colour)
-        except tk.TclError:
-            return
-
-        for child in card.winfo_children():
+        def recolour(widget: tk.Misc) -> None:
             try:
-                child.config(bg=colour)
+                widget.config(bg=colour)
             except tk.TclError:
                 pass
+            for child in widget.winfo_children():
+                recolour(child)
+
+        recolour(card)
 
     def _set_cursor_for_widget_tree(
         self,
@@ -838,7 +1013,7 @@ class SmallGamesPage(tk.Frame):
             return
 
         self.current_category = category
-        self.category_title.config(text=category)
+        self.category_title.config(text=self._tr(category))
 
         for name, button in self.category_buttons.items():
             selected = name == category
@@ -885,9 +1060,9 @@ class SmallGamesPage(tk.Frame):
         for index, (display_name, module_name, maintenance) in enumerate(games):
             row, column = divmod(index, column_count)
 
-            normal_bg = "#263f38" if maintenance else self.PANEL_2
-            hover_bg = normal_bg if maintenance else "#245246"
-            text_colour = "#81938c" if maintenance else self.TEXT
+            normal_bg = self.MAINTENANCE if maintenance else self.PANEL_2
+            hover_bg = normal_bg if maintenance else self.HOVER
+            text_colour = self.TEXT
             # 维护游戏显示禁止光标；正常游戏显示普通箭头。
             cursor = "no" if maintenance else "arrow"
 
@@ -896,7 +1071,9 @@ class SmallGamesPage(tk.Frame):
                 bg=normal_bg,
                 bd=0,
                 highlightthickness=1,
-                highlightbackground="#345048" if maintenance else "#2e5a4d",
+                highlightbackground=(
+                    self.MAINTENANCE_BORDER if maintenance else self.CARD_BORDER
+                ),
                 highlightcolor=self.GOLD,
                 cursor=cursor,
             )
@@ -914,13 +1091,19 @@ class SmallGamesPage(tk.Frame):
                 maintenance=maintenance,
             )
 
+            favorite_bar = None
+            if not maintenance:
+                favorite_bar = tk.Frame(card, bg=normal_bg, height=30)
+                favorite_bar.pack(fill="x", padx=8, pady=(5, 0))
+                favorite_bar.pack_propagate(False)
+
             image_area = tk.Frame(
                 card,
                 bg=normal_bg,
-                height=180,
+                height=150,
                 cursor=cursor,
             )
-            image_area.pack(fill="x", expand=True, padx=8, pady=(7, 0))
+            image_area.pack(fill="x", expand=True, padx=8, pady=(0, 0))
             image_area.pack_propagate(False)
 
             if image is not None:
@@ -939,10 +1122,10 @@ class SmallGamesPage(tk.Frame):
 
                 image_label = tk.Label(
                     image_area,
-                    text=fallback_text,
+                    text=self._tr(fallback_text),
                     font=("Microsoft YaHei UI", 15, "bold"),
                     bg=normal_bg,
-                    fg="#60756d" if maintenance else "#6f9487",
+                    fg=self.TEXT,
                     bd=0,
                     cursor=cursor,
                 )
@@ -950,7 +1133,7 @@ class SmallGamesPage(tk.Frame):
 
             name_label = tk.Label(
                 card,
-                text=display_name,
+                text=self._tr(display_name),
                 font=("Microsoft YaHei UI", 11, "bold"),
                 bg=normal_bg,
                 fg=text_colour,
@@ -996,21 +1179,42 @@ class SmallGamesPage(tk.Frame):
                     colour=normal_bg,
                 ):
                     self._set_card_background(current_card, colour)
-                    current_card.config(highlightbackground="#2e5a4d")
+                    current_card.config(highlightbackground=self.CARD_BORDER)
 
                 self._bind_to_all_children(card, "<Button-1>", on_click)
                 self._bind_to_all_children(card, "<Enter>", on_enter)
                 self._bind_to_all_children(card, "<Leave>", on_leave)
 
+                favorite_active = is_favorite(self.username, module_name)
+                heart = tk.Button(
+                    favorite_bar, text="♥" if favorite_active else "♡",
+                    font=("Segoe UI Symbol", 15, "bold"),
+                    bg=normal_bg, fg=self.RED if favorite_active else self.TEXT,
+                    activebackground=hover_bg, activeforeground=self.RED,
+                    relief="flat", bd=0, padx=5, pady=2, cursor="hand2",
+                )
+                heart.pack(side="right")
+
+                def toggle_heart(button=heart, game_name=display_name,
+                                 game_module=module_name):
+                    active, message = toggle_favorite(
+                        self.username, game_name, game_module
+                    )
+                    button.configure(text="♥" if active else "♡",
+                                     fg=self.RED if active else self.TEXT)
+                    self.status_var.set(self._tr(message))
+
+                heart.configure(command=toggle_heart)
+
         # 所有卡片创建完成后，只按当前分类重新计算滚动条。
-        self.after_idle(self._update_scrollbar_visibility)
+        self._schedule_scrollbar_update()
 
     def _replace_root_page(self, page: tk.Widget) -> None:
         """使用 index.py 的 replace_page() 在同一个 Tk 窗口内切换页面。"""
         replace_page = getattr(self.master, "replace_page", None)
         if not callable(replace_page):
             raise RuntimeError(
-                "父窗口没有 replace_page(page) 方法，无法进行嵌入式页面切换。"
+                "父窗口没有 replace_page(page) 方法，无法切换页面。"
             )
         replace_page(page)
 
@@ -1068,7 +1272,7 @@ class SmallGamesPage(tk.Frame):
         except Exception as exc:
             messagebox.showerror(
                 "启动失败",
-                f"无法在当前窗口打开《{display_name}》：\n\n"
+                f"无法打开《{display_name}》：\n\n"
                 f"{type(exc).__name__}: {exc}",
                 parent=self,
             )
@@ -1156,8 +1360,8 @@ class SmallGamesPage(tk.Frame):
 
         self.result_file = result_file
         self.running_game_name = display_name
-        self.status_var.set(f"已启动：{display_name}")
-        self.running_label.config(text="游戏运行中…")
+        self.status_var.set(self._tr(f"已启动：{display_name}"))
+        self.running_label.config(text=self._tr("游戏运行中…"))
         self._set_controls_enabled(False)
 
         # 与旧版一致：独立游戏运行时小游戏中心先最小化。
@@ -1205,7 +1409,7 @@ class SmallGamesPage(tk.Frame):
             self._refresh_balance_label()
             if self.on_balance_change:
                 self.on_balance_change(self.balance)
-            self.status_var.set(f"{old_name} 已结束，余额已更新")
+            self.status_var.set(self._tr(f"{old_name} 已结束，余额已更新"))
         else:
             # 即使游戏异常退出，也重新读取存档，避免丢失已写入的余额。
             self.balance = read_balance(self.username, self.balance)
@@ -1216,7 +1420,7 @@ class SmallGamesPage(tk.Frame):
             error = ""
             if isinstance(result, dict):
                 error = str(result.get("error", ""))
-            self.status_var.set(f"{old_name} 已关闭")
+            self.status_var.set(self._tr(f"{old_name} 已关闭"))
             if error:
                 messagebox.showerror(
                     "游戏运行出错",
@@ -1274,6 +1478,8 @@ def main(
     user: str,
     on_back: Callable[[float], None],
     on_balance_change: Optional[Callable[[float], None]] = None,
+    on_preferences: Optional[Callable[[], None]] = None,
+    translator: Optional[Callable[[str], str]] = None,
 ) -> SmallGamesPage:
     """
     供 index.py 使用；不会创建新的 Tk 根窗口或 mainloop。
@@ -1284,6 +1490,8 @@ def main(
         balance=balance,
         on_back=on_back,
         on_balance_change=on_balance_change,
+        on_preferences=on_preferences,
+        translator=translator,
     )
 
 

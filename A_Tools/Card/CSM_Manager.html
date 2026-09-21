@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src blob: data:; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>CSM Manager · HTML R7</title>
+<style>
+:root{color-scheme:dark;--bg:#101c21;--panel:#192b32;--line:#2a4047;--muted:#9eb1b7;--gold:#d6bd86;--text:#edf1ea}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px 'Microsoft JhengHei','Segoe UI',sans-serif}button{font:inherit;cursor:pointer;color:inherit}button:focus-visible{outline:2px solid var(--gold);outline-offset:3px}.shell{display:grid;grid-template-columns:220px 1fr;grid-template-rows:82px minmax(0,1fr);height:100vh}.brand{background:#0d171b;display:flex;align-items:center;padding:14px;color:var(--gold);font-weight:700;letter-spacing:3px;border-bottom:1px solid var(--line)}.brand.ready{background:var(--gold);color:#111;justify-content:space-between}.brand span{letter-spacing:1px;font-size:11px}.brand strong{font-size:18px}header{display:flex;align-items:center;gap:30px;padding:0 34px;border-bottom:1px solid var(--line);background:#132229}header nav{display:flex;height:100%;gap:26px}.tab{border:0;border-bottom:3px solid transparent;background:none;letter-spacing:2px;padding:0 5px;color:var(--muted)}.tab.active{color:var(--gold);border-bottom-color:var(--gold)}.counts{margin-left:auto;display:flex;gap:30px;color:var(--muted)}.counts strong{font-size:24px;color:var(--text);margin-left:8px;font-variant-numeric:tabular-nums}aside{overflow:auto;background:#0d171b;padding:24px 14px;display:flex;flex-direction:column;gap:6px}.section{margin:16px 12px 10px;font-size:11px;color:var(--muted);letter-spacing:2px}.location{border:1px solid transparent;border-radius:6px;background:none;text-align:left;padding:10px 12px;display:flex;justify-content:space-between;gap:8px}.location:hover{background:var(--panel)}.location.active{border-color:#766b50;background:#2b302b;color:var(--gold)}.location.preselected{background:var(--gold);color:#111}.location.preselected span{color:#111}.location span{color:var(--muted)}.connection{margin-top:auto;padding:22px 12px 0;border-top:1px solid var(--line)}#connect{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:10px}main{overflow:auto;padding:32px 36px}h1{font-size:28px;font-weight:500;margin:0 0 10px}p{color:var(--muted);line-height:1.8}.status{display:flex;gap:10px;align-items:center;margin-bottom:25px;color:var(--muted);font-size:12px}.dot{width:7px;height:7px;background:var(--gold);border-radius:50%}#error{color:#ffb6a8;white-space:pre-wrap}#gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:18px;align-content:start}.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:12px;text-align:left;min-width:0}.card:hover{border-color:var(--gold)}.ordinal{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-bottom:10px}.face{aspect-ratio:5/7;position:relative;border-radius:5px;overflow:hidden;background:#efebe1;display:grid;place-content:center;color:#172329;font:38px Georgia,serif;text-align:center}.face.red{color:#ae3441}.face img{position:absolute;width:100%;height:100%;object-fit:contain;background:#efebe1}.small{font-size:11px;color:var(--muted);line-height:1.8}.event{background:var(--panel);border-left:3px solid #bd8672;border-radius:4px;padding:18px 22px;margin-bottom:14px}.event small{color:var(--gold)}.event p{color:var(--text)}.event details{color:var(--muted);overflow-wrap:anywhere}dialog{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:12px;width:min(600px,90vw);padding:26px}dialog::backdrop{background:#0009}dialog pre{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}dialog button{background:var(--bg);padding:10px 20px;border:1px solid var(--line);border-radius:5px}[hidden]{display:none!important}@media(max-width:800px){.shell{grid-template-columns:170px 1fr}header{padding:0 16px;gap:10px}.counts{gap:10px}.counts strong{font-size:19px}main{padding:24px 16px}.brand{font-size:12px;padding:12px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<div class="brand" id="preselectedWarehouse" aria-live="polite"></div>
+<header><nav aria-label="主導覽"><button class="tab active" id="mainTab">MAIN</button><button class="tab" id="logTab">LOG</button></nav><div class="counts"><div>廢牌<strong id="discardCount">—</strong></div><div>外借<strong id="loanCount">—</strong></div></div></header>
+<aside aria-label="牌區"><div class="section">倉庫</div><div id="warehouses"></div><div class="section">流轉區</div><button class="location" id="discardNav">廢牌<span>—</span></button><button class="location" id="loansNav">外借<span>—</span></button><div class="connection"><button id="connect">連接本機 Card 資料夾</button><p class="small">本機唯讀 · 無網路連線<br>自動監察 100 ms<br>僅供管理員查看</p></div></aside>
+<main><div class="status"><span class="dot"></span><span id="status">尚未連接 · HTML R5</span></div><div id="error" role="status"></div><section id="mainView"><h1 id="heading">牌倉 01</h1><p id="description">選擇 A_Tools/Card 資料夾後，自動讀取加密牌靴與 Poker1 圖片。</p><div id="gallery"></div><p id="empty">不需要啟動 Python 管理器，也不需要伺服器。請使用支援本機資料夾授權的桌面 Chrome 或 Edge。</p></section><section id="logView" hidden><h1>錯誤紀錄</h1><p>中文說明 · 最近 500 筆 · 最新事件在上</p><div id="logs"></div></section></main>
+</div>
+<dialog id="detail"><h2>牌張資料</h2><pre id="detailText"></pre><button id="closeDetail">關閉</button></dialog>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), symbols={Club:'♣',Diamond:'♦',Heart:'♥',Spade:'♠'}, ranks=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+let root=null,jsonDir=null,key=null,snapshot=null,selection='1',page='main',busy=false,lastCipher='',logStamp='',lastLogText='',lastGallery='',photos=new Map(),events=[];
+const navs=new Map(),tiles=new Map();
+function element(tag,cls,text){const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=text;return node;}
+function setText(node,text){if(node.textContent!==String(text))node.textContent=text;}
+for(let i=1;i<=15;i++){const b=element('button','location');b.append(element('b','',`倉 ${String(i).padStart(2,'0')}`),element('span','','—'));b.style.width='100%';b.onclick=()=>choose(String(i));$('warehouses').append(b);navs.set(String(i),b);}
+navs.set('discard',$('discardNav'));navs.set('loans',$('loansNav'));
+$('discardNav').onclick=()=>choose('discard');$('loansNav').onclick=()=>choose('loans');
+function choose(value){selection=value;switchPage('main');render();}
+function switchPage(value){page=value;$('mainView').hidden=value!=='main';$('logView').hidden=value!=='log';$('mainTab').classList.toggle('active',value==='main');$('logTab').classList.toggle('active',value==='log');}
+$('mainTab').onclick=()=>switchPage('main');$('logTab').onclick=()=>switchPage('log');$('closeDetail').onclick=()=>$('detail').close();
+function decode64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
+async function decryptEnvelope(text,cryptoKey){const e=JSON.parse(text);if(e.format!=='CSM-STATE'||e.version!==1)throw Error('不支援的牌靴檔案格式');const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:decode64(e.nonce),additionalData:new TextEncoder().encode('CSM-STATE-V1'),tagLength:128},cryptoKey,decode64(e.ciphertext));return JSON.parse(new TextDecoder().decode(raw));}
+function validate(s){if(!s.warehouses||!s.batches||Object.keys(s.warehouses).length!==15)throw Error('牌倉結構不完整');const cards=[...Object.values(s.warehouses).flat(),...(s.discard_shoe||[]),...Object.values(s.batches).flatMap(b=>b.cards)];if(cards.length!==416||new Set(cards.map(c=>c.permanent_id)).size!==416)throw Error('牌數守恆失敗：應為 416 張唯一牌');for(const c of cards)if(!symbols[c.suit]||!ranks.includes(c.rank))throw Error('牌面資料無效');}
+async function loadPhotos(){for(const url of photos.values())URL.revokeObjectURL(url);photos.clear();try{const dir=await root.getDirectoryHandle('Poker1');for(const suit of Object.keys(symbols))for(const rank of ranks){try{const handle=await dir.getFileHandle(suit+rank+'.png');const file=await handle.getFile();photos.set(suit+rank,URL.createObjectURL(file));}catch{}}}catch{}lastGallery='';}
+$('connect').onclick=async()=>{if(busy)return;if(!window.showDirectoryPicker||!crypto.subtle){$('error').textContent='此瀏覽器不支援離線資料夾授權或本機解密。請用桌面 Chrome／Edge 開啟此 HTML。';return;}busy=true;try{const selected=await window.showDirectoryPicker({mode:'read',id:'csm-card'});const logs=await selected.getDirectoryHandle('A_Logs');const jd=await logs.getDirectoryHandle('Json');const kd=await logs.getDirectoryHandle('Keys');const kh=await kd.getFileHandle('CSM_State.key');const bytes=await(await kh.getFile()).arrayBuffer();if(bytes.byteLength!==32)throw Error('密鑰長度錯誤：必須為 32 bytes');const candidate=await crypto.subtle.importKey('raw',bytes,'AES-GCM',false,['decrypt']);const sh=await jd.getFileHandle('CSM_State.enc');const text=await(await sh.getFile()).text();const s=await decryptEnvelope(text,candidate);validate(s);root=selected;jsonDir=jd;key=candidate;snapshot=s;lastCipher=text;logStamp='';lastGallery='';events=[];lastLogText='';await loadPhotos();render();$('connect').textContent='切換資料夾';$('error').textContent='';$('status').textContent='已連接 · '+new Date().toLocaleTimeString();}catch(e){if(e.name!=='AbortError')$('error').textContent=explain(e);}finally{busy=false;}};
+function explain(e){if(e.name==='OperationError')return '解密／完整性驗證失敗：請確認選到配對的狀態檔與密鑰。';if(e.name==='NotAllowedError')return '讀取授權被拒絕或已撤銷，請重新連接資料夾。';if(e.name==='NotFoundError')return '找不到資料檔。請選擇包含 A_Logs 和 Poker1 的 Card 資料夾。';return e.message||String(e);}
+async function poll(){if(busy||!root)return;busy=true;try{// Re-resolve by name: CSM replaces the state file atomically.
+const h=await jsonDir.getFileHandle('CSM_State.enc');const text=await(await h.getFile()).text();if(text!==lastCipher){const s=await decryptEnvelope(text,key);validate(s);snapshot=s;lastCipher=text;render();$('status').textContent='同步 · '+new Date().toLocaleTimeString();}$('error').textContent='';try{const lh=await jsonDir.getFileHandle('CSM_Error.jsonl');const f=await lh.getFile();const stamp=f.lastModified+':'+f.size;if(stamp!==logStamp){const text=await f.text();events=text.trim().split(/\r?\n/).filter(Boolean).slice(-500).map(line=>{try{return JSON.parse(line);}catch{return {message:'日誌記錄不完整，可能正在寫入。'};}});logStamp=stamp;renderLogs();}}catch(e){if(e.name!=='NotFoundError')throw e;}}catch(e){$('error').textContent='更新失敗，保留最後成功快照。'+explain(e);}finally{busy=false;}}
+function render(){const preselected=snapshot?.preselected_warehouse==null?'':String(snapshot.preselected_warehouse);const badge=$('preselectedWarehouse');badge.classList.toggle('ready',!!preselected);badge.replaceChildren(preselected?element('span','',`預洗牌倉庫`):document.createTextNode(''),preselected?element('strong','',`倉 ${preselected.padStart(2,'0')}`):document.createTextNode(''));for(const [id,b]of navs){b.classList.toggle('active',id===selection);b.classList.toggle('preselected',id===preselected);const count=!snapshot?'—':id==='discard'?(snapshot.discard_shoe||[]).length:id==='loans'?Object.values(snapshot.batches).reduce((a,b)=>a+b.cards.length,0):(snapshot.warehouses[id]||[]).length;setText(b.querySelector('span'),count);}if(!snapshot)return;setText($('discardCount'),(snapshot.discard_shoe||[]).length);setText($('loanCount'),Object.values(snapshot.batches).reduce((a,b)=>a+b.cards.length,0));let rows=[];if(selection==='loans'){setText($('heading'),'外借牌張');setText($('description'),'尚未歸還的牌；包含遊戲已使用及未使用的牌。按批次原有順序展示。');for(const [id,b]of Object.entries(snapshot.batches))b.cards.forEach((c,i)=>rows.push({c,i:i+1,where:`${b.game_id} · 倉 ${b.warehouse_id} · ${id}`}));}else{const disc=selection==='discard';setText($('heading'),disc?'廢牌牌靴':`牌倉 ${selection.padStart(2,'0')}`);setText($('description'),disc?'按歸還順序排列；滿 30 張或收到強制指令後洗牌回倉。':'由左至右、由上至下排列。#001 是倉內第一張。');(disc?snapshot.discard_shoe||[]:snapshot.warehouses[selection]||[]).forEach((c,i)=>rows.push({c,i:i+1,where:disc?'廢牌':`倉 ${selection}`}));}const signature=selection+JSON.stringify(rows);if(signature===lastGallery)return;lastGallery=signature;const keep=new Set();for(const row of rows){const {c,i,where}=row,id=c.permanent_id;keep.add(id);let tile=tiles.get(id);if(!tile){tile=element('button','card');tile.append(element('div','ordinal'),element('div','face'));tiles.set(id,tile);}const face=tile.children[1],old=tile.dataset.face,name=c.suit+c.rank;if(old!==name){tile.dataset.face=name;face.replaceChildren();face.classList.toggle('red',c.suit==='Heart'||c.suit==='Diamond');face.append(element('span','',c.rank+' '+symbols[c.suit]));if(photos.has(name)){const img=element('img');img.src=photos.get(name);img.alt=name;img.onerror=()=>img.remove();face.append(img);}}setText(tile.children[0],`#${String(i).padStart(3,'0')} · D${c.deck_no}`);tile.onclick=()=>{$('detailText').textContent=`位置：${where}\n順序：${i}\n牌面：${c.rank}${symbols[c.suit]}\n\n永久牌號：${id}\n\n臨時牌號：${c.temporary_id||'—'}`;$('detail').showModal();};const current=$('gallery').children[rows.indexOf(row)];if(current!==tile)$('gallery').insertBefore(tile,current||null);}for(const [id,tile]of tiles)if(!keep.has(id)){tile.remove();tiles.delete(id);}setText($('empty'),rows.length?'': '此區目前沒有牌');}
+const meanings=[['WinError 5','Windows 拒絕替換狀態檔，歸還結果未能保存。請檢查唯讀權限或檔案佔用。'],['authenticated or decrypted','狀態檔無法解密或驗證，請檢查密鑰是否配對。'],['Card conservation failed','牌數或唯一編號檢查失敗，該操作已被拒絕。'],['Invalid batch ID or game ID','遊戲或批次編號無效，無法歸還。'],['does not belong to this batch','歸還牌不屬於該批次。'],['more than once','同次請求含重複牌號。'],['No warehouse','目前沒有可取的非空牌倉。']];
+function renderLogs(){const str=JSON.stringify(events);if(str===lastLogText)return;lastLogText=str;$('logs').replaceChildren();if(!events.length){$('logs').append(element('p','','目前沒有錯誤紀錄'));return;}for(const r of [...events].reverse()){const message=String(r?.message||'未知錯誤'),card=element('article','event');card.append(element('small','',`${r?.timestamp||''} · ${r?.operation||'CSM'}`),element('p','',meanings.find(([source])=>message.includes(source))?.[1]||'未分類錯誤：'+message));const details=element('details');details.append(element('summary','','原始內容'),element('p','',message));card.append(details);$('logs').append(card);}}
+
+const bridgeToken = location.hostname === '127.0.0.1' ? location.hash.slice(1) : '';
+let lastBridgeSnapshot = '';
+async function bridgePoll(){
+ if(busy)return;busy=true;
+ try{
+  const response=await fetch('/api/state',{headers:{'X-CSM-Token':bridgeToken},cache:'no-store'});
+  if(!response.ok)throw Error('本機連線授權失敗；請重新使用啟動器。');
+  const result=await response.json();
+  if(result.snapshot){
+   validate(result.snapshot);
+   const signature=JSON.stringify(result.snapshot);
+   if(signature!==lastBridgeSnapshot){snapshot=result.snapshot;lastBridgeSnapshot=signature;render();}
+  }
+  events=result.logs||[];renderLogs();
+  $('status').textContent=(result.version||'未知後端版本')+' · '+(result.error?'讀取失敗':'已連接')+' · '+result.root;
+  $('error').textContent=result.error||result.log_error||'';
+ }catch(e){$('error').textContent='本機服務連線失敗：'+explain(e);}
+ finally{busy=false;}
+}
+async function bridgeStart(){
+ $('connect').hidden=true;
+ try{
+  const response=await fetch('/api/images',{headers:{'X-CSM-Token':bridgeToken}});
+  if(!response.ok)throw Error('圖片連線失敗');
+  const images=await response.json();
+  for(const [name,data]of Object.entries(images))photos.set(name,data);
+ }catch(e){$('error').textContent=explain(e);}
+ await bridgePoll();
+ setInterval(bridgePoll,100);
+}
+render();renderLogs();
+if(bridgeToken){bridgeStart();}else{setInterval(poll,100);}
+
+</script>
+</body></html>

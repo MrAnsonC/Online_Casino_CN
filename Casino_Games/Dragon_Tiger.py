@@ -1,11 +1,45 @@
+import sys as _account_sys
+from pathlib import Path as _AccountPath
+_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
+if _account_root is None:
+    raise RuntimeError("Cannot locate encrypted account storage")
+if str(_account_root) not in _account_sys.path:
+    _account_sys.path.insert(0, str(_account_root))
+from A_Tools.Account import install_secure_json as _install_secure_json
+_install_secure_json()
+del _install_secure_json, _account_root, _AccountPath, _account_sys
+
 import copy
 import json
 import os
 import random
 import re
+import sys
+import tempfile
+import time
 import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox, ttk
+
+# Project layout (same CSM discovery strategy as Blackjack_Classic.py):
+#   A_Tools/Card/CSM_Shuffler.py
+#   A_Tools/Casino_Games/Dragon_Tiger.py
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_CSM_CANDIDATES = [
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'A_Tools', 'Card')),
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'Card')),
+    _THIS_DIR,
+]
+_CARD_TOOLS_DIR = next((p for p in _CSM_CANDIDATES
+                        if os.path.isfile(os.path.join(p, 'CSM_Shuffler.py'))), None)
+if _CARD_TOOLS_DIR is None:
+    raise ModuleNotFoundError('找不到 CSM_Shuffler.py，已檢查：' + '; '.join(_CSM_CANDIDATES))
+if _CARD_TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _CARD_TOOLS_DIR)
+
+from CSM_Shuffler import CSMError, ContinuousShuffleMachine  # type: ignore
+
+DRAGON_TIGER_VERSION = 'V25-CSM-R7-DUAL-HISTORY'
 
 try:
     from PIL import Image, ImageTk, ImageDraw, ImageFont
@@ -20,7 +54,7 @@ except ImportError:  # external artwork fallback still works with Canvas primiti
 # Account-data compatibility with the original project
 # -----------------------------------------------------------------------------
 def get_data_file_path():
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../saving_data.json')
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), '../A_Tools/Account/saving_data.json')
 
 
 def load_user_data():
@@ -50,7 +84,7 @@ def update_balance_in_json(username, new_balance):
 
 
 # -----------------------------------------------------------------------------
-# Dragon/Tiger rules / shoe / bet settlement
+# Dragon/Tiger rules / CSM / bet settlement
 # -----------------------------------------------------------------------------
 class DragonTigerEngine:
     SUITS = ('Club', 'Diamond', 'Heart', 'Spade')
@@ -112,48 +146,51 @@ class DragonTigerEngine:
     TREASURE_RANK_MULTIPLIER_VALUES = (2, 3, 4, 5, 8)
     TREASURE_RANK_MULTIPLIER_WEIGHTS = (40, 30, 20, 7, 3)
 
-    def __init__(self, decks=8):
-        self.decks = int(decks)
-        self.deck = []
-        self.current_index = 0
-        self.cut_threshold = random.SystemRandom().randint(50, 80)
-        self.shuffle_count = 0
-        self.new_shoe()
+    def __init__(self, csm, game_id):
+        self.decks = 8
+        self.csm = csm
+        self.game_id = str(game_id)
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
+        self.round_open = False
+        self.round_id = None
 
-    def new_shoe(self, deck=None):
-        if deck is None:
-            deck = [
-                (suit, rank)
-                for _ in range(self.decks)
-                for suit in self.SUITS
-                for rank in self.RANKS
-            ]
-            random.SystemRandom().shuffle(deck)
-        self.deck = [tuple(card) for card in deck]
-        self.current_index = 0
-        self.cut_threshold = random.SystemRandom().randint(50, 80)
-        self.shuffle_count += 1
+    def _clear_local_csm_state(self):
+        self.round_id = None
+        self.round_open = False
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
 
-    def set_shoe_state(self, deck, current_index=0, cut_threshold=None):
-        self.deck = [tuple(card) for card in deck]
-        self.current_index = max(0, min(int(current_index), len(self.deck)))
-        if cut_threshold is None:
-            cut_threshold = random.SystemRandom().randint(50, 80)
-        self.cut_threshold = max(50, min(80, int(cut_threshold)))
+    def start_round(self):
+        if self.round_open:
+            raise RuntimeError('上一局尚未结束。')
+        try:
+            self.round_id = self.csm.begin_round(
+                self.game_id, self.current_batch_id if self.card_buffer else None)
+            self.used_by_batch = {}
+            self.round_open = True
+            if not self.card_buffer:
+                self._request_next_chamber()
+        except Exception:
+            # CSM may already have rebuilt all warehouses after the primary error.
+            # Drop every local lease/round reference so stale IDs are never reused.
+            self._clear_local_csm_state()
+            raise
 
-    def cut_shoe(self, cut_position):
-        if not self.deck:
-            self.new_shoe()
-        cut_position = max(0, min(int(cut_position), len(self.deck) - 1))
-        self.deck = self.deck[cut_position:] + self.deck[:cut_position]
-        self.current_index = 0
-        self.cut_threshold = random.SystemRandom().randint(50, 80)
+    def _request_next_chamber(self):
+        packet = self.csm.acquire_chamber(self.game_id, self.round_id)
+        self.current_batch_id = packet['batch_id']
+        self.card_buffer = list(packet['cards'])
+        if not self.card_buffer:
+            raise CSMError('自动洗牌机返回了空仓。')
 
     def remaining_cards(self):
-        return max(0, len(self.deck) - self.current_index)
+        return len(self.card_buffer) + self.csm.available_cards()
 
     def needs_shuffle(self):
-        return self.remaining_cards() <= self.cut_threshold
+        return False
 
     @classmethod
     def rank_value(cls, card):
@@ -187,15 +224,17 @@ class DragonTigerEngine:
         return {1: 'A', 11: 'J', 12: 'Q', 13: 'K'}.get(value, str(value))
 
     def draw_card(self):
-        if self.current_index >= len(self.deck):
-            raise RuntimeError('牌靴已用完，请重新切牌。')
-        card = self.deck[self.current_index]
-        self.current_index += 1
-        return card
+        if not self.round_open:
+            raise RuntimeError('牌局尚未开始。')
+        if len(self.card_buffer) <= 3:
+            self._request_next_chamber()
+        record = self.card_buffer.pop(0)
+        self.used_by_batch.setdefault(self.current_batch_id, []).append(record['card_id'])
+        return record['suit'], record['rank']
 
     def deal_round(self):
-        if self.remaining_cards() < 2:
-            raise RuntimeError('剩余牌不足，请重新切牌。')
+        if not self.round_open:
+            raise RuntimeError('牌局尚未开始。')
         dragon = [self.draw_card()]
         tiger = [self.draw_card()]
         dragon_score = self.score(dragon)
@@ -216,6 +255,36 @@ class DragonTigerEngine:
             'reshuffled': False,
             'shoe_remaining': self.remaining_cards(),
         }
+
+    def finish_round(self):
+        if not self.round_open:
+            return
+        rid = self.round_id
+        try:
+            for batch_id in list(self.used_by_batch):
+                card_ids = self.used_by_batch[batch_id]
+                if card_ids:
+                    self.csm.return_cards(self.game_id, batch_id, card_ids)
+                del self.used_by_batch[batch_id]
+        except Exception:
+            # Do not call end_round with a round ID that may have been erased by
+            # CSM automatic recovery; preserve the primary error instead.
+            self._clear_local_csm_state()
+            raise
+        try:
+            self.csm.end_round(self.game_id, rid)
+        finally:
+            self.round_id = None
+            self.round_open = False
+
+    def close(self):
+        try:
+            self.csm.release_game(self.game_id, force_shuffle=True)
+        except Exception:
+            # Closing must never resurrect or reuse stale CSM identifiers.
+            pass
+        finally:
+            self._clear_local_csm_state()
 
     @classmethod
     def result_rank(cls, result):
@@ -483,9 +552,8 @@ class DragonTigerBetState:
 # Canvas interface adapted for Dragon/Tiger
 # -----------------------------------------------------------------------------
 class BubbleDragonTigerGame(tk.Frame):
-    # V22: Tie-chip settlement hold + physical casino cut packet swap;
-    # V21: Treasure Pot fee-aware total betting, mode-switch bet migration,
-    # synchronized golden-badge settlement flashing, and Enter=random casino cut.
+    # V25-CSM: temp_finish_data remains the full 300-round history source;
+    # last_72_record is a matching rolling cache used only by the Bead Plate.
     WIDTH = 1150
     HEIGHT = 750
 
@@ -526,7 +594,9 @@ class BubbleDragonTigerGame(tk.Frame):
 
     MIN_BET = 100.0
     MAX_TABLE_BET = 2_000_000.0
-    MAX_RECORDS = 500
+    MAX_RECORDS = 300
+    BEAD_MAX_RECORDS = 72
+    HISTORY_DROP_COUNT = 6
 
     CHIP_SPECS = [
         (100, '#202020', '100'),
@@ -562,7 +632,10 @@ class BubbleDragonTigerGame(tk.Frame):
         self.last_net = 0.0
 
         self.game_mode = game_mode if game_mode in self.MODE_ORDER else 'classic'
-        self.engine = DragonTigerEngine()
+        import uuid
+        self.csm_game_id = f"DragonTiger:{self.username or 'local'}:{uuid.uuid4().hex}"
+        self.csm = ContinuousShuffleMachine()
+        self.engine = DragonTigerEngine(self.csm, self.csm_game_id)
         self.bet_state = DragonTigerBetState()
         self.selected_chip = 1000.0
         self.undo_stack = []
@@ -616,19 +689,19 @@ class BubbleDragonTigerGame(tk.Frame):
         # V12: 14 visible columns makes each Big Road cell ~71% larger than V11's 24-column viewport.
         self.big_road_view_cols = 14
         self.runtime_json_dir = self.get_runtime_json_dir()
-        # V14: shoe state, current-shoe finished hands, and lifetime statistics
-        # live in ONE JSON document.  Only the two temporary sections are reset
-        # when the dragon cuts a new shoe; statistic_data is never deleted.
+        # CSM owns all card/shoe state. temp_finish_data drives every history
+        # view except the Bead Plate, which alone uses last_72_record.
         self.runtime_data_file = os.path.join(self.runtime_json_dir, 'Dragon_Tiger.json')
-        self.legacy_temp_data_file = os.path.join(self.runtime_json_dir, 'temp_data.json')
-        self.legacy_temp_finish_data_file = os.path.join(self.runtime_json_dir, 'temp_finish_data.json')
-        self.legacy_statistic_data_file = os.path.join(self.runtime_json_dir, 'statistic_data.json')
         self.runtime_store = self.load_runtime_store()
         self.history_file = self.runtime_data_file
-        self.shoe_resumed = self.load_temp_data()
         self.history_store = self.load_history_store()
         self.history_data = self.history_records_from_store()
+        self.last_72_store = self.load_last_72_store()
+        self.last_72_data = self.last_72_records_from_store()
         self.statistic_data = self.load_statistic_data()
+        self.runtime_store['temp_finish_data'] = copy.deepcopy(self.history_store)
+        self.runtime_store['last_72_record'] = copy.deepcopy(self.last_72_store)
+        self._write_runtime_store()
         self.treasure_pot_amount = 0.0  # V19: current-round fee only; never persisted
 
         # Bead Plate text can be toggled between result labels/special marks and
@@ -663,8 +736,6 @@ class BubbleDragonTigerGame(tk.Frame):
         self.create_ui()
         self.select_chip(self.selected_chip)
         self.update_display()
-        if not self.shoe_resumed:
-            self.after(180, lambda: self.start_new_shoe_cut(False))
 
     # ------------------------------------------------------------------ UI base
     def create_ui(self):
@@ -680,7 +751,7 @@ class BubbleDragonTigerGame(tk.Frame):
         self.canvas.bind('<Button-1>', self._handle_bead_click, add='+')
 
     def draw_history_panel(self):
-        """Right-side history panel with Roads/Data tabs."""
+        """Right-side roads plus a compact pie-chart data page."""
         c = self.canvas
         x0, y0, x1, y1 = self.HISTORY_X0, 4, self.HISTORY_X1, 620
         c.create_rectangle(x0, y0, x1, y1, fill=self.PANEL,
@@ -897,33 +968,23 @@ class BubbleDragonTigerGame(tk.Frame):
         except tk.TclError:
             pass
 
-    def _draw_stats_grid(self, x0, y0, x1, y1, rows):
-        c = self.canvas
-        value_x = x1 - 92
-        c.create_rectangle(x0, y0, x1, y1, fill='#15110f', outline='#7c6754',
-                           width=1, tags='history_panel_content')
-        c.create_line(value_x, y0, value_x, y1, fill='#514338',
-                      tags='history_panel_content')
-        row_h = (y1 - y0) / max(1, rows)
-        for row in range(1, rows):
-            y = y0 + row * row_h
-            c.create_line(x0, y, x1, y, fill='#3e352f', tags='history_panel_content')
-        return {'x0': x0, 'x1': x1, 'value_x': value_x, 'top': y0, 'row_h': row_h}
-
     def _draw_data_page(self):
         c = self.canvas
         x0, x1 = 786, 1130
-        c.create_text(x0, 82, anchor='w', text='本轮统计',
-                      font=('Arial', 12, 'bold'), fill=self.GOLD,
+        c.create_text((x0 + x1) / 2, 82, text='最近 300 局分布',
+                      font=('Arial', 13, 'bold'), fill=self.GOLD,
                       tags='history_panel_content')
-        self.base_stats_geometry = self._draw_stats_grid(x0, 98, x1, 306, 6)
-
-        mode_name = self.MODE_SHORT.get(self.game_mode, self.game_mode)
-        self.history_special_title = c.create_text(
-            x0, 334, anchor='w', text='边注数据',
-            font=('Arial', 12, 'bold'), fill=self.GOLD,
-            tags='history_panel_content')
-        self.special_stats_geometry = self._draw_stats_grid(x0, 350, x1, 590, 6)
+        for bx0, by0, bx1, by1 in (
+            (x0, 102, x1, 310), (x0, 324, x1, 484), (x0, 500, x1, 590),
+        ):
+            c.create_rectangle(bx0, by0, bx1, by1, fill='#15110f',
+                               outline='#7c6754', width=1,
+                               tags='history_panel_content')
+        self.history_chart_geometry = {
+            'winner': (x0, 102, x1, 310),
+            'size': (x0, 324, x1, 484),
+            'perfect': (x0, 500, x1, 590),
+        }
 
     def _draw_road_grid(self, x0, y0, cell, rows, cols):
         c = self.canvas
@@ -1312,7 +1373,6 @@ class BubbleDragonTigerGame(tk.Frame):
                                         fill=color, width=2, tags='history_dynamic')
 
     def _draw_round_statistics(self, records):
-        c = self.canvas
         counts = {'Dragon': 0, 'Tiger': 0, 'Tie': 0, 'Small': 0, 'Big': 0}
         perfect = 0
         for record in records:
@@ -1328,34 +1388,68 @@ class BubbleDragonTigerGame(tk.Frame):
             th = record.get('tiger_hand') or []
             if dh and th and record.get('dragon_score') == record.get('tiger_score') and dh[0][0] == th[0][0]:
                 perfect += 1
-        geo = self.base_stats_geometry
-        base_items = [
-            ('总局', len(records)), ('龙', counts['Dragon']), ('虎', counts['Tiger']),
-            ('和', counts['Tie']), ('小', counts['Small']), ('大', counts['Big']),
-        ]
-        base_colors = ['#d4c3a9', self.DRAGON_RED, self.TIGER_YELLOW,
-                       self.TIE_GREEN, '#78c59f', '#d7ad62']
-        for row, ((label, value), color) in enumerate(zip(base_items, base_colors)):
-            y = geo['top'] + geo['row_h'] * (row + 0.5)
-            c.create_text(geo['x0'] + 10, y, anchor='w', text=label,
-                          font=('Arial', 10, 'bold'), fill=color, tags='history_dynamic')
-            c.create_text((geo['value_x'] + geo['x1']) / 2, y, text=str(value),
-                          font=('Arial', 11, 'bold'), fill='#f2eadf', tags='history_dynamic')
-        if getattr(self, 'history_special_title', None):
-            try:
-                c.itemconfigure(self.history_special_title, text='边注数据')
-            except tk.TclError:
-                pass
-        geo = self.special_stats_geometry
-        specials = [('完美同花', perfect)]
-        for row in range(6):
-            y = geo['top'] + geo['row_h'] * (row + 0.5)
-            if row < len(specials):
-                label, value = specials[row]
-                c.create_text(geo['x0'] + 10, y, anchor='w', text=label,
-                              font=('Arial', 9, 'bold'), fill='#e7dfd5', tags='history_dynamic')
-                c.create_text((geo['value_x'] + geo['x1']) / 2, y, text=str(value),
-                              font=('Arial', 11, 'bold'), fill='#f2eadf', tags='history_dynamic')
+        geometry = self.history_chart_geometry
+        self._draw_pie_chart(
+            geometry['winner'], '龙 / 虎 / 和',
+            [('龙', counts['Dragon'], self.DRAGON_RED),
+             ('虎', counts['Tiger'], self.TIGER_YELLOW),
+             ('和', counts['Tie'], self.TIE_GREEN)])
+        self._draw_pie_chart(
+            geometry['size'], '小 / 大',
+            [('小', counts['Small'], '#55a982'),
+             ('大', counts['Big'], '#d18a45')])
+
+        c = self.canvas
+        x0, y0, x1, y1 = geometry['perfect']
+        c.create_text(x0 + 16, (y0 + y1) / 2, anchor='w', text='完美同花',
+                      font=('Arial', 13, 'bold'), fill='#e7dfd5',
+                      tags='history_dynamic')
+        c.create_text(x1 - 28, (y0 + y1) / 2, anchor='e', text=str(perfect),
+                      font=('Arial', 30, 'bold'), fill=self.GOLD,
+                      tags='history_dynamic')
+
+    def _draw_pie_chart(self, bounds, title, items):
+        c = self.canvas
+        x0, y0, x1, y1 = bounds
+        c.create_text(x0 + 14, y0 + 18, anchor='w', text=title,
+                      font=('Arial', 11, 'bold'), fill='#f2eadf',
+                      tags='history_dynamic')
+        height = y1 - y0
+        radius = min(62, max(38, (height - 52) / 2))
+        cx = x0 + 78
+        cy = (y0 + y1) / 2 + 10
+        bbox = (cx - radius, cy - radius, cx + radius, cy + radius)
+        total = sum(max(0, int(value)) for _label, value, _color in items)
+        if total <= 0:
+            c.create_oval(*bbox, fill='#302a25', outline='#75695d', width=2,
+                          tags='history_dynamic')
+            c.create_text(cx, cy, text='0', font=('Arial', 18, 'bold'),
+                          fill='#8f857b', tags='history_dynamic')
+        else:
+            start = 90.0
+            for _label, value, color in items:
+                value = max(0, int(value))
+                if not value:
+                    continue
+                extent = 360.0 * value / total
+                c.create_arc(*bbox, start=start, extent=-extent, fill=color,
+                             outline='#15110f', width=2, style=tk.PIESLICE,
+                             tags='history_dynamic')
+                start -= extent
+
+        legend_x = x0 + 166
+        row_gap = min(35, max(25, (height - 52) / max(1, len(items))))
+        legend_y = y0 + 48
+        for index, (label, value, color) in enumerate(items):
+            y = legend_y + index * row_gap
+            c.create_rectangle(legend_x, y - 6, legend_x + 13, y + 7,
+                               fill=color, outline='#e5ddd3', width=1,
+                               tags='history_dynamic')
+            percentage = (100.0 * int(value) / total) if total else 0.0
+            c.create_text(legend_x + 22, y, anchor='w',
+                          text=f'{label}  {int(value)}  ({percentage:.1f}%)',
+                          font=('Arial', 10, 'bold'), fill='#e9e1d8',
+                          tags='history_dynamic')
 
     def update_history_table(self):
         if not hasattr(self, 'canvas'):
@@ -1372,10 +1466,9 @@ class BubbleDragonTigerGame(tk.Frame):
                 self.canvas.itemconfigure(note_item, text=self._asterisk_note_text())
             except tk.TclError:
                 pass
-        # temp_finish_data records are stored oldest -> newest.  Roadmaps must
-        # be built in that same chronological order (V8 accidentally reversed
-        # them, which made every road structurally wrong).
-        records = list(self.history_data[-self.MAX_RECORDS:])
+        # temp_finish_data remains the source for Big Road, derived roads,
+        # predictions and pie charts. Only the Bead Plate uses last_72_record.
+        records = self._drawable_history_records(self.history_data)[-self.MAX_RECORDS:]
         if self.history_panel_mode == 'data':
             self._draw_round_statistics(records)
             return
@@ -1383,9 +1476,35 @@ class BubbleDragonTigerGame(tk.Frame):
         self._draw_big_road(big_cells)
         self._draw_derived_road('eye', self._derive_road(records, 1), 'ring')
         self._draw_derived_road('cockroach', self._derive_road(records, 3), 'slash')
-        self._draw_bead_plate(records)
+        bead_records = self._drawable_history_records(
+            self.last_72_data)[-self.BEAD_MAX_RECORDS:]
+        self._draw_bead_plate(bead_records)
         self._draw_derived_road('small', self._derive_road(records, 2), 'dot')
         self._draw_next_round_indicator(records)
+
+    @staticmethod
+    def _drawable_history_records(records):
+        """Return only valid results that every road renderer can safely draw."""
+        drawable = []
+        for record in records if isinstance(records, list) else []:
+            if not isinstance(record, dict):
+                continue
+            winner = record.get('winner')
+            if winner not in ('Dragon', 'Tie', 'Tiger'):
+                continue
+            try:
+                dragon_score = int(record.get('dragon_score'))
+                tiger_score = int(record.get('tiger_score'))
+            except (TypeError, ValueError):
+                continue
+            if not (1 <= dragon_score <= 13 and 1 <= tiger_score <= 13):
+                continue
+            if ((winner == 'Dragon' and dragon_score <= tiger_score)
+                    or (winner == 'Tiger' and tiger_score <= dragon_score)
+                    or (winner == 'Tie' and dragon_score != tiger_score)):
+                continue
+            drawable.append(record)
+        return drawable
 
     def _next_road_color(self, records, candidate, offset):
         simulated = list(records) + [{
@@ -1937,42 +2056,129 @@ class BubbleDragonTigerGame(tk.Frame):
         self.update_control_states()
 
     def show_game_instructions(self):
-        text = (
-            '【龙虎规则】\n\n'
-            '每局龙、虎各发1张牌，A最小、K最大；点数相同为和局。\n'
-            '龙 / 虎主注均为1:1；若开和局，龙、虎主注各输一半。\n\n'
-            '【经典版】\n'
-            '双方红色 2.9:1｜红黑各一 0.95:1｜双方黑色 2.9:1\n'
-            '小(A-9) 1:1｜完美同花 50:1｜大(10-K) 0.9:1\n'
-            '和局 10:1\n\n'
-            '【聚宝盆】\n'
-            '每局黄金条件：仅花色34%｜仅点数44%｜花色+点数22%。花色倍率为2X/3X/4X；点数倍率为2X/3X/4X/5X/8X。\n'
-            '双方红色 2:1｜红黑各一 0.75:1｜双方黑色 2:1\n'
-            '小(A-9) 0.75:1｜完美同花 30:1｜大(10-K) 0.55:1\n'
-            '和局 8:1。双方红色/红黑各一/双方黑色与小/大均同时计算命中牌的花色与点数倍率；龙/虎主注同时计算该侧牌的花色与点数倍率。'
-        )
-        messagebox.showinfo('龙虎玩法说明', text, parent=self.winfo_toplevel())
+        existing = getattr(self, '_intro_window', None)
+        try:
+            if existing is not None and existing.winfo_exists():
+                existing.lift()
+                existing.focus_force()
+                return
+        except tk.TclError:
+            pass
+
+        window = tk.Toplevel(self.winfo_toplevel())
+        self._intro_window = window
+        window.title('龙虎 · 游戏简介')
+        window.configure(bg='#120f0d')
+        window.resizable(False, False)
+        window.transient(self.winfo_toplevel())
+
+        width, height = 860, 720
+        try:
+            parent = self.winfo_toplevel()
+            x = parent.winfo_rootx() + max(0, (parent.winfo_width() - width) // 2)
+            y = parent.winfo_rooty() + max(0, (parent.winfo_height() - height) // 2)
+            window.geometry(f'{width}x{height}+{x}+{y}')
+        except tk.TclError:
+            window.geometry(f'{width}x{height}')
+
+        header = tk.Frame(window, bg='#352417', height=96,
+                          highlightbackground='#a7844d', highlightthickness=1)
+        header.pack(fill='x', padx=12, pady=(12, 8))
+        header.pack_propagate(False)
+        tk.Label(header, text='龙  虎', bg='#352417', fg='#f2d37b',
+                 font=('Arial', 28, 'bold')).place(x=24, y=14)
+        tk.Label(header, text='DRAGON  ·  TIGER', bg='#352417', fg='#bda98d',
+                 font=('Arial', 10, 'bold')).place(x=27, y=61)
+        mode_name = DragonTigerEngine.MODE_NAMES.get(self.game_mode, self.game_mode)
+        tk.Label(header, text=f'当前玩法  {mode_name}', bg='#a77a31', fg='#130f0b',
+                 padx=18, pady=7, font=('Arial', 12, 'bold')).place(x=630, y=28)
+
+        content = tk.Frame(window, bg='#120f0d')
+        content.pack(fill='both', expand=True, padx=12)
+        left = tk.Frame(content, bg='#120f0d')
+        right = tk.Frame(content, bg='#120f0d')
+        left.pack(side='left', fill='both', expand=True, padx=(0, 5))
+        right.pack(side='right', fill='both', expand=True, padx=(5, 0))
+
+        def section(parent, title, accent, body, height_px):
+            frame = tk.Frame(parent, bg='#201914', height=height_px,
+                             highlightbackground='#58483a', highlightthickness=1)
+            frame.pack(fill='x', pady=(0, 8))
+            frame.pack_propagate(False)
+            tk.Frame(frame, bg=accent, width=5).pack(side='left', fill='y')
+            inner = tk.Frame(frame, bg='#201914')
+            inner.pack(side='left', fill='both', expand=True, padx=14, pady=10)
+            tk.Label(inner, text=title, bg='#201914', fg=accent,
+                     font=('Arial', 13, 'bold'), anchor='w').pack(fill='x')
+            tk.Label(inner, text=body, bg='#201914', fg='#e9dfd4',
+                     font=('Arial', 10), justify='left', anchor='nw',
+                     wraplength=360).pack(fill='both', expand=True, pady=(7, 0))
+            return frame
+
+        section(
+            left, '一眼看懂', '#e25a60',
+            '龙、虎各发 1 张牌，比较点数大小。\n'
+            'A 最小，依次到 K 最大；同点数即为和局。\n'
+            '龙／虎主注赔率 1:1；遇和时各输一半。', 128)
+
+        rank_frame = tk.Frame(left, bg='#201914', height=92,
+                              highlightbackground='#58483a', highlightthickness=1)
+        rank_frame.pack(fill='x', pady=(0, 8))
+        rank_frame.pack_propagate(False)
+        tk.Label(rank_frame, text='牌面顺序', bg='#201914', fg='#f2d37b',
+                 font=('Arial', 12, 'bold')).pack(anchor='w', padx=14, pady=(8, 4))
+        ranks = tk.Frame(rank_frame, bg='#201914')
+        ranks.pack(fill='x', padx=12)
+        for rank in ('A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'):
+            tk.Label(ranks, text=rank, bg='#3b3028', fg='white', width=2,
+                     font=('Arial', 9, 'bold'), padx=1, pady=4).pack(side='left', padx=1)
+
+        section(
+            left, '边注速查', '#56b58b',
+            '小：胜方点数 A–9    ｜    大：胜方点数 10–K\n'
+            '完美同花：两张牌点数及花色完全相同\n'
+            '颜色注：双方红色／红黑各一／双方黑色', 126)
+        section(
+            left, '操作与记录', '#70a9d6',
+            '左键下注 · 右键清除单区 · Enter 开牌\n'
+            '「道路」查看珠盘及派生路；「数据」查看最近 300 局饼图。\n'
+            '珠盘独立保留 72 局；第 73 局时按整列移除最旧 6 局。', 120)
+
+        section(
+            right, '经典版赔率', '#d6aa58',
+            '和局 10:1　｜　完美同花 50:1\n'
+            '双方红色 2.9:1　｜　红黑各一 0.95:1\n'
+            '双方黑色 2.9:1　｜　小 1:1　｜　大 0.9:1', 120)
+        section(
+            right, '聚宝盆赔率', '#b884e0',
+            '和局 8:1　｜　完美同花 30:1\n'
+            '双方红／双方黑 2:1　｜　红黑各一 0.75:1\n'
+            '小 0.75:1　｜　大 0.55:1\n'
+            '命中黄金花色或点数时，按当局倍率加乘。', 140)
+        section(
+            right, '黄金条件', '#f0c84d',
+            '仅花色 34%　｜　仅点数 44%　｜　两者 22%\n'
+            '花色倍率：2X / 3X / 4X\n'
+            '点数倍率：2X / 3X / 4X / 5X / 8X', 116)
+        section(
+            right, '连续洗牌机', '#68c9c0',
+            '8 副牌 · 15 仓 CSM 连续洗牌。\n'
+            '每局由机器提供牌张，结算后自动归还；不使用本地 JSON 牌靴。', 96)
+
+        footer = tk.Frame(window, bg='#120f0d', height=54)
+        footer.pack(fill='x', padx=12, pady=(4, 10))
+        tk.Label(footer, text=f'版本 {DRAGON_TIGER_VERSION}', bg='#120f0d',
+                 fg='#756b62', font=('Arial', 9)).pack(side='left', padx=4)
+        tk.Button(footer, text='知道了', command=window.destroy,
+                  bg='#a77a31', fg='#130f0b', activebackground='#d1a750',
+                  relief='flat', padx=28, pady=7,
+                  font=('Arial', 11, 'bold')).pack(side='right')
+        window.protocol('WM_DELETE_WINDOW', window.destroy)
+        window.bind('<Escape>', lambda _event: window.destroy())
+        window.after(20, window.focus_force)
 
     def show_help_window(self):
-        mode = DragonTigerEngine.MODE_NAMES[self.game_mode]
-        rows = DragonTigerEngine.MODE_ROWS[self.game_mode]
-        odds = DragonTigerEngine.ODDS_TEXT[self.game_mode]
-        side_lines = [
-            f'• {DragonTigerEngine.DISPLAY_NAMES.get(bt, bt)}：{odds.get(bt, "")}'
-            for bt in rows[0] + rows[1]
-        ]
-        messagebox.showinfo(
-            '龙虎玩法说明',
-            '【基本规则】\n'
-            '• 龙、虎各发1张牌；A=1，J=11，Q=12，K=13。\n'
-            '• 点数较大者获胜；同点数为和局。\n'
-            '• 龙/虎主注1:1；开和时返还一半本金，即净输一半。\n'
-            '• 小为A-9；大为10-K。\n\n'
-            f'【当前玩法：{mode}】\n' + '\n'.join(side_lines) +
-            ('\n\n聚宝盆：每局仅花色34%、仅点数44%、花色+点数22%。'
-             if self.game_mode == 'treasure' else '') +
-            '\n\n操作：左键下注；右键清除单区；清除按钮清空本局；Enter开牌。',
-            parent=self.winfo_toplevel())
+        self.show_game_instructions()
 
     @staticmethod
     def shade_color(color, factor):
@@ -3068,21 +3274,15 @@ class BubbleDragonTigerGame(tk.Frame):
         return int(result[0] if result[0] is not None else selected['value'])
 
     def start_new_shoe_cut(self, second=False):
-        if self._closing or self.animation_running or self.settlement_running:
+        """Legacy host entry point; CSM mode has no manual cut or burn flow."""
+        del second
+        if self._closing or self.engine.round_open:
             return
-        self.accept_bets = False
-        self.animation_running = True
-        self.update_control_states()
-        cut_position = self._show_cut_dialog(second)
-        # Cutting a new shoe completely resets the two temporary sections in
-        # Dragon_Tiger.json, while lifetime statistic_data is preserved.
-        self.clear_shoe_temp_sections()
-        self.engine.new_shoe()
-        self.engine.cut_shoe(cut_position)
-        self.save_temp_data(burn_complete=False)
-        self.clear_card_display()
-        self.canvas.itemconfigure(self.animation_phase_text, text='切牌完成 · 烧牌')
-        self._start_initial_burn_animation()
+        self.animation_running = False
+        self.settlement_running = False
+        self.accept_bets = True
+        self.canvas.itemconfigure(self.animation_phase_text, text='龙虎 DRAGON TIGER')
+        self.update_display()
 
     def _start_initial_burn_animation(self):
         if self.engine.remaining_cards() <= 0:
@@ -3186,16 +3386,11 @@ class BubbleDragonTigerGame(tk.Frame):
     def deal_cards(self):
         if not self.accept_bets or self.animation_running or self.settlement_running:
             return
-        if self.engine.needs_shuffle():
-            outstanding = self.bet_state.clear_all()
-            fee_refund = sum(float(v) for v in self.bet_fee_state.values())
-            self.bet_fee_state.clear()
-            if outstanding > 0 or fee_refund > 0:
-                self.balance += outstanding + fee_refund
-                if fee_refund > 0:
-                    self.treasure_pot_amount = max(0.0, self.treasure_pot_amount - fee_refund)
-            self.update_display()
-            self.start_new_shoe_cut(True)
+        try:
+            self.engine.start_round()
+        except (CSMError, OSError, RuntimeError) as exc:
+            messagebox.showerror('自动洗牌机', f'无法开始牌局：{exc}',
+                                 parent=self.winfo_toplevel())
             return
 
         self.accept_bets = False
@@ -3228,7 +3423,17 @@ class BubbleDragonTigerGame(tk.Frame):
     def _begin_actual_round_deal(self):
         if self._closing:
             return
-        self.current_result = self.engine.deal_round()
+        try:
+            self.current_result = self.engine.deal_round()
+        except (CSMError, OSError, RuntimeError) as exc:
+            self.accept_bets = False
+            self.animation_running = False
+            self.update_display()
+            messagebox.showerror(
+                '自动洗牌机',
+                f'本局发牌已暂停：{exc}\n请退出本局以归还牌张；系统不会放宽取仓规则。',
+                parent=self.winfo_toplevel())
+            return
         if self.game_mode == 'treasure':
             bonus = {}
             if self.current_treasure_suit:
@@ -3236,7 +3441,6 @@ class BubbleDragonTigerGame(tk.Frame):
             if self.current_treasure_rank:
                 bonus['rank'], bonus['rank_multiplier'] = self.current_treasure_rank
             self.current_result['_treasure_bonus'] = bonus
-        self.save_temp_data()
         self.canvas.itemconfigure(self.animation_phase_text, text='发牌中…')
         self._deal_initial_sequence_original()
 
@@ -3658,6 +3862,16 @@ class BubbleDragonTigerGame(tk.Frame):
     def finish_settlement(self):
         if self._closing:
             return
+        try:
+            self.engine.finish_round()
+        except (CSMError, OSError) as exc:
+            self.accept_bets = False
+            self.animation_running = False
+            self.settlement_running = False
+            self.update_display()
+            messagebox.showerror('自动洗牌机', f'本局牌张归还失败，游戏已暂停：{exc}',
+                                 parent=self.winfo_toplevel())
+            return
         self.settlement_after_id = None
         self.canvas.delete('win_flash_area')
         self.restore_flash_text_colors()
@@ -3679,13 +3893,8 @@ class BubbleDragonTigerGame(tk.Frame):
             self.treasure_pot_amount = 0.0
             self.update_golden_bet_visuals()
             self._refresh_treasure_pool_text()
-        if self.engine.needs_shuffle():
-            self.accept_bets = False
-            self.update_display()
-            self.after(350, lambda: self.start_new_shoe_cut(True))
-        else:
-            self.accept_bets = True
-            self.update_display()
+        self.accept_bets = True
+        self.update_display()
 
     @classmethod
     def result_color(cls, winner):
@@ -3719,34 +3928,85 @@ class BubbleDragonTigerGame(tk.Frame):
     @classmethod
     def new_runtime_store(cls):
         return {
-            'temp_data': {},
             'temp_finish_data': cls.new_history_store(),
+            'last_72_record': cls.new_history_store(),
             'statistic_data': cls._default_statistic_data(),
         }
 
     def _write_runtime_store(self):
-        """Persist all three data groups into one Dragon_Tiger.json file."""
+        """Write both history stores safely, including the Windows fallback."""
+        temp_path = None
         try:
-            os.makedirs(os.path.dirname(self.runtime_data_file), exist_ok=True)
-            temp_path = self.runtime_data_file + '.tmp'
-            with open(temp_path, 'w', encoding='utf-8') as handle:
-                json.dump(self.runtime_store, handle, ensure_ascii=False, indent=4)
-            os.replace(temp_path, self.runtime_data_file)
+            self.runtime_store = {
+                'temp_finish_data': copy.deepcopy(
+                    self.runtime_store.get('temp_finish_data', self.new_history_store())),
+                'last_72_record': copy.deepcopy(
+                    self.runtime_store.get('last_72_record', self.new_history_store())),
+                'statistic_data': dict(
+                    self.runtime_store.get('statistic_data', self._default_statistic_data())),
+            }
+            payload = json.dumps(self.runtime_store, ensure_ascii=False, indent=4)
+            directory = os.path.dirname(self.runtime_data_file)
+            os.makedirs(directory, exist_ok=True)
+            descriptor, temp_path = tempfile.mkstemp(
+                prefix=os.path.basename(self.runtime_data_file) + '.',
+                suffix='.tmp', dir=directory)
+            with os.fdopen(descriptor, 'w', encoding='utf-8') as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+
+            replace_error = None
+            for attempt in range(6):
+                try:
+                    os.replace(temp_path, self.runtime_data_file)
+                    temp_path = None
+                    replace_error = None
+                    break
+                except OSError as exc:
+                    replace_error = exc
+                    if getattr(exc, 'winerror', None) != 5 and not isinstance(exc, PermissionError):
+                        raise
+                    time.sleep(0.05 * (attempt + 1))
+
+            if replace_error is not None:
+                # Windows can deny replacement while still allowing the already
+                # existing file to be updated. This fallback avoids the repeated
+                # WinError 5 loop caused by os.replace().
+                with open(self.runtime_data_file, 'w', encoding='utf-8') as handle:
+                    handle.write(payload)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+            self._last_runtime_save_error = None
+            return True
         except OSError as exc:
-            print(f'保存 Dragon_Tiger 失败：{exc}')
+            message = f'{type(exc).__name__}: {exc}'
+            if message != getattr(self, '_last_runtime_save_error', None):
+                print(f'保存 Dragon_Tiger 失败：{exc}')
+                self._last_runtime_save_error = message
+            return False
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
 
     def load_runtime_store(self):
-        """读取 Dragon_Tiger.json；结构沿用 temp_data/temp_finish_data/statistic_data。"""
+        """读取记录，并自动忽略旧版 JSON 中的牌靴/temp_data。"""
         store = self.new_runtime_store()
+        last_72_missing = True
         try:
             with open(self.runtime_data_file, 'r', encoding='utf-8') as handle:
                 raw = json.load(handle)
             if isinstance(raw, dict):
-                for key in ('temp_data', 'temp_finish_data', 'statistic_data'):
+                last_72_missing = not isinstance(raw.get('last_72_record'), dict)
+                for key in ('temp_finish_data', 'last_72_record', 'statistic_data'):
                     if isinstance(raw.get(key), dict):
                         store[key] = raw[key]
         except (FileNotFoundError, json.JSONDecodeError, OSError):
             pass
+        self._last_72_missing = last_72_missing
         return store
 
     def get_history_file(self):
@@ -3754,40 +4014,16 @@ class BubbleDragonTigerGame(tk.Frame):
                        os.path.join(self.get_runtime_json_dir(), 'Dragon_Tiger.json'))
 
     def load_temp_data(self):
+        """Compatibility helper: CSM encrypted state is the sole shoe state."""
         try:
-            data = self.runtime_store.get('temp_data', {})
-            if not isinstance(data, dict):
-                return False
-            deck = data.get('deck', [])
-            index = int(data.get('current_index', 0))
-            threshold = int(data.get('cut_threshold', 60))
-            burn_complete = bool(data.get('burn_complete', False))
-            if (not isinstance(deck, list) or len(deck) != 416 or not burn_complete
-                    or not (0 <= index <= 416) or not (50 <= threshold <= 80)):
-                return False
-            normalized = []
-            for card in deck:
-                if not isinstance(card, (list, tuple)) or len(card) != 2:
-                    return False
-                suit, rank = str(card[0]), str(card[1])
-                if suit not in DragonTigerEngine.SUITS or rank not in DragonTigerEngine.RANKS:
-                    return False
-                normalized.append((suit, rank))
-            self.engine.set_shoe_state(normalized, index, threshold)
-            return self.engine.remaining_cards() > self.engine.cut_threshold
-        except (TypeError, ValueError):
+            self.csm.status()
+            return True
+        except (CSMError, OSError, TypeError, ValueError):
             return False
 
     def save_temp_data(self, burn_complete=True):
-        self.runtime_store['temp_data'] = {
-            'deck': [list(card) for card in self.engine.deck],
-            'current_index': int(self.engine.current_index),
-            'cut_threshold': int(self.engine.cut_threshold),
-            'remaining_cards': int(self.engine.remaining_cards()),
-            'burn_complete': bool(burn_complete),
-            'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        }
-        self._write_runtime_store()
+        """Compatibility no-op: card state must never be duplicated in JSON."""
+        del burn_complete
 
     @classmethod
     def new_history_store(cls):
@@ -3801,7 +4037,7 @@ class BubbleDragonTigerGame(tk.Frame):
         raw_records = data.get('records', [])
         if not isinstance(raw_records, list):
             return normalized
-        for record in raw_records[-cls.MAX_RECORDS:]:
+        for record in raw_records:
             if not isinstance(record, dict):
                 continue
             winner = record.get('winner')
@@ -3812,41 +4048,61 @@ class BubbleDragonTigerGame(tk.Frame):
                 bs = int(record.get('tiger_score', 0))
             except (TypeError, ValueError):
                 continue
+            if not (1 <= ps <= 13 and 1 <= bs <= 13):
+                continue
+            if ((winner == 'Dragon' and ps <= bs)
+                    or (winner == 'Tiger' and bs <= ps)
+                    or (winner == 'Tie' and ps != bs)):
+                continue
             item = copy.deepcopy(record)
             item['dragon_score'] = ps
             item['tiger_score'] = bs
             normalized['records'].append(item)
+        if len(normalized['records']) > cls.MAX_RECORDS:
+            del normalized['records'][:-cls.MAX_RECORDS]
         return normalized
 
     def load_history_store(self):
         raw = self.runtime_store.get('temp_finish_data', self.new_history_store())
         return self.normalize_history_store(raw)
 
+    def load_last_72_store(self):
+        if getattr(self, '_last_72_missing', False):
+            seeded = self.new_history_store()
+            seeded['records'] = copy.deepcopy(
+                self.history_store.get('records', [])[-self.BEAD_MAX_RECORDS:])
+            return seeded
+        raw = self.runtime_store.get('last_72_record', self.new_history_store())
+        normalized = self.normalize_history_store(raw)
+        while len(normalized['records']) > self.BEAD_MAX_RECORDS:
+            del normalized['records'][:self.HISTORY_DROP_COUNT]
+        return normalized
+
     def save_history_store(self):
         self.runtime_store['temp_finish_data'] = copy.deepcopy(self.history_store)
+        self.runtime_store['last_72_record'] = copy.deepcopy(self.last_72_store)
         self._write_runtime_store()
 
     def history_records_from_store(self):
         return list(self.history_store.get('records', []))
 
+    def last_72_records_from_store(self):
+        return list(self.last_72_store.get('records', []))
+
     def clear_temp_finish_data(self):
-        """Clear current-shoe completed hands but preserve shoe/statistic sections."""
+        """Clear both synchronized history stores while preserving statistics."""
         self.history_store = self.new_history_store()
         self.history_data = []
+        self.last_72_store = self.new_history_store()
+        self.last_72_data = []
         self.runtime_store['temp_finish_data'] = self.new_history_store()
+        self.runtime_store['last_72_record'] = self.new_history_store()
         self._write_runtime_store()
         self.update_history_table()
 
     def clear_shoe_temp_sections(self):
-        """Dragon cut: delete BOTH temporary sections, never lifetime statistics."""
-        self.runtime_store['temp_data'] = {}
-        self.runtime_store['temp_finish_data'] = self.new_history_store()
-        self.history_store = self.new_history_store()
-        self.history_data = []
-        self.big_road_scroll_col = 0
-        self.big_road_auto_follow = True
+        """Compatibility no-op: CSM has no shoe boundary and history is rolling."""
         self._write_runtime_store()
-        self.update_history_table()
 
     def add_history(self, result):
         special_by_mode = {}
@@ -3871,11 +4127,18 @@ class BubbleDragonTigerGame(tk.Frame):
             record['treasure_bonus'] = copy.deepcopy(result['_treasure_bonus'])
         records = self.history_store.setdefault('records', [])
         records.append(record)
-        self.big_road_auto_follow = True
         if len(records) > self.MAX_RECORDS:
             del records[:-self.MAX_RECORDS]
+
+        bead_records = self.last_72_store.setdefault('records', [])
+        bead_records.append(copy.deepcopy(record))
+        while len(bead_records) > self.BEAD_MAX_RECORDS:
+            del bead_records[:self.HISTORY_DROP_COUNT]
+
+        self.big_road_auto_follow = True
         self.save_history_store()
         self.history_data = self.history_records_from_store()
+        self.last_72_data = self.last_72_records_from_store()
 
     def load_statistic_data(self):
         defaults = self._default_statistic_data()
@@ -3994,6 +4257,12 @@ class BubbleDragonTigerGame(tk.Frame):
                 self.treasure_pot_amount = max(0.0, self.treasure_pot_amount - fee_refund)
         self.bet_fee_state.clear()
         self.bet_state.bets.clear()
+        try:
+            self.engine.close()
+        except Exception as exc:
+            messagebox.showerror('自动洗牌机',
+                                 f'退出时归还或强制洗牌失败，牌仍保留在 CSM 记录中：{exc}',
+                                 parent=self.winfo_toplevel())
         self.final_balance = float(self.balance)
         try:
             self.save_balance()

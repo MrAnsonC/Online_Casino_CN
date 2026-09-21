@@ -1,13 +1,42 @@
+import sys as _account_sys
+from pathlib import Path as _AccountPath
+_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
+if _account_root is None:
+    raise RuntimeError("Cannot locate encrypted account storage")
+if str(_account_root) not in _account_sys.path:
+    _account_sys.path.insert(0, str(_account_root))
+from A_Tools.Account import install_secure_json as _install_secure_json
+_install_secure_json()
+del _install_secure_json, _account_root, _AccountPath, _account_sys
+
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image, ImageTk, ImageDraw, ImageFont
-import random
 import json
 import os
 import math
-import secrets
+import sys
 import time
 from collections import Counter
+
+# Shared continuous shuffler discovery (same project layout as Blackjack and
+# Dragon Tiger): A_Tools/Card/CSM_Shuffler.py.
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_CSM_CANDIDATES = [
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'A_Tools', 'Card')),
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'Card')),
+    _THIS_DIR,
+]
+_CARD_TOOLS_DIR = next((p for p in _CSM_CANDIDATES
+                        if os.path.isfile(os.path.join(p, 'CSM_Shuffler.py'))), None)
+if _CARD_TOOLS_DIR is None:
+    raise ModuleNotFoundError('找不到 CSM_Shuffler.py，已檢查：' + '; '.join(_CSM_CANDIDATES))
+if _CARD_TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _CARD_TOOLS_DIR)
+
+from CSM_Shuffler import CSMError, ContinuousShuffleMachine  # type: ignore
+
+CASINO_WAR_VERSION = 'V2-CSM-R7'
 
 # =========================================================
 # 全局颜色与常量
@@ -32,7 +61,7 @@ RANK_VALUES = {r: i for i, r in enumerate(RANKS, start=2)}
 # =========================================================
 def get_data_file_path():
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(parent_dir, 'saving_data.json')
+    return os.path.join(parent_dir, 'A_Tools/Account/saving_data.json')
 
 def save_user_data(users):
     with open(get_data_file_path(), 'w', encoding='utf-8') as f:
@@ -230,7 +259,7 @@ def save_casino_war_history(player_card, dealer_card, result_info=None,
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 # =========================================================
-# 扑克牌类与牌堆（全局单例，8副牌）
+# 扑克牌类与连续洗牌机适配器
 # =========================================================
 class Card:
     def __init__(self, suit, rank):
@@ -241,55 +270,104 @@ class Card:
         return f"{self.rank}{self.suit}"
 
 class Deck:
-    _instance = None
-    _initialized = False
+    SUIT_SYMBOLS = {
+        'Spade': '♠', 'Heart': '♥', 'Diamond': '♦', 'Club': '♣',
+    }
 
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+    def __init__(self, csm, game_id):
+        self.csm = csm
+        self.game_id = str(game_id)
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
+        self.round_open = False
+        self.round_id = None
 
-    def __init__(self, num_decks=8):
-        if Deck._initialized:
-            return
-        Deck._initialized = True
-        self.num_decks = num_decks
-        self.full_deck = []
-        self.cut_position = 0
-        self.pointer = 0
-        self._rebuild()
-        self.start_pos = self.cut_position
-        self.indexes = [(self.start_pos + i) % len(self.full_deck) for i in range(len(self.full_deck))]
-        self.card_sequence = [self.full_deck[i] for i in self.indexes]
+    def _clear_local_csm_state(self):
+        self.round_id = None
+        self.round_open = False
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
 
-    def _rebuild(self):
-        self.full_deck = [Card(s, r) for s in SUITS for r in RANKS] * self.num_decks
-        self._secure_shuffle()
-        self.cut_position = secrets.randbelow(len(self.full_deck))
-        self.pointer = 0
-        self.start_pos = self.cut_position
-        self.indexes = [(self.start_pos + i) % len(self.full_deck) for i in range(len(self.full_deck))]
-        self.card_sequence = [self.full_deck[i] for i in self.indexes]
+    def start_round(self):
+        if self.round_open:
+            raise RuntimeError('上一局尚未结束。')
+        try:
+            self.round_id = self.csm.begin_round(
+                self.game_id, self.current_batch_id if self.card_buffer else None)
+            self.used_by_batch = {}
+            self.round_open = True
+            if not self.card_buffer:
+                self._request_next_chamber()
+        except Exception:
+            # CSM may already have rebuilt all warehouses after the primary error.
+            # Drop every local lease/round reference so stale IDs are never reused.
+            self._clear_local_csm_state()
+            raise
 
-    def _secure_shuffle(self):
-        for i in range(len(self.full_deck) - 1, 0, -1):
-            j = secrets.randbelow(i + 1)
-            self.full_deck[i], self.full_deck[j] = self.full_deck[j], self.full_deck[i]
+    def _request_next_chamber(self):
+        packet = self.csm.acquire_chamber(self.game_id, self.round_id)
+        self.current_batch_id = packet['batch_id']
+        self.card_buffer = list(packet['cards'])
+        if not self.card_buffer:
+            raise CSMError('自动洗牌机返回了空仓。')
 
     def deal(self, n=1):
-        remaining = len(self.full_deck) - self.pointer
-        if remaining < 60:
-            self._rebuild()
-        dealt = [self.full_deck[self.indexes[self.pointer + i]] for i in range(n)]
-        self.pointer += n
+        if not self.round_open:
+            raise RuntimeError('牌局尚未开始。')
+        dealt = []
+        for _ in range(max(0, int(n))):
+            if len(self.card_buffer) <= 3:
+                self._request_next_chamber()
+            record = self.card_buffer.pop(0)
+            self.used_by_batch.setdefault(self.current_batch_id, []).append(record['card_id'])
+            try:
+                suit = self.SUIT_SYMBOLS[record['suit']]
+                dealt.append(Card(suit, record['rank']))
+            except (KeyError, TypeError, ValueError) as exc:
+                raise CSMError(f'自动洗牌机返回无效牌张：{record!r}') from exc
         return dealt
+
+    def finish_round(self):
+        if not self.round_open:
+            return
+        rid = self.round_id
+        try:
+            for batch_id in list(self.used_by_batch):
+                card_ids = self.used_by_batch[batch_id]
+                if card_ids:
+                    self.csm.return_cards(self.game_id, batch_id, card_ids)
+                del self.used_by_batch[batch_id]
+        except Exception:
+            # Do not call end_round with a round ID that may have been erased by
+            # CSM automatic recovery; preserve the primary error instead.
+            self._clear_local_csm_state()
+            raise
+        try:
+            self.csm.end_round(self.game_id, rid)
+        finally:
+            self.round_id = None
+            self.round_open = False
+
+    def close(self):
+        try:
+            self.csm.release_game(self.game_id, force_shuffle=True)
+        except Exception:
+            # Closing must never resurrect or reuse stale CSM identifiers.
+            pass
+        finally:
+            self._clear_local_csm_state()
 
 # =========================================================
 # 游戏逻辑类（Casino War）
 # =========================================================
 class CasinoWarGame:
-    def __init__(self):
-        self.deck = Deck()
+    def __init__(self, csm, game_id):
+        self.deck = Deck(csm, game_id)
+        self.reset_hand_state()
+
+    def reset_hand_state(self):
         self.player_card = None
         self.dealer_card = None
         self.initial_player_card = None
@@ -304,6 +382,16 @@ class CasinoWarGame:
         self.player_war_cards = []   # 仅在战争时填充
         self.dealer_war_cards = []
         self.war_comp = 0
+
+    def start_round(self):
+        self.reset_hand_state()
+        self.deck.start_round()
+
+    def finish_round(self):
+        self.deck.finish_round()
+
+    def close(self):
+        self.deck.close()
 
     def deal_initial(self):
         self.player_card = self.deck.deal(1)[0]
@@ -345,7 +433,12 @@ class CasinoWarGUI(tk.Frame):
 
         self.username = username
         self.balance = initial_balance
-        self.game = CasinoWarGame()
+        import uuid
+        self.csm_game_id = f"CasinoWar:{self.username or 'local'}:{uuid.uuid4().hex}"
+        self.csm = ContinuousShuffleMachine()
+        self.game = CasinoWarGame(self.csm, self.csm_game_id)
+        self.csm_faulted = False
+        self._closing = False
         self.card_images = {}
         self.original_images = {}
         self.animation_queue = []
@@ -377,12 +470,22 @@ class CasinoWarGUI(tk.Frame):
         self._create_widgets()
 
     def on_close(self):
+        if self._closing:
+            return
+        self._closing = True
         timer = getattr(self, "auto_reset_timer", None)
         if timer:
             try:
                 self.after_cancel(timer)
             except tk.TclError:
                 pass
+        try:
+            self.game.close()
+        except Exception as exc:
+            messagebox.showerror(
+                '自动洗牌机',
+                f'退出时归还或强制洗牌失败，牌仍保留在 CSM 记录中：{exc}',
+                parent=self.winfo_toplevel())
         try:
             update_balance_in_json(self.username, self.balance)
         except Exception:
@@ -876,8 +979,9 @@ class CasinoWarGUI(tk.Frame):
              * 四张完全一样：100% 奖池
            - 高额模式下固定奖金不变，百分比不变。
 
-        6. 牌靴：
-           - 8副牌（416张）顺序发牌，剩余＜60张时自动重洗。
+        6. 连续洗牌机：
+           - 使用8副牌、15仓 CSM_Shuffler；每局按需取仓发牌。
+           - 初始牌与战争牌在整局结束后统一作为废牌归还并连续混洗。
 
         7. 高额模式：
            - 点击下注上限区域，输入当前时间（HHMM）切换。
@@ -896,9 +1000,31 @@ class CasinoWarGUI(tk.Frame):
         if self.username != 'Guest':
             update_balance_in_json(self.username, self.balance)
 
+    def _abort_csm_round(self, exc, refund_amount):
+        """Abort an incomplete deal, return all leases, and refund escrow."""
+        close_error = None
+        try:
+            self.game.close()
+        except Exception as close_exc:
+            close_error = close_exc
+            self.csm_faulted = True
+        self.balance += max(0.0, float(refund_amount))
+        self.game_in_progress = False
+        self.war_animation_running = False
+        self.update_balance()
+        detail = f'本局已取消并退还 ${float(refund_amount):.2f}。'
+        if close_error is not None:
+            detail += f'\n归还牌张亦失败，游戏已暂停：{close_error}'
+        messagebox.showerror('自动洗牌机', f'发牌失败：{exc}\n{detail}',
+                             parent=self.winfo_toplevel())
+        if not self.csm_faulted:
+            self._do_reset(False)
+        else:
+            self.disable_action_buttons()
+
     # ---------- 开始游戏 ----------
     def start_game(self):
-        if self.war_animation_running:
+        if self.war_animation_running or self.csm_faulted:
             return
         try:
             self.ante = int(self.ante_var.get())
@@ -930,6 +1056,13 @@ class CasinoWarGUI(tk.Frame):
             messagebox.showerror("错误", "余额不足以支付所有下注！")
             return
 
+        try:
+            self.game.start_round()
+        except (CSMError, OSError, RuntimeError) as exc:
+            messagebox.showerror('自动洗牌机', f'无法开始牌局：{exc}',
+                                 parent=self.winfo_toplevel())
+            return
+
         self.balance -= total_bet
         self.game_in_progress = True
         self.last_bet = {'ante': self.ante, 'tie': self.tie_bet, 'jackpot': self.jackpot_bet}
@@ -941,12 +1074,15 @@ class CasinoWarGUI(tk.Frame):
         self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
         self.last_win_label.config(text="上局获胜: $0.00")
 
-        # 重置游戏
-        self.game = CasinoWarGame()
+        # start_round 已重置本局状态，并保留当前 CSM 牌仓缓冲。
         self.game.ante = self.ante
         self.game.tie_bet = self.tie_bet
         self.game.jackpot_bet = self.jackpot_bet
-        self.game.player_card = self.game.deck.deal(1)[0]
+        try:
+            self.game.player_card = self.game.deck.deal(1)[0]
+        except (CSMError, OSError, RuntimeError) as exc:
+            self._abort_csm_round(exc, total_bet)
+            return
         self.game.dealer_card = None
         self.game.initial_player_card = self.game.player_card
 
@@ -1045,7 +1181,11 @@ class CasinoWarGUI(tk.Frame):
 
     # ---------- 发庄家牌 ----------
     def deal_dealer_card(self):
-        self.game.dealer_card = self.game.deck.deal(1)[0]
+        try:
+            self.game.dealer_card = self.game.deck.deal(1)[0]
+        except (CSMError, OSError, RuntimeError) as exc:
+            self._abort_csm_round(exc, self.total_bet)
+            return
         self.game.initial_dealer_card = self.game.dealer_card
         self.animation_queue = []
         self.card_positions = {}
@@ -1204,7 +1344,14 @@ class CasinoWarGUI(tk.Frame):
         self.stage_label.config(text="开战！")
         self.status_label.config(text="战争进行中...")
 
-        self.war_comp = self.game.war_compare()
+        try:
+            self.war_comp = self.game.war_compare()
+        except (CSMError, OSError, RuntimeError) as exc:
+            # Tie bet has already been settled; refund only unresolved ante,
+            # War raise and progressive wager.
+            unresolved = self.game.ante + self.game.war_bet + self.game.jackpot_bet
+            self._abort_csm_round(exc, unresolved)
+            return
         # 注意：战争牌保存在 self.game.player_war_cards 和 self.game.dealer_war_cards 中
 
         self.clear_btn_frame()
@@ -1543,6 +1690,16 @@ class CasinoWarGUI(tk.Frame):
         except Exception as e:
             print(f"保存历史失败: {e}")
 
+        try:
+            self.game.finish_round()
+        except (CSMError, OSError) as exc:
+            self.csm_faulted = True
+            self.status_label.config(text='自动洗牌机归还牌张失败，游戏已暂停')
+            messagebox.showerror('自动洗牌机', f'本局牌张归还失败，游戏已暂停：{exc}',
+                                 parent=self.winfo_toplevel())
+            self.disable_action_buttons()
+            return
+
         self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
         self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante", e))
         self.tie_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("tie"))
@@ -1613,7 +1770,7 @@ class CasinoWarGUI(tk.Frame):
 
     def _do_reset(self, auto_reset=False):
         self._load_assets()
-        self.game = CasinoWarGame()
+        self.game.reset_hand_state()
         self.stage_label.config(text="等待下注")
         self.player_label.config(text="玩家")
         self.dealer_label.config(text="庄家")

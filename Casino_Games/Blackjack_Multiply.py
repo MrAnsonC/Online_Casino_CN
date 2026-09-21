@@ -1,3 +1,14 @@
+import sys as _account_sys
+from pathlib import Path as _AccountPath
+_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
+if _account_root is None:
+    raise RuntimeError("Cannot locate encrypted account storage")
+if str(_account_root) not in _account_sys.path:
+    _account_sys.path.insert(0, str(_account_root))
+from A_Tools.Account import install_secure_json as _install_secure_json
+_install_secure_json()
+del _install_secure_json, _account_root, _AccountPath, _account_sys
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 from PIL import Image, ImageTk, ImageDraw, ImageFont
@@ -8,13 +19,30 @@ import math
 import subprocess, sys
 import random
 
+# Project layout:
+#   A_Tools/Card/CSM_Shuffler.py
+_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+_CSM_CANDIDATES = [
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'A_Tools', 'Card')),
+    os.path.abspath(os.path.join(_THIS_DIR, '..', 'Card')),
+    _THIS_DIR,
+]
+_CARD_TOOLS_DIR = next((p for p in _CSM_CANDIDATES
+                        if os.path.isfile(os.path.join(p, 'CSM_Shuffler.py'))), None)
+if _CARD_TOOLS_DIR is None:
+    raise ModuleNotFoundError('找不到 CSM_Shuffler.py，已檢查：' + '; '.join(_CSM_CANDIDATES))
+if _CARD_TOOLS_DIR not in sys.path:
+    sys.path.insert(0, _CARD_TOOLS_DIR)
+
+from CSM_Shuffler import CSMError, ContinuousShuffleMachine  # type: ignore
+
 # 扑克牌花色和点数 - 包括所有52张牌
 SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 
 def get_data_file_path():
     parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(parent_dir, 'saving_data.json')
+    return os.path.join(parent_dir, 'A_Tools/Account/saving_data.json')
 
 def save_user_data(users):
     file_path = get_data_file_path()
@@ -56,71 +84,101 @@ class Card:
             return int(self.rank)
 
 class Deck:
+    SUIT_TO_GLYPH = {'Spade': '♠', 'Heart': '♥', 'Diamond': '♦', 'Club': '♣'}
+
     def __init__(self, num_decks=8):
-        self.num_decks = num_decks
-        self.cards = []
-        self.generate_deck()
-        self.shuffle()
-        self.cut_card_position = 60
-    
-    def generate_deck(self):
-        self.cards = [Card(suit, rank) for _ in range(self.num_decks) for suit in SUITS for rank in RANKS]
-    
-    def shuffle(self):
-        """使用shuffle.py洗牌，失败则使用secrets洗牌"""
+        import uuid
+        self.num_decks = 8
+        self.csm_game_id = f"MultiplyBlackjack:local:{uuid.uuid4().hex}"
+        self.csm = ContinuousShuffleMachine()
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
+        self.round_open = False
+        self.round_id = None
+
+    def _clear_local_csm_state(self):
+        self.round_id = None
+        self.round_open = False
+        self.card_buffer = []
+        self.current_batch_id = None
+        self.used_by_batch = {}
+
+    def start_round(self):
+        if self.round_open:
+            return
         try:
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            parent_dir = os.path.dirname(current_dir)
-            shuffle_script = os.path.join(parent_dir, 'A_Tools', 'Card', 'shuffle.py')
-            
-            cmd = [sys.executable, shuffle_script, 'false', str(self.num_decks)]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            
-            if result.returncode == 0:
-                shuffle_data = json.loads(result.stdout)
-                shuffled_deck = shuffle_data['deck']
-                
-                self.cards = []
-                for card_dict in shuffled_deck:
-                    suit = card_dict['suit']
-                    rank = card_dict['rank']
-                    self.cards.append(Card(suit, rank))
-                return
-            else:
-                print(f"shuffle.py执行失败，使用secrets洗牌: {result.stderr}")
-                
-        except Exception as e:
-            print(f"调用shuffle.py失败，使用secrets洗牌: {e}")
-        
-        self._secrets_shuffle()
-    
-    def _secrets_shuffle(self):
-        n = len(self.cards)
-        for i in range(n - 1, 0, -1):
-            j = secrets.randbelow(i + 1)
-            self.cards[i], self.cards[j] = self.cards[j], self.cards[i]
-        print(f"使用secrets洗牌完成，剩余{len(self.cards)}张牌")
-    
+            self.round_id = self.csm.begin_round(
+                self.csm_game_id, self.current_batch_id if self.card_buffer else None)
+            self.used_by_batch = {}
+            self.round_open = True
+            if not self.card_buffer:
+                self._request_next_chamber()
+        except Exception:
+            self._clear_local_csm_state()
+            raise
+
+    def _request_next_chamber(self):
+        packet = self.csm.acquire_chamber(self.csm_game_id, self.round_id)
+        self.current_batch_id = packet['batch_id']
+        self.card_buffer = list(packet['cards'])
+        if not self.card_buffer:
+            raise CSMError('自动洗牌机返回了空仓。')
+
     def deal_card(self):
-        if len(self.cards) == 0:
-            self.generate_deck()
-            self.shuffle()
-            self.cut_card_position = 60
-        return self.cards.pop()
-    
+        self.start_round()
+        if len(self.card_buffer) <= 3:
+            self._request_next_chamber()
+        record = self.card_buffer.pop(0)
+        self.used_by_batch.setdefault(self.current_batch_id, []).append(record['card_id'])
+        return Card(self.SUIT_TO_GLYPH[record['suit']], record['rank'])
+
+    def finish_round(self):
+        if not self.round_open:
+            return
+        rid = self.round_id
+        try:
+            for batch_id in list(self.used_by_batch):
+                card_ids = self.used_by_batch[batch_id]
+                if card_ids:
+                    self.csm.return_cards(self.csm_game_id, batch_id, card_ids)
+                del self.used_by_batch[batch_id]
+        except Exception:
+            self._clear_local_csm_state()
+            raise
+        try:
+            self.csm.end_round(self.csm_game_id, rid)
+        finally:
+            self.round_id = None
+            self.round_open = False
+
+    def close(self):
+        try:
+            self.csm.release_game(self.csm_game_id, force_shuffle=True)
+        except Exception:
+            pass
+        finally:
+            self._clear_local_csm_state()
+
+    @property
+    def cards(self):
+        snapshot = self.csm.admin_snapshot()
+        records = []
+        for warehouse in snapshot.get('warehouses', {}).values():
+            records.extend(warehouse)
+        for batch in snapshot.get('batches', {}).values():
+            if batch.get('game_id') == self.csm_game_id:
+                records.extend(batch.get('cards', []))
+        return [Card(self.SUIT_TO_GLYPH[item['suit']], item['rank']) for item in records]
+
     def get_remaining_cards_count(self):
-        count_dict = {}
-        for suit in SUITS:
-            count_dict[suit] = {}
-            for rank in RANKS:
-                count_dict[suit][rank] = 0
-        
+        count_dict = {suit: {rank: 0 for rank in RANKS} for suit in SUITS}
         for card in self.cards:
             count_dict[card.suit][card.rank] += 1
         return count_dict
-    
+
     def needs_reshuffle(self):
-        return len(self.cards) <= 60
+        return False
 
 class BlackjackGame:
     def __init__(self):
@@ -350,6 +408,11 @@ class BlackjackGUI(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.on_close)
     
     def on_close(self):
+        if hasattr(self.game, 'deck') and self.game.deck is not None:
+            try:
+                self.game.deck.close()
+            except (CSMError, OSError):
+                pass
         if self.auto_reset_timer:
             self.after_cancel(self.auto_reset_timer)
         self.destroy()
@@ -1154,8 +1217,8 @@ class BlackjackGUI(tk.Tk):
             "   e. 玩家回合: 要牌、停牌、加倍、投降\n"
             "   f. 庄家回合: 必须补牌至17点或以上\n\n"
             "4. 特殊规则:\n"
-            "   - 使用8副标准52张扑克牌\n"
-            "   - 剩余60张牌时，本局结束后洗牌\n"
+            "   - 使用8副标准52张扑克牌，并由CSM_Shuffler连续洗牌机发牌\n"
+            "   - 每局结束后已发出的牌进入弃牌区，再按连续洗牌规则混回牌仓\n"
             "   - 庄家3张牌爆牌，主注平局，边注正常结算\n"
             "   - 玩家获胜且手牌含有特殊奖励牌时，主注额外乘以倍数X和匹配张数Y\n"
             "     例如: 主注100，基础获胜200(含本金)，倍数5X，匹配2张，最终=200*5*2=2000"
@@ -1665,29 +1728,10 @@ class BlackjackGUI(tk.Tk):
         self.update_balance()
         self.current_bet_label.config(text=f"本局下注: ${total_bet:.2f}")
 
-        need_shuffle = False
-        
         if not hasattr(self.game, 'deck') or self.game.deck is None:
-            need_shuffle = True
-        else:
-            if self.game.deck.needs_reshuffle():
-                need_shuffle = True
-
-        def continue_after_shuffle():
             self.game.deck = Deck(8)
-            self.game.stage = "special_offer"
-            self.show_special_offer_stage()
-
-        def continue_without_shuffle():
-            if not hasattr(self.game, 'deck') or self.game.deck is None:
-                self.game.deck = Deck(8)
-            self.game.stage = "special_offer"
-            self.show_special_offer_stage()
-
-        if need_shuffle:
-            self.play_shuffle_animation(duration_ms=3500, callback=continue_after_shuffle)
-        else:
-            continue_without_shuffle()
+        self.game.stage = "special_offer"
+        self.show_special_offer_stage()
     
     def show_special_offer_stage(self):
         self.stage_label.config(text="特殊奖励")
@@ -3011,6 +3055,13 @@ class BlackjackGUI(tk.Tk):
             self.after_cancel(after_id)
 
         def after_animation():
+            if hasattr(self.game, 'deck') and self.game.deck is not None:
+                try:
+                    self.game.deck.finish_round()
+                except (CSMError, OSError) as exc:
+                    messagebox.showerror('自动洗牌机', f'本局牌张归还失败：{exc}')
+                    self._resetting = False
+                    return
             self.game.reset_game()
             
             self.win_details = {

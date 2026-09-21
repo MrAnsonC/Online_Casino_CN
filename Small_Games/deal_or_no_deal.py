@@ -7,6 +7,17 @@ flat modern buttons, fixed cards, and the EmbeddedGamePage entry point.
 """
 
 from __future__ import annotations
+import sys as _account_sys
+from pathlib import Path as _AccountPath
+_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
+if _account_root is None:
+    raise RuntimeError("Cannot locate encrypted account storage")
+if str(_account_root) not in _account_sys.path:
+    _account_sys.path.insert(0, str(_account_root))
+from A_Tools.Account import install_secure_json as _install_secure_json
+_install_secure_json()
+del _install_secure_json, _account_root, _AccountPath, _account_sys
+
 
 import json
 import os
@@ -75,7 +86,7 @@ class Theme:
 
 
 def get_data_file_path() -> str:
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "../saving_data.json")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "../A_Tools/Account/saving_data.json")
 
 
 def save_user_data(users) -> None:

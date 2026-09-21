@@ -1,43 +1,15 @@
 {
     "history_record": {
         "player_win": 815,
-        "dealer_win": 804,
+        "dealer_win": 806,
         "war": 146,
         "war_fail": 64,
         "war_success": 69,
         "war_push": 13,
         "surrender": 0,
-        "game": 1765
+        "game": 1767
     },
     "history": [
-        {
-            "game_id": 1716,
-            "timestamp": "2026-07-18 10:08:27",
-            "player_card": "5♦",
-            "dealer_card": "8♣",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1717,
-            "timestamp": "2026-07-18 10:08:36",
-            "player_card": "Q♥",
-            "dealer_card": "9♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
         {
             "game_id": 1718,
             "timestamp": "2026-07-18 10:08:45",
@@ -701,6 +673,34 @@
             "timestamp": "2026-09-02 23:29:04",
             "player_card": "9♥",
             "dealer_card": "10♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1766,
+            "timestamp": "2026-09-09 22:40:12",
+            "player_card": "4♠",
+            "dealer_card": "10♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "surrender": false
+            }
+        },
+        {
+            "game_id": 1767,
+            "timestamp": "2026-09-09 22:40:31",
+            "player_card": "5♦",
+            "dealer_card": "10♥",
             "war_cards": {
                 "player_war_card": null,
                 "dealer_war_card": null

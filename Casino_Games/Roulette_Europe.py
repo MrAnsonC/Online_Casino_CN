@@ -1,3 +1,14 @@
+import sys as _account_sys
+from pathlib import Path as _AccountPath
+_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
+if _account_root is None:
+    raise RuntimeError("Cannot locate encrypted account storage")
+if str(_account_root) not in _account_sys.path:
+    _account_sys.path.insert(0, str(_account_root))
+from A_Tools.Account import install_secure_json as _install_secure_json
+_install_secure_json()
+del _install_secure_json, _account_root, _AccountPath, _account_sys
+
 import json
 import math
 import os
@@ -11,19 +22,6 @@ try:
 except Exception:
     ImageColor = None
 
-
-# =========================================================
-# Constants for scaling the betting board (shrink to 75%)
-# =========================================================
-ORIGINAL_SCALE = 2.0
-BOARD_SCALE = 1.5                     # 75% of original scale (since 1.5 / 2 = 0.75)
-BOARD_W = 660
-BOARD_H = 340
-
-# =========================================================
-# Paths / persistence
-# =========================================================
-
 def uuid_uniform(a: float, b: float) -> float:
     """使用 uuid4 的随机位生成 [a, b) 范围内的浮点数"""
     # uuid4 返回 128 位随机整数，取高 64 位足够了
@@ -32,18 +30,31 @@ def uuid_uniform(a: float, b: float) -> float:
     rand_float = rand_int / (1 << 64)
     return a + (b - a) * rand_float
 
+
+# =========================================================
+# Constants for scaling the betting board
+# =========================================================
+ORIGINAL_SCALE = 2.0
+BOARD_SCALE = 1.2                     # Fit the betting board within the 540px left column.
+BOARD_W = 508
+BOARD_H = 265
+
+# =========================================================
+# Paths / persistence
+# =========================================================
+
 def project_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def user_data_path() -> str:
-    return os.path.join(project_root(), "saving_data.json")
+    return os.path.join(project_root(), "A_Tools/Account/saving_data.json")
 
 
 def roulette_log_path() -> str:
     log_dir = os.path.join(project_root(), "A_Logs", "Json")
     os.makedirs(log_dir, exist_ok=True)
-    return os.path.join(log_dir, "Roulette_Europe.json")      # changed to European
+    return os.path.join(log_dir, "Roulette_Europe.json")
 
 
 def ensure_json_file(path: str, default_obj):
@@ -106,7 +117,7 @@ def update_balance_in_json(username: str, new_balance: float):
 
 
 # =========================================================
-# Roulette rules / constants – European single zero
+# Roulette rules / constants
 # =========================================================
 
 ROULETTE_SEQUENCE = [
@@ -135,11 +146,10 @@ BET_ODDS = {
     "color": 1,
     "odd_even": 1,
     "high_low": 1,
-    # "five_number" removed
 }
 
 OUTCOME_COLORS = {
-    "0": "#188a8e",    # green
+    "0": "TEAL",
 }
 
 OUTCOME_TEXT_COLORS = {
@@ -171,7 +181,6 @@ ROULETTE_BET_TYPES = {
     "color",
     "odd_even",
     "high_low",
-    # "five_number" removed
 }
 
 
@@ -383,14 +392,14 @@ def draw_cell(canvas, x1, y1, x2, y2, fill, text=None, text_font=("Arial", 12, "
         draw_center_text(canvas, x1, y1, x2, y2, text, font=text_font, angle=text_angle, fill=text_fill)
 
 
+
 def get_board_layout(scale=BOARD_SCALE):
     x0 = 12 * scale
     y0 = 17 * scale
     num_w = 29 * scale
     num_h = 38 * scale
     zero_w = num_w 
-    zero_h = (3 * num_h) // 2          # 1.5 * num_h (for half-height cells)
-    # For European: zero area will be 2 * zero_h high (3 * num_h)
+    zero_h = (3 * num_h) // 2
     dozen_h = 39 * scale
     outer_h = 38 * scale
     col_w = 14 * scale + 20
@@ -467,7 +476,7 @@ def draw_roulette_static(canvas, scale=BOARD_SCALE):
         int(y0 + zero_height / 2),
         text="0",
         fill=TEXT,
-        font=("Arial", int(16 * scale // 2), "bold"),
+        font=("Arial", 11, "bold"),
         angle=90
     )
 
@@ -488,7 +497,7 @@ def draw_roulette_static(canvas, scale=BOARD_SCALE):
                 int((y1 + y2) / 2),
                 text=str(n),
                 fill=TEXT,
-                font=("Arial", int(13 * scale // 2), "bold"),
+                font=("Arial", 11, "bold"),
                 angle=90
             )
 
@@ -510,43 +519,33 @@ def draw_roulette_static(canvas, scale=BOARD_SCALE):
         canvas,
         int(grid_x1), int(dozen_y1), int(grid_x1 + dozen_w), int(dozen_y2),
         fill=DARK_BLUE, text="1st 12",
-        text_font=("Arial", int(14 * scale // 2), "bold")
+        text_font=("Arial", 11, "bold")
     )
     draw_cell(
         canvas,
         int(grid_x1 + dozen_w), int(dozen_y1), int(grid_x1 + 2 * dozen_w), int(dozen_y2),
         fill=DARK_BLUE, text="2nd 12",
-        text_font=("Arial", int(14 * scale // 2), "bold")
+        text_font=("Arial", 11, "bold")
     )
     draw_cell(
         canvas,
         int(grid_x1 + 2 * dozen_w), int(dozen_y1), int(grid_x1 + 3 * dozen_w), int(dozen_y2),
         fill=DARK_BLUE, text="3rd 12",
-        text_font=("Arial", int(14 * scale // 2), "bold")
+        text_font=("Arial", 11, "bold")
     )
 
     outer_y1 = dozen_y2
     outer_y2 = outer_y1 + outer_h
 
-    seg_w = dozen_w // 2
-    x = grid_x1
-    draw_cell(canvas, int(x), int(outer_y1), int(x + seg_w), int(outer_y2),
-              fill=DARK_BLUE, text="1 to 18", text_font=("Arial", int(14 * scale // 2), "bold"))
-    x += seg_w
-    draw_cell(canvas, int(x), int(outer_y1), int(x + seg_w), int(outer_y2),
-              fill=DARK_BLUE, text="EVEN", text_font=("Arial", int(14 * scale // 2), "bold"))
-    x += seg_w
-    draw_cell(canvas, int(x), int(outer_y1), int(x + seg_w), int(outer_y2),
-              fill=RED, text="RED", text_font=("Arial", int(14 * scale // 2), "bold"))
-    x += seg_w
-    draw_cell(canvas, int(x), int(outer_y1), int(x + seg_w), int(outer_y2),
-              fill=BLACK, text="BLACK", text_font=("Arial", int(14 * scale // 2), "bold"))
-    x += seg_w
-    draw_cell(canvas, int(x), int(outer_y1), int(x + seg_w), int(outer_y2),
-              fill=DARK_BLUE, text="ODD", text_font=("Arial", int(14 * scale // 2), "bold"))
-    x += seg_w
-    draw_cell(canvas, int(x), int(outer_y1), int(x + seg_w), int(outer_y2),
-              fill=DARK_BLUE, text="19 to 36", text_font=("Arial", int(14 * scale // 2), "bold"))
+    grid_x2 = layout["grid_x2"]
+    seg_w = (grid_x2 - grid_x1) / 6
+    for idx, (label, fill) in enumerate((
+            ("1 to 18", DARK_BLUE), ("EVEN", DARK_BLUE), ("RED", RED),
+            ("BLACK", BLACK), ("ODD", DARK_BLUE), ("19 to 36", DARK_BLUE))):
+        x1 = grid_x1 + idx * seg_w
+        x2 = grid_x2 if idx == 5 else grid_x1 + (idx + 1) * seg_w
+        draw_cell(canvas, int(x1), int(outer_y1), int(x2), int(outer_y2),
+                  fill=fill, text=label, text_font=("Arial", 11, "bold"))
 
     # Street bet lines: 12 个横线下注位
     street_y = int(round(dozen_y1))
@@ -562,7 +561,7 @@ def draw_roulette_static(canvas, scale=BOARD_SCALE):
 
 
 def roulette_color(result: str) -> str:
-    if result == "0":
+    if result in {"0"}:
         return "Green"
     try:
         n = int(result)
@@ -658,16 +657,26 @@ class RouletteBoardGeometry:
         return []
 
 
-class RouletteGameGUI(tk.Tk):
+class RouletteGameGUI(tk.Frame):
     BETTING_SECONDS = 30  #时间
     TIMER_TICK_MS = 250
 
-    def __init__(self, initial_balance=1_000_000, username="Guest"):
-        super().__init__()
-        self.title("欧式轮盘")        # changed title
-        self.geometry("1230x770+20+10")
-        self.resizable(False, False)
-        self.configure(bg=ROOT_BG)
+    def __init__(self, parent, initial_balance=1_000_000, username="Guest",
+                 on_back=None, on_balance_change=None):
+        super().__init__(parent, bg=ROOT_BG, width=1150, height=750)
+        self.pack_propagate(False)
+        self.parent = parent
+        self.root = self.winfo_toplevel()
+        self.on_back = on_back
+        self.on_balance_change = on_balance_change
+        self._embedded = not bool(getattr(self.root, "_roulette_europe_standalone", False))
+        self._previous_title = self.root.title()
+        self._previous_geometry = self.root.geometry()
+        self._previous_close_protocol = self.root.protocol("WM_DELETE_WINDOW")
+        self.root.title("欧式轮盘")
+        self.root.geometry("1150x750+50+10")
+        self.root.resizable(False, False)
+        self.root.configure(bg=ROOT_BG)
 
         self.username = username
         self.balance = float(load_balance(username, float(initial_balance)))
@@ -678,6 +687,7 @@ class RouletteGameGUI(tk.Tk):
         self.marker_rows = 6
         self.marker_cols = 9
 
+        self.bet_multiplier = 1
         self.selected_bet_amount = 25
         self.selected_chip_color = "#ffffff"
         self.selected_chip = None
@@ -704,11 +714,6 @@ class RouletteGameGUI(tk.Tk):
         self.pointer_acceleration = 0.0
         self.is_pointer_spinning = False
 
-        # 用于存储最后一局的开奖物理数据
-        self.last_spin_data = None
-        # 结果弹窗防重复
-        self.detail_window = None
-
         self.current_round_result = None
         self.current_round_index = None
         self.center_display_result = None
@@ -727,6 +732,14 @@ class RouletteGameGUI(tk.Tk):
         self.distribution_frame = None         # 分布面板主框架
         self.distribution_labels = {}          # 存储各统计标签的引用
 
+        # 用于存储最后一局的开奖物理数据
+        self.last_spin_data = None
+        # 结果弹窗防重复
+        self.detail_window = None
+
+        # 饼图模式: "sector" 区间分布(1-12/13-24/25-36/0) 或 "row" 每行分布
+        self.pie_mode = "sector"
+
         self._build_ui()
         self._sync_marker_from_history()
         self._start_new_round()
@@ -735,7 +748,7 @@ class RouletteGameGUI(tk.Tk):
         self.bind("<Return>", lambda event: self.start_game())
         self.bind("<KP_Enter>", lambda event: self.start_game())
 
-        self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # =====================================================
     # UI
@@ -746,11 +759,11 @@ class RouletteGameGUI(tk.Tk):
         main.pack(fill=tk.BOTH, expand=True)
 
         # 左右整体重新分配宽度，给右侧统计区留更多空间
-        left_frame = tk.Frame(main, bg=ROOT_BG, width=650)
+        left_frame = tk.Frame(main, bg=ROOT_BG, width=540)
         left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0), pady=0)
         left_frame.pack_propagate(False)
 
-        right_frame = tk.Frame(main, bg=ROOT_BG, width=560)
+        right_frame = tk.Frame(main, bg=ROOT_BG, width=594)
         right_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=0)
         right_frame.pack_propagate(False)
 
@@ -759,12 +772,12 @@ class RouletteGameGUI(tk.Tk):
 
     def _build_left_side(self, parent):
         top_frame = tk.Frame(parent, bg=ROOT_BG)
-        top_frame.pack(fill=tk.X, padx=8, pady=0)
+        top_frame.pack(fill=tk.X, padx=8, pady=(8, 4))
 
         self.wheel_canvas = tk.Canvas(
             top_frame,
             width=910,
-            height=450,
+            height=420,
             bg=ROOT_BG,
             highlightthickness=0,
             bd=0
@@ -772,10 +785,10 @@ class RouletteGameGUI(tk.Tk):
         self.wheel_canvas.pack(fill=tk.X)
 
         betting_area = tk.Frame(parent, bg=ROOT_BG)
-        betting_area.pack(fill=tk.BOTH, expand=True, padx=8, pady=0)
+        betting_area.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
 
         betting_left = tk.Frame(betting_area, bg=ROOT_BG)
-        betting_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        betting_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
 
         self._populate_betting_area(betting_left)
 
@@ -798,31 +811,38 @@ class RouletteGameGUI(tk.Tk):
         self.board_canvas.bind("<Button-3>", self.on_board_right_click)
 
     def _add_help_button_on_board(self):
-        """在棋盘上0格子下方、1-18格子左侧添加一个帮助按钮，鼠标悬停时显示手型光标"""
+        """在棋盘上0格子下方、1-18格子左侧添加一个帮助按钮"""
         if not hasattr(self, "board_canvas"):
             return
 
+        # 获取布局参数
         g = self.geometry_model
-        zero_bottom_y = g.y0 + 2 * g.zero_h
+        # 0格子区域：zero_x1, y0 到 zero_x2, y0 + 2*zero_h
+        zero_bottom_y = g.y0 + 2 * g.zero_h   # 0格子的底部Y坐标
+        # 外围第一行（1-18）的Y范围
         outer_y1 = g.outer_y1
+        # 按钮放置在0格子正下方、且在外围第一行上方（如果空间足够）
         btn_y1 = zero_bottom_y + 5
         btn_y2 = outer_y1 - 5
         if btn_y2 - btn_y1 < 20:
+            # 如果空间太小，则放在0格子内部底部
             btn_y1 = zero_bottom_y - 20
             btn_y2 = zero_bottom_y - 2
 
+        # 按钮宽度：与0格子同宽，或更小
         btn_width = (g.zero_x2 - g.zero_x1) - 8
         btn_x1 = g.zero_x1 + 4
         btn_x2 = btn_x1 + btn_width
 
+        # 绘制圆形背景
         cx = (btn_x1 + btn_x2) / 2
         cy = (btn_y1 + btn_y2) / 2
         radius = min((btn_x2 - btn_x1) / 2, (btn_y2 - btn_y1) / 2) * 0.7
 
-        # 删除旧的按钮（避免重复）
+        # 先删除旧的帮助按钮（如果有）
         self.board_canvas.delete("help_button")
 
-        # 绘制按钮圆底
+        # 绘制按钮底圆
         self.board_canvas.create_oval(
             cx - radius, cy - radius,
             cx + radius, cy + radius,
@@ -831,7 +851,7 @@ class RouletteGameGUI(tk.Tk):
             width=2,
             tags="help_button"
         )
-        # 绘制问号
+        # 绘制问号文字
         self.board_canvas.create_text(
             cx, cy,
             text="?",
@@ -843,10 +863,10 @@ class RouletteGameGUI(tk.Tk):
         # 绑定鼠标进入/离开事件，实现手型光标
         self.board_canvas.tag_bind("help_button", "<Enter>", self._on_help_enter)
         self.board_canvas.tag_bind("help_button", "<Leave>", self._on_help_leave)
-
-        # 绑定点击事件
+        
+        # 绑定点击事件（使用tag绑定）
         self.board_canvas.tag_bind("help_button", "<Button-1>", lambda e: self.show_game_instructions())
-
+    
     def _on_help_enter(self, event):
         """鼠标进入帮助按钮区域时，将画布光标改为手型"""
         if hasattr(self, "board_canvas"):
@@ -857,115 +877,12 @@ class RouletteGameGUI(tk.Tk):
         if hasattr(self, "board_canvas"):
             self.board_canvas.config(cursor="")
 
-    def _store_current_bets_as_last(self):
-        """将当前下注数据存储为“上一局下注”，只有非空时才存储"""
-        if self.current_bets:
-            self.last_bets = self.current_bets.copy()
-            self.last_bet_colors = self.current_bet_colors.copy()
-            # 更新按钮状态
-        else:
-            # 如果当前没有下注，清空之前存储的数据，使按钮不可用
-            pass
-        self._update_repeat_button_state()
-
-    def _update_repeat_button_state(self):
-        """
-        根据存储的上一局数据和当前余额，更新重复下注按钮的可用性。
-        注意：如果当前不在投注阶段，按钮应保持禁用（由 _set_control_buttons_state 控制）。
-        """
-        if self.round_state != "betting":
-            return  # 非投注阶段，按钮已被禁用，无需额外处理
-        if not self.last_bets:
-            self.repeat_last_btn.config(state=tk.DISABLED)
-            return
-        total_last = sum(self.last_bets.values())
-        if total_last > self.balance:
-            self.repeat_last_btn.config(state=tk.DISABLED)
-        else:
-            self.repeat_last_btn.config(state=tk.NORMAL)
-
-    def _repeat_last_bet(self):
-        """重复上一局的下注（复制到当前局）"""
-        if self.round_state != "betting":
-            messagebox.showwarning("提示", "只能在投注阶段重复上局下注")
-            return
-        if not self.last_bets:
-            messagebox.showwarning("提示", "没有上一局下注记录")
-            return
-        total_last = sum(self.last_bets.values())
-        if total_last > self.balance:
-            messagebox.showwarning("余额不足", f"重复上局下注需要 ${total_last:,.0f}，余额不足")
-            return
-
-        # 清除当前下注
-        self.clear_bets()
-        # 复制上局下注
-        for spot_id, amount in self.last_bets.items():
-            spot = self._find_spot_by_id(spot_id)
-            if not spot:
-                continue
-            limit = self._bet_limit_for_spot(spot)
-            existing = self.current_bets.get(spot_id, 0)
-            remaining_limit = limit - existing
-            actual_amount = min(amount, remaining_limit)
-            if actual_amount <= 0:
-                continue
-            if self.balance < actual_amount:
-                # 余额不足时终止后续复制
-                break
-            self.balance -= actual_amount
-            self.current_bets[spot_id] = existing + actual_amount
-            self.current_bet_colors[spot_id] = self._chip_fill_color_for_amount(self.current_bets[spot_id])
-
-        self._refresh_balance_display()
-        self._refresh_bet_totals()
-        self._repaint_all_chips()
-
-        total_bet = sum(self.current_bets.values())
-        self.current_chip_label.config(text=f"本局下注金额: ${total_bet:,}")
-
-    def _toggle_pause_timer(self):
-        """暂停/继续倒计时"""
-        if self.round_state != "betting":
-            return
-
-        if not self.timer_paused:
-            # 暂停倒计时
-            if self._countdown_job is not None:
-                try:
-                    self.after_cancel(self._countdown_job)
-                except Exception:
-                    pass
-                self._countdown_job = None
-            # 计算剩余时间
-            self.paused_remaining = max(0, self.betting_deadline - time.time())
-            self.timer_paused = True
-            self.pause_timer_btn.config(text="开始倒计时", bg="#4A90E2")
-            # 显示暂停剩余时间
-            if hasattr(self, "wheel_timer_id") and self.wheel_timer_id:
-                try:
-                    self.wheel_canvas.itemconfig(self.wheel_timer_id, text=f"{int(self.paused_remaining)}s (暂停)")
-                except Exception:
-                    pass
-        else:
-            # 继续倒计时
-            if self.paused_remaining <= 0:
-                # 如果剩余时间为0，直接结束下注
-                self._lock_bets_and_spin()
-                return
-            # 重新设置截止时间
-            self.betting_deadline = time.time() + self.paused_remaining
-            self.timer_paused = False
-            self.pause_timer_btn.config(text="暂停倒计时", bg="#F5A623")
-            # 重新启动倒计时更新
-            self._update_countdown()
-
     def _populate_chips(self, parent):
         panel_bg = "#F2E6C9"
         header_bg = "#D8B46A"
 
-        panel = tk.Frame(parent, bg=ROOT_BG, width=240, height=449)
-        panel.pack(fill=tk.Y, expand=False, pady=(0, 5))
+        panel = tk.Frame(parent, bg=ROOT_BG, width=280, height=408)
+        panel.pack(fill=tk.Y, expand=False)
         panel.pack_propagate(False)
 
         card = tk.Frame(panel, bg=panel_bg, bd=1, relief=tk.SOLID, highlightthickness=0)
@@ -981,7 +898,29 @@ class RouletteGameGUI(tk.Tk):
         ).pack(fill=tk.X)
 
         chips_frame = tk.Frame(card, bg=panel_bg)
-        chips_frame.pack(pady=16, padx=6)
+        chips_frame.pack(pady=8, padx=4)
+        chip_grid = tk.Frame(chips_frame, bg=panel_bg)
+        chip_grid.pack(side=tk.LEFT)
+        multiplier_frame = tk.Frame(chips_frame, bg=panel_bg)
+        multiplier_frame.pack(side=tk.RIGHT, padx=(4, 0))
+        tk.Label(multiplier_frame, text="倍数", bg=panel_bg,
+                 font=("Arial", 12, "bold")).pack(pady=(0, 8))
+        self.multiplier_var = tk.StringVar(value="1")
+        self.multiplier_display = tk.Label(
+            multiplier_frame, text="×1", bg="#193C30", fg="#F5D68A",
+            font=("Arial", 17, "bold"), width=4, pady=7)
+        self.multiplier_display.pack(fill=tk.X)
+        step_controls = tk.Frame(multiplier_frame, bg=panel_bg)
+        step_controls.pack(fill=tk.X, pady=(4, 0))
+        self.multiplier_buttons = []
+        for symbol, direction in (("−", -1), ("+", 1)):
+            button = tk.Button(
+                step_controls, text=symbol, command=lambda d=direction: self._step_multiplier(d),
+                bg="#D8B46A", fg="#2A1B08", activebackground="#E8C67F",
+                relief=tk.FLAT, bd=0, font=("Arial", 12, "bold"),
+                cursor="hand2", width=2, takefocus=True)
+            button.pack(side=tk.LEFT, expand=True, fill=tk.X, padx=1)
+            self.multiplier_buttons.append(button)
 
         chips = [
             ("1", "#ffffff"),
@@ -993,29 +932,30 @@ class RouletteGameGUI(tk.Tk):
         ]
 
         for i in range(0, len(chips), 3):
-            row_frame = tk.Frame(chips_frame, bg=panel_bg)
+            row_frame = tk.Frame(chip_grid, bg=panel_bg)
             row_frame.pack(pady=5)
             for text, bg_color in chips[i:i + 3]:
                 canvas = self._create_chip_button(row_frame, text, bg_color)
-                canvas.pack(side=tk.LEFT, padx=5)
+                canvas.pack(side=tk.LEFT, padx=3)
 
         self.current_chip_label = tk.Label(
             card,
-            text="筹码: $25",
-            font=("Arial", 14, "bold"),
+            text="本局下注金额\n$0 * 1 = $0",
+            font=("Arial", 12, "bold"),
             bg=panel_bg,
             fg="black"
         )
-        self.current_chip_label.pack(pady=(3, 2))
+        self.current_chip_label.pack(pady=(3, 0))
+
 
         self.balance_label_side = tk.Label(
             card,
             text=f"余额: ${self.balance:,.2f}",
-            font=("Arial", 13, "bold"),
+            font=("Arial", 12, "bold"),
             bg=panel_bg,
             fg="black"
         )
-        self.balance_label_side.pack(pady=(0, 10))
+        self.balance_label_side.pack(pady=(0, 5))
 
         self._set_default_chip()
 
@@ -1036,7 +976,7 @@ class RouletteGameGUI(tk.Tk):
             bd=3,
             cursor="hand2"
         )
-        self.reset_button.pack(side=tk.TOP, fill=tk.X, pady=4)
+        self.reset_button.pack(side=tk.TOP, fill=tk.X, pady=0)
 
         # 两个按钮水平排列
         button_row = tk.Frame(btn_frame, bg=panel_bg)
@@ -1083,15 +1023,129 @@ class RouletteGameGUI(tk.Tk):
             fg="#2A1B08",
             activebackground="#C8A455",
             activeforeground="#2A1B08",
-            font=("微软雅黑", 14, "bold"),
+            font=("微软雅黑", 12, "bold"),
             relief=tk.RAISED,
             bd=3,
             cursor="hand2"
         )
-        self.deal_button.pack(side=tk.TOP, fill=tk.X, pady=4)
+        self.deal_button.pack(side=tk.TOP, fill=tk.X, pady=0)
+
+    def _store_current_bets_as_last(self):
+        """
+        将当前下注数据存储为“上一局下注”。
+        - 只有当前下注非空时，才更新 last_bets 和 last_bet_colors。
+        - 如果当前下注为空，则保留原有的 last_bets 不变（不清空）。
+        - 最后根据当前余额和保留的 last_bets 更新按钮状态。
+        """
+        if self.current_bets:
+            # 有下注：存储新的记录
+            self.last_bets = self.current_bets.copy()
+            self.last_bet_colors = self.current_bet_colors.copy()
+        else:
+            # 没有下注：保持原有 last_bets 不变（不清空）
+            pass
+
+        # 根据现有的 last_bets 和余额更新按钮状态
+        self._update_repeat_button_state()
+
+    def _update_repeat_button_state(self):
+        """
+        根据存储的上一局数据和当前余额，更新重复下注按钮的可用性。
+        注意：如果当前不在投注阶段，按钮应保持禁用（由 _set_control_buttons_state 控制）。
+        """
+        if self.round_state != "betting":
+            return  # 非投注阶段，按钮已被禁用，无需额外处理
+        if not self.last_bets:
+            self.repeat_last_btn.config(state=tk.DISABLED)
+            return
+        total_last = sum(self.last_bets.values()) * self.bet_multiplier
+        if total_last > self.balance + sum(self.current_bets.values()) * self.bet_multiplier:
+            self.repeat_last_btn.config(state=tk.DISABLED)
+        else:
+            self.repeat_last_btn.config(state=tk.NORMAL)
+
+    def _repeat_last_bet(self):
+        """重复上一局的下注（复制到当前局）"""
+        if self.round_state != "betting":
+            messagebox.showwarning("提示", "只能在投注阶段重复上局下注")
+            return
+        if not self.last_bets:
+            messagebox.showwarning("提示", "没有上一局下注记录")
+            return
+
+        total_last = sum(self.last_bets.values()) * self.bet_multiplier
+        if total_last > self.balance + sum(self.current_bets.values()) * self.bet_multiplier:
+            messagebox.showwarning("提示", f"余额不足，重复上局下注需要 ${total_last:,.0f}")
+            return
+
+        # 清除当前下注
+        self.clear_bets()
+
+        # 复制上局下注
+        for spot_id, amount in self.last_bets.items():
+            spot = self._find_spot_by_id(spot_id)
+            if not spot:
+                continue
+
+            limit = self._bet_limit_for_spot(spot)
+            existing = self.current_bets.get(spot_id, 0)
+            remaining_limit = limit - existing
+            actual_amount = min(amount, remaining_limit)
+
+            if actual_amount <= 0:
+                continue
+            if self.balance < actual_amount * self.bet_multiplier:
+                break
+
+            self.balance -= actual_amount * self.bet_multiplier
+            self.current_bets[spot_id] = existing + actual_amount
+            self.current_bet_colors[spot_id] = self._chip_fill_color_for_amount(self.current_bets[spot_id])
+
+        self._refresh_balance_display()
+        self._refresh_bet_totals()
+        self._repaint_all_chips()
+
+        total_bet = sum(self.current_bets.values()) * self.bet_multiplier
+        self._show_round_amount("本局下注金额", sum(self.current_bets.values()))
+
+    def _toggle_pause_timer(self):
+        """暂停/继续倒计时"""
+        if self.round_state != "betting":
+            return
+
+        if not self.timer_paused:
+            # 暂停倒计时
+            if self._countdown_job is not None:
+                try:
+                    self.after_cancel(self._countdown_job)
+                except Exception:
+                    pass
+                self._countdown_job = None
+            # 计算剩余时间
+            self.paused_remaining = max(0, self.betting_deadline - time.time())
+            self.timer_paused = True
+            self.pause_timer_btn.config(text="开始倒计时", bg="#4A90E2")
+            # 显示暂停剩余时间
+            if hasattr(self, "wheel_timer_id") and self.wheel_timer_id:
+                try:
+                    self.wheel_canvas.itemconfig(self.wheel_timer_id, text=f"{int(self.paused_remaining)}s (暂停)")
+                except Exception:
+                    pass
+        else:
+            # 继续倒计时
+            if self.paused_remaining <= 0:
+                # 如果剩余时间为0，直接结束下注
+                self._lock_bets_and_spin()
+                return
+            # 重新设置截止时间
+            self.betting_deadline = time.time() + self.paused_remaining
+            self.timer_paused = False
+            self.pause_timer_btn.config(text="暂停倒计时", bg="#F5A623")
+            # 重新启动倒计时更新
+            self._update_countdown()
 
     def _create_chip_button(self, parent, text, bg_color):
-        size = 60
+        size = 52
         canvas = tk.Canvas(
             parent,
             width=size,
@@ -1131,7 +1185,7 @@ class RouletteGameGUI(tk.Tk):
         # chip_text is like "1","5","10","25","100","500"
         amount = int(chip_text)
         self.selected_bet_amount = amount
-        self.current_chip_label.config(text=f"筹码: ${amount:,}")
+        self._refresh_bet_totals()
 
     def _set_default_chip(self):
         # default to chip "25"
@@ -1141,28 +1195,30 @@ class RouletteGameGUI(tk.Tk):
                 self.selected_chip = chip
                 self.selected_chip_color = chip.get("bg_color", "#ffffff")
                 self.selected_bet_amount = 25
-                self.current_chip_label.config(text="筹码: $25")
+                self._refresh_bet_totals()
                 break
 
     # =====================================================
-    # Right side: marker road + history proportion
+    # Right side: marker road + history proportion + pie chart
     # =====================================================
+
     def _build_right_side(self, parent):
+        # 左侧筹码区、右侧统计区：贴合显示，没有任何缝隙
         root = tk.Frame(parent, bg=ROOT_BG)
         root.pack(fill=tk.BOTH, expand=True, padx=0, pady=0)
 
         root.grid_rowconfigure(0, weight=1)
-        root.grid_columnconfigure(0, weight=0, minsize=240)
+        root.grid_columnconfigure(0, weight=0, minsize=280)
         root.grid_columnconfigure(1, weight=1, minsize=300)
 
-        chip_frame = tk.Frame(root, bg=ROOT_BG, width=240)
+        chip_frame = tk.Frame(root, bg=ROOT_BG, width=280)
         chip_frame.grid(row=0, column=0, sticky="ns", padx=0, pady=0)
         chip_frame.grid_propagate(False)
 
-        # 饼图放在筹码区上方
+        # 饼图放在筹码区顶部，取代原来的 top_spacer
         self._create_pie_chart(chip_frame)
 
-        # 筹码区（包含“筹码”面板和按钮）
+        # 筹码区面板
         self._populate_chips(chip_frame)
 
         stats_frame = tk.Frame(root, bg=ROOT_BG)
@@ -1172,6 +1228,226 @@ class RouletteGameGUI(tk.Tk):
         self._create_distribution_panel(stats_frame)
         self._create_hot_cold_panel(stats_frame)
 
+    # ---------- 新增饼图相关方法（移植自欧洲版，适配单零） ----------
+    def _create_pie_chart(self, parent):
+        """创建可切换的饼图：区间分布/每行分布，居中显示，下方动态显示颜色+说明+次数"""
+        card_bg = "#F2E6C9"
+        header_bg = "#D8B46A"
+        title_fg = "#2A1B08"
+
+        outer = tk.Frame(parent, bg=ROOT_BG)
+        outer.pack(fill=tk.X, pady=(8, 0))
+
+        card = tk.Frame(outer, bg=card_bg, bd=1, relief=tk.SOLID, highlightthickness=0)
+        card.pack(fill=tk.X)
+
+        # 标题栏 - 可点击切换模式
+        title_bar = tk.Frame(card, bg=header_bg)
+        title_bar.pack(fill=tk.X)
+
+        self.pie_title_btn = tk.Button(
+            title_bar,
+            text="最新50局的区间分布",
+            font=("Arial", 13, "bold"),
+            bg=header_bg,
+            fg=title_fg,
+            activebackground=header_bg,
+            activeforeground=title_fg,
+            relief=tk.FLAT,
+            bd=0,
+            cursor="hand2",
+            command=self._toggle_pie_chart_type
+        )
+        self.pie_title_btn.pack(anchor=tk.CENTER, padx=10, pady=6)
+
+        # 主体内容区
+        body = tk.Frame(card, bg=card_bg)
+        body.pack(fill=tk.X, padx=6)
+
+        # 饼图容器 - 居中显示
+        pie_container = tk.Frame(body, bg=card_bg)
+        pie_container.pack(expand=True, fill=tk.BOTH)
+        self.pie_canvas = tk.Canvas(
+            pie_container,
+            width=150,
+            height=150,
+            bg=card_bg,
+            highlightthickness=0,
+            bd=0
+        )
+        self.pie_canvas.pack(anchor=tk.CENTER)
+
+        # 饼图下方统计表格容器
+        self.pie_stats_frame = tk.Frame(card, bg=card_bg)
+        self.pie_stats_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        # 预定义颜色
+        self.pie_colors = {
+            "sector1": "#5F9F4F",   # 1-12
+            "sector2": "#AF4900",   # 13-24
+            "sector3": "#4A90E2",   # 25-36
+            "zero": TEAL,           # 0
+            "row1": RED,            # 行1
+            "row2": BLACK,          # 行2
+            "row3": "#8B4513",      # 行3
+        }
+
+    def _toggle_pie_chart_type(self):
+        """切换饼图模式（区间分布 或 每行分布）并更新界面"""
+        if self.pie_mode == "sector":
+            self.pie_mode = "row"
+            self.pie_title_btn.config(text="最新50局的每行分布")
+        else:
+            self.pie_mode = "sector"
+            self.pie_title_btn.config(text="最新50局的区间分布")
+        self._update_pie_chart()
+
+    def _get_sector_data_from_recent(self, limit=50):
+        """从 Record2 中获取最近 limit 条结果，统计各区间（1-12,13-24,25-36,0）出现的次数"""
+        all_results = self.history.recent_results2(limit=2000)
+        recent = [entry.get("result", "") for entry in all_results if entry.get("result", "")][:limit]
+        counts = {"1-12": 0, "13-24": 0, "25-36": 0, "0": 0}
+        for res in recent:
+            if res == "0":
+                counts["0"] += 1
+            else:
+                try:
+                    num = int(res)
+                    if 1 <= num <= 12:
+                        counts["1-12"] += 1
+                    elif 13 <= num <= 24:
+                        counts["13-24"] += 1
+                    elif 25 <= num <= 36:
+                        counts["25-36"] += 1
+                except ValueError:
+                    pass
+        total = sum(counts.values())
+        return counts, total
+
+    def _get_row_data_from_recent(self, limit=50):
+        """统计最近 limit 条结果中属于 Row1/Row2/Row3/0 的次数"""
+        row1_set = {1,4,7,10,13,16,19,22,25,28,31,34}
+        row2_set = {2,5,8,11,14,17,20,23,26,29,32,35}
+        row3_set = {3,6,9,12,15,18,21,24,27,30,33,36}
+
+        all_results = self.history.recent_results2(limit=2000)
+        recent = [entry.get("result", "") for entry in all_results if entry.get("result", "")][:limit]
+        counts = {"row1": 0, "row2": 0, "row3": 0, "0": 0}
+        for res in recent:
+            if res == "0":
+                counts["0"] += 1
+            else:
+                try:
+                    num = int(res)
+                    if num in row1_set:
+                        counts["row1"] += 1
+                    elif num in row2_set:
+                        counts["row2"] += 1
+                    elif num in row3_set:
+                        counts["row3"] += 1
+                except ValueError:
+                    pass
+        total = sum(counts.values())
+        return counts, total
+
+    def _update_pie_chart(self):
+        """根据当前模式，动态绘制饼图（仅绘制计数>0的扇形），下方以表格显示分类与次数，0始终在最上方且永远显示（即使0次）"""
+        if not hasattr(self, "pie_canvas"):
+            return
+
+        limit = 50
+        if self.pie_mode == "sector":
+            counts, total = self._get_sector_data_from_recent(limit)
+            all_keys = ["1-12", "13-24", "25-36", "0"]
+            display_names = {"1-12": "1-12", "13-24": "13-24", "25-36": "25-36", "0": "0"}
+            color_keys = {"1-12": "sector1", "13-24": "sector2", "25-36": "sector3", "0": "zero"}
+        else:
+            counts, total = self._get_row_data_from_recent(limit)
+            all_keys = ["row1", "row2", "row3", "0"]
+            display_names = {"row1": "直行1(1/4/7...)", "row2": "直行2(2/5/8...)", "row3": "直行3(3/6/9...)", "0": "0"}
+            color_keys = {"row1": "row1", "row2": "row2", "row3": "row3", "0": "zero"}
+
+        if total == 0:
+            total = 1
+
+        # 构建用于饼图扇形的有效数据（计数>0）
+        valid_for_pie = [(key, counts[key]) for key in all_keys if counts[key] > 0]
+
+        # 构建用于统计显示的数据：包含所有计数>0的分类 + 始终包含0（即使计数为0）
+        zero_count = counts.get("0", 0)
+        other_items = [(key, counts[key]) for key in all_keys if key != "0" and counts[key] > 0]
+        # 始终把0放在最前面（即使计数为0）
+        valid_for_stats = [("0", zero_count)] + other_items
+
+        # 如果没有扇形数据（只有0且0次），则清空饼图
+        if not valid_for_pie:
+            self.pie_canvas.delete("all")
+        else:
+            # 绘制饼图扇形
+            self.pie_canvas.delete("all")
+            cx, cy = 75, 75
+            radius = 65
+            start_angle = 0
+            values = [cnt for _, cnt in valid_for_pie]
+            angles = [360 * (v / total) for v in values]
+
+            for (key, _), angle in zip(valid_for_pie, angles):
+                color = self.pie_colors[color_keys[key]]
+                self.pie_canvas.create_arc(
+                    cx - radius, cy - radius,
+                    cx + radius, cy + radius,
+                    start=start_angle,
+                    extent=angle,
+                    fill=color,
+                    outline="white",
+                    width=1.5
+                )
+                # 添加扇区中央文字（短名称）
+                mid_angle = start_angle + angle / 2
+                rad = math.radians(mid_angle)
+                text_r = radius * 0.65
+                tx = cx + text_r * math.cos(rad)
+                ty = cy - text_r * math.sin(rad)
+                if key == "0":
+                    label = "0"
+                elif key.startswith("row"):
+                    label = key[-1]
+                else:
+                    label = key
+                text_color = "white"
+                self.pie_canvas.create_text(tx, ty, text=label, fill=text_color, font=("Arial", 9, "bold"))
+                start_angle += angle
+
+        # 以紧凑表格显示统计，保留与饼图对应的分类颜色。
+        for widget in self.pie_stats_frame.winfo_children():
+            widget.destroy()
+
+        self.pie_stats_frame.grid_columnconfigure(0, weight=0, minsize=188)
+        self.pie_stats_frame.grid_columnconfigure(1, weight=0, minsize=70)
+        heading = "区间" if self.pie_mode == "sector" else "直行"
+        for column, title in enumerate((heading, "次数")):
+            tk.Label(
+                self.pie_stats_frame, text=title, bg="#D8B46A", fg="#2A1B08",
+                font=("Arial", 14, "bold"), width=1, bd=1, relief=tk.SOLID,
+                padx=4, pady=0
+            ).grid(row=0, column=column, sticky="nsew")
+
+        table_names = {"row1": "直行1", "row2": "直行2", "row3": "直行3"}
+        for row, (key, cnt) in enumerate(valid_for_stats, start=1):
+            row_bg = "#FFF7E6" if row % 2 else "#F2E6C9"
+            tk.Label(
+                self.pie_stats_frame, text=f"●  {table_names.get(key, display_names[key])}",
+                bg=row_bg, fg=self.pie_colors[color_keys[key]],
+                font=("Arial", 14, "bold"), width=1, anchor="w",
+                bd=1, relief=tk.SOLID, padx=6, pady=0
+            ).grid(row=row, column=0, sticky="nsew")
+            tk.Label(
+                self.pie_stats_frame, text=str(cnt), bg=row_bg, fg="#1A1A1A",
+                font=("Arial", 14, "bold"), width=1, anchor="center",
+                bd=1, relief=tk.SOLID, padx=6, pady=0
+            ).grid(row=row, column=1, sticky="nsew")
+
+    # ---------- 原有统计面板 ----------
     def _create_marker_road(self, parent):
         card_bg = "#F2E6C9"
         header_bg = "#D8B46A"
@@ -1214,7 +1490,7 @@ class RouletteGameGUI(tk.Tk):
         """从 Record2 读取最近 N 条结果，更新：
         1) 小/0/大
         2) 单/0/双
-        3) 红/绿/黑   （新增）
+        3) 红/绿/黑
         """
         if not hasattr(self, 'history'):
             return
@@ -1375,7 +1651,7 @@ class RouletteGameGUI(tk.Tk):
         self.zero_progress2.config(text=f"{zp2_display}%")
         self.even_progress.config(text=f"{ep_display}%")
 
-        # ========== 第三组（新增）：红 / 绿(0) / 黑 ==========
+        # ========== 第三组：红 / 绿(0) / 黑 ==========
         red_w   = int(total_width * red_pct / 100)
         green_w = int(total_width * green_pct / 100)
         black_w = total_width - red_w - green_w
@@ -1529,136 +1805,6 @@ class RouletteGameGUI(tk.Tk):
         self.dist_title_btn.config(text=f"最新{self.distribution_display_count}局的获胜分布")
         self._update_distribution()
 
-    def _create_pie_chart(self, parent):
-        """创建可切换的饼图：居中显示，下方动态显示颜色+说明+次数"""
-        card_bg = "#F2E6C9"
-        header_bg = "#D8B46A"
-        title_fg = "#2A1B08"
-
-        outer = tk.Frame(parent, bg=ROOT_BG)
-        outer.pack(fill=tk.X, pady=(8, 0))
-
-        card = tk.Frame(outer, bg=card_bg, bd=1, relief=tk.SOLID, highlightthickness=0)
-        card.pack(fill=tk.X)
-
-        # 标题栏 - 与其他卡片保持一致
-        title_bar = tk.Frame(card, bg=header_bg)
-        title_bar.pack(fill=tk.X)
-
-        self.pie_mode = "sector"  # "sector" 或 "row"
-        self.pie_title_btn = tk.Button(
-            title_bar,
-            text="最新50局的区间分布",
-            font=("Arial", 13, "bold"),          # 字体统一为 13
-            bg=header_bg,
-            fg=title_fg,
-            activebackground=header_bg,
-            activeforeground=title_fg,
-            relief=tk.FLAT,
-            bd=0,
-            cursor="hand2",
-            command=self._toggle_pie_chart_type
-        )
-        self.pie_title_btn.pack(anchor=tk.CENTER, padx=10, pady=6)
-
-        # 主体内容区
-        body = tk.Frame(card, bg=card_bg)
-        body.pack(fill=tk.X, padx=6)
-
-        # 饼图容器 - 居中显示
-        pie_container = tk.Frame(body, bg=card_bg)
-        pie_container.pack(expand=True, fill=tk.BOTH)
-        # 让饼图画布在容器中居中
-        self.pie_canvas = tk.Canvas(
-            pie_container,
-            width=150,
-            height=150,
-            bg=card_bg,
-            highlightthickness=0,
-            bd=0
-        )
-        self.pie_canvas.pack(anchor=tk.CENTER)
-
-        # 饼图下方统计容器（颜色+说明+次数）
-        self.pie_stats_frame = tk.Frame(card, bg=card_bg)
-        self.pie_stats_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
-
-        # 预定义颜色
-        self.pie_colors = {
-            "sector1": "#5F9F4F",   # 1-12
-            "sector2": "#AF4900",   # 13-24
-            "sector3": "#4A90E2",   # 25-36
-            "zero": TEAL,           # 0
-            "row1": RED,            # 行1
-            "row2": BLACK,          # 行2
-            "row3": "#8B4513",      # 行3
-        }
-
-    def _rebuild_pie_legend(self, parent):
-        """重建图例：仅显示名称和色块，不显示百分比（根据当前模式动态生成，但实际内容在_update中动态增减）"""
-        # 清除原有
-        for widget in parent.winfo_children():
-            widget.destroy()
-        self.legend_widgets = {}  # 存储每个分类对应的图例行（用于隐藏/显示）
-        pass
-
-    def _toggle_pie_chart_type(self):
-        """切换饼图模式（Sector 或 Row）并更新界面"""
-        if self.pie_mode == "sector":
-            self.pie_mode = "row"
-            self.pie_title_btn.config(text="最新50局的每行分布")
-        else:
-            self.pie_mode = "sector"
-            self.pie_title_btn.config(text="最新50局的区间分布")
-
-        self._update_pie_chart()
-
-    def _get_sector_data_from_recent(self, limit=50):
-        """从 Record2 中获取最近 limit 条结果，统计各区间（1-12,13-24,25-36,0）出现的次数"""
-        all_results = self.history.recent_results2(limit=2000)
-        recent = [entry.get("result", "") for entry in all_results if entry.get("result", "")][:limit]
-        counts = {"1-12": 0, "13-24": 0, "25-36": 0, "0": 0}
-        for res in recent:
-            if res == "0":
-                counts["0"] += 1
-            else:
-                try:
-                    num = int(res)
-                    if 1 <= num <= 12:
-                        counts["1-12"] += 1
-                    elif 13 <= num <= 24:
-                        counts["13-24"] += 1
-                    elif 25 <= num <= 36:
-                        counts["25-36"] += 1
-                except ValueError:
-                    pass
-        return counts, len(recent)
-
-    def _get_row_data_from_recent(self, limit=50):
-        """统计最近 limit 条结果中属于 Row1/Row2/Row3/0 的次数"""
-        row1_set = {1,4,7,10,13,16,19,22,25,28,31,34}
-        row2_set = {2,5,8,11,14,17,20,23,26,29,32,35}
-        row3_set = {3,6,9,12,15,18,21,24,27,30,33,36}
-
-        all_results = self.history.recent_results2(limit=2000)
-        recent = [entry.get("result", "") for entry in all_results if entry.get("result", "")][:limit]
-        counts = {"row1": 0, "row2": 0, "row3": 0, "0": 0}
-        for res in recent:
-            if res == "0":
-                counts["0"] += 1
-            else:
-                try:
-                    num = int(res)
-                    if num in row1_set:
-                        counts["row1"] += 1
-                    elif num in row2_set:
-                        counts["row2"] += 1
-                    elif num in row3_set:
-                        counts["row3"] += 1
-                except ValueError:
-                    pass
-        return counts, len(recent)
-
     def _create_hot_cold_panel(self, parent):
         """最热/最冷数字卡片化，支持循环切换统计局数（500/1000/1500/2000）"""
         card_bg = "#F2E6C9"
@@ -1671,15 +1817,15 @@ class RouletteGameGUI(tk.Tk):
         card = tk.Frame(outer, bg=card_bg, bd=1, relief=tk.SOLID, highlightthickness=0)
         card.pack(fill=tk.X)
 
-        # 标题栏（可点击切换）
         header = tk.Frame(card, bg=header_bg)
         header.pack(fill=tk.X)
 
-        self.hot_cold_limit = 500   # 默认500局
+        # 初始局数（可点击切换）
+        self.hot_cold_limit = 500
         self.hot_cold_title_btn = tk.Button(
             header,
             text=f"最新{self.hot_cold_limit}局的最热/最冷数字",
-            font=("Arial", 13, "bold"),
+            font=("Arial", 11, "bold"),
             bg=header_bg,
             fg=title_fg,
             activebackground=header_bg,
@@ -1688,7 +1834,7 @@ class RouletteGameGUI(tk.Tk):
             bd=0,
             command=self._toggle_hot_cold_count
         )
-        self.hot_cold_title_btn.pack(anchor=tk.CENTER, padx=10, pady=6)   # 居中显示
+        self.hot_cold_title_btn.pack(anchor=tk.CENTER, padx=10, pady=6)
 
         content_frame = tk.Frame(card, bg=card_bg)
         content_frame.pack(fill=tk.X, pady=(8, 10))
@@ -1707,7 +1853,7 @@ class RouletteGameGUI(tk.Tk):
 
             rows = []
             for _ in range(6):
-                row_frame = tk.Frame(outer_card, bg=body_bg, height=42)
+                row_frame = tk.Frame(outer_card, bg=body_bg, height=38)
                 row_frame.pack(fill=tk.X, padx=6, pady=0)
                 row_frame.pack_propagate(False)
 
@@ -1736,21 +1882,10 @@ class RouletteGameGUI(tk.Tk):
 
             return rows
 
-        self.hot_canvases = create_table(
-            content_frame,
-            "🔥 最热数字",
-            "#E67E22",
-            "#FFF7EE"
-        )
+        self.hot_canvases = create_table(content_frame, "🔥 最热数字", "#E67E22", "#FFF7EE")
+        self.cold_canvases = create_table(content_frame, "❄ 最冷数字", "#3498DB", "#EEF7FF")
 
-        self.cold_canvases = create_table(
-            content_frame,
-            "❄ 最冷数字",
-            "#3498DB",
-            "#EEF7FF"
-        )
-
-        self._update_hot_cold_display()
+        self._update_hot_cold_display()   # 初始绘制
 
     def _toggle_hot_cold_count(self):
         """循环切换统计局数：500 -> 1000 -> 1500 -> 2000 -> 500"""
@@ -1813,101 +1948,6 @@ class RouletteGameGUI(tk.Tk):
 
         update_group(hot_items, self.hot_canvases, "#FFF7EE")
         update_group(cold_items, self.cold_canvases, "#EEF7FF")
-
-    def _update_pie_chart(self):
-        """根据当前模式，动态绘制饼图（仅绘制计数>0的扇形），下方显示颜色+说明+次数，0始终在最上方且永远显示（即使0次）"""
-        if not hasattr(self, "pie_canvas"):
-            return
-
-        limit = 50
-        if self.pie_mode == "sector":
-            counts, total = self._get_sector_data_from_recent(limit)
-            all_keys = ["1-12", "13-24", "25-36", "0"]
-            display_names = {"1-12": "1-12", "13-24": "13-24", "25-36": "25-36", "0": "数字0"}
-            color_keys = {"1-12": "sector1", "13-24": "sector2", "25-36": "sector3", "0": "zero"}
-        else:
-            counts, total = self._get_row_data_from_recent(limit)
-            all_keys = ["row1", "row2", "row3", "0"]
-            display_names = {"row1": "直行1(1/4/7...)", "row2": "直行2(2/5/8...)", "row3": "直行3(3/6/9...)", "0": "数字0"}
-            color_keys = {"row1": "row1", "row2": "row2", "row3": "row3", "0": "zero"}
-
-        if total == 0:
-            total = 1
-
-        # 构建用于饼图扇形的有效数据（计数>0）
-        valid_for_pie = [(key, counts[key]) for key in all_keys if counts[key] > 0]
-
-        # 构建用于统计显示的数据：包含所有计数>0的分类 + 始终包含0（即使计数为0）
-        zero_count = counts.get("0", 0)
-        other_items = [(key, counts[key]) for key in all_keys if key != "0" and counts[key] > 0]
-        # 始终把0放在最前面（即使计数为0）
-        valid_for_stats = [("0", zero_count)] + other_items
-
-        # 如果没有扇形数据（只有0且0次），则清空饼图
-        if not valid_for_pie:
-            self.pie_canvas.delete("all")
-        else:
-            # 绘制饼图扇形
-            self.pie_canvas.delete("all")
-            cx, cy = 75, 75
-            radius = 65
-            start_angle = 0
-            values = [cnt for _, cnt in valid_for_pie]
-            angles = [360 * (v / total) for v in values]
-
-            for (key, _), angle in zip(valid_for_pie, angles):
-                color = self.pie_colors[color_keys[key]]
-                self.pie_canvas.create_arc(
-                    cx - radius, cy - radius,
-                    cx + radius, cy + radius,
-                    start=start_angle,
-                    extent=angle,
-                    fill=color,
-                    outline="white",
-                    width=1.5
-                )
-                # 添加扇区中央文字（短名称）
-                mid_angle = start_angle + angle / 2
-                rad = math.radians(mid_angle)
-                text_r = radius * 0.65
-                tx = cx + text_r * math.cos(rad)
-                ty = cy - text_r * math.sin(rad)
-                if key == "0":
-                    label = "0"
-                elif key.startswith("row"):
-                    label = key[-1]
-                else:
-                    label = key
-                text_color = "black" if label == "0" else "white"
-                self.pie_canvas.create_text(tx, ty, text=label, fill=text_color, font=("Arial", 9, "bold"))
-                start_angle += angle
-
-        # 更新下方统计信息：颜色 + 说明 + 次数（0永远显示）
-        for widget in self.pie_stats_frame.winfo_children():
-            widget.destroy()
-
-        for key, cnt in valid_for_stats:
-            row_frame = tk.Frame(self.pie_stats_frame, bg=self.pie_stats_frame["bg"])
-            row_frame.pack(fill=tk.X, pady=2)
-
-            color_block = tk.Canvas(row_frame, width=16, height=16, bg=self.pie_stats_frame["bg"],
-                                    highlightthickness=0, bd=0)
-            color_block.pack(side=tk.LEFT, padx=(0, 6))
-            # 即使次数为0，也显示色块（颜色正常）
-            color_block.create_oval(2, 2, 14, 14, fill=self.pie_colors[color_keys[key]], outline="")
-
-            lbl_text = tk.Label(row_frame, text=f"{display_names[key]}: {cnt}次",
-                                bg=self.pie_stats_frame["bg"], fg="#1A1A1A",
-                                font=("Arial", 10, "bold"), anchor="w")
-            lbl_text.pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-    def _get_legend_frame(self):
-        """辅助方法：获取饼图右侧的图例框架"""
-        body = self.pie_canvas.master
-        for child in body.winfo_children():
-            if isinstance(child, tk.Frame) and child != self.pie_canvas:
-                return child
-        return None
 
     def _draw_marker_grid(self):
         self.marker_canvas.delete("all")
@@ -1980,7 +2020,7 @@ class RouletteGameGUI(tk.Tk):
                 width=2,
                 tags="dot"
             )
-            font = ("Segoe UI Emoji", 11, "bold") if result == "00" else ("Arial", 11, "bold")
+            font = ("Arial", 11, "bold")
             self.marker_canvas.create_text(
                 cx, cy,
                 text=result,
@@ -2024,7 +2064,7 @@ class RouletteGameGUI(tk.Tk):
         # ===== 背景：赌场风格深色舞台 + 轻微渐层感 =====
         self.wheel_canvas.create_rectangle(
             0, 0, canvas_w, canvas_h,
-            fill="#1B3D31",
+            fill=ROOT_BG,
             outline="",
             tags=("wheel_bg",)
         )
@@ -2095,8 +2135,8 @@ class RouletteGameGUI(tk.Tk):
         )
 
         # 外圈刻痕 / 螺钉感装饰
-        for i in range(37):
-            ang = math.radians(i * (360.0 / 37.0))
+        for i in range(len(ROULETTE_SEQUENCE)):
+            ang = math.radians(i * (360.0 / len(ROULETTE_SEQUENCE)))
             r1 = outer_r + 6
             r2 = outer_r + 14
             x1 = cx + r1 * math.sin(ang)
@@ -2142,7 +2182,7 @@ class RouletteGameGUI(tk.Tk):
                 tags=("wheel",)
             )
             font_size = 34 if len(result) == 2 else 36
-            font = ("Segoe UI Emoji", font_size, "bold") if result == "00" else ("Arial", font_size, "bold")
+            font = ("Arial", font_size, "bold")
             self.wheel_canvas.create_text(
                 cx, cy,
                 text=result,
@@ -2237,8 +2277,8 @@ class RouletteGameGUI(tk.Tk):
             tx = cx + text_r * math.sin(rad)
             ty = cy - text_r * math.cos(rad)
 
-            is_zero = symbol in {"0", "00"}
-            text_font = ("Segoe UI Emoji", 11, "bold") if symbol == "00" else ("Arial", 11, "bold")
+            is_zero = symbol in {"0"}
+            text_font = ("Arial", 11, "bold")
             text_fill = OUTCOME_TEXT_COLORS[symbol]
 
             # 轻微文字阴影
@@ -2368,7 +2408,7 @@ class RouletteGameGUI(tk.Tk):
             )
 
         # Outside bets
-        seg_w = (4 * g.num_w) // 2
+        seg_w = (g.grid_x2 - g.grid_x1) / 6
         outer_labels = [
             ("1-18", set(str(n) for n in range(1, 19))),
             ("Even", set(str(n) for n in range(1, 37) if n % 2 == 0)),
@@ -2573,7 +2613,7 @@ class RouletteGameGUI(tk.Tk):
         return "#FF7DDA"
 
     def _bet_limit_for_spot(self, spot):
-        inside_types = {"straight", "split", "street", "corner", "six_line"}  # five_number removed
+        inside_types = {"straight", "split", "street", "corner", "six_line"}
         if spot.get("type") in inside_types:
             return 200
         return 500
@@ -2629,11 +2669,11 @@ class RouletteGameGUI(tk.Tk):
             "six_line": 1,
             "corner": 2,
             "split": 3,
-            "dozen": 4,
-            "column": 5,
-            "color": 6,
-            "odd_even": 7,
-            "high_low": 8,
+            "dozen": 5,
+            "column": 6,
+            "color": 7,
+            "odd_even": 8,
+            "high_low": 9,
         }
 
         matches = []
@@ -2681,7 +2721,7 @@ class RouletteGameGUI(tk.Tk):
             "corner",
             "street",
             "six_line",
-        ):
+                ):
             return 10
 
         # 外围投注
@@ -2817,6 +2857,7 @@ class RouletteGameGUI(tk.Tk):
     # =====================================================
     # Betting / settlement
     # =====================================================
+
     def place_bet(self, spot_id: str):
         if self.round_state != "betting":
             return
@@ -2832,15 +2873,14 @@ class RouletteGameGUI(tk.Tk):
         existing = self.current_bets.get(spot_id, 0)
         remaining_limit = limit - existing
         if remaining_limit <= 0:
-            messagebox.showwarning("投注上限", f"{spot['label']} 已达到最高限红 ${limit:,}")
             return
 
         actual_amount = min(amount, remaining_limit)
-        if self.balance < actual_amount:
-            messagebox.showwarning("余额不足", f"余额不足，无法下注 ${actual_amount:,.0f}。")
+        if self.balance < actual_amount * self.bet_multiplier:
+            messagebox.showwarning("余额不足", f"余额不足，无法下注 ${actual_amount * self.bet_multiplier:,.0f}。")
             return
 
-        self.balance -= actual_amount
+        self.balance -= actual_amount * self.bet_multiplier
         self.current_bets[spot_id] = existing + actual_amount
         self.current_bet_colors[spot_id] = self._chip_fill_color_for_amount(self.current_bets[spot_id])
 
@@ -2848,39 +2888,75 @@ class RouletteGameGUI(tk.Tk):
         self._refresh_bet_totals()
         self._repaint_all_chips()
 
-        total_bet = sum(self.current_bets.values())
-        self.current_chip_label.config(text=f"本局下注金额: ${total_bet:,}")
+        total_bet = sum(self.current_bets.values()) * self.bet_multiplier
+        self._show_round_amount("本局下注金额", sum(self.current_bets.values()))
 
     def clear_bets(self):
+        """清除当前所有下注，并退还金额"""
         if self.round_state != "betting":
             return
-        refund = sum(self.current_bets.values())
+
+        refund = sum(self.current_bets.values()) * self.bet_multiplier
+
         if refund > 0:
             self.balance += refund
-        self.current_bets = {}
-        self.current_bet_colors = {}
+
+        self.current_bets.clear()
+        self.current_bet_colors.clear()
+
         self._refresh_balance_display()
         self._refresh_bet_totals()
         self._repaint_all_chips()
 
-        self.current_chip_label.config(
-            text=f"上局获胜金额: ${int(getattr(self, 'last_win_amount', 0)):,}"
-        )
+        self._show_round_amount("本局下注金额", 0)
 
     def clear_single_bet(self, spot_id: str):
         if self.round_state != "betting":
             return
         amount = self.current_bets.get(spot_id, 0)
         if amount > 0:
-            self.balance += amount
+            self.balance += amount * self.bet_multiplier
             self.current_bets.pop(spot_id, None)
             self.current_bet_colors.pop(spot_id, None)
             self._refresh_balance_display()
             self._refresh_bet_totals()
             self._repaint_all_chips()
 
+    def _show_round_amount(self, title, base_amount):
+        total = base_amount * self.bet_multiplier
+        self.current_chip_label.config(
+            text=f"{title}\n${base_amount:,.0f} * {self.bet_multiplier} = ${total:,.0f}")
+
+    def _step_multiplier(self, direction):
+        options = (1, 2, 5, 10, 20, 50, 100)
+        index = options.index(self.bet_multiplier)
+        index = max(0, min(len(options) - 1, index + direction))
+        self.multiplier_var.set(str(options[index]))
+        self._change_multiplier()
+
+    def _change_multiplier(self, event=None):
+        """Keep table bets in base units; charge/refund the cash difference."""
+        if self.round_state != "betting":
+            self.multiplier_var.set(str(self.bet_multiplier))
+            return
+        new_multiplier = int(self.multiplier_var.get())
+        base_total = sum(self.current_bets.values())
+        difference = base_total * (new_multiplier - self.bet_multiplier)
+        if difference > self.balance:
+            self.multiplier_var.set(str(self.bet_multiplier))
+            messagebox.showwarning("余额不足", f"调整倍数还需 ${difference:,.0f}。")
+            return
+        self.balance -= difference
+        self.bet_multiplier = new_multiplier
+        self.multiplier_display.config(text=f"×{new_multiplier}")
+        self._refresh_balance_display()
+        self._refresh_bet_totals()
+
     def _refresh_bet_totals(self):
-        total_bet = sum(self.current_bets.values())
+        base_total = sum(self.current_bets.values())
+        if self.round_state == "betting":
+            self._show_round_amount("本局下注金额", base_total)
+        total_bet = sum(self.current_bets.values()) * self.bet_multiplier
         if hasattr(self, "current_bet_label"):
             self.current_bet_label.config(text=f"${total_bet:,}")
 
@@ -2894,7 +2970,7 @@ class RouletteGameGUI(tk.Tk):
 
             if result in spot["numbers"]:
                 multiplier = spot["payout"] + 1
-                win_amount = amount * multiplier
+                win_amount = amount * multiplier * self.bet_multiplier
                 total_payout += win_amount
                 self.balance += win_amount
 
@@ -2903,17 +2979,19 @@ class RouletteGameGUI(tk.Tk):
 
         self.last_win_amount = int(total_payout)
 
-        self.current_chip_label.config(
-            text=f"本局获胜金额: ${self.last_win_amount:,}"
-        )
+        self._show_round_amount("本局获胜金额", total_payout / self.bet_multiplier)
         return total_payout
 
     # =====================================================
     # Game flow
     # =====================================================
     def _start_new_round(self):
-        self._stop_result_flash()
+        # 重新添加帮助按钮（因为上面delete了all）
+        self._add_help_button_on_board()
+
+        # 清除上一局的数据，避免在新局点击依然弹出旧数据
         self.last_spin_data = None
+        self._stop_result_flash()
 
         # 重置暂停相关标志
         self.timer_paused = False
@@ -2941,6 +3019,7 @@ class RouletteGameGUI(tk.Tk):
             self._spin_job = None
 
         self.round_state = "betting"
+        self._refresh_bet_totals()
         self.current_round_result = None
         self.current_round_index = None
 
@@ -2960,10 +3039,7 @@ class RouletteGameGUI(tk.Tk):
 
         self.betting_deadline = time.time() + self.BETTING_SECONDS
         self._update_countdown()
-
-        # 重新添加帮助按钮（因为上面delete了all）
-        self._add_help_button_on_board()
-
+        
     def _update_countdown(self):
         if self.timer_paused:
             # 暂停时不更新倒计时，也不自动结束
@@ -2987,6 +3063,7 @@ class RouletteGameGUI(tk.Tk):
         self._countdown_job = self.after(self.TIMER_TICK_MS, self._update_countdown)
 
     def _lock_bets_and_spin(self):
+        # 如果弹窗还开着，关掉它（可选）
         if self.detail_window and self.detail_window.winfo_exists():
             self.detail_window.destroy()
             self.detail_window = None
@@ -3021,7 +3098,7 @@ class RouletteGameGUI(tk.Tk):
 
     def _physics_update(self):
         now = time.time()
-        dt = min(0.04, now - self._last_physics_time)
+        dt = min(0.05, now - self._last_physics_time)
         self._last_physics_time = now
 
         # 轮盘：顺时针
@@ -3065,7 +3142,7 @@ class RouletteGameGUI(tk.Tk):
         self.current_round_result = ROULETTE_SEQUENCE[self.current_round_index]
 
         self._finish_round(self.current_round_result)
-    
+
     def _draw_orbiting_pointer(self, cx, cy, outer_r):
         """
         绕着轮盘旋转的指针：
@@ -3141,7 +3218,7 @@ class RouletteGameGUI(tk.Tk):
 
         self.wheel_canvas.tag_raise("pointer_shadow")
         self.wheel_canvas.tag_raise("pointer")
-
+    
     def _get_winning_spot_ids(self, result: str):
         """
         Only straight up bets and outside bets flash.
@@ -3412,8 +3489,8 @@ class RouletteGameGUI(tk.Tk):
         offset = data["wheel_offset"]
         idx = data["result_index"]
 
-        step = 360.0 / 37   # 每个扇区角度跨度
-        # 扇区边界算法：假设轮盘上第 i 个扇区起始边界（相对于轮盘自身0点）为 i * step
+        step = 360.0 / len(ROULETTE_SEQUENCE)   # 每个扇区角度跨度
+        # 扇区边界算法：假设轮盘上第 i 个扇区的起始边界（相对于轮盘自身0点）为 i * step
         # 绝对坐标下的起始边界 = (i * step + offset) % 360
         def sector_range(i):
             start = (i * step + offset) % 360
@@ -3421,9 +3498,9 @@ class RouletteGameGUI(tk.Tk):
             return start, end
 
         cur_start, cur_end = sector_range(idx)
-        prev_idx = (idx - 1) % 37
+        prev_idx = (idx - 1) % len(ROULETTE_SEQUENCE)
         prev_start, prev_end = sector_range(prev_idx)
-        next_idx = (idx + 1) % 37
+        next_idx = (idx + 1) % len(ROULETTE_SEQUENCE)
         next_start, next_end = sector_range(next_idx)
 
         # 构建弹窗
@@ -3468,6 +3545,7 @@ class RouletteGameGUI(tk.Tk):
         if self.detail_window:
             self.detail_window.destroy()
             self.detail_window = None
+
     # =====================================================
     # Misc / controls
     # =====================================================
@@ -3490,6 +3568,8 @@ class RouletteGameGUI(tk.Tk):
         控制游戏相关按钮的状态（清除下注、重复上局下注、暂停倒计时、开始游戏）
         state: tk.NORMAL 或 tk.DISABLED
         """
+        for button in self.multiplier_buttons:
+            button.config(state=state)
         self.deal_button.config(state=state)
         self.reset_button.config(state=state)
         self.repeat_last_btn.config(state=state)
@@ -3503,15 +3583,46 @@ class RouletteGameGUI(tk.Tk):
         self.balance_label_side.config(text=f"余额: ${self.balance:,.2f}")
         if self.username != "Guest":
             update_balance_in_json(self.username, self.balance)
-        self._update_repeat_button_state()   # 余额变化时更新重复按钮状态
+        self._update_repeat_button_state()
 
     def on_close(self):
+        # 父窗口继续运行时，取消属于当前游戏页面的所有定时回调。
+        for job in self.tk.splitlist(self.tk.call("after", "info")):
+            try:
+                script = self.tk.call("after", "info", job)[0]
+                command = self.tk.splitlist(script)[0]
+                if command in (self._tclCommands or ()):
+                    self.after_cancel(job)
+            except (tk.TclError, IndexError):
+                pass
         try:
             if self.username != "Guest":
                 update_balance_in_json(self.username, self.balance)
         except Exception:
             pass
-        self.destroy()
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
+
+        if self._embedded:
+            try:
+                self.root.title(self._previous_title)
+                self.root.geometry(self._previous_geometry)
+                self.root.tk.call(
+                    "wm", "protocol", self.root._w,
+                    "WM_DELETE_WINDOW", self._previous_close_protocol
+                )
+            except tk.TclError:
+                pass
+            self.destroy()
+            if callable(self.on_back):
+                self.on_back(float(self.balance))
+            try:
+                self.root.deiconify()
+                self.root.lift()
+            except tk.TclError:
+                pass
+        else:
+            self.root.destroy()
 
     def show_game_instructions(self):
         win = tk.Toplevel(self)
@@ -3522,7 +3633,7 @@ class RouletteGameGUI(tk.Tk):
             "欧式轮盘 玩法说明\n\n"
             "1. 每局下注时间为 30 秒。\n"
             "2. 时间结束后，所有下注会锁定，轮盘开始旋转。\n"
-            "3. 轮盘停止时，最上方指针指向的格子为中奖结果。\n\n"
+            "3. 轮盘停止时，指针指向的格子为中奖结果。\n\n"
             "4. 单注类型和赔率（净赢）：\n"
             "   - 直注 Straight Up：35:1\n"
             "   - 分注 Split：17:1\n"
@@ -3533,8 +3644,10 @@ class RouletteGameGUI(tk.Tk):
             "   - 选号列 / Column：2:1\n"
             "   - 红 / 黑：1:1\n"
             "   - 单 / 双：1:1\n"
-            "   - 大 / 小（1-18 / 19-36）：1:1\n\n"
-            "5. 下注在桌面上的位置后，筹码会直接显示在对应下注区域。\n"
+            "   - 大 / 小（1-18 / 19-36）：1:1\n"
+            "5. 下注区按基础金额计算限额（200/500）；实际扣款与含本金派奖均乘以倍数。\n"
+            "   例如基础下注200、10倍，实际扣款2000；投注期间改倍数补扣或退还差额。\n"
+            "   开转后倍数锁定；重复下注使用当前选择的倍数。\n"
             "6. 标记路会显示每次开奖结果的颜色与号码。\n"
         )
         frm = tk.Frame(win)
@@ -3557,10 +3670,26 @@ class RouletteGameGUI(tk.Tk):
                 self._countdown_job = None
             self._lock_bets_and_spin()
 
-def main(initial_balance=1_000_000, username="Guest"):
-    app = RouletteGameGUI(initial_balance=initial_balance, username=username)
-    app.mainloop()
-    return app.balance
+def main(initial_balance=1_000_000, username="Guest", *, parent=None,
+         balance=None, user=None, on_back=None, on_balance_change=None):
+    actual_balance = float(initial_balance if balance is None else balance)
+    actual_user = username if user is None else user
+
+    if parent is not None:
+        page = RouletteGameGUI(
+            parent, initial_balance=actual_balance, username=actual_user,
+            on_back=on_back, on_balance_change=on_balance_change
+        )
+        page.place(x=0, y=0, relwidth=1, relheight=1)
+        page.tkraise()
+        return page
+
+    root = tk.Tk()
+    root._roulette_europe_standalone = True
+    page = RouletteGameGUI(root, initial_balance=actual_balance, username=actual_user)
+    page.pack(fill=tk.BOTH, expand=True)
+    root.mainloop()
+    return page.balance
 
 
 if __name__ == "__main__":

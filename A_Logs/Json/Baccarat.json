@@ -2,315 +2,19 @@
     "temp_data": {
         "deck": [
             [
-                "Spade",
-                "2"
-            ],
-            [
-                "Diamond",
-                "5"
-            ],
-            [
-                "Spade",
-                "9"
-            ],
-            [
-                "Club",
-                "J"
-            ],
-            [
-                "Diamond",
-                "10"
-            ],
-            [
-                "Diamond",
-                "K"
-            ],
-            [
-                "Spade",
-                "6"
-            ],
-            [
-                "Diamond",
-                "2"
-            ],
-            [
-                "Club",
-                "10"
-            ],
-            [
-                "Heart",
-                "J"
-            ],
-            [
-                "Club",
-                "8"
-            ],
-            [
-                "Spade",
-                "6"
-            ],
-            [
-                "Spade",
-                "A"
-            ],
-            [
-                "Heart",
-                "A"
-            ],
-            [
-                "Heart",
-                "2"
-            ],
-            [
-                "Heart",
-                "5"
-            ],
-            [
-                "Spade",
-                "6"
-            ],
-            [
-                "Spade",
-                "6"
-            ],
-            [
-                "Club",
-                "8"
-            ],
-            [
-                "Diamond",
-                "8"
-            ],
-            [
-                "Diamond",
-                "2"
-            ],
-            [
                 "Diamond",
                 "3"
             ],
             [
                 "Club",
-                "J"
-            ],
-            [
-                "Club",
-                "A"
-            ],
-            [
-                "Club",
-                "K"
-            ],
-            [
-                "Heart",
-                "A"
-            ],
-            [
-                "Heart",
-                "K"
+                "7"
             ],
             [
                 "Spade",
-                "J"
-            ],
-            [
-                "Spade",
-                "K"
-            ],
-            [
-                "Diamond",
-                "6"
-            ],
-            [
-                "Club",
-                "J"
-            ],
-            [
-                "Club",
-                "3"
-            ],
-            [
-                "Spade",
-                "J"
-            ],
-            [
-                "Diamond",
-                "3"
-            ],
-            [
-                "Diamond",
-                "6"
-            ],
-            [
-                "Club",
                 "Q"
             ],
             [
-                "Diamond",
-                "5"
-            ],
-            [
                 "Heart",
-                "8"
-            ],
-            [
-                "Diamond",
-                "J"
-            ],
-            [
-                "Club",
-                "2"
-            ],
-            [
-                "Spade",
-                "3"
-            ],
-            [
-                "Heart",
-                "3"
-            ],
-            [
-                "Heart",
-                "8"
-            ],
-            [
-                "Club",
-                "4"
-            ],
-            [
-                "Spade",
-                "9"
-            ],
-            [
-                "Spade",
-                "J"
-            ],
-            [
-                "Heart",
-                "6"
-            ],
-            [
-                "Diamond",
-                "A"
-            ],
-            [
-                "Spade",
-                "7"
-            ],
-            [
-                "Spade",
-                "A"
-            ],
-            [
-                "Spade",
-                "4"
-            ],
-            [
-                "Spade",
-                "8"
-            ],
-            [
-                "Heart",
-                "A"
-            ],
-            [
-                "Diamond",
-                "4"
-            ],
-            [
-                "Heart",
-                "10"
-            ],
-            [
-                "Diamond",
-                "9"
-            ],
-            [
-                "Club",
-                "A"
-            ],
-            [
-                "Club",
-                "J"
-            ],
-            [
-                "Club",
-                "7"
-            ],
-            [
-                "Heart",
-                "J"
-            ],
-            [
-                "Club",
-                "K"
-            ],
-            [
-                "Spade",
-                "7"
-            ],
-            [
-                "Spade",
-                "K"
-            ],
-            [
-                "Spade",
-                "4"
-            ],
-            [
-                "Club",
-                "7"
-            ],
-            [
-                "Heart",
-                "3"
-            ],
-            [
-                "Diamond",
-                "K"
-            ],
-            [
-                "Diamond",
-                "5"
-            ],
-            [
-                "Diamond",
-                "3"
-            ],
-            [
-                "Spade",
-                "6"
-            ],
-            [
-                "Diamond",
-                "3"
-            ],
-            [
-                "Club",
-                "9"
-            ],
-            [
-                "Club",
-                "8"
-            ],
-            [
-                "Spade",
-                "10"
-            ],
-            [
-                "Spade",
-                "8"
-            ],
-            [
-                "Spade",
-                "K"
-            ],
-            [
-                "Diamond",
-                "J"
-            ],
-            [
-                "Diamond",
                 "2"
             ],
             [
@@ -318,16 +22,40 @@
                 "6"
             ],
             [
-                "Heart",
-                "4"
-            ],
-            [
-                "Diamond",
-                "5"
-            ],
-            [
-                "Diamond",
+                "Club",
                 "6"
+            ],
+            [
+                "Diamond",
+                "Q"
+            ],
+            [
+                "Spade",
+                "A"
+            ],
+            [
+                "Club",
+                "10"
+            ],
+            [
+                "Diamond",
+                "9"
+            ],
+            [
+                "Diamond",
+                "8"
+            ],
+            [
+                "Spade",
+                "8"
+            ],
+            [
+                "Club",
+                "9"
+            ],
+            [
+                "Heart",
+                "9"
             ],
             [
                 "Diamond",
@@ -335,7 +63,23 @@
             ],
             [
                 "Club",
-                "4"
+                "10"
+            ],
+            [
+                "Diamond",
+                "7"
+            ],
+            [
+                "Club",
+                "J"
+            ],
+            [
+                "Club",
+                "8"
+            ],
+            [
+                "Spade",
+                "5"
             ],
             [
                 "Spade",
@@ -343,63 +87,35 @@
             ],
             [
                 "Club",
-                "9"
-            ],
-            [
-                "Diamond",
                 "A"
             ],
             [
-                "Heart",
-                "7"
+                "Diamond",
+                "J"
             ],
             [
                 "Diamond",
-                "7"
+                "8"
             ],
             [
                 "Club",
-                "6"
+                "3"
+            ],
+            [
+                "Diamond",
+                "2"
             ],
             [
                 "Spade",
                 "J"
             ],
             [
-                "Club",
-                "4"
-            ],
-            [
-                "Spade",
-                "5"
-            ],
-            [
-                "Heart",
-                "6"
-            ],
-            [
-                "Club",
-                "A"
-            ],
-            [
-                "Spade",
-                "8"
-            ],
-            [
-                "Heart",
+                "Diamond",
                 "7"
             ],
             [
-                "Heart",
-                "9"
-            ],
-            [
-                "Diamond",
-                "10"
-            ],
-            [
-                "Diamond",
-                "6"
+                "Spade",
+                "J"
             ],
             [
                 "Diamond",
@@ -407,26 +123,6 @@
             ],
             [
                 "Heart",
-                "6"
-            ],
-            [
-                "Diamond",
-                "2"
-            ],
-            [
-                "Diamond",
-                "Q"
-            ],
-            [
-                "Club",
-                "10"
-            ],
-            [
-                "Heart",
-                "9"
-            ],
-            [
-                "Club",
                 "3"
             ],
             [
@@ -434,163 +130,95 @@
                 "7"
             ],
             [
-                "Club",
-                "7"
-            ],
-            [
-                "Diamond",
-                "7"
-            ],
-            [
-                "Spade",
-                "10"
-            ],
-            [
-                "Diamond",
-                "J"
-            ],
-            [
-                "Spade",
-                "Q"
-            ],
-            [
-                "Club",
-                "A"
-            ],
-            [
-                "Spade",
-                "7"
-            ],
-            [
-                "Club",
-                "Q"
-            ],
-            [
-                "Spade",
-                "2"
-            ],
-            [
-                "Club",
-                "A"
-            ],
-            [
                 "Spade",
                 "9"
-            ],
-            [
-                "Spade",
-                "10"
-            ],
-            [
-                "Heart",
-                "K"
-            ],
-            [
-                "Diamond",
-                "9"
-            ],
-            [
-                "Diamond",
-                "2"
-            ],
-            [
-                "Club",
-                "7"
             ],
             [
                 "Spade",
                 "8"
             ],
             [
+                "Club",
+                "J"
+            ],
+            [
+                "Diamond",
+                "A"
+            ],
+            [
+                "Heart",
+                "Q"
+            ],
+            [
+                "Heart",
+                "Q"
+            ],
+            [
                 "Spade",
+                "K"
+            ],
+            [
+                "Club",
+                "A"
+            ],
+            [
+                "Heart",
+                "6"
+            ],
+            [
+                "Club",
                 "4"
             ],
             [
-                "Heart",
-                "8"
-            ],
-            [
-                "Diamond",
-                "Q"
-            ],
-            [
-                "Heart",
-                "10"
-            ],
-            [
                 "Spade",
+                "2"
+            ],
+            [
+                "Club",
                 "5"
             ],
             [
                 "Club",
-                "2"
+                "9"
             ],
             [
-                "Heart",
+                "Club",
+                "3"
+            ],
+            [
+                "Club",
+                "K"
+            ],
+            [
+                "Club",
+                "7"
+            ],
+            [
+                "Diamond",
                 "J"
             ],
             [
                 "Diamond",
-                "Q"
+                "A"
+            ],
+            [
+                "Club",
+                "J"
+            ],
+            [
+                "Heart",
+                "5"
             ],
             [
                 "Spade",
                 "7"
             ],
             [
-                "Club",
-                "10"
-            ],
-            [
-                "Heart",
-                "3"
-            ],
-            [
-                "Heart",
-                "A"
-            ],
-            [
-                "Spade",
-                "K"
-            ],
-            [
-                "Heart",
-                "9"
-            ],
-            [
                 "Diamond",
-                "A"
-            ],
-            [
-                "Club",
-                "10"
+                "4"
             ],
             [
                 "Spade",
-                "Q"
-            ],
-            [
-                "Spade",
-                "10"
-            ],
-            [
-                "Heart",
-                "5"
-            ],
-            [
-                "Club",
-                "K"
-            ],
-            [
-                "Spade",
-                "2"
-            ],
-            [
-                "Heart",
-                "8"
-            ],
-            [
-                "Diamond",
                 "2"
             ],
             [
@@ -598,60 +226,16 @@
                 "9"
             ],
             [
-                "Diamond",
+                "Spade",
+                "10"
+            ],
+            [
+                "Club",
                 "6"
             ],
             [
                 "Diamond",
-                "7"
-            ],
-            [
-                "Spade",
-                "10"
-            ],
-            [
-                "Club",
-                "5"
-            ],
-            [
-                "Diamond",
                 "J"
-            ],
-            [
-                "Spade",
-                "3"
-            ],
-            [
-                "Club",
-                "3"
-            ],
-            [
-                "Club",
-                "5"
-            ],
-            [
-                "Spade",
-                "9"
-            ],
-            [
-                "Heart",
-                "10"
-            ],
-            [
-                "Club",
-                "J"
-            ],
-            [
-                "Club",
-                "4"
-            ],
-            [
-                "Spade",
-                "9"
-            ],
-            [
-                "Club",
-                "4"
             ],
             [
                 "Club",
@@ -659,83 +243,31 @@
             ],
             [
                 "Heart",
-                "4"
-            ],
-            [
-                "Diamond",
-                "9"
-            ],
-            [
-                "Club",
-                "K"
-            ],
-            [
-                "Spade",
-                "3"
-            ],
-            [
-                "Heart",
-                "4"
-            ],
-            [
-                "Heart",
-                "6"
-            ],
-            [
-                "Diamond",
-                "4"
-            ],
-            [
-                "Club",
-                "K"
-            ],
-            [
-                "Spade",
                 "5"
-            ],
-            [
-                "Heart",
-                "3"
             ],
             [
                 "Spade",
                 "Q"
             ],
             [
-                "Club",
+                "Diamond",
                 "8"
             ],
             [
-                "Diamond",
-                "10"
-            ],
-            [
-                "Spade",
-                "5"
-            ],
-            [
-                "Club",
-                "J"
-            ],
-            [
-                "Spade",
+                "Heart",
                 "2"
             ],
             [
-                "Heart",
-                "K"
-            ],
-            [
-                "Club",
-                "5"
+                "Spade",
+                "6"
             ],
             [
                 "Spade",
-                "Q"
+                "8"
             ],
             [
-                "Heart",
-                "J"
+                "Diamond",
+                "9"
             ],
             [
                 "Heart",
@@ -743,115 +275,23 @@
             ],
             [
                 "Club",
-                "4"
+                "Q"
             ],
             [
                 "Club",
-                "A"
-            ],
-            [
-                "Club",
-                "3"
-            ],
-            [
-                "Heart",
-                "5"
-            ],
-            [
-                "Club",
-                "6"
-            ],
-            [
-                "Heart",
-                "6"
-            ],
-            [
-                "Heart",
                 "10"
             ],
             [
                 "Heart",
-                "Q"
+                "2"
             ],
             [
-                "Heart",
-                "Q"
-            ],
-            [
-                "Club",
-                "6"
-            ],
-            [
-                "Diamond",
-                "A"
-            ],
-            [
-                "Diamond",
-                "J"
-            ],
-            [
-                "Diamond",
+                "Spade",
                 "K"
             ],
             [
                 "Heart",
-                "4"
-            ],
-            [
-                "Heart",
-                "7"
-            ],
-            [
-                "Spade",
-                "3"
-            ],
-            [
-                "Heart",
-                "Q"
-            ],
-            [
-                "Club",
-                "5"
-            ],
-            [
-                "Diamond",
-                "8"
-            ],
-            [
-                "Diamond",
-                "5"
-            ],
-            [
-                "Club",
-                "8"
-            ],
-            [
-                "Heart",
-                "5"
-            ],
-            [
-                "Diamond",
-                "A"
-            ],
-            [
-                "Spade",
-                "7"
-            ],
-            [
-                "Heart",
-                "A"
-            ],
-            [
-                "Heart",
-                "8"
-            ],
-            [
-                "Diamond",
-                "10"
-            ],
-            [
-                "Spade",
-                "5"
+                "J"
             ],
             [
                 "Heart",
@@ -859,14 +299,262 @@
             ],
             [
                 "Heart",
+                "4"
+            ],
+            [
+                "Club",
+                "7"
+            ],
+            [
+                "Heart",
+                "4"
+            ],
+            [
+                "Spade",
+                "4"
+            ],
+            [
+                "Club",
+                "4"
+            ],
+            [
+                "Spade",
+                "6"
+            ],
+            [
+                "Diamond",
+                "5"
+            ],
+            [
+                "Club",
+                "5"
+            ],
+            [
+                "Spade",
+                "5"
+            ],
+            [
+                "Heart",
+                "9"
+            ],
+            [
+                "Spade",
+                "3"
+            ],
+            [
+                "Diamond",
                 "A"
+            ],
+            [
+                "Diamond",
+                "10"
+            ],
+            [
+                "Diamond",
+                "10"
+            ],
+            [
+                "Heart",
+                "8"
+            ],
+            [
+                "Club",
+                "K"
+            ],
+            [
+                "Heart",
+                "5"
+            ],
+            [
+                "Club",
+                "8"
+            ],
+            [
+                "Spade",
+                "10"
+            ],
+            [
+                "Heart",
+                "10"
+            ],
+            [
+                "Club",
+                "K"
+            ],
+            [
+                "Diamond",
+                "10"
+            ],
+            [
+                "Spade",
+                "Q"
+            ],
+            [
+                "Heart",
+                "2"
+            ],
+            [
+                "Heart",
+                "3"
+            ],
+            [
+                "Spade",
+                "9"
             ],
             [
                 "Spade",
                 "J"
             ],
             [
+                "Diamond",
+                "6"
+            ],
+            [
+                "Diamond",
+                "Q"
+            ],
+            [
+                "Diamond",
+                "3"
+            ],
+            [
                 "Club",
+                "9"
+            ],
+            [
+                "Diamond",
+                "9"
+            ],
+            [
+                "Heart",
+                "8"
+            ],
+            [
+                "Heart",
+                "8"
+            ],
+            [
+                "Spade",
+                "4"
+            ],
+            [
+                "Club",
+                "6"
+            ],
+            [
+                "Spade",
+                "8"
+            ],
+            [
+                "Club",
+                "A"
+            ],
+            [
+                "Heart",
+                "4"
+            ],
+            [
+                "Spade",
+                "3"
+            ],
+            [
+                "Heart",
+                "5"
+            ],
+            [
+                "Club",
+                "J"
+            ],
+            [
+                "Heart",
+                "7"
+            ],
+            [
+                "Diamond",
+                "4"
+            ],
+            [
+                "Heart",
+                "7"
+            ],
+            [
+                "Diamond",
+                "6"
+            ],
+            [
+                "Spade",
+                "Q"
+            ],
+            [
+                "Heart",
+                "2"
+            ],
+            [
+                "Spade",
+                "10"
+            ],
+            [
+                "Spade",
+                "K"
+            ],
+            [
+                "Spade",
+                "K"
+            ],
+            [
+                "Heart",
+                "8"
+            ],
+            [
+                "Diamond",
+                "8"
+            ],
+            [
+                "Heart",
+                "Q"
+            ],
+            [
+                "Heart",
+                "6"
+            ],
+            [
+                "Spade",
+                "6"
+            ],
+            [
+                "Diamond",
+                "K"
+            ],
+            [
+                "Club",
+                "3"
+            ],
+            [
+                "Club",
+                "3"
+            ],
+            [
+                "Club",
+                "10"
+            ],
+            [
+                "Spade",
+                "A"
+            ],
+            [
+                "Club",
+                "K"
+            ],
+            [
+                "Spade",
+                "7"
+            ],
+            [
+                "Diamond",
+                "5"
+            ],
+            [
+                "Spade",
                 "4"
             ],
             [
@@ -874,64 +562,52 @@
                 "5"
             ],
             [
-                "Club",
-                "9"
-            ],
-            [
                 "Heart",
-                "9"
-            ],
-            [
-                "Diamond",
-                "6"
-            ],
-            [
-                "Heart",
-                "4"
-            ],
-            [
-                "Club",
-                "3"
-            ],
-            [
-                "Spade",
-                "J"
-            ],
-            [
-                "Diamond",
-                "4"
-            ],
-            [
-                "Club",
-                "10"
-            ],
-            [
-                "Club",
-                "9"
-            ],
-            [
-                "Club",
-                "Q"
-            ],
-            [
-                "Diamond",
-                "3"
-            ],
-            [
-                "Diamond",
                 "K"
             ],
             [
                 "Diamond",
-                "10"
+                "5"
+            ],
+            [
+                "Spade",
+                "Q"
             ],
             [
                 "Diamond",
+                "2"
+            ],
+            [
+                "Club",
+                "A"
+            ],
+            [
+                "Heart",
+                "10"
+            ],
+            [
+                "Club",
+                "8"
+            ],
+            [
+                "Diamond",
+                "9"
+            ],
+            [
+                "Heart",
                 "6"
             ],
             [
                 "Spade",
-                "6"
+                "A"
+            ],
+            [
+                "Club",
+                "9"
+            ],
+            [
+                "Diamond",
+                "10"
             ],
             [
                 "Club",
@@ -939,31 +615,123 @@
             ],
             [
                 "Diamond",
+                "3"
+            ],
+            [
+                "Diamond",
+                "7"
+            ],
+            [
+                "Spade",
+                "A"
+            ],
+            [
+                "Spade",
                 "4"
+            ],
+            [
+                "Heart",
+                "10"
+            ],
+            [
+                "Diamond",
+                "8"
             ],
             [
                 "Club",
                 "Q"
             ],
             [
+                "Heart",
+                "Q"
+            ],
+            [
                 "Spade",
+                "8"
+            ],
+            [
+                "Spade",
+                "3"
+            ],
+            [
+                "Heart",
+                "Q"
+            ],
+            [
+                "Heart",
+                "3"
+            ],
+            [
+                "Heart",
                 "A"
+            ],
+            [
+                "Spade",
+                "Q"
+            ],
+            [
+                "Diamond",
+                "3"
+            ],
+            [
+                "Spade",
+                "7"
+            ],
+            [
+                "Spade",
+                "9"
             ],
             [
                 "Club",
                 "5"
             ],
             [
+                "Diamond",
+                "7"
+            ],
+            [
                 "Club",
-                "3"
+                "4"
             ],
             [
                 "Heart",
-                "Q"
+                "7"
             ],
             [
-                "Spade",
-                "8"
+                "Diamond",
+                "J"
+            ],
+            [
+                "Heart",
+                "A"
+            ],
+            [
+                "Heart",
+                "9"
+            ],
+            [
+                "Heart",
+                "10"
+            ],
+            [
+                "Club",
+                "10"
+            ],
+            [
+                "Heart",
+                "A"
+            ],
+            [
+                "Heart",
+                "3"
+            ],
+            [
+                "Club",
+                "K"
+            ],
+            [
+                "Diamond",
+                "5"
             ],
             [
                 "Heart",
@@ -971,7 +739,103 @@
             ],
             [
                 "Diamond",
+                "Q"
+            ],
+            [
+                "Club",
+                "6"
+            ],
+            [
+                "Spade",
+                "2"
+            ],
+            [
+                "Heart",
+                "J"
+            ],
+            [
+                "Club",
+                "J"
+            ],
+            [
+                "Spade",
+                "A"
+            ],
+            [
+                "Heart",
+                "A"
+            ],
+            [
+                "Heart",
+                "7"
+            ],
+            [
+                "Diamond",
+                "K"
+            ],
+            [
+                "Spade",
+                "K"
+            ],
+            [
+                "Spade",
+                "7"
+            ],
+            [
+                "Diamond",
+                "6"
+            ],
+            [
+                "Diamond",
+                "5"
+            ],
+            [
+                "Spade",
                 "4"
+            ],
+            [
+                "Heart",
+                "5"
+            ],
+            [
+                "Heart",
+                "8"
+            ],
+            [
+                "Spade",
+                "J"
+            ],
+            [
+                "Diamond",
+                "2"
+            ],
+            [
+                "Spade",
+                "10"
+            ],
+            [
+                "Spade",
+                "9"
+            ],
+            [
+                "Heart",
+                "J"
+            ],
+            [
+                "Diamond",
+                "A"
+            ],
+            [
+                "Diamond",
+                "A"
+            ],
+            [
+                "Heart",
+                "4"
+            ],
+            [
+                "Diamond",
+                "8"
             ],
             [
                 "Diamond",
@@ -983,183 +847,195 @@
             ],
             [
                 "Heart",
-                "K"
-            ],
-            [
-                "Heart",
                 "10"
             ],
             [
                 "Spade",
-                "10"
-            ],
-            [
-                "Spade",
-                "Q"
-            ],
-            [
-                "Spade",
-                "K"
-            ],
-            [
-                "Diamond",
-                "10"
-            ],
-            [
-                "Heart",
-                "A"
-            ],
-            [
-                "Diamond",
                 "3"
             ],
             [
                 "Spade",
+                "A"
+            ],
+            [
+                "Diamond",
+                "5"
+            ],
+            [
+                "Spade",
+                "3"
+            ],
+            [
+                "Spade",
+                "4"
+            ],
+            [
+                "Spade",
+                "8"
+            ],
+            [
+                "Diamond",
+                "J"
+            ],
+            [
+                "Diamond",
+                "K"
+            ],
+            [
+                "Diamond",
+                "4"
+            ],
+            [
+                "Heart",
+                "3"
+            ],
+            [
+                "Spade",
+                "9"
+            ],
+            [
+                "Diamond",
+                "2"
+            ],
+            [
+                "Heart",
+                "5"
+            ],
+            [
+                "Heart",
+                "K"
+            ],
+            [
+                "Club",
+                "8"
+            ],
+            [
+                "Spade",
+                "6"
+            ],
+            [
+                "Diamond",
+                "10"
+            ],
+            [
+                "Spade",
+                "10"
+            ],
+            [
+                "Club",
                 "Q"
+            ],
+            [
+                "Diamond",
+                "10"
+            ],
+            [
+                "Heart",
+                "6"
+            ],
+            [
+                "Diamond",
+                "A"
+            ],
+            [
+                "Spade",
+                "6"
+            ],
+            [
+                "Diamond",
+                "9"
+            ],
+            [
+                "Diamond",
+                "K"
+            ],
+            [
+                "Club",
+                "2"
+            ],
+            [
+                "Club",
+                "A"
+            ],
+            [
+                "Club",
+                "8"
+            ],
+            [
+                "Club",
+                "J"
+            ],
+            [
+                "Heart",
+                "6"
+            ],
+            [
+                "Club",
+                "8"
+            ],
+            [
+                "Club",
+                "9"
+            ],
+            [
+                "Heart",
+                "8"
+            ],
+            [
+                "Spade",
+                "8"
+            ],
+            [
+                "Heart",
+                "K"
+            ],
+            [
+                "Club",
+                "J"
+            ],
+            [
+                "Spade",
+                "4"
+            ],
+            [
+                "Spade",
+                "3"
+            ],
+            [
+                "Diamond",
+                "7"
+            ],
+            [
+                "Diamond",
+                "6"
             ],
             [
                 "Heart",
                 "J"
             ],
             [
-                "Diamond",
-                "4"
-            ],
-            [
-                "Spade",
-                "8"
-            ],
-            [
-                "Heart",
-                "4"
-            ],
-            [
-                "Spade",
-                "3"
-            ],
-            [
-                "Spade",
-                "7"
-            ],
-            [
-                "Diamond",
-                "7"
-            ],
-            [
                 "Club",
-                "8"
-            ],
-            [
-                "Spade",
                 "4"
-            ],
-            [
-                "Spade",
-                "A"
-            ],
-            [
-                "Spade",
-                "8"
-            ],
-            [
-                "Spade",
-                "6"
-            ],
-            [
-                "Spade",
-                "4"
-            ],
-            [
-                "Diamond",
-                "7"
             ],
             [
                 "Diamond",
                 "Q"
             ],
             [
-                "Diamond",
-                "8"
-            ],
-            [
-                "Heart",
-                "4"
-            ],
-            [
-                "Diamond",
-                "9"
-            ],
-            [
-                "Heart",
-                "9"
-            ],
-            [
-                "Diamond",
-                "K"
-            ],
-            [
-                "Heart",
-                "7"
-            ],
-            [
                 "Club",
-                "6"
+                "5"
             ],
             [
                 "Heart",
                 "8"
             ],
             [
-                "Spade",
-                "8"
-            ],
-            [
-                "Heart",
-                "3"
-            ],
-            [
-                "Club",
-                "9"
-            ],
-            [
                 "Diamond",
-                "8"
-            ],
-            [
-                "Diamond",
-                "A"
-            ],
-            [
-                "Diamond",
-                "7"
-            ],
-            [
-                "Club",
                 "Q"
             ],
             [
                 "Club",
-                "7"
-            ],
-            [
-                "Spade",
-                "7"
-            ],
-            [
-                "Heart",
-                "8"
-            ],
-            [
-                "Diamond",
-                "6"
-            ],
-            [
-                "Diamond",
-                "2"
-            ],
-            [
-                "Club",
-                "2"
+                "J"
             ],
             [
                 "Diamond",
@@ -1174,19 +1050,299 @@
                 "Q"
             ],
             [
-                "Heart",
-                "A"
+                "Club",
+                "K"
             ],
             [
                 "Spade",
-                "10"
+                "K"
+            ],
+            [
+                "Club",
+                "5"
+            ],
+            [
+                "Diamond",
+                "3"
             ],
             [
                 "Spade",
                 "2"
             ],
             [
+                "Spade",
+                "7"
+            ],
+            [
+                "Spade",
+                "J"
+            ],
+            [
                 "Heart",
+                "K"
+            ],
+            [
+                "Diamond",
+                "J"
+            ],
+            [
+                "Heart",
+                "J"
+            ],
+            [
+                "Heart",
+                "J"
+            ],
+            [
+                "Spade",
+                "Q"
+            ],
+            [
+                "Spade",
+                "10"
+            ],
+            [
+                "Heart",
+                "4"
+            ],
+            [
+                "Diamond",
+                "Q"
+            ],
+            [
+                "Heart",
+                "9"
+            ],
+            [
+                "Diamond",
+                "2"
+            ],
+            [
+                "Heart",
+                "2"
+            ],
+            [
+                "Club",
+                "9"
+            ],
+            [
+                "Spade",
+                "2"
+            ],
+            [
+                "Spade",
+                "J"
+            ],
+            [
+                "Club",
+                "4"
+            ],
+            [
+                "Diamond",
+                "A"
+            ],
+            [
+                "Club",
+                "K"
+            ],
+            [
+                "Diamond",
+                "6"
+            ],
+            [
+                "Club",
+                "8"
+            ],
+            [
+                "Diamond",
+                "2"
+            ],
+            [
+                "Club",
+                "3"
+            ],
+            [
+                "Club",
+                "A"
+            ],
+            [
+                "Heart",
+                "9"
+            ],
+            [
+                "Spade",
+                "10"
+            ],
+            [
+                "Diamond",
+                "A"
+            ],
+            [
+                "Spade",
+                "5"
+            ],
+            [
+                "Diamond",
+                "6"
+            ],
+            [
+                "Club",
+                "9"
+            ],
+            [
+                "Heart",
+                "J"
+            ],
+            [
+                "Diamond",
+                "4"
+            ],
+            [
+                "Diamond",
+                "2"
+            ],
+            [
+                "Spade",
+                "6"
+            ],
+            [
+                "Spade",
+                "6"
+            ],
+            [
+                "Heart",
+                "Q"
+            ],
+            [
+                "Heart",
+                "10"
+            ],
+            [
+                "Diamond",
+                "4"
+            ],
+            [
+                "Club",
+                "Q"
+            ],
+            [
+                "Spade",
+                "2"
+            ],
+            [
+                "Spade",
+                "7"
+            ],
+            [
+                "Spade",
+                "2"
+            ],
+            [
+                "Club",
+                "A"
+            ],
+            [
+                "Heart",
+                "5"
+            ],
+            [
+                "Heart",
+                "6"
+            ],
+            [
+                "Club",
+                "4"
+            ],
+            [
+                "Spade",
+                "5"
+            ],
+            [
+                "Diamond",
+                "7"
+            ],
+            [
+                "Club",
+                "3"
+            ],
+            [
+                "Heart",
+                "4"
+            ],
+            [
+                "Spade",
+                "5"
+            ],
+            [
+                "Diamond",
+                "K"
+            ],
+            [
+                "Heart",
+                "6"
+            ],
+            [
+                "Diamond",
+                "9"
+            ],
+            [
+                "Diamond",
+                "4"
+            ],
+            [
+                "Club",
+                "2"
+            ],
+            [
+                "Diamond",
+                "K"
+            ],
+            [
+                "Club",
+                "2"
+            ],
+            [
+                "Heart",
+                "4"
+            ],
+            [
+                "Club",
+                "7"
+            ],
+            [
+                "Diamond",
+                "3"
+            ],
+            [
+                "Diamond",
+                "6"
+            ],
+            [
+                "Spade",
+                "3"
+            ],
+            [
+                "Diamond",
+                "K"
+            ],
+            [
+                "Club",
+                "2"
+            ],
+            [
+                "Heart",
+                "6"
+            ],
+            [
+                "Diamond",
+                "3"
+            ],
+            [
+                "Spade",
+                "A"
+            ],
+            [
+                "Club",
                 "6"
             ],
             [
@@ -1195,63 +1351,79 @@
             ],
             [
                 "Heart",
-                "K"
-            ],
-            [
-                "Spade",
-                "2"
-            ],
-            [
-                "Diamond",
-                "Q"
-            ],
-            [
-                "Club",
-                "10"
+                "A"
             ],
             [
                 "Heart",
-                "5"
-            ],
-            [
-                "Diamond",
-                "9"
+                "4"
             ],
             [
                 "Club",
                 "7"
             ],
             [
+                "Heart",
+                "K"
+            ],
+            [
                 "Club",
-                "9"
+                "2"
             ],
             [
                 "Diamond",
+                "5"
+            ],
+            [
+                "Club",
+                "10"
+            ],
+            [
+                "Club",
+                "2"
+            ],
+            [
+                "Heart",
                 "K"
             ],
             [
                 "Spade",
+                "5"
+            ],
+            [
+                "Diamond",
                 "9"
             ],
             [
-                "Spade",
+                "Heart",
                 "A"
             ],
             [
-                "Diamond",
-                "10"
+                "Spade",
+                "6"
             ],
             [
-                "Diamond",
-                "3"
-            ],
-            [
-                "Diamond",
+                "Club",
                 "Q"
             ],
             [
                 "Spade",
-                "9"
+                "7"
+            ],
+            [
+                "Club",
+                "Q"
+            ],
+            [
+                "Diamond",
+                "10"
+            ],
+            [
+                "Heart",
+                "7"
+            ],
+            [
+                "Spade",
+                "A"
             ],
             [
                 "Spade",
@@ -1259,63 +1431,23 @@
             ],
             [
                 "Heart",
-                "K"
+                "7"
             ],
             [
-                "Club",
-                "9"
+                "Spade",
+                "J"
             ],
             [
                 "Diamond",
+                "4"
+            ],
+            [
+                "Club",
                 "3"
             ],
             [
                 "Club",
-                "5"
-            ],
-            [
-                "Spade",
-                "5"
-            ],
-            [
-                "Spade",
-                "3"
-            ],
-            [
-                "Club",
-                "10"
-            ],
-            [
-                "Diamond",
-                "A"
-            ],
-            [
-                "Diamond",
-                "2"
-            ],
-            [
-                "Club",
-                "A"
-            ],
-            [
-                "Club",
-                "K"
-            ],
-            [
-                "Heart",
-                "10"
-            ],
-            [
-                "Heart",
-                "J"
-            ],
-            [
-                "Club",
-                "J"
-            ],
-            [
-                "Heart",
-                "J"
+                "9"
             ],
             [
                 "Club",
@@ -1323,23 +1455,63 @@
             ],
             [
                 "Heart",
-                "3"
+                "2"
             ],
             [
-                "Heart",
+                "Diamond",
+                "J"
+            ],
+            [
+                "Club",
+                "2"
+            ],
+            [
+                "Spade",
+                "J"
+            ],
+            [
+                "Diamond",
+                "Q"
+            ],
+            [
+                "Club",
                 "7"
             ],
             [
                 "Club",
-                "9"
+                "3"
+            ],
+            [
+                "Spade",
+                "4"
+            ],
+            [
+                "Club",
+                "K"
+            ],
+            [
+                "Spade",
+                "8"
+            ],
+            [
+                "Diamond",
+                "2"
+            ],
+            [
+                "Spade",
+                "7"
+            ],
+            [
+                "Heart",
+                "3"
             ],
             [
                 "Spade",
                 "3"
             ],
             [
-                "Club",
-                "A"
+                "Spade",
+                "Q"
             ],
             [
                 "Diamond",
@@ -1347,147 +1519,47 @@
             ],
             [
                 "Diamond",
-                "4"
+                "5"
             ],
             [
-                "Heart",
+                "Club",
                 "Q"
             ],
             [
                 "Heart",
-                "10"
-            ],
-            [
-                "Club",
-                "8"
-            ],
-            [
-                "Heart",
-                "Q"
-            ],
-            [
-                "Diamond",
-                "J"
-            ],
-            [
-                "Diamond",
-                "8"
-            ],
-            [
-                "Club",
-                "2"
-            ],
-            [
-                "Heart",
-                "6"
-            ],
-            [
-                "Heart",
-                "4"
-            ],
-            [
-                "Club",
-                "3"
-            ],
-            [
-                "Spade",
-                "2"
-            ],
-            [
-                "Diamond",
-                "8"
-            ],
-            [
-                "Diamond",
-                "Q"
-            ],
-            [
-                "Spade",
                 "A"
             ],
             [
                 "Heart",
-                "2"
-            ],
-            [
-                "Club",
-                "5"
-            ],
-            [
-                "Diamond",
-                "5"
-            ],
-            [
-                "Spade",
-                "6"
-            ],
-            [
-                "Heart",
-                "2"
-            ],
-            [
-                "Heart",
-                "2"
+                "A"
             ],
             [
                 "Heart",
                 "3"
-            ],
-            [
-                "Heart",
-                "2"
-            ],
-            [
-                "Spade",
-                "2"
             ],
             [
                 "Spade",
                 "K"
             ],
             [
-                "Spade",
-                "4"
-            ],
-            [
-                "Club",
-                "Q"
-            ],
-            [
-                "Spade",
-                "J"
-            ],
-            [
-                "Spade",
-                "3"
-            ],
-            [
-                "Club",
+                "Heart",
                 "10"
             ],
             [
-                "Spade",
+                "Heart",
+                "8"
+            ],
+            [
+                "Heart",
+                "Q"
+            ],
+            [
+                "Club",
                 "4"
             ],
             [
                 "Spade",
-                "Q"
-            ],
-            [
-                "Spade",
-                "A"
-            ],
-            [
-                "Club",
-                "3"
-            ],
-            [
-                "Heart",
-                "5"
-            ],
-            [
-                "Diamond",
-                "K"
+                "9"
             ],
             [
                 "Club",
@@ -1498,68 +1570,64 @@
                 "4"
             ],
             [
-                "Spade",
-                "A"
-            ],
-            [
                 "Diamond",
-                "J"
-            ],
-            [
-                "Heart",
-                "6"
-            ],
-            [
-                "Heart",
-                "2"
-            ],
-            [
-                "Heart",
-                "K"
-            ],
-            [
-                "Spade",
-                "4"
-            ],
-            [
-                "Club",
-                "6"
-            ],
-            [
-                "Club",
-                "J"
-            ],
-            [
-                "Club",
-                "2"
-            ],
-            [
-                "Club",
-                "2"
-            ],
-            [
-                "Heart",
-                "K"
-            ],
-            [
-                "Heart",
-                "8"
-            ],
-            [
-                "Club",
-                "2"
-            ],
-            [
-                "Diamond",
-                "A"
-            ],
-            [
-                "Spade",
                 "Q"
             ],
             [
                 "Heart",
                 "9"
+            ],
+            [
+                "Spade",
+                "5"
+            ],
+            [
+                "Spade",
+                "9"
+            ],
+            [
+                "Heart",
+                "K"
+            ],
+            [
+                "Club",
+                "5"
+            ],
+            [
+                "Diamond",
+                "7"
+            ],
+            [
+                "Club",
+                "6"
+            ],
+            [
+                "Club",
+                "10"
+            ],
+            [
+                "Club",
+                "10"
+            ],
+            [
+                "Heart",
+                "Q"
+            ],
+            [
+                "Club",
+                "A"
+            ],
+            [
+                "Diamond",
+                "6"
+            ],
+            [
+                "Spade",
+                "2"
+            ],
+            [
+                "Spade",
+                "K"
             ],
             [
                 "Diamond",
@@ -1567,145 +1635,430 @@
             ],
             [
                 "Diamond",
-                "9"
-            ],
-            [
-                "Diamond",
-                "7"
-            ],
-            [
-                "Spade",
-                "7"
-            ],
-            [
-                "Heart",
-                "7"
-            ],
-            [
-                "Heart",
-                "Q"
-            ],
-            [
-                "Heart",
-                "5"
-            ],
-            [
-                "Heart",
-                "2"
-            ],
-            [
-                "Heart",
-                "9"
-            ],
-            [
-                "Spade",
-                "5"
-            ],
-            [
-                "Diamond",
-                "9"
-            ],
-            [
-                "Spade",
-                "K"
+                "3"
             ],
             [
                 "Club",
-                "6"
-            ],
-            [
-                "Heart",
                 "5"
-            ],
-            [
-                "Club",
-                "K"
-            ],
-            [
-                "Diamond",
-                "5"
-            ],
-            [
-                "Club",
-                "Q"
-            ],
-            [
-                "Club",
-                "K"
-            ],
-            [
-                "Heart",
-                "Q"
-            ],
-            [
-                "Spade",
-                "5"
-            ],
-            [
-                "Spade",
-                "K"
-            ],
-            [
-                "Diamond",
-                "5"
-            ],
-            [
-                "Spade",
-                "J"
-            ],
-            [
-                "Heart",
-                "J"
-            ],
-            [
-                "Diamond",
-                "Q"
             ],
             [
                 "Club",
                 "4"
+            ],
+            [
+                "Heart",
+                "K"
+            ],
+            [
+                "Heart",
+                "J"
+            ],
+            [
+                "Heart",
+                "9"
+            ],
+            [
+                "Heart",
+                "5"
+            ],
+            [
+                "Spade",
+                "5"
             ]
         ],
-        "current_index": 8,
-        "cut_threshold": 62,
-        "remaining_cards": 408,
+        "current_index": 142,
+        "cut_threshold": 53,
+        "remaining_cards": 274,
         "burn_complete": true,
-        "updated_at": "2026-09-03 10:25:46"
+        "updated_at": "2026-09-19 23:20:39"
     },
     "temp_finish_data": {
         "records": [
             {
-                "time": "2026-09-03 10:25:51",
+                "time": "2026-09-11 00:17:29",
                 "winner": "Banker",
-                "player_score": 2,
-                "banker_score": 6,
+                "player_score": 6,
+                "banker_score": 7,
                 "natural": false,
-                "mode": "lucky7",
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "6"
+                    ],
+                    [
+                        "Diamond",
+                        "Q"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Club",
+                        "6"
+                    ],
+                    [
+                        "Spade",
+                        "A"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:16:25",
+                "winner": "Player",
+                "player_score": 8,
+                "banker_score": 7,
+                "natural": true,
+                "mode": "classic",
                 "player_pair": false,
                 "banker_pair": false,
                 "specials": [
-                    "Small Lucky 6",
-                    "Lucky 6"
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "10"
+                    ],
+                    [
+                        "Diamond",
+                        "8"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "9"
+                    ],
+                    [
+                        "Spade",
+                        "8"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:16:38",
+                "winner": "Banker",
+                "player_score": 7,
+                "banker_score": 9,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon B"
                 ],
                 "special_by_mode": {
                     "classic": [
                         "Dragon B"
                     ],
-                    "tiger": [
-                        "Tiger",
-                        "Small Tiger"
-                    ],
+                    "tiger": [],
                     "ez": [
                         "Dragon B"
                     ],
                     "2to1": [
                         "Dragon B"
                     ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "9"
+                    ],
+                    [
+                        "Diamond",
+                        "8"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Heart",
+                        "9"
+                    ],
+                    [
+                        "Club",
+                        "10"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:16:47",
+                "winner": "Banker",
+                "player_score": 4,
+                "banker_score": 5,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Diamond",
+                        "7"
+                    ],
+                    [
+                        "Club",
+                        "8"
+                    ],
+                    [
+                        "Spade",
+                        "9"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Club",
+                        "J"
+                    ],
+                    [
+                        "Spade",
+                        "5"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:16:55",
+                "winner": "Player",
+                "player_score": 9,
+                "banker_score": 3,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ],
+                    [
+                        "Diamond",
+                        "8"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "J"
+                    ],
+                    [
+                        "Club",
+                        "3"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:17:03",
+                "winner": "Player",
+                "player_score": 9,
+                "banker_score": 0,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": true,
+                "specials": [
+                    "Pair Banker",
+                    "Any Pair",
+                    "Dragon P",
+                    "Perfect Pair"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Pair Banker",
+                        "Any Pair",
+                        "Dragon P",
+                        "Perfect Pair"
+                    ],
+                    "tiger": [
+                        "Tiger Pair"
+                    ],
+                    "ez": [
+                        "Pair Banker",
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Pair Banker",
+                        "Any Pair",
+                        "Dragon P",
+                        "Perfect Pair"
+                    ],
                     "lucky7": [
-                        "Small Lucky 6",
-                        "Lucky 6"
+                        "Pair Banker"
+                    ],
+                    "monkey": [
+                        "Pair Banker"
+                    ],
+                    "goldendice": [
+                        "Pair Banker"
+                    ],
+                    "treasure": [
+                        "Pair Banker"
+                    ],
+                    "xxx": [
+                        "Pair Banker"
+                    ]
+                },
+                "player_hand": [
+                    [
+                        "Diamond",
+                        "2"
+                    ],
+                    [
+                        "Diamond",
+                        "7"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Spade",
+                        "J"
+                    ],
+                    [
+                        "Spade",
+                        "J"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:17:11",
+                "winner": "Player",
+                "player_score": 7,
+                "banker_score": 0,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [
+                        "Lucky 7"
                     ],
                     "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Diamond",
+                        "K"
+                    ],
+                    [
+                        "Heart",
+                        "7"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Heart",
+                        "3"
+                    ],
+                    [
+                        "Spade",
+                        "9"
+                    ],
+                    [
+                        "Spade",
+                        "8"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:17:21",
+                "winner": "Banker",
+                "player_score": 0,
+                "banker_score": 2,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [
+                        "Lucky Monkey"
+                    ],
                     "goldendice": [],
                     "treasure": [],
                     "xxx": []
@@ -1716,12 +2069,621 @@
                         "J"
                     ],
                     [
-                        "Diamond",
+                        "Heart",
+                        "Q"
+                    ],
+                    [
+                        "Spade",
                         "K"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "A"
+                    ],
+                    [
+                        "Heart",
+                        "Q"
+                    ],
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:17:29",
+                "winner": "Banker",
+                "player_score": 8,
+                "banker_score": 9,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon B"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon B"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon B"
+                    ],
+                    "2to1": [
+                        "Dragon B"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Heart",
+                        "6"
+                    ],
+                    [
+                        "Spade",
+                        "2"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Club",
+                        "4"
+                    ],
+                    [
+                        "Club",
+                        "5"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:17:37",
+                "winner": "Player",
+                "player_score": 9,
+                "banker_score": 0,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "9"
+                    ],
+                    [
+                        "Club",
+                        "K"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Club",
+                        "3"
+                    ],
+                    [
+                        "Club",
+                        "7"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:17:47",
+                "winner": "Player",
+                "player_score": 7,
+                "banker_score": 0,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": true,
+                "banker_pair": false,
+                "specials": [
+                    "Pair Player",
+                    "Any Pair",
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Pair Player",
+                        "Any Pair",
+                        "Dragon P"
+                    ],
+                    "tiger": [
+                        "Tiger Pair"
+                    ],
+                    "ez": [
+                        "Pair Player",
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Pair Player",
+                        "Any Pair",
+                        "Dragon P"
+                    ],
+                    "lucky7": [
+                        "Pair Player",
+                        "Lucky 7"
+                    ],
+                    "monkey": [
+                        "Pair Player"
+                    ],
+                    "goldendice": [
+                        "Pair Player"
+                    ],
+                    "treasure": [
+                        "Pair Player"
+                    ],
+                    "xxx": [
+                        "Pair Player"
+                    ]
+                },
+                "player_hand": [
+                    [
+                        "Diamond",
+                        "J"
+                    ],
+                    [
+                        "Club",
+                        "J"
+                    ],
+                    [
+                        "Spade",
+                        "7"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "A"
+                    ],
+                    [
+                        "Heart",
+                        "5"
                     ],
                     [
                         "Diamond",
+                        "4"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:17:56",
+                "winner": "Banker",
+                "player_score": 2,
+                "banker_score": 5,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [
+                        "Lucky Monkey"
+                    ],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Spade",
                         "2"
+                    ],
+                    [
+                        "Spade",
+                        "10"
+                    ],
+                    [
+                        "Diamond",
+                        "J"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "9"
+                    ],
+                    [
+                        "Club",
+                        "6"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:18:04",
+                "winner": "Player",
+                "player_score": 8,
+                "banker_score": 3,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "8"
+                    ],
+                    [
+                        "Spade",
+                        "Q"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Heart",
+                        "5"
+                    ],
+                    [
+                        "Diamond",
+                        "8"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:18:14",
+                "winner": "Player",
+                "player_score": 9,
+                "banker_score": 5,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Divine 9",
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Heart",
+                        "2"
+                    ],
+                    [
+                        "Spade",
+                        "8"
+                    ],
+                    [
+                        "Heart",
+                        "9"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ],
+                    [
+                        "Diamond",
+                        "9"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:18:28",
+                "winner": "Tie",
+                "player_score": 2,
+                "banker_score": 2,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [
+                        "Lucky Monkey"
+                    ],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "Q"
+                    ],
+                    [
+                        "Heart",
+                        "2"
+                    ],
+                    [
+                        "Heart",
+                        "J"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Club",
+                        "10"
+                    ],
+                    [
+                        "Spade",
+                        "K"
+                    ],
+                    [
+                        "Heart",
+                        "2"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:18:36",
+                "winner": "Player",
+                "player_score": 8,
+                "banker_score": 1,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": true,
+                "banker_pair": false,
+                "specials": [
+                    "Pair Player",
+                    "Any Pair",
+                    "Dragon P",
+                    "Perfect Pair"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Pair Player",
+                        "Any Pair",
+                        "Dragon P",
+                        "Perfect Pair"
+                    ],
+                    "tiger": [
+                        "Tiger Pair"
+                    ],
+                    "ez": [
+                        "Pair Player",
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Pair Player",
+                        "Any Pair",
+                        "Dragon P",
+                        "Perfect Pair"
+                    ],
+                    "lucky7": [
+                        "Pair Player"
+                    ],
+                    "monkey": [
+                        "Pair Player"
+                    ],
+                    "goldendice": [
+                        "Pair Player"
+                    ],
+                    "treasure": [
+                        "Pair Player"
+                    ],
+                    "xxx": [
+                        "Pair Player"
+                    ]
+                },
+                "player_hand": [
+                    [
+                        "Heart",
+                        "4"
+                    ],
+                    [
+                        "Heart",
+                        "4"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Club",
+                        "7"
+                    ],
+                    [
+                        "Spade",
+                        "4"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:18:43",
+                "winner": "Player",
+                "player_score": 9,
+                "banker_score": 1,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "4"
+                    ],
+                    [
+                        "Diamond",
+                        "5"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ],
+                    [
+                        "Club",
+                        "5"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:18:51",
+                "winner": "Player",
+                "player_score": 8,
+                "banker_score": 0,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Spade",
+                        "5"
+                    ],
+                    [
+                        "Spade",
+                        "3"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Heart",
+                        "9"
+                    ],
+                    [
+                        "Diamond",
+                        "A"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:19:00",
+                "winner": "Player",
+                "player_score": 8,
+                "banker_score": 0,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Diamond",
+                        "10"
+                    ],
+                    [
+                        "Heart",
+                        "8"
                     ]
                 ],
                 "banker_hand": [
@@ -1730,17 +2692,567 @@
                         "10"
                     ],
                     [
+                        "Club",
+                        "K"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:19:08",
+                "winner": "Banker",
+                "player_score": 5,
+                "banker_score": 8,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon B"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon B"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon B"
+                    ],
+                    "2to1": [
+                        "Dragon B"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Heart",
+                        "5"
+                    ],
+                    [
+                        "Spade",
+                        "10"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Club",
+                        "8"
+                    ],
+                    [
+                        "Heart",
+                        "10"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:19:18",
+                "winner": "Player",
+                "player_score": 3,
+                "banker_score": 1,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "K"
+                    ],
+                    [
+                        "Spade",
+                        "Q"
+                    ],
+                    [
+                        "Heart",
+                        "3"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "10"
+                    ],
+                    [
+                        "Heart",
+                        "2"
+                    ],
+                    [
+                        "Spade",
+                        "9"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:19:26",
+                "winner": "Banker",
+                "player_score": 0,
+                "banker_score": 9,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon B"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon B"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon B"
+                    ],
+                    "2to1": [
+                        "Dragon B"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Spade",
+                        "J"
+                    ],
+                    [
+                        "Diamond",
+                        "Q"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "6"
+                    ],
+                    [
+                        "Diamond",
+                        "3"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:19:34",
+                "winner": "Tie",
+                "player_score": 7,
+                "banker_score": 7,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "9"
+                    ],
+                    [
+                        "Heart",
+                        "8"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "9"
+                    ],
+                    [
+                        "Heart",
+                        "8"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:19:43",
+                "winner": "Banker",
+                "player_score": 6,
+                "banker_score": 7,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Spade",
+                        "4"
+                    ],
+                    [
+                        "Spade",
+                        "8"
+                    ],
+                    [
+                        "Heart",
+                        "4"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Club",
+                        "6"
+                    ],
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:19:53",
+                "winner": "Banker",
+                "player_score": 7,
+                "banker_score": 9,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [
+                        "Divine 9"
+                    ],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Spade",
+                        "3"
+                    ],
+                    [
+                        "Club",
+                        "J"
+                    ],
+                    [
+                        "Diamond",
+                        "4"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Heart",
+                        "5"
+                    ],
+                    [
+                        "Heart",
+                        "7"
+                    ],
+                    [
+                        "Heart",
+                        "7"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:20:01",
+                "winner": "Player",
+                "player_score": 8,
+                "banker_score": 0,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Diamond",
+                        "6"
+                    ],
+                    [
+                        "Heart",
+                        "2"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Spade",
+                        "Q"
+                    ],
+                    [
+                        "Spade",
+                        "10"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:20:09",
+                "winner": "Tie",
+                "player_score": 8,
+                "banker_score": 8,
+                "natural": true,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Spade",
+                        "K"
+                    ],
+                    [
+                        "Heart",
+                        "8"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Spade",
+                        "K"
+                    ],
+                    [
+                        "Diamond",
+                        "8"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:20:17",
+                "winner": "Tie",
+                "player_score": 6,
+                "banker_score": 6,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [
+                        "Tiger Tie"
+                    ],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Heart",
+                        "Q"
+                    ],
+                    [
                         "Spade",
                         "6"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Heart",
+                        "6"
+                    ],
+                    [
+                        "Diamond",
+                        "K"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:20:36",
+                "winner": "Banker",
+                "player_score": 3,
+                "banker_score": 4,
+                "natural": false,
+                "mode": "tiger",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [],
+                "special_by_mode": {
+                    "classic": [],
+                    "tiger": [],
+                    "ez": [],
+                    "2to1": [],
+                    "lucky7": [],
+                    "monkey": [
+                        "Lucky Monkey"
+                    ],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Club",
+                        "3"
+                    ],
+                    [
+                        "Club",
+                        "10"
+                    ],
+                    [
+                        "Club",
+                        "K"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Club",
+                        "3"
+                    ],
+                    [
+                        "Spade",
+                        "A"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-09-19 23:20:45",
+                "winner": "Banker",
+                "player_score": 1,
+                "banker_score": 5,
+                "natural": false,
+                "mode": "tiger",
+                "player_pair": false,
+                "banker_pair": true,
+                "specials": [
+                    "Tiger Pair"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Pair Banker",
+                        "Any Pair",
+                        "Dragon B"
+                    ],
+                    "tiger": [
+                        "Tiger Pair"
+                    ],
+                    "ez": [
+                        "Pair Banker",
+                        "Dragon B"
+                    ],
+                    "2to1": [
+                        "Pair Banker",
+                        "Any Pair",
+                        "Dragon B"
+                    ],
+                    "lucky7": [
+                        "Pair Banker"
+                    ],
+                    "monkey": [
+                        "Lucky Monkey",
+                        "Pair Banker"
+                    ],
+                    "goldendice": [
+                        "Pair Banker"
+                    ],
+                    "treasure": [
+                        "Pair Banker"
+                    ],
+                    "xxx": [
+                        "Pair Banker"
+                    ]
+                },
+                "player_hand": [
+                    [
+                        "Spade",
+                        "7"
+                    ],
+                    [
+                        "Spade",
+                        "4"
+                    ],
+                    [
+                        "Heart",
+                        "K"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "5"
+                    ],
+                    [
+                        "Club",
+                        "5"
+                    ],
+                    [
+                        "Diamond",
+                        "5"
                     ]
                 ]
             }
         ]
     },
     "statistic_data": {
-        "total_game": 5660,
-        "player_win": 2519,
-        "banker_win": 2626,
-        "tie_win": 515
+        "total_game": 5690,
+        "player_win": 2533,
+        "banker_win": 2638,
+        "tie_win": 519
     }
 }
