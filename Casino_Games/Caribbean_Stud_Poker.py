@@ -12,6 +12,226 @@ del _install_secure_json, _account_root, _AccountPath, _account_sys
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image, ImageTk, ImageDraw, ImageFont
+
+# ==================== Progressive 向下翻牌数字 ====================
+class ProgressiveFlipDisplay(tk.Canvas):
+    """金额更新时逐位向下翻牌；每步 600ms 翻动 + 200ms 停留。
+
+    每位仅允许 n -> (n + 1) % 10。更新中收到的新金额在下一步
+    接管目标，不中断正在翻动的牌。StringVar 始终保存真实金额。
+    """
+    FLIP_MS = 600
+    HOLD_MS = 200
+    FRAME_MS = 16
+    INTEGER_DIGITS = 6  # 6 位整数 + 2 位小数，共 8 位数字
+
+    def __init__(self, master, textvariable, font=('Arial', 20, 'bold'),
+                 bg='#F2E6C9', fg='#A88100', **kwargs):
+        import time as _flip_time
+        import math as _flip_math
+        from tkinter import font as _tk_font
+        self._clock = _flip_time.monotonic
+        self._cos = _flip_math.cos
+        self._pi = _flip_math.pi
+        self._variable = textvariable
+        self._foreground = fg
+        self._job = None
+        self._closed = False
+        self._phase = 'idle'
+        self._progress = 1.0
+        self._glyphs = {}
+        self._photos = []
+        super().__init__(master, bg=bg, highlightthickness=0, bd=0, **kwargs)
+        metrics = _tk_font.Font(root=self, font=font)
+        pixels = max(12, abs(round(metrics.actual('size') * self.winfo_fpixels('1p'))))
+        self._card_width = max(18, metrics.measure('0') + 6)
+        self._card_height = max(28, metrics.metrics('linespace') + 8)
+        self._card_height += self._card_height % 2
+        self._font = None
+        for name in ('arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans-Bold.ttf',
+                     '/System/Library/Fonts/Supplemental/Arial Bold.ttf'):
+            try:
+                self._font = ImageFont.truetype(name, pixels)
+                break
+            except OSError:
+                pass
+        if self._font is None:
+            try:
+                self._font = ImageFont.load_default(size=pixels)
+            except TypeError:
+                self._font = ImageFont.load_default()
+        self._target = self._format_amount(textvariable.get())
+        self._digits = self._extract(self._target)
+        self._next = self._digits[:]
+        self._layout = self._target
+        self._draw()
+        self._trace = textvariable.trace_add('write', self._changed)
+        self.bind('<Destroy>', self._on_destroy, add='+')
+
+    @classmethod
+    def _format_amount(cls, value):
+        """补足八位数字；货币符号、逗号和小数点不计入位数。
+
+        超出六位整数时保留完整金额，避免截断真实大奖数值。
+        """
+        from decimal import Decimal, ROUND_HALF_UP
+        amount = Decimal(str(value).replace('$', '').replace(',', '').strip())
+        amount = amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        sign = '-' if amount < 0 else ''
+        integer, fraction = format(abs(amount), '.2f').split('.')
+        integer = integer.zfill(cls.INTEGER_DIGITS)
+        groups = [integer[max(0, i-3):i] for i in range(len(integer), 0, -3)]
+        return '$' + sign + ','.join(reversed(groups)) + '.' + fraction
+
+    @staticmethod
+    def _extract(text):
+        return [int(c) for c in text if c in '0123456789']
+
+    def _changed(self, *_):
+        if self._closed:
+            return
+        self._target = self._format_amount(self._variable.get())
+        if self._phase == 'idle' and self._job is None:
+            # 合并同一个事件处理函数内的多次金额更新。
+            self._job = self.after_idle(self._begin)
+
+    def _begin(self):
+        self._job = None
+        if self._closed:
+            return
+        goal = self._extract(self._target)
+        width = max(len(goal), len(self._digits))
+        self._digits = [0] * (width - len(self._digits)) + self._digits
+        goal = [0] * (width - len(goal)) + goal
+        if self._digits == goal:
+            self._digits = self._extract(self._target)
+            self._next = self._digits[:]
+            self._layout = self._target
+            self._phase = 'idle'
+            self._draw()
+            return
+        # 按右侧小数位对齐；缩位时保留前导零，全部到位后才收起。
+        raw = ''.join(str(n) for n in goal)
+        if '.' in self._target:
+            decimals = len(self._target.rsplit('.', 1)[1])
+        else:
+            decimals = 0
+        integer = raw[:-decimals] if decimals else raw
+        groups = [integer[max(0, i-3):i] for i in range(len(integer), 0, -3)]
+        grouped = ','.join(reversed(groups))
+        prefix = self._target[:next((i for i, c in enumerate(self._target)
+                                    if c in '0123456789'), len(self._target))]
+        self._layout = prefix + grouped + ('.' + raw[-decimals:] if decimals else '')
+        self._next = [(old + 1) % 10 if old != wanted else old
+                      for old, wanted in zip(self._digits, goal)]
+        self._phase = 'flip'
+        self._started = self._clock()
+        self._tick()
+
+    def _tick(self):
+        self._job = None
+        if self._closed:
+            return
+        elapsed = (self._clock() - self._started) * 1000.0
+        self._progress = min(1.0, elapsed / self.FLIP_MS)
+        self._draw()
+        if elapsed >= self.FLIP_MS:
+            self._digits = self._next[:]
+            self._phase = 'hold'
+            self._job = self.after(self.HOLD_MS, self._begin)
+        else:
+            self._job = self.after(min(self.FRAME_MS, max(1, round(self.FLIP_MS - elapsed))),
+                                   self._tick)
+
+    def _rgb(self, color):
+        return tuple(value // 257 for value in self.winfo_rgb(color))
+
+    def _glyph(self, char):
+        if char not in self._glyphs:
+            bg = self._rgb(self.cget('bg'))
+            canvas = Image.new('RGB', (self._card_width, self._card_height), bg)
+            draw = ImageDraw.Draw(canvas)
+            if char in '0123456789':
+                draw.rounded_rectangle((0, 0, self._card_width-1, self._card_height-1), radius=3,
+                                       fill=tuple(min(255, c+8) for c in bg),
+                                       outline=tuple(max(0, c-35) for c in bg))
+            box = draw.textbbox((0, 0), char, font=self._font)
+            # 所有字符共用数字的文字基线；逗号、小数点不能单独垂直居中。
+            digit_box = draw.textbbox((0, 0), '0', font=self._font)
+            text_y = (self._card_height-(digit_box[3]-digit_box[1]))/2-digit_box[1]
+            draw.text(((self._card_width-(box[2]-box[0]))/2-box[0],
+                       text_y),
+                      char, font=self._font, fill=self._rgb(self._foreground))
+            self._glyphs[char] = canvas
+        return self._glyphs[char]
+
+    def _draw(self):
+        self.delete('all')
+        self._photos = []
+        x = 0
+        index = 0
+        half = self._card_height // 2
+        for char in self._layout:
+            if char in '0123456789':
+                old = self._glyph(str(self._digits[index]))
+                new = self._glyph(str(self._next[index]))
+                frame = old.copy()
+                if self._phase == 'flip' and self._digits[index] != self._next[index]:
+                    p = self._progress
+                    # 新牌上半部在后，旧牌下半部在后；翻片绕中轴向下。
+                    frame.paste(new.crop((0, 0, self._card_width, half)), (0, 0))
+                    if p < 0.5:
+                        height = max(1, round(half * self._cos(self._pi * p)))
+                        flap = old.crop((0, 0, self._card_width, half))
+                        frame.paste(flap.resize((self._card_width, height), Image.Resampling.LANCZOS),
+                                    (0, half-height))
+                    else:
+                        height = max(1, round(half * -self._cos(self._pi * p)))
+                        flap = new.crop((0, half, self._card_width, self._card_height))
+                        frame.paste(flap.resize((self._card_width, height), Image.Resampling.LANCZOS),
+                                    (0, half))
+                ImageDraw.Draw(frame).line((1, half, self._card_width-2, half),
+                                           fill=self._rgb(self.cget('bg')))
+                index += 1
+                advance = self._card_width + 2
+            else:
+                frame = self._glyph(char)
+                advance = self._card_width if char == '$' else max(6, self._card_width // 2)
+                frame = frame.crop(((self._card_width-advance)//2, 0,
+                                    (self._card_width-advance)//2+advance, self._card_height))
+            photo = ImageTk.PhotoImage(frame, master=self)
+            self._photos.append(photo)
+            self.create_image(x, 0, image=photo, anchor='nw')
+            x += advance
+        super().configure(width=max(1, x), height=self._card_height)
+
+    def configure(self, cnf=None, **kwargs):
+        result = super().configure(cnf, **kwargs)
+        if hasattr(self, '_layout') and ('bg' in kwargs or 'background' in kwargs or
+                isinstance(cnf, dict) and ('bg' in cnf or 'background' in cnf)):
+            self._glyphs.clear()
+            self._draw()
+        return result
+
+    config = configure
+
+    def _on_destroy(self, event):
+        if event.widget is not self or self._closed:
+            return
+        self._closed = True
+        if self._job is not None:
+            try:
+                self.after_cancel(self._job)
+            except tk.TclError:
+                pass
+            self._job = None
+        try:
+            self._variable.trace_remove('write', self._trace)
+        except tk.TclError:
+            pass
+# ==================== Progressive 翻牌控件结束 ====================
+
+
 import random
 import json
 import os
@@ -521,7 +741,8 @@ class CaribbeanStudGUI(tk.Frame):
                         except:
                             font = ImageFont.load_default()
                         text = f"{rank}{suit}"
-                        tw, th = draw.textsize(text, font=font)
+                        text_bbox = draw.textbbox((0, 0), text, font=font)
+                        tw, th = text_bbox[2], text_bbox[3]
                         draw.text(((card_size[0]-tw)//2, (card_size[1]-th)//2), text, fill="white", font=font)
                         self.original_images[(suit, rank)] = img_orig
                         self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
@@ -702,7 +923,7 @@ class CaribbeanStudGUI(tk.Frame):
         body_prog.pack(fill=tk.X, padx=10, pady=8)
         self.progressive_amount_var = tk.StringVar()
         self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
-        self.progressive_display = tk.Label(body_prog, textvariable=self.progressive_amount_var,
+        self.progressive_display = ProgressiveFlipDisplay(body_prog, textvariable=self.progressive_amount_var,
                                             font=('Arial',20,'bold'), bg=PANEL_BG, fg='#A88100')
         self.progressive_display.pack(anchor='center')
 
@@ -1878,7 +2099,8 @@ class CaribbeanStudGUI(tk.Frame):
                 except:
                     font = ImageFont.load_default()
                 text = f"{card.rank}{card.suit}"
-                tw, th = draw.textsize(text, font=font)
+                text_bbox = draw.textbbox((0, 0), text, font=font)
+                tw, th = text_bbox[2], text_bbox[3]
                 draw.text(((small_size[0]-tw)//2, (small_size[1]-th)//2), text, fill="white", font=font)
                 small_images[i] = ImageTk.PhotoImage(img)
 

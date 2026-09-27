@@ -35,6 +35,138 @@ if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
 
+# This page owns all of its translations. index.py passes only a language code.
+_TRANSLATION_ROWS = [
+    ('老虎机', 'Slot Machines', '老虎機', 'Mīhini moni', 'Monludiloj'),
+    ('← 返回主目录', '← Back to home', '← 返回主目錄', '← Hoki ki te kāinga', '← Reen al hejmo'),
+    ('老虎机中心', 'Slot Machines', '老虎機中心', 'Mīhini moni', 'Monludiloj'),
+    ('游戏分类', 'Categories', '遊戲分類', 'Ngā kāwai', 'Kategorioj'),
+    ('游戏运行中…', 'Game running…', '遊戲執行中…', 'Kei te haere te kēmu…', 'Ludo funkcias…'),
+    ('数字老虎机', 'Number Slot Machine', '數字老虎機', 'Mīhini Moni Tau', 'Nombra Monludilo'),
+    ('旋转扑克', 'Spin Poker', '旋轉撲克', 'Poker Takataka', 'Turna Pokero'),
+    ('21 BELL老虎机', '21 BELL Slot Machine', '21 BELL老虎機', 'Mīhini 21 BELL', 'Monludilo 21 BELL'),
+    ('21点老虎机', 'Blackjack Slot Machine', '21點老虎機', 'Mīhini Moni Blackjack', 'Nigra-Joĉja Monludilo'),
+    ('现金老虎机', 'Cash Machine', '現金老虎機', 'Mīhini Moni', 'Kontanta Monludilo'),
+    ('双倍钻石老虎机', 'Double Diamond', '雙倍鑽石老虎機', 'Taimana Takirua', 'Duobla Diamanto'),
+    ('最高奖金老虎机', 'Top Dollar', '最高獎金老虎機', 'Tāra Nui', 'Plej Alta Premio'),
+    ('体验账号不会储存收藏。', 'Guest accounts do not save favorites.', '體驗帳號不會儲存我的最愛。', 'Kāore ngā pūkete manuhiri e tiaki tino pai.', 'Gastaj kontoj ne konservas ŝatatajn ludojn.'),
+    ('我的最爱最多只能储存 8 个游戏。', 'Favorites can contain up to 8 games.', '我的最愛最多只能儲存 8 個遊戲。', 'E waru rawa ngā kēmu tino pai ka taea te tiaki.', 'Ŝatataj povas enhavi maksimume 8 ludojn.'),
+    ('找不到玩家资料，无法储存收藏。', 'Player data was not found; the favorite could not be saved.', '找不到玩家資料，無法儲存我的最愛。', 'Kāore i kitea ngā raraunga kaitākaro; kāore i tiakina te tino pai.', 'Ludantaj datumoj ne estis trovitaj; la ŝatata ludo ne konserviĝis.'),
+    ('请选择老虎机', 'Choose a slot machine', '請選擇老虎機', 'Kōwhiria he mīhini moni', 'Elektu monludilon'),
+    ('维护', 'Maintenance', '維護', 'Tiaki', 'Prizorgado'),
+    ('提示', 'Notice', '提示', 'Pānui', 'Avizo'),
+    ('游戏运行中', 'Game running', '遊戲執行中', 'Kei te haere te kēmu', 'Ludo funkcias'),
+    ('无法打开《{name}》：\n\n{error}', 'Could not open “{name}”:\n\n{error}', '無法開啟《{name}》：\n\n{error}', 'Kāore i taea te whakatuwhera “{name}”:\n\n{error}', 'Ne eblis malfermi “{name}”:\n\n{error}'),
+    ('《{name}》目前正在维护。', '“{name}” is under maintenance.', '《{name}》目前正在維護。', 'Kei te tiakina “{name}” ināianei.', '“{name}” estas nun prizorgata.'),
+    ('《{name}》没有设置对应的程序模块。', 'No program module is configured for “{name}”.', '《{name}》沒有設定對應的程式模組。', 'Kāore he kōwae papatono kua whakaritea mō “{name}”.', 'Neniu programmodulo estas agordita por “{name}”.'),
+    ('{name} 未正常结束：\n\n{error}', '“{name}” did not finish normally:\n\n{error}', '《{name}》未正常結束：\n\n{error}', 'Kāore i mutu tika “{name}”:\n\n{error}', '“{name}” ne finiĝis normale:\n\n{error}'),
+    ('{file} 应由项目根目录的 index.py 启动。', 'Open {file} through index.py in the project root.', '{file} 應由專案根目錄的 index.py 啟動。', 'Whakatuwheratia {file} mā te index.py i te pūtake o te kaupapa.', 'Malfermu {file} per index.py en la projekta radiko.'),
+]
+
+_TRANSLATIONS = {code: {} for code in ("en", "zh_CN", "zh_TW", "mi", "eo")}
+for _source, _en, _zh_tw, _mi, _eo in _TRANSLATION_ROWS:
+    for _code, _text in zip(("en", "zh_TW", "mi", "eo"), (_en, _zh_tw, _mi, _eo)):
+        _TRANSLATIONS[_code][_source] = _text
+
+_GAME_NAMES = ('数字老虎机', '旋转扑克', '21 BELL老虎机', '21点老虎机', '现金老虎机', '双倍钻石老虎机', '最高奖金老虎机')
+_DYNAMIC_PHRASES = {'en': {'已启动：': 'Started: ',
+        '已结束，余额已更新': ' finished; balance updated',
+        '已关闭': ' closed',
+        '已加入我的最爱：': 'Added to favorites: ',
+        '已从我的最爱移除：': 'Removed from favorites: ',
+        '余额': 'Balance',
+        '维护通知': 'Maintenance',
+        '目前正在维护。': ' is under maintenance.',
+        '启动失败': 'Launch failed',
+        '无法打开': 'Could not open ',
+        '游戏运行出错': 'Game error',
+        '没有设置对应的程序模块。': ' has no program module configured.',
+        '请先关闭当前运行中的游戏。': 'Close the running game first.',
+        '未正常结束：': ' did not finish normally: '},
+ 'zh_TW': {'已启动：': '已啟動：',
+           '已结束，余额已更新': '已結束，餘額已更新',
+           '已关闭': '已關閉',
+           '已加入我的最爱：': '已加入我的最愛：',
+           '已从我的最爱移除：': '已從我的最愛移除：',
+           '余额': '餘額',
+           '维护通知': '維護通知',
+           '目前正在维护。': '目前正在維護。',
+           '启动失败': '啟動失敗',
+           '无法打开': '無法開啟',
+           '游戏运行出错': '遊戲執行出錯',
+           '没有设置对应的程序模块。': '沒有設定對應的程式模組。',
+           '请先关闭当前运行中的游戏。': '請先關閉目前執行中的遊戲。',
+           '未正常结束：': '未正常結束：'},
+ 'mi': {'已启动：': 'Kua tīmata: ',
+        '已结束，余额已更新': ' kua mutu; kua whakahōutia te toenga',
+        '已关闭': ' kua katia',
+        '已加入我的最爱：': 'Kua tāpiritia ki ngā tino pai: ',
+        '已从我的最爱移除：': 'Kua tangohia i ngā tino pai: ',
+        '余额': 'Toenga',
+        '维护通知': 'Pānui tiaki',
+        '目前正在维护。': ' kei te tiakina ināianei.',
+        '启动失败': 'I rahua te tīmata',
+        '无法打开': 'Kāore i taea te whakatuwhera ',
+        '游戏运行出错': 'Hapa kēmu',
+        '没有设置对应的程序模块。': ' kāore he kōwae papatono kua whakaritea.',
+        '请先关闭当前运行中的游戏。': 'Katia te kēmu e haere ana i te tuatahi.',
+        '未正常结束：': ' kāore i mutu tika: '},
+ 'eo': {'已启动：': 'Lanĉita: ',
+        '已结束，余额已更新': ' finiĝis; saldo ĝisdatigita',
+        '已关闭': ' fermiĝis',
+        '已加入我的最爱：': 'Aldonita al ŝatataj: ',
+        '已从我的最爱移除：': 'Forigita el ŝatataj: ',
+        '余额': 'Saldo',
+        '维护通知': 'Prizorga avizo',
+        '目前正在维护。': ' estas nun prizorgata.',
+        '启动失败': 'Lanĉo malsukcesis',
+        '无法打开': 'Ne eblis malfermi ',
+        '游戏运行出错': 'Luderaro',
+        '没有设置对应的程序模块。': ' ne havas agorditan programmodulon.',
+        '请先关闭当前运行中的游戏。': 'Unue fermu la rulantan ludon.',
+        '未正常结束：': ' ne finiĝis normale: '}}
+
+
+def normalise_language(value) -> str:
+    aliases = {"sc": "zh_CN", "tc": "zh_TW", "zh-cn": "zh_CN", "zh-tw": "zh_TW",
+               "zh_cn": "zh_CN", "zh_tw": "zh_TW"}
+    code = aliases.get(str(value).lower(), str(value).lower())
+    return code if code in _TRANSLATIONS else "en"
+
+
+def translate_text(text: str, language: str = "en") -> str:
+    """Translate this page's UI and game names without importing index.py."""
+    text = str(text)
+    language = normalise_language(language)
+    if language == "zh_CN":
+        return text
+    translated = _TRANSLATIONS[language].get(text)
+    if translated is not None:
+        return translated
+    if text.startswith("余额  $"):
+        labels = {"en": "Balance", "zh_TW": "餘額", "mi": "Toenga", "eo": "Saldo"}
+        return f"{labels[language]}  ${text.split('$', 1)[1]}"
+    greetings = {
+        "en": ("Good morning", "Good morning", "Good afternoon", "Good evening"),
+        "zh_TW": ("凌晨好", "早安", "午安", "晚安"),
+        "mi": ("Ata mārie", "Ata mārie", "Kia ora i te ahiahi", "Pō mārie"),
+        "eo": ("Bonan matenon", "Bonan matenon", "Bonan posttagmezon", "Bonan vesperon"),
+    }
+    for index, prefix in enumerate(("凌晨好，", "早上好，", "中午好，", "晚上好，")):
+        if text.startswith(prefix) and text.endswith("！"):
+            name = text[len(prefix):-1]
+            if language == "zh_TW":
+                return f"{greetings[language][index]}，{name}！"
+            return f"{greetings[language][index]}, {name}!"
+    # Composite launch/favorite status messages contain this page's game names.
+    for source in sorted(_GAME_NAMES, key=len, reverse=True):
+        text = text.replace(source, _TRANSLATIONS[language].get(source, source))
+    for source, target in sorted(_DYNAMIC_PHRASES[language].items(),
+                                 key=lambda item: len(item[0]), reverse=True):
+        text = text.replace(source, target)
+    return text
+
+
 def greeting_for(username: str) -> str:
     hour = datetime.now().hour
     period = "凌晨好" if hour < 6 else "早上好" if hour < 12 else "中午好" if hour < 18 else "晚上好"
@@ -441,6 +573,7 @@ class SlotMachinesPage(tk.Frame):
         on_balance_change: Optional[Callable[[float], None]] = None,
         on_preferences: Optional[Callable[[], None]] = None,
         translator: Optional[Callable[[str], str]] = None,
+        language: Optional[str] = None,
     ):
         for name in ("BG", "PANEL", "PANEL_2", "GOLD", "TEXT", "MUTED", "RED"):
             setattr(self, name, _ui_colour(master, getattr(type(self), name)))
@@ -456,7 +589,11 @@ class SlotMachinesPage(tk.Frame):
         self.on_back = on_back
         self.on_balance_change = on_balance_change
         self.on_preferences = on_preferences
-        self.translator = translator
+        # translator is accepted for compatibility; this page owns its translations.
+        self.language = normalise_language(
+            language if language is not None else
+            getattr(master.winfo_toplevel(), "language", "en")
+        )
 
         self.current_category = "老虎机"
         self.process: Optional[subprocess.Popen] = None
@@ -478,10 +615,7 @@ class SlotMachinesPage(tk.Frame):
         self._preferences_ready = True
 
     def _tr(self, text: str) -> str:
-        if callable(self.translator):
-            return self.translator(text)
-        translator = getattr(self.winfo_toplevel(), "translate_ui", None)
-        return translator(text) if callable(translator) else text
+        return translate_text(text, self.language)
 
     def _build_ui(self) -> None:
         top = tk.Frame(self, bg=self.PANEL, height=82)
@@ -1211,6 +1345,9 @@ class SlotMachinesPage(tk.Frame):
             username = self.username
             parent_back = self.on_back
             balance_callback = self.on_balance_change
+            language = self.language
+            preferences_callback = self.on_preferences
+            category = self.current_category
 
             def return_to_slot_machines(final_balance: float) -> None:
                 new_balance = float(final_balance)
@@ -1225,7 +1362,11 @@ class SlotMachinesPage(tk.Frame):
                     balance=new_balance,
                     on_back=parent_back,
                     on_balance_change=balance_callback,
+                    on_preferences=preferences_callback,
+                    language=language,
                 )
+                if new_page.current_category != category:
+                    new_page.show_category(category)
                 replace_page = getattr(master, "replace_page", None)
                 if not callable(replace_page):
                     raise RuntimeError("父窗口没有 replace_page(page) 方法。")
@@ -1248,9 +1389,8 @@ class SlotMachinesPage(tk.Frame):
 
         except Exception as exc:
             messagebox.showerror(
-                "启动失败",
-                f"无法打开《{display_name}》：\n\n"
-                f"{type(exc).__name__}: {exc}",
+                self._tr("启动失败"),
+                self._tr('无法打开《{name}》：\n\n{error}').format(name=self._tr(display_name), error=f"{type(exc).__name__}: {exc}"),
                 parent=self,
             )
 
@@ -1262,16 +1402,16 @@ class SlotMachinesPage(tk.Frame):
     ) -> None:
         if maintenance:
             messagebox.showinfo(
-                "维护通知",
-                f"《{display_name}》目前正在维护。",
+                self._tr("维护通知"),
+                self._tr('《{name}》目前正在维护。').format(name=self._tr(display_name)),
                 parent=self,
             )
             return
 
         if not module_name:
             messagebox.showerror(
-                "启动失败",
-                f"《{display_name}》没有设置对应的程序模块。",
+                self._tr("启动失败"),
+                self._tr('《{name}》没有设置对应的程序模块。').format(name=self._tr(display_name)),
                 parent=self,
             )
             return
@@ -1324,7 +1464,7 @@ class SlotMachinesPage(tk.Frame):
                 creationflags=creationflags,
             )
         except OSError as exc:
-            messagebox.showerror("启动失败", str(exc), parent=self)
+            messagebox.showerror(self._tr("启动失败"), self._tr(str(exc)), parent=self)
             self.process = None
             try:
                 os.remove(result_file)
@@ -1397,8 +1537,8 @@ class SlotMachinesPage(tk.Frame):
             self.status_var.set(self._tr(f"{old_name} 已关闭"))
             if error:
                 messagebox.showerror(
-                    "游戏运行出错",
-                    f"{old_name} 未正常结束：\n\n{error}",
+                    self._tr("游戏运行出错"),
+                    self._tr('{name} 未正常结束：\n\n{error}').format(name=self._tr(old_name), error=error),
                     parent=self,
                 )
 
@@ -1435,8 +1575,8 @@ class SlotMachinesPage(tk.Frame):
     def back_to_main(self) -> None:
         if self.process is not None:
             messagebox.showwarning(
-                "游戏运行中",
-                "请先关闭当前运行中的游戏。",
+                self._tr("游戏运行中"),
+                self._tr("请先关闭当前运行中的游戏。"),
                 parent=self,
             )
             return
@@ -1454,6 +1594,7 @@ def main(
     on_balance_change: Optional[Callable[[float], None]] = None,
     on_preferences: Optional[Callable[[], None]] = None,
     translator: Optional[Callable[[str], str]] = None,
+    language: Optional[str] = None,
 ) -> SlotMachinesPage:
     """
     供 index.py 使用；不会创建新的 Tk 根窗口或 mainloop。
@@ -1466,6 +1607,7 @@ def main(
         on_balance_change=on_balance_change,
         on_preferences=on_preferences,
         translator=translator,
+        language=language,
     )
 
 
@@ -1483,8 +1625,8 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.withdraw()
     messagebox.showinfo(
-        "提示",
-        "slot_machines.py 应由项目根目录的 index.py 启动。",
+        translate_text("提示"),
+        translate_text("{file} 应由项目根目录的 index.py 启动。").format(file='slot_machines.py'),
         parent=root,
     )
     root.destroy()

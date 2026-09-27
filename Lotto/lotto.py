@@ -23,6 +23,94 @@ PROJECT_DIR = os.path.dirname(BASE_DIR)
 DATA_FILE = os.path.join(PROJECT_DIR, "A_Tools/Account/saving_data.json")
 
 
+# This page owns all of its translations. index.py passes only a language code.
+_TRANSLATION_ROWS = [
+    ('← 返回主目录', '← Back to home', '← 返回主目錄', '← Hoki ki te kāinga', '← Reen al hejmo'),
+    ('刮刮乐中心', 'Scratch Cards', '刮刮樂中心', 'Kāri waruwaru', 'Skrapkartoj'),
+    ('验钞机', 'Banknote Detector', '驗鈔機', 'Kaitiro Moni Pepa', 'Monbileta Kontrolilo'),
+    ('高尔夫球', 'Golf', '高爾夫球', 'Korowha', 'Golfo'),
+    ('过三关', 'Three Levels', '過三關', 'Ngā Taumata e Toru', 'Tri Niveloj'),
+    ('叠叠乐', 'Stack Up', '疊疊樂', 'Tāpae', 'Stakado'),
+    ('100X 现金大挑战', '100X Cash Challenge', '100X 現金大挑戰', 'Wero Moni 100X', 'Kontanta Defio 100X'),
+    ('1 元 / 特易中奖', '$1 / Very easy to win', '1 元／特易中獎', '$1 / He tino māmā te toa', '$1 / Tre facile gajni'),
+    ('每局 1 元', '$1 per game', '每局 1 元', '$1 ia kēmu', '$1 por ludo'),
+    ('每局 5 元', '$5 per game', '每局 5 元', '$5 ia kēmu', '$5 por ludo'),
+    ('大奖 1,000', 'Top prize 1,000', '大獎 1,000', 'Tohu nui 1,000', 'Ĉefa premio 1,000'),
+    ('大奖 10,000', 'Top prize 10,000', '大獎 10,000', 'Tohu nui 10,000', 'Ĉefa premio 10,000'),
+    ('大奖 50,000', 'Top prize 50,000', '大獎 50,000', 'Tohu nui 50,000', 'Ĉefa premio 50,000'),
+    ('请选择一张刮刮卡', 'Choose a scratch card', '請選擇一張刮刮卡', 'Kōwhiria he kāri waruwaru', 'Elektu skrapkarton'),
+    ('体验账号不会储存收藏。', 'Guest accounts do not save favorites.', '體驗帳號不會儲存我的最愛。', 'Kāore ngā pūkete manuhiri e tiaki tino pai.', 'Gastaj kontoj ne konservas ŝatatajn ludojn.'),
+    ('我的最爱最多只能储存 8 个游戏。', 'Favorites can contain up to 8 games.', '我的最愛最多只能儲存 8 個遊戲。', 'E waru rawa ngā kēmu tino pai ka taea te tiaki.', 'Ŝatataj povas enhavi maksimume 8 ludojn.'),
+    ('找不到玩家资料，无法储存收藏。', 'Player data was not found; the favorite could not be saved.', '找不到玩家資料，無法儲存我的最愛。', 'Kāore i kitea ngā raraunga kaitākaro; kāore i tiakina te tino pai.', 'Ludantaj datumoj ne estis trovitaj; la ŝatata ludo ne konserviĝis.'),
+    ('提示', 'Notice', '提示', 'Pānui', 'Avizo'),
+    ('无法打开《{name}》：\n\n{error}', 'Could not open “{name}”:\n\n{error}', '無法開啟《{name}》：\n\n{error}', 'Kāore i taea te whakatuwhera “{name}”:\n\n{error}', 'Ne eblis malfermi “{name}”:\n\n{error}'),
+    ('{file} 应由项目根目录的 index.py 启动。', 'Open {file} through index.py in the project root.', '{file} 應由專案根目錄的 index.py 啟動。', 'Whakatuwheratia {file} mā te index.py i te pūtake o te kaupapa.', 'Malfermu {file} per index.py en la projekta radiko.'),
+]
+
+_TRANSLATIONS = {code: {} for code in ("en", "zh_CN", "zh_TW", "mi", "eo")}
+for _source, _en, _zh_tw, _mi, _eo in _TRANSLATION_ROWS:
+    for _code, _text in zip(("en", "zh_TW", "mi", "eo"), (_en, _zh_tw, _mi, _eo)):
+        _TRANSLATIONS[_code][_source] = _text
+
+_GAME_NAMES = ('验钞机', '高尔夫球', '过三关', '叠叠乐', '100X 现金大挑战', '1 元 / 特易中奖', '每局 1 元', '每局 5 元', '大奖 1,000', '大奖 10,000', '大奖 50,000', '请选择一张刮刮卡')
+_DYNAMIC_PHRASES = {'en': {'已加入我的最爱：': 'Added to favorites: ',
+        '已从我的最爱移除：': 'Removed from favorites: ',
+        '余额': 'Balance',
+        '启动失败': 'Launch failed',
+        '无法打开': 'Could not open '},
+ 'zh_TW': {'已加入我的最爱：': '已加入我的最愛：', '已从我的最爱移除：': '已從我的最愛移除：', '余额': '餘額', '启动失败': '啟動失敗', '无法打开': '無法開啟'},
+ 'mi': {'已加入我的最爱：': 'Kua tāpiritia ki ngā tino pai: ',
+        '已从我的最爱移除：': 'Kua tangohia i ngā tino pai: ',
+        '余额': 'Toenga',
+        '启动失败': 'I rahua te tīmata',
+        '无法打开': 'Kāore i taea te whakatuwhera '},
+ 'eo': {'已加入我的最爱：': 'Aldonita al ŝatataj: ',
+        '已从我的最爱移除：': 'Forigita el ŝatataj: ',
+        '余额': 'Saldo',
+        '启动失败': 'Lanĉo malsukcesis',
+        '无法打开': 'Ne eblis malfermi '}}
+
+
+def normalise_language(value) -> str:
+    aliases = {"sc": "zh_CN", "tc": "zh_TW", "zh-cn": "zh_CN", "zh-tw": "zh_TW",
+               "zh_cn": "zh_CN", "zh_tw": "zh_TW"}
+    code = aliases.get(str(value).lower(), str(value).lower())
+    return code if code in _TRANSLATIONS else "en"
+
+
+def translate_text(text: str, language: str = "en") -> str:
+    """Translate this page's UI and game names without importing index.py."""
+    text = str(text)
+    language = normalise_language(language)
+    if language == "zh_CN":
+        return text
+    translated = _TRANSLATIONS[language].get(text)
+    if translated is not None:
+        return translated
+    if text.startswith("余额  $"):
+        labels = {"en": "Balance", "zh_TW": "餘額", "mi": "Toenga", "eo": "Saldo"}
+        return f"{labels[language]}  ${text.split('$', 1)[1]}"
+    greetings = {
+        "en": ("Good morning", "Good morning", "Good afternoon", "Good evening"),
+        "zh_TW": ("凌晨好", "早安", "午安", "晚安"),
+        "mi": ("Ata mārie", "Ata mārie", "Kia ora i te ahiahi", "Pō mārie"),
+        "eo": ("Bonan matenon", "Bonan matenon", "Bonan posttagmezon", "Bonan vesperon"),
+    }
+    for index, prefix in enumerate(("凌晨好，", "早上好，", "中午好，", "晚上好，")):
+        if text.startswith(prefix) and text.endswith("！"):
+            name = text[len(prefix):-1]
+            if language == "zh_TW":
+                return f"{greetings[language][index]}，{name}！"
+            return f"{greetings[language][index]}, {name}!"
+    # Composite launch/favorite status messages contain this page's game names.
+    for source in sorted(_GAME_NAMES, key=len, reverse=True):
+        text = text.replace(source, _TRANSLATIONS[language].get(source, source))
+    for source, target in sorted(_DYNAMIC_PHRASES[language].items(),
+                                 key=lambda item: len(item[0]), reverse=True):
+        text = text.replace(source, target)
+    return text
+
+
 def greeting_for(username: str) -> str:
     hour = datetime.now().hour
     period = "凌晨好" if hour < 6 else "早上好" if hour < 12 else "中午好" if hour < 18 else "晚上好"
@@ -183,6 +271,7 @@ class LottoPage(tk.Frame):
         on_balance_change: Optional[Callable[[float], None]] = None,
         on_preferences: Optional[Callable[[], None]] = None,
         translator: Optional[Callable[[str], str]] = None,
+        language: Optional[str] = None,
     ):
         for name in ("BG", "PANEL", "CARD", "CARD_HOVER", "GOLD", "TEXT", "MUTED"):
             setattr(self, name, _ui_colour(master, getattr(type(self), name)))
@@ -194,7 +283,11 @@ class LottoPage(tk.Frame):
         self.on_back = on_back
         self.on_balance_change = on_balance_change
         self.on_preferences = on_preferences
-        self.translator = translator
+        # translator is accepted for compatibility; this page owns its translations.
+        self.language = normalise_language(
+            language if language is not None else
+            getattr(master.winfo_toplevel(), "language", "en")
+        )
         self.game_cards = []
 
         self.balance_var = tk.StringVar()
@@ -204,10 +297,7 @@ class LottoPage(tk.Frame):
         self._preferences_ready = True
 
     def _tr(self, text: str) -> str:
-        if callable(self.translator):
-            return self.translator(text)
-        translator = getattr(self.winfo_toplevel(), "translate_ui", None)
-        return translator(text) if callable(translator) else text
+        return translate_text(text, self.language)
 
     def _build_ui(self) -> None:
         header = tk.Frame(self, bg=self.PANEL, height=82)
@@ -386,6 +476,8 @@ class LottoPage(tk.Frame):
             username = self.username
             parent_back = self.on_back
             balance_callback = self.on_balance_change
+            language = self.language
+            preferences_callback = self.on_preferences
 
             def return_to_lotto(final_balance: float) -> None:
                 new_balance = float(final_balance)
@@ -400,6 +492,8 @@ class LottoPage(tk.Frame):
                     balance=new_balance,
                     on_back=parent_back,
                     on_balance_change=balance_callback,
+                    on_preferences=preferences_callback,
+                    language=language,
                 )
                 replace_page = getattr(master, "replace_page", None)
                 if not callable(replace_page):
@@ -423,9 +517,8 @@ class LottoPage(tk.Frame):
 
         except Exception as exc:
             messagebox.showerror(
-                "启动失败",
-                f"无法打开《{display_name}》：\n\n"
-                f"{type(exc).__name__}: {exc}",
+                self._tr("启动失败"),
+                self._tr('无法打开《{name}》：\n\n{error}').format(name=self._tr(display_name), error=f"{type(exc).__name__}: {exc}"),
                 parent=self,
             )
 
@@ -443,6 +536,7 @@ def main(
     on_balance_change: Optional[Callable[[float], None]] = None,
     on_preferences: Optional[Callable[[], None]] = None,
     translator: Optional[Callable[[str], str]] = None,
+    language: Optional[str] = None,
 ) -> LottoPage:
     """供 index.py 使用；不会创建新的 Tk 根窗口或 mainloop。"""
     return LottoPage(
@@ -453,6 +547,7 @@ def main(
         on_balance_change=on_balance_change,
         on_preferences=on_preferences,
         translator=translator,
+        language=language,
     )
 
 
@@ -460,8 +555,8 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.withdraw()
     messagebox.showinfo(
-        "提示",
-        "lotto.py 应由项目根目录的 index.py 启动。",
+        translate_text("提示"),
+        translate_text("{file} 应由项目根目录的 index.py 启动。").format(file='lotto.py'),
         parent=root,
     )
     root.destroy()

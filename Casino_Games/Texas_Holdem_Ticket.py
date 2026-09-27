@@ -673,6 +673,91 @@ def exact_two_card_rank_pair_prob(deck_cards):
     return good / math.comb(n, 2)
 
 
+def _comb_or_zero(n, k):
+    return math.comb(n, k) if 0 <= k <= n else 0
+
+
+def exact_rank_count_probs(deck_cards, draw_count, rank):
+    """Hypergeometric distribution, including impossible counts as zero."""
+    n = len(deck_cards)
+    copies = sum(c.value == rank for c in deck_cards)
+    total = _comb_or_zero(n, draw_count)
+    if not total:
+        return {k: 0.0 for k in range(min(4, draw_count) + 1)}
+    return {
+        k: _comb_or_zero(copies, k) * _comb_or_zero(n - copies, draw_count - k) / total
+        for k in range(min(4, draw_count) + 1)
+    }
+
+
+def exact_predeal_hole_detail_probs():
+    """Ten exposed hole cards form a uniform 10-card subset of the deck."""
+    deck = [Card(s, r) for s in SUITS for r in RANKS]
+    total = math.comb(52, 10)
+    # Inclusion-exclusion: ten cards can contain at most two complete ranks.
+    four_kind_ways = sum(
+        (-1) ** (groups + 1) * math.comb(13, groups)
+        * math.comb(52 - 4 * groups, 10 - 4 * groups)
+        for groups in range(1, 10 // 4 + 1)
+    )
+    return {
+        'rank_counts': {r: exact_rank_count_probs(deck, 10, r) for r in (14, 13)},
+        'black_counts': {
+            k: math.comb(26, k) * math.comb(26, 10 - k) / total for k in range(11)
+        },
+        'any_four_of_rank': four_kind_ways / total,
+    }
+
+
+def flop_highest_bucket(cards):
+    """A/K/Q/J/10/9-or-lower; Ace is always high for this market."""
+    return max(9, max(c.value for c in cards))
+
+
+def exact_flop_detail_probs(deck_cards):
+    total = _comb_or_zero(len(deck_cards), 3)
+    highest = {}
+    for rank in (14, 13, 12, 11, 10, 9):
+        at_most = sum(c.value <= rank for c in deck_cards)
+        below = sum(c.value < rank for c in deck_cards)
+        ways = _comb_or_zero(at_most, 3)
+        if rank != 9:
+            ways -= _comb_or_zero(below, 3)
+        highest[rank] = ways / total if total else 0.0
+    return {
+        'rank_counts': {r: exact_rank_count_probs(deck_cards, 3, r) for r in (14, 13)},
+        'highest': highest,
+    }
+
+
+def all_players_at_least_two_pair(values):
+    """Category threshold: trips and all stronger hands also qualify."""
+    return len(values) == 5 and all(value[0] >= 2 for value in values)
+
+
+def river_comeback_from_values(half_values, final_values):
+    """Compare Stage-2's completed half-time result (hole cards + Flop) to River.
+
+    A tied half-time lead closes the entire market. Otherwise 'happened' means
+    the sole half-time leader is absent from ALL final winners. A final tie
+    between other players still counts as a comeback; one including that
+    leader does not. Turn leadership is deliberately irrelevant.
+    """
+    half_best = max(half_values)
+    half_winners = [i for i, value in enumerate(half_values) if value == half_best]
+    if len(half_winners) != 1:
+        return False
+    return final_values[half_winners[0]] < max(final_values)
+
+
+def river_comeback_happened(hole_hands, board):
+    if len(board) < 5:
+        return False
+    half_values = [hand_key7(list(h) + list(board[:3])) for h in hole_hands]
+    final_values = [hand_key7(list(h) + list(board[:5])) for h in hole_hands]
+    return river_comeback_from_values(half_values, final_values)
+
+
 def exact_flop_later_rank_match_probs(deck_cards):
     """Exact Stage-1/2 rank-overlap probabilities between Flop (3) and Turn/River (2).
 
@@ -750,6 +835,13 @@ PREDEAL_FLOP_LATER_RANK_MATCH_PROBS = exact_flop_later_rank_match_probs(_FULL_DE
 # A board-only 5-card hand has the standard exact 5-card category distribution.
 # straight_flush remains inclusive of royal_flush, matching the existing market rules.
 PREDEAL_COMMUNITY_HAND_TYPE_PROBS = dict(PREDEAL_HALF_PLAYER_TYPE_PROBS)
+PREDEAL_HOLE_DETAIL_PROBS = exact_predeal_hole_detail_probs()
+# Offline five-player JOINT calibration, not the fifth power of a single hand's
+# probability. 50,000,000 independent uniform 15-card deals, mt19937_64 seed
+# 20260925: 4,468,045 hits; approximate 95% interval +/-0.0000791.
+# Like the existing predeal joint tables this is a fixed estimated baseline.
+# Stage 2 and Stage 3 replace it with exhaustive conditional enumeration.
+PREDEAL_ALL_TWO_PAIR_PROB = 4468045 / 50000000
 
 
 def analyze_future_boards(hole_hands, known_board, remaining_cards):
@@ -765,6 +857,14 @@ def analyze_future_boards(hole_hands, known_board, remaining_cards):
     total=0;eq=[0.0]*5;hit=[0]*5;type_counts=Counter();player_type_counts=[Counter() for _ in range(5)];same_color_count=0;ge3_count=0;ge4_count=0;remaining_same_suit=0
     spec_holders={code:specified_holders(hole_hands,code) for code in SPECIFIED_HOLE_PATTERNS}
     spec_counts={code:{'win':0,'lose':0} for code in SPECIFIED_HOLE_PATTERNS}
+    all_two_pair_count = 0
+    river_comeback_count = 0
+    half_values = []
+    half_winners = []
+    if len(known_board) >= 3:
+        half_values = [hand_key7(list(h) + list(known_board[:3])) for h in hole_hands]
+        half_best = max(half_values)
+        half_winners = [i for i, value in enumerate(half_values) if value == half_best]
     iterable=combinations(rc,need) if need else [()]
     for extra in iterable:
         code=base_code;sc=base_sc.copy();sm=base_sm.copy(); board=list(known_board)
@@ -778,6 +878,10 @@ def analyze_future_boards(hole_hands, known_board, remaining_cards):
         for i,v in enumerate(vals):
             for market_key in hand_market_keys(v): player_type_counts[i][market_key] += 1
         best=max(vals);winners=[i for i,v in enumerate(vals) if v==best];share=1.0/len(winners)
+        if all_players_at_least_two_pair(vals):
+            all_two_pair_count += 1
+        if len(half_winners) == 1 and half_winners[0] not in winners:
+            river_comeback_count += 1
         for i in winners:eq[i]+=share;hit[i]+=1
         winner_set=set(winners)
         for code,holders in spec_holders.items():
@@ -803,12 +907,16 @@ def analyze_future_boards(hole_hands, known_board, remaining_cards):
       'player_types':[{k:counts.get(k,0)/total for k in HAND_KEY_TO_NAME} for counts in player_type_counts],
       'community_same_color_yes':same_color_count/total,'community_same_color_no':1-same_color_count/total,
       'community_ge3_suits':ge3_count/total,'community_ge4_suits':ge4_count/total,
+      'all_players_two_pair':all_two_pair_count/total,
       'specified_hand_results':{
           code:{kind:count/total for kind,count in counts.items()}
           for code,counts in spec_counts.items()
       }}
     if need==2:
         result['remaining_same_suit']=remaining_same_suit/total;result['remaining_diff_suit']=1-result['remaining_same_suit']
+        result['river_comeback'] = river_comeback_count / total
+        result['river_comeback_available'] = len(half_winners) == 1
+        result['river_comeback_half_leader'] = half_winners[0] if len(half_winners) == 1 else None
     return result
 
 def _card_bit52(card):
@@ -858,6 +966,7 @@ def analyze_half_flops(hole_hands, remaining_cards, *, with_masks=False):
     }
     if masks is not None:
         result['winner_masks'] = masks
+    result['flop_details'] = exact_flop_detail_probs(remaining_cards)
     return result
 
 
@@ -889,6 +998,7 @@ def analyze_hole_stage_exact(hole_hands, remaining_cards):
     same_color_count = 0
     ge3_count = 0
     ge4_count = 0
+    all_two_pair_count = 0
     mask_pair_counts = [[0] * 32 for _ in range(32)]
 
     for extra in combinations(rc, 5):
@@ -912,6 +1022,8 @@ def analyze_hole_stage_exact(hole_hands, remaining_cards):
                 player_type_counts[i][market_key] += 1
         best = max(vals)
         winners = [i for i, v in enumerate(vals) if v == best]
+        if all_players_at_least_two_pair(vals):
+            all_two_pair_count += 1
         share = 1.0 / len(winners)
         full_mask = 0
         for i in winners:
@@ -956,6 +1068,7 @@ def analyze_hole_stage_exact(hole_hands, remaining_cards):
         'community_same_color_no': 1 - same_color_count / total,
         'community_ge3_suits': ge3_count / total,
         'community_ge4_suits': ge4_count / total,
+        'all_players_two_pair': all_two_pair_count / total,
         'community_hand_types': {
             key: community_type_counts.get(key, 0) / total for key in HAND_KEY_TO_NAME
         },
@@ -1354,7 +1467,7 @@ class TexasHoldemSportsbook(tk.Frame):
         if row.get('scope','full')=='half':
             if row.get('market')=='half_h2h': return 'h2h'
             if row.get('market') in ('half_winner_type','half_player_type'): return 'hand'
-            if row.get('market')=='flop_pattern': return 'public'
+            if row.get('market') in ('flop_pattern','flop_rank_count','flop_highest_rank'): return 'public'
             if row.get('market')=='half_full': return 'half_full'
             return 'half_full'
         m=row.get('market')
@@ -1453,6 +1566,20 @@ class TexasHoldemSportsbook(tk.Frame):
         result.  Keep the wording compact, e.g. ``公牌 · 对子`` or
         ``公牌 · 翻2+转河1``.
         """
+        if t.market == 'flop_rank_count':
+            if len(self.board) < 3:
+                return '待结算'
+            rank = int(t.meta['rank'])
+            count = sum(c.value == rank for c in self.board[:3])
+            return f'翻牌 · {RANKS[rank-2]}共{count}张'
+
+        if t.market == 'flop_highest_rank':
+            if len(self.board) < 3:
+                return '待结算'
+            bucket = flop_highest_bucket(self.board[:3])
+            label = '9或以下' if bucket == 9 else RANKS[bucket-2]
+            return f'翻牌 · 最高点数{label}'
+
         if t.market == 'flop_pattern':
             if len(self.board) < 3:
                 return '待结算'
@@ -1520,6 +1647,7 @@ class TexasHoldemSportsbook(tk.Frame):
         'flop_pattern', 'community_same_color', 'community_suit_diversity',
         'remaining_suit_relation', 'turn_river_pair', 'board_rank_pairing',
         'community_hand_type',
+        'flop_rank_count', 'flop_highest_rank',
     })
 
     def _ticket_result_detail(self,t):
@@ -1532,6 +1660,39 @@ class TexasHoldemSportsbook(tk.Frame):
         status=t.result_text
         if t.market in self.PURE_PUBLIC_MARKETS:
             return self._public_market_result_detail(t) or '待结算'
+        if t.market in ('hole_rank_count','hole_color_count','hole_any_four_rank'):
+            if self.stage == 'predeal' or not all(len(h) == 2 for h in self.holes):
+                return '待结算'
+            cards = [c for h in self.holes for c in h]
+            if t.market == 'hole_rank_count':
+                rank = int(t.meta['rank'])
+                count = sum(c.value == rank for c in cards)
+                return f'5家手牌 · {RANKS[rank-2]}共{count}张'
+            if t.market == 'hole_color_count':
+                black = sum(c.suit in ('♠','♣') for c in cards)
+                return f'5家手牌 · {black}黑{10-black}红'
+            counts = Counter(c.value for c in cards)
+            ranks = [RANKS[r-2] for r in range(14,1,-1) if counts[r] == 4]
+            return '5家手牌 · ' + ('、'.join(ranks) + '四张齐出' if ranks else '无四张齐出')
+        if t.market == 'all_players_two_pair':
+            if len(self.board) >= 5:
+                values = [hand_key7(h + self.board) for h in self.holes]
+                happened = all_players_at_least_two_pair(values)
+            elif t.settled:
+                # Early settlement may follow an exact future-board proof.
+                happened = bool(t.won) == bool(t.selection)
+            else:
+                return '待结算'
+            return '全场 · ' + ('全部玩家最少两对' if happened else '有玩家不足两对')
+        if t.market == 'river_comeback':
+            if len(self.board) < 5:
+                return '待结算'
+            happened = river_comeback_happened(self.holes, self.board)
+            _hv, _hb, half_winners = self._half_result()
+            if len(half_winners) != 1:
+                return '半场并列领先 · 本项目不开售'
+            leader = half_winners[0] + 1
+            return f'河牌反超 · {"发生" if happened else "不发生"}（半场领先：玩家{leader}）'
         if t.market=='half_full':
             half=self._result_line(half=True)
             full=self._result_line(half=False)
@@ -1579,6 +1740,20 @@ class TexasHoldemSportsbook(tk.Frame):
         if market=='flop_pattern':
             short=label.replace('（包括同花顺）','')
             return f"翻牌3张 · {short}"
+        if market in ('flop_rank_count','hole_rank_count'):
+            rank = int(row['meta']['rank'])
+            prefix = '翻牌3张' if market == 'flop_rank_count' else '5家手牌'
+            return f'{prefix} · {RANKS[rank-2]}共{label}'
+        if market=='flop_highest_rank':
+            return f'翻牌 · 最高点数({label})'
+        if market=='hole_color_count':
+            return f'5家手牌 · {label}'
+        if market=='hole_any_four_rank':
+            return f'任意点数四张齐出 · {label}'
+        if market=='all_players_two_pair':
+            return f'全部玩家最终最少两对 · {label}'
+        if market=='river_comeback':
+            return f'河牌反超夺冠 · {label}'
         if market=='board_rank_pairing':
             return f"公牌配对 · {label}"
         if market=='community_hand_type':
@@ -1809,7 +1984,8 @@ class TexasHoldemSportsbook(tk.Frame):
         htxt=', '.join(f'{x:.2f}' for x in hist[-5:]) if hist else '—'
         hist_lab=tk.Label(line,text=htxt,bg=row_bg,fg='#13752B',font=('Arial',9,'bold'),wraplength=145,justify=tk.CENTER)
         hist_lab.grid(row=0,column=1,sticky='nsew',padx=3,pady=5);self._bind_market_wheel(hist_lab)
-        prob_lab=tk.Label(line,text=f"{row['prob']*100:.2f}%",bg=row_bg,fg='#222',font=('Arial',10,'bold'))
+        approx = '约' if (row.get('meta') or {}).get('probability_estimated') else ''
+        prob_lab=tk.Label(line,text=f"{approx}{row['prob']*100:.2f}%",bg=row_bg,fg='#222',font=('Arial',10,'bold'))
         prob_lab.grid(row=0,column=2,sticky='nsew',padx=3,pady=5);self._bind_market_wheel(prob_lab)
 
         od=row['odds']
@@ -2205,6 +2381,73 @@ class TexasHoldemSportsbook(tk.Frame):
         return {'market':'turn_river_pair','market_label':'转牌和河牌的2张',
                 'selection':'pair','selection_label':'对子','prob':p}
 
+    def _binary_prop_rows(self, market, label, probability, *, labels=('是','否'), meta=None):
+        # Do not sell a newly added market once its outcome is already certain.
+        if not 0.0 < probability < 1.0:
+            return []
+        return [
+            {'market':market,'market_label':label,'accordion_group':label,
+             'selection':selection,'selection_label':selection_label,'prob':p,
+             'meta':dict(meta or {})}
+            for selection, selection_label, p in (
+                (True, labels[0], probability), (False, labels[1], 1.0-probability)
+            )
+        ]
+
+    def _predeal_hole_detail_rows(self):
+        probs = PREDEAL_HOLE_DETAIL_PROBS
+        rows = []
+        for rank in (14, 13):
+            label = f'5家手牌共有几张{RANKS[rank-2]}'
+            for count, p in probs['rank_counts'][rank].items():
+                if 0.0 < p < 1.0:
+                    rows.append({
+                        'market':'hole_rank_count','market_label':label,'accordion_group':label,
+                        'selection':f'{rank}:{count}','selection_label':f'{count}张','prob':p,
+                        'meta':{'rank':rank,'count':count},
+                    })
+        for black, p in probs['black_counts'].items():
+            rows.append({
+                'market':'hole_color_count','market_label':'5家手牌红黑分布',
+                'accordion_group':'5家手牌红黑分布','selection':black,
+                'selection_label':f'{black}黑{10-black}红','prob':p,
+            })
+        rows += self._binary_prop_rows(
+            'hole_any_four_rank','任意点数四张齐出',probs['any_four_of_rank']
+        )
+        return rows
+
+    def _flop_detail_rows(self, probs):
+        rows = []
+        for rank in (14, 13):
+            label = f'翻牌出现几张{RANKS[rank-2]}'
+            for count, p in probs['rank_counts'][rank].items():
+                if 0.0 < p < 1.0:
+                    rows.append({
+                        'scope':'half','market':'flop_rank_count','market_label':label,
+                        'accordion_group':label,'selection':f'{rank}:{count}',
+                        'selection_label':f'{count}张','prob':p,
+                        'meta':{'rank':rank,'count':count},
+                    })
+        for rank, p in probs['highest'].items():
+            if 0.0 < p < 1.0:
+                rows.append({
+                    'scope':'half','market':'flop_highest_rank','market_label':'翻牌最高点数',
+                    'accordion_group':'翻牌最高点数','selection':rank,
+                    'selection_label':'9或以下' if rank == 9 else RANKS[rank-2], 'prob':p,
+                })
+        return rows
+
+    def _all_two_pair_rows(self, probability, *, estimated=False):
+        if self.stage == 'flop':
+            values = [hand_key7(h + self.board[:3]) for h in self.holes]
+            if all_players_at_least_two_pair(values):
+                return []
+        return self._binary_prop_rows(
+            'all_players_two_pair','全部玩家最终最少两对',probability,
+            meta={'probability_estimated':estimated}
+        )
+
     def _half_h2h_rows(self,analysis):
         out=[]
         for i in range(5):
@@ -2323,6 +2566,8 @@ class TexasHoldemSportsbook(tk.Frame):
         for key,label,k in [('hole_rank_match_ge2','最少2家','ge2'),('hole_rank_match_ge3','最少3家','ge3')]:
             rows.append({'market':'hole_rank_pattern_match','market_label':'玩家手牌点数组合相同','selection':k,'selection_label':label,'prob':PREDEAL_HOLE_RANK_MATCH_PROBS[key]})
         rows += self._specified_hand_rows(PREDEAL_SPECIFIED_RESULT_PROBS,predeal=True)
+        rows += self._predeal_hole_detail_rows()
+        rows += self._all_two_pair_rows(PREDEAL_ALL_TWO_PAIR_PROB,estimated=True)
         return rows+self.predeal_half_markets()
 
     def hole_markets_from_analysis(self,a,flop_probs,turn_river_pair_prob,rank_pair_probs,half,half_full):
@@ -2343,10 +2588,19 @@ class TexasHoldemSportsbook(tk.Frame):
         rows += self._half_player_type_rows(half['player_types'])
         rows += self._half_full_rows(half_full)
         rows += self._specified_hand_rows(a.get('specified_hand_results',{}),predeal=False)
+        rows += self._flop_detail_rows(half['flop_details'])
+        rows += self._all_two_pair_rows(a['all_players_two_pair'])
         return rows
 
     def flop_markets_from_analysis(self,a,special,turn_river_pair_prob):
         rows=self._h2h_rows(a)+self._winner_type_rows(a['winner_types'])+self._full_player_type_rows(a['player_types'])
+        rows += self._all_two_pair_rows(a['all_players_two_pair'])
+        if a.get('river_comeback_available'):
+            rows += self._binary_prop_rows(
+                'river_comeback','河牌反超夺冠',a['river_comeback'],
+                labels=('发生','不发生'),
+                meta={'half_leader':a['river_comeback_half_leader']}
+            )
         rows += [
             {'market':'remaining_suit_relation','market_label':'剩余2张公共牌','selection':'same','selection_label':'同一花色','prob':a['remaining_same_suit']},
             {'market':'remaining_suit_relation','market_label':'剩余2张公共牌','selection':'different','selection_label':'不同花色','prob':a['remaining_diff_suit']},
@@ -2725,6 +2979,7 @@ class TexasHoldemSportsbook(tk.Frame):
             return a,flop_probs,tr_pair,rank_pair_probs,half,half_full
         def done(res):
             a,flop_probs,tr_pair,rank_pair_probs,half,half_full=res
+            self._settle_all_two_pair_tickets(a['all_players_two_pair'])
             self.sales_open=True
             self.set_markets(self.hole_markets_from_analysis(a,flop_probs,tr_pair,rank_pair_probs,half,half_full))
             self.status.config(text=f"阶段2：10张手牌已知；全场 C(42,5) + 半场 C(42,3) + 半全场精确组合已完成")
@@ -2741,6 +2996,7 @@ class TexasHoldemSportsbook(tk.Frame):
             return a,sp,top,tr_pair
         def done(res):
             a,sp,top,tr_pair=res
+            self._settle_all_two_pair_tickets(a['all_players_two_pair'])
             self._settle_draw_dead_tickets(a)
             self._rebuild_scope_tabs();self._rebuild_category_tabs()
             self.sales_open=True;self.set_markets(self.flop_markets_from_analysis(a,sp,tr_pair));self.status.config(text=f"阶段3：已知14张牌；精确枚举 {a['total']:,} 种 Turn/River，特殊对决=P{top[0]+1} vs P{top[1]+1}")
@@ -2790,6 +3046,30 @@ class TexasHoldemSportsbook(tk.Frame):
         return in_winners if desired=='W' else not in_winners
 
     def ticket_is_win(self,t,vals,best,winners):
+        if t.market=='hole_rank_count':
+            rank = int(t.meta['rank'])
+            count = sum(c.value == rank for h in self.holes for c in h)
+            return count == int(t.meta['count']),1
+        if t.market=='hole_color_count':
+            black = sum(c.suit in ('♠','♣') for h in self.holes for c in h)
+            return black == int(t.selection),1
+        if t.market=='hole_any_four_rank':
+            counts = Counter(c.value for h in self.holes for c in h)
+            happened = any(count == 4 for count in counts.values())
+            return happened == bool(t.selection),1
+        if t.market=='flop_rank_count':
+            if len(self.board)<3:return False,1
+            count = sum(c.value == int(t.meta['rank']) for c in self.board[:3])
+            return count == int(t.meta['count']),1
+        if t.market=='flop_highest_rank':
+            return len(self.board)>=3 and flop_highest_bucket(self.board[:3])==int(t.selection),1
+        if t.market=='all_players_two_pair':
+            if len(self.board)<5:return False,1
+            happened = all_players_at_least_two_pair(vals)
+            return happened == bool(t.selection),1
+        if t.market=='river_comeback':
+            if len(self.board)<5:return False,1
+            return river_comeback_happened(self.holes,self.board)==bool(t.selection),1
         if t.market=='half_h2h':
             _hv,_hb,hw=self._half_result();p=int(t.selection)
             if p in hw:return True,len(hw)
@@ -2889,7 +3169,10 @@ class TexasHoldemSportsbook(tk.Frame):
             if t.settled:
                 continue
             known=False; won=False; split=1
-            if checkpoint in ('holes','flop') and t.market in ('hole_suited_count','hole_pair_count','hole_rank_pattern_match'):
+            if checkpoint in ('holes','flop') and t.market in (
+                'hole_suited_count','hole_pair_count','hole_rank_pattern_match',
+                'hole_rank_count','hole_color_count','hole_any_four_rank'
+            ):
                 vals=[hand_key7(h + self.board) if len(self.board)>=5 else None for h in self.holes]
                 # ticket_is_win only needs holes for these markets; dummy final args are safe.
                 won,split=self.ticket_is_win(t,vals,(0,),[]);known=True
@@ -2907,8 +3190,12 @@ class TexasHoldemSportsbook(tk.Frame):
                     _hv,_hb,hw=self._half_result()
                     if not self._tie_wildcard_leg_matches(p,hw,code[0]):
                         won=False;split=1;known=True
-            elif checkpoint=='flop' and t.market=='flop_pattern':
+            elif checkpoint=='flop' and t.market in ('flop_pattern','flop_rank_count','flop_highest_rank'):
                 won,split=self.ticket_is_win(t,[],(0,),[]);known=True
+            elif checkpoint=='flop' and t.market=='all_players_two_pair':
+                half_values, _hb, _hw = self._half_result()
+                if all_players_at_least_two_pair(half_values):
+                    won=bool(t.selection);known=True
             elif checkpoint=='flop' and t.market=='community_same_color':
                 colors={0 if c.suit in ('♥','♦') else 1 for c in self.board}
                 if len(colors)>1:
@@ -2925,6 +3212,19 @@ class TexasHoldemSportsbook(tk.Frame):
         self._credit_returns(total_return)
         if total_return>0:
             self.status.config(text=f'已有彩卷完成结算，本阶段即时返还 {money(total_return)}')
+
+    def _settle_all_two_pair_tickets(self, probability):
+        """Settle either side when exhaustive future-board counting proves it."""
+        if probability not in (0.0, 1.0):
+            return
+        happened = probability == 1.0
+        total_return = 0.0
+        for ticket in self.tickets:
+            if not ticket.settled and ticket.market == 'all_players_two_pair':
+                total_return += self._apply_ticket_result(
+                    ticket, happened == bool(ticket.selection), 1
+                )
+        self._credit_returns(total_return)
 
     def _settle_draw_dead_tickets(self,analysis):
         """After the flop exact enumeration, immediately settle mathematically dead bets."""
@@ -3003,15 +3303,22 @@ class TexasHoldemSportsbook(tk.Frame):
 
    阶段1 — 玩家手牌派出前
    - 所有玩家手牌与公共牌仍未知，可购买全场、半场及阶段1开放项目。
+   - 新增5家手牌A张数、K张数（各0至4张）、红黑分布（共10张）、任意点数四张齐出。
+   - 上述手牌项目只统计5家共10张手牌，并在手牌全部亮出后结算。
    - 按“停止售票 · 玩家发张”后，庄家明牌派出5家各2张手牌。
 
    阶段2 — 10张玩家手牌全部明牌后
    - 系统依据已知10张牌重新计算动态赔率。
    - 全场精确枚举剩余5张公共牌组合；半场精确枚举所有可能Flop。
+   - 半场 > 公牌新增翻牌A张数、K张数（各0至3张），以及最高点数A/K/Q/J/10/9或以下。
+   - 新增翻牌项目只在阶段2出售，三张Flop亮出后结算；A始终按最高点数判断。
    - 按“停止售票 · 翻牌三张”后，烧1张牌，再明牌派出3张Flop。
 
    阶段3 — Flop 3张公开后
    - 半场已经确定，因此只开放全场与购买记录。
+   - 新增“河牌反超夺冠”，以阶段2结束时的半场结果（2张手牌+3张Flop）为比较基准。
+   - 若半场并列领先，此项目不可下注；若半场只有一名领先者，则比较最终赢家名单。
+   - 最终赢家含该领先者：不发生；完全不含该领先者：发生。最终其他玩家并列也算发生。
    - 系统精确枚举剩余 翻牌/和牌 组合并更新全场赔率。
    - 按“停止售票 · 转牌河牌两张”后：烧1张→Turn；再烧1张→River；随后结算。
 
@@ -3034,6 +3341,12 @@ class TexasHoldemSportsbook(tk.Frame):
    - 阶段1、阶段2提供“指定手牌获胜/败”：AA、AK、27、22。
    - 阶段1“任一家27并且获胜”采用105% RTP特别定价；阶段2恢复一般赌场优势。
    - 包含玩家手牌对子数量、相同点数组合、特殊两家对决等当阶段开放项目。
+   - “任意点数四张齐出”指10张手牌中，至少一个点数的四种花色全部出现；不要求同一家持有。
+   - 红黑分布中的黑色为黑桃/梅花，红色为红桃/方块，选项从0黑10红至10黑0红。
+   - 三个阶段均提供“全部玩家最终最少两对”的是/否选项，按5家各自最终最佳5张牌判定。
+   - 最少两对包括两对、三条、顺子、同花、葫芦、四条及同花顺（含皇家同花顺）。
+   - 阶段3若5家当前已经全部最少两对，便不再显示该项目，已购彩卷立即结算。
+   - 新增项目若根据已知牌已经确定发生或不发生，不再出售；不可能的张数选项也不显示。
 
 4. 半场彩卷（仅阶段1与阶段2）
 
@@ -3066,6 +3379,9 @@ class TexasHoldemSportsbook(tk.Frame):
 
    - 阶段2与阶段3动态赔率使用确定性组合枚举，不以Monte Carlo模拟次数估算。
    - 阶段1完全未知时，对称/单人牌型等项目使用精确对称或组合概率；部分5人赢家联合分布使用程序内固定基准表。
+   - 新增手牌张数、红黑分布、四张齐出及翻牌项目均采用精确组合概率。
+   - 阶段1“全部玩家最终最少两对”采用离线5000万局五人联合估计基准，概率显示“约”。
+   - 该项目阶段2、3均改用当前已知牌下的完整组合枚举，不以单人概率相乘，也不进行实时模拟。
    - 当某张彩卷在River前已经客观确定结果，会立即结算并把返还加入余额。
    - 尚未提前结算的彩卷在River完成后统一结算。
    - 一局结束后按“再来一局”开始新局；上一局购买记录不会带入新局。

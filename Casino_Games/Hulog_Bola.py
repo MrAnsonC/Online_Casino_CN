@@ -18,7 +18,8 @@ try:
 except ImportError:
     Image = ImageTk = None
 
-VERSION = "PocketRain-DropBall-2.5D-R16"
+VERSION = "PocketRain-DropBall-2.5D-R17-FlapCycle-v6"
+FLAP_REVISION = "2026-09-22-v6-fast-reveal"
 
 class Theme:
     """Shared interface colours and fonts."""
@@ -63,6 +64,122 @@ def chip_amount_text(amount):
     whole,decimal=divmod(tenths,10)
     label=str(whole)+(f".{decimal}" if decimal else "")
     return label+suffix+("+" if remainder else "")
+
+
+
+class SplitFlapDigit(tk.Frame):
+    """A hinged card: old upper half falls, then the new lower half unfolds."""
+    WIDTH, HALF, DURATION = 27, 17, .60
+    HOLD_MS = 200
+    DASH_DURATION = .20
+    DASH_HOLD_MS = 70
+    SYMBOLS = "0123456789-"
+
+    def __init__(self, master):
+        super().__init__(master, width=27, height=34, bg="#0B100E",
+                         highlightbackground="#647269", highlightthickness=1)
+        self.pack_propagate(False)
+        self._value="-"
+        self._target="-"
+        self._next=None
+        self._job=None
+        self._dead=False
+        self._top=tk.Canvas(self, bg="#28332D", highlightthickness=0)
+        self._bottom=tk.Canvas(self, bg="#141C17", highlightthickness=0)
+        self._leaf=tk.Canvas(self, bg="#28332D", highlightthickness=0)
+        self._top.place(x=0,y=0,width=27,height=17)
+        self._bottom.place(x=0,y=17,width=27,height=17)
+        self._hinge=tk.Frame(self,bg="#080C09",height=1)
+        self._hinge.place(x=0,y=17,width=27,height=1)
+        self.bind("<Destroy>",self._on_destroy,add="+")
+        self._paint_rest()
+
+    @staticmethod
+    def _paint_half(canvas, digit, upper, height=17, shade=None):
+        # Each half is a separate clipping surface.  The moving card's height
+        # follows a cosine projection around the horizontal hinge.
+        canvas.delete("all")
+        if shade is not None:canvas.configure(bg=shade)
+        canvas.create_text(13.5,height if upper else 0,text=digit,
+                           fill="#F7F2D9",font=("Courier",max(1,round(23*height/17)),"bold"))
+        canvas.create_line(1,0 if upper else height-1,26,0 if upper else height-1,
+                           fill="#526055")
+
+    def _paint_rest(self):
+        self._leaf.place_forget()
+        self._paint_half(self._top,self._value,True)
+        self._paint_half(self._bottom,self._value,False)
+        self._hinge.lift()
+
+    def set(self, value, *, animate=True, delay=0, fast=False):
+        value=str(value)
+        if value not in self.SYMBOLS or len(value)!=1:
+            raise ValueError("翻牌字符必须是 0–9 或 -")
+        if not animate:
+            self._cancel()
+            self._value=self._target=value
+            self._next=None
+            self._paint_rest()
+            return
+        if value==self._target:return
+        self._target=value
+        self._fast=fast
+        # Never jump to a previous target or cut a falling card in half.
+        # An in-flight step finishes before following the latest destination.
+        if self._job is None:
+            self._job=self.after(delay,self._advance)
+
+    def is_animating(self):
+        return self._job is not None or self._value!=self._target
+
+    def _advance(self):
+        self._job=None
+        if self._dead or self._value==self._target:return
+        self._next=self.SYMBOLS[(self.SYMBOLS.index(self._value)+1)%len(self.SYMBOLS)]
+        # Trips to unknown dashes and the explicit bonus reveal use fast timing.
+        # Ordinary numeric increments (including 9 -> - -> 0) stay standard.
+        # Snapshot each step so repainting/retargeting cannot change it mid-fall.
+        self._step_duration=self.DASH_DURATION if self._target=="-" or getattr(self,"_fast",False) else self.DURATION
+        self._step_hold_ms=self.DASH_HOLD_MS if self._target=="-" or getattr(self,"_fast",False) else self.HOLD_MS
+        self._start=time.monotonic()
+        self._tick()
+
+    def _tick(self):
+        self._job=None
+        if self._dead:return
+        progress=max(0.,min(1.,(time.monotonic()-self._start)/self._step_duration))
+        if progress>=1:
+            self._value=self._next
+            self._next=None
+            self._paint_rest()
+            # Every intermediate card stays legible, even after a slow frame.
+            # A late timer never skips intermediate symbols to catch up.
+            self._job=self.after(self._step_hold_ms,self._advance)
+            return
+        self._paint_half(self._top,self._next,True)
+        self._paint_half(self._bottom,self._value,False)
+        angle=math.pi*progress**.8
+        upper=angle<math.pi/2
+        height=max(1,round(self.HALF*abs(math.cos(angle))))
+        y=self.HALF-height if upper else self.HALF
+        tone=round(20+22*abs(math.cos(angle)))
+        shade=f"#{tone:02x}{tone+8:02x}{tone+2:02x}"
+        self._leaf.place(x=0,y=y,width=self.WIDTH,height=height)
+        self._paint_half(self._leaf,self._value if upper else self._next,upper,height,shade)
+        self._leaf.tk.call("raise",self._leaf._w)
+        self._hinge.lift()
+        self._job=self.after(16,self._tick)
+
+    def _cancel(self):
+        if self._job is not None:
+            try:self.after_cancel(self._job)
+            except tk.TclError:pass
+            self._job=None
+
+    def _on_destroy(self,event):
+        if event.widget is self:
+            self._dead=True
+            self._cancel()
 
 
 class ModernButton(tk.Button):
@@ -130,8 +247,8 @@ def settle_table(balance, bets, outcomes, *, bonus_multiplier=0, bonus_slot=-1, 
     returned=stake if invalid else sum((bet*(1+PROFIT_ODDS[outcomes.count(i)])
                  for i,bet in enumerate(bets) if outcomes.count(i)),Decimal(0))
     if bonus_multiplier:
-        if invalid or len(set(outcomes))!=1 or not 4<=bonus_multiplier<=100:
-            raise ValueError("Plinko 仅适用于三球同格，倍数必须为 4–100")
+        if invalid or len(set(outcomes))!=1 or bonus_multiplier not in PlinkoPhysics.AWARDS:
+            raise ValueError("Plinko 仅适用于三球同格，倍数必须为 5、10、20、50 或 100")
         returned=bets[outcomes[0]]*bonus_multiplier
     return TableResult(bets,stake,outcomes,returned,returned-stake,balance-stake+returned,invalid,
                        bonus_multiplier,bonus_slot,tuple(bonus_values))
@@ -403,37 +520,44 @@ class BallPhysics:
 
 
 class PlinkoPhysics:
-    """One 2D hollow ball, fixed pegs and 18 physical bins. Only release is random."""
+    """One 2D ball, rotating deflectors and 15 physical bins."""
     WIDTH,HEIGHT=18.,20.
+    BIN_COUNT=15
+    BIN_WIDTH=WIDTH/BIN_COUNT
+    AWARDS=(5,10,20,50,100)
+    WEIGHTS=((350,510,115,20,5),)*2 + ((120,400,330,110,40),)*2 + ((420,490,80,10,0),)*2 + ((550,415,30,5,0),) + ((560,417,20,3,0),) + ((550,415,30,5,0),) + ((420,490,80,10,0),)*2 + ((120,400,330,110,40),)*2 + ((350,510,115,20,5),)*2
+    # Screen coordinates have downward-positive y: +1 rotates clockwise.
+    ROTORS=((4.0,7.0,1),(4.0,12.0,1),
+            (8.0,7.8,1),(10.0,12.0,-1),
+            (14.0,7.0,-1),(14.0,12.0,-1))
+    ROTOR_SPEED=3.2
     RADIUS,PEG_RADIUS=.18,.12
     DT,FRAME_DT=1/480,1/60
     GRAVITY=9.81
     def __init__(self,rng=None):
         rng=rng or random.SystemRandom()
-        total=rng.randint(180,220)
-        base,remainder=divmod(total,18)
-        values=[base+(i<remainder) for i in range(18)]
-        # Preserve the sum while keeping all bins near the board average.
-        # No small group of large awards surrounded by minimum-value bins.
-        low=max(4,base-3);high=min(100,base+4)
-        for _ in range(180):
-            a,b=rng.sample(range(18),2)
-            if values[a]>low and values[b]<high:
-                values[a]-=1;values[b]+=1
-        rng.shuffle(values)
-        self.multipliers=tuple(values)
-        self.launch_duration=rng.uniform(2.,3.)
-        self.launch_phase=rng.uniform(0.,32.8)
-        self.launch_speed=28.
-        self.x=self.launcher_x(self.launch_duration);self.y=1.1
-        self.vx=0.;self.vy=0.;self.spin=0.
+        self.multipliers=tuple(rng.choices(self.AWARDS,weights=weights,k=1)[0]
+                               for weights in self.WEIGHTS)
+        self.launch_duration=1.0
+        self.x=9.;self.y=1.1
+        self.vx=rng.uniform(-.25,.25);self.vy=0.;self.spin=0.
         self.pegs=[(j+(.5 if row%2==0 else 1),3+row*1.1)
-                   for row in range(12) for j in range(18 if row%2==0 else 17)]
+                   for row in range(12) for j in range(18 if row%2==0 else 17)
+                   if all(math.hypot(j+(.5 if row%2==0 else 1)-rx,3+row*1.1-ry)>1.25
+                          for rx,ry,_ in self.ROTORS)]
         self.contacts=0
+        self.time=0.
 
     def launcher_x(self,elapsed):
-        distance=(self.launch_phase+self.launch_speed*max(0,min(elapsed,self.launch_duration)))%32.8
-        return .8+(distance if distance<=16.4 else 32.8-distance)
+        return self.WIDTH/2
+
+    @classmethod
+    def rotor_points(cls,elapsed):
+        for cx,cy,direction in cls.ROTORS:
+            angle=direction*cls.ROTOR_SPEED*elapsed
+            for blade in range(4):
+                theta=angle+blade*math.pi/2
+                yield cx,cy,cx+.7*math.cos(theta),cy+.7*math.sin(theta),theta,direction
 
     def contact(self,nx,ny,penetration,restitution=.65,friction=.08):
         self.x+=nx*max(0,penetration);self.y+=ny*max(0,penetration)
@@ -451,6 +575,7 @@ class PlinkoPhysics:
 
     def step(self):
         dt=self.DT;r=self.RADIUS
+        self.time+=dt
         drag=1/(1+.035*math.hypot(self.vx,self.vy)*dt)
         self.vx*=drag;self.vy*=drag
         self.x+=self.vx*dt;self.y+=self.vy*dt+.5*self.GRAVITY*dt*dt
@@ -459,16 +584,29 @@ class PlinkoPhysics:
             if self.x<r:self.contact(1,0,r-self.x,.55)
             if self.x>18-r:self.contact(-1,0,self.x-(18-r),.55)
             if self.y<r:self.contact(0,1,r-self.y,.55)
+            # Funnel shoulders open outward below the central inlet.
+            if self.y<2.8:
+                edge=max(0.,9.-self.y*3.2)
+                if self.x<edge+r:self.contact(1,0,edge+r-self.x,.35)
+                if self.x>18-edge-r:self.contact(-1,0,self.x-(18-edge-r),.35)
             for px,py in self.pegs:
                 if abs(self.y-py)>.31:continue
                 dx,dy=self.x-px,self.y-py;d=math.hypot(dx,dy)
                 if d<r+self.PEG_RADIUS:
                     nx,ny=(dx/d,dy/d) if d>1e-10 else (0,-1)
                     self.contact(nx,ny,r+self.PEG_RADIUS-d)
+            for _,_,px,py,theta,direction in self.rotor_points(self.time):
+                dx,dy=self.x-px,self.y-py;d=math.hypot(dx,dy)
+                if d<r+.19:
+                    nx,ny=(dx/d,dy/d) if d>1e-10 else (0,-1)
+                    self.contact(nx,ny,r+.19-d,.55)
+                    # The spinning blade transfers part of its tangential velocity.
+                    self.vx+=-direction*.10*math.sin(theta)
+                    self.vy+=direction*.10*math.cos(theta)
             # Capsules forming the bin dividers: same geometry used for drawing.
             if self.y>16.7:
-                for wall in range(1,18):
-                    dx=self.x-wall;dy=self.y-max(17.,min(20.,self.y));d=math.hypot(dx,dy)
+                for wall in range(1,self.BIN_COUNT):
+                    dx=self.x-wall*self.BIN_WIDTH;dy=self.y-max(17.,min(20.,self.y));d=math.hypot(dx,dy)
                     if d<r+.025:
                         nx,ny=(dx/d,dy/d) if d>1e-10 else (1,0)
                         self.contact(nx,ny,r+.025-d,.35)
@@ -485,8 +623,25 @@ class PlinkoPhysics:
             quiet=quiet+1 if resting else 0
             if quiet>=120:
                 frames.append((self.x,self.y))
-                return frames,min(17,max(0,int(self.x)))
+                return frames,min(self.BIN_COUNT-1,max(0,int(self.x/self.BIN_WIDTH)))
         raise RuntimeError("Plinko 未停稳，本轮未扣款。")
+
+
+def draw_plinko_rotors(canvas,ox,oy,scale,elapsed):
+    """Draw rounded four-blade pinwheels matching the collision tip positions."""
+    for cx,cy,px,py,_,_ in PlinkoPhysics.rotor_points(elapsed):
+        x0,y0=ox+cx*scale,oy+cy*scale
+        x1,y1=ox+px*scale,oy+py*scale
+        canvas.create_line(x0,y0,x1,y1,fill="#9B6321",width=max(3,.26*scale),capstyle=tk.ROUND)
+        canvas.create_line(x0,y0,x1,y1,fill="#FFD46B",width=max(2,.16*scale),capstyle=tk.ROUND)
+        radius=.19*scale
+        canvas.create_oval(x1-radius,y1-radius,x1+radius,y1+radius,
+                           fill="#FFD46B",outline="#9B6321",width=1)
+    for cx,cy,_ in PlinkoPhysics.ROTORS:
+        x,y=ox+cx*scale,oy+cy*scale;r=.24*scale
+        canvas.create_oval(x-r,y-r,x+r,y+r,fill="#704F2A",outline="#FFE5A1",width=2)
+        r=.07*scale
+        canvas.create_oval(x-r,y-r,x+r,y+r,fill="#FFF1BA",outline="")
 
 
 class AccountStore:
@@ -534,6 +689,43 @@ class DropBallHistory:
             if not isinstance(data,dict) or not isinstance(data.get("Record2"),dict):
                 raise ValueError("落球历史记录格式错误")
             self.data=data
+        self._restore_latest_triple()
+
+    @staticmethod
+    def _is_triple(outcomes, invalid=False):
+        return (not invalid and len(outcomes)==3
+                and all(type(i) is int and 0<=i<6 for i in outcomes)
+                and len(set(outcomes))==1)
+
+    def _restore_latest_triple(self):
+        """Migrate old logs; retain the summary after Record2's 1000-row cutoff."""
+        if "LatestTriple" in self.data:
+            return
+        self.data["LatestTriple"] = None
+        for entry in self.entries():
+            outcomes=entry.get("outcomes", [])
+            if self._is_triple(outcomes, entry.get("invalid", False)):
+                self.data["LatestTriple"]={
+                    "round":entry["round"], "outcomes":list(outcomes),
+                    "labels":[CARDS[i] for i in outcomes],
+                    "rounds_ago":max(1, self.data["Total"]-entry["round"]+1),
+                    "multiplier":entry.get("plinko", {}).get("multiplier") or None}
+                break
+
+    def latest_triple(self):
+        record=self.data.get("LatestTriple")
+        return dict(record) if record is not None else None
+
+    def _next_latest_triple(self, result, number):
+        record=self.latest_triple()
+        if self._is_triple(result.outcomes, result.invalid):
+            # Reset BEFORE counting this settlement: a new triple reads 001.
+            record={"round":number, "outcomes":list(result.outcomes),
+                    "labels":[CARDS[i] for i in result.outcomes],
+                    "rounds_ago":0, "multiplier":result.bonus_multiplier or (1+PROFIT_ODDS[3])}
+        if record is not None:
+            record["rounds_ago"]+=1
+        return record
 
     def entries(self):
         return sorted(self.data["Record2"].values(),key=lambda e:e["round"],reverse=True)
@@ -545,7 +737,11 @@ class DropBallHistory:
                "plinko":{"multiplier":result.bonus_multiplier,"slot":result.bonus_slot,"values":list(result.bonus_values)}}
         recent=([entry]+self.entries())[:1000]
         data={"Total":number,"Record1":{f"{e['round']}_Data":e for e in recent[:15]},
-              "Record2":{f"{e['round']}_Data":e for e in recent}}
+              "Record2":{f"{e['round']}_Data":e for e in recent},
+              "LatestTriple":self._next_latest_triple(result, number)}
+        self._save_data(data)
+
+    def _save_data(self, data):
         if self.path:
             self.path.parent.mkdir(parents=True,exist_ok=True)
             # Exact project filename preserves the installed secure-json routing.
@@ -728,6 +924,7 @@ class RedPacketRainGame:
         board.pack(side="left",fill="both",expand=True,padx=(0,10))
         self.canvas=tk.Canvas(board,bg="#263d38",highlightthickness=0);self.canvas.pack(fill="both",expand=True)
         self.canvas.bind("<Configure>",lambda e:self.draw_scene())
+        self._create_latest_triple_panel(board)
         # Caribbean's distinct bordered cards, gold section headers and inset bodies.
         def section(title=None,padding=2):
             card=tk.Frame(right,bg=Theme.PANEL,bd=1,relief=tk.SOLID)
@@ -760,7 +957,7 @@ class RedPacketRainGame:
         self.bet_canvas.bind("<Button-1>",self._bet_click)
         self.bet_canvas.bind("<Button-3>",self._bet_clear_click)
         self.bet_canvas.bind("<Key>",self._bet_key)
-        self.root.bind("<Return>",lambda e:self.start_game(),add="+")
+        self._bind_start_keys()
         action=section("操作",padding=2)
         tk.Label(action,textvariable=self.info_var,font=("Arial",10,"bold"),bg=Theme.PANEL,fg="#2A1B08",wraplength=370,height=1).pack(fill="x",pady=(0,3))
         buttons=tk.Frame(action,bg=Theme.PANEL);buttons.pack(fill="x")
@@ -789,6 +986,140 @@ class RedPacketRainGame:
         tk.Label(row_last,textvariable=self.last_win_var,font=("Arial",12),bg=Theme.PANEL,fg="black").pack(side="left")
         tk.Button(row_last,text="ℹ️",command=self.show_game_instructions,bg="#4B8BBE",fg="white",
                   font=("Arial",12),width=2,relief=tk.FLAT).pack(side="right")
+
+
+    def _bind_start_keys(self):
+        # Tk events include the toplevel tag, but NOT ancestor Frame tags.
+        self._key_window=self.root.winfo_toplevel()
+        self._start_key_bindings=[]
+        for sequence in ("<Return>", "<KP_Enter>"):
+            command=self._key_window.bind(sequence, self._on_start_key, add="+")
+            self._start_key_bindings.append((sequence, command))
+
+    def _on_start_key(self, event):
+        if self._closed or not self.root.winfo_ismapped():
+            return
+        # Do not start a game from another page or a child dialog.
+        widget=event.widget
+        if widget is not self._key_window:
+            while widget is not None and widget is not self.root:
+                if isinstance(widget, (tk.Tk, tk.Toplevel)):
+                    return
+                widget=getattr(widget, "master", None)
+            if widget is None:
+                return
+        try:
+            if self.root.grab_current() is not None:
+                return
+            if str(self.start_button.cget("state"))!=tk.DISABLED:
+                self.start_button.invoke()
+        except tk.TclError:
+            return
+        return "break"
+
+    def _unbind_start_keys(self):
+        for sequence, command in getattr(self, "_start_key_bindings", []):
+            try:
+                self._key_window.unbind(sequence, command)
+            except tk.TclError:
+                pass
+        self._start_key_bindings=[]
+
+    def _create_latest_triple_panel(self, board):
+        self.latest_triple_canvas=tk.Canvas(
+            board, width=170, height=192, bg="#172923",
+            highlightbackground="#D8B46A", highlightthickness=1)
+        self.latest_triple_canvas.place(relx=1.0, x=-10, y=10, anchor="ne")
+        self._latest_triple_images=[]
+        self._latest_triple_preview=None
+        self._triple_reveal_requested=False
+        self._triple_flaps={key:[SplitFlapDigit(self.latest_triple_canvas) for _ in range(3)]
+                            for key in ("rounds_ago","multiplier")}
+        self._draw_latest_triple(animate=False)
+
+    def _show_pending_triple(self):
+        """Called only when the visible color/card result has landed."""
+        r=self._result
+        if (self._latest_triple_preview is not None or r is None or r.invalid
+                or len(set(r.outcomes))!=1):return
+        self._latest_triple_preview={"outcomes":list(r.outcomes),
+                                    "rounds_ago":None,"multiplier":None}
+        self._draw_latest_triple()
+
+    def _wait_for_latest_triple(self):
+        """Settlement must not replace 000 while a multiplier card is falling."""
+        self._job=None
+        if self._closed or not self.game_active or self._result is None:return
+        if any(cell.is_animating() for cells in self._triple_flaps.values() for cell in cells):
+            self._job=self.root.after(50,self._wait_for_latest_triple)
+        elif self._triple_reveal_requested:
+            # Complete all six trips to '-' before assigning numeric targets.
+            self._reveal_latest_triple()
+            self._job=self.root.after(50,self._wait_for_latest_triple)
+        else:
+            # All six cards have landed; keep the result readable before +1.
+            self._job=self.root.after(800,self._finish_round)
+
+    def _reveal_latest_triple(self):
+        """Reveal 000 and the FINAL multiplier after the bonus animation ends."""
+        r=self._result
+        if r is None or r.invalid or len(set(r.outcomes))!=1:return
+        if any(cell.is_animating() for cells in self._triple_flaps.values() for cell in cells):
+            # The bonus can finish before the slowest card reaches '-'.
+            # Keep that destination intact; the existing wait loop reveals later.
+            self._triple_reveal_requested=True
+            return
+        self._triple_reveal_requested=False
+        self._latest_triple_preview={"outcomes":list(r.outcomes),
+                                    "rounds_ago":0,"multiplier":r.bonus_multiplier}
+        self._draw_latest_triple()
+
+    def _draw_latest_triple(self, animate=True):
+        c=self.latest_triple_canvas
+        c.delete("all")
+        self._latest_triple_images=[]
+        c.create_text(85,17,text="最近豹子是",fill="#E7D39C",
+                      font=(Theme.FONT_CJK,13,"bold"))
+        record=self._latest_triple_preview
+        if record is None:record=self.history_store.latest_triple()
+        if record is None:
+            c.create_text(85,56,text="暂无豹子记录",fill="#C5D1C8",
+                          font=(Theme.FONT_CJK,10))
+        else:
+            self._draw_latest_triple_symbols(c,record["outcomes"][0])
+        for y,key,unit in ((96,"rounds_ago","局前"),(139,"multiplier","X")):
+            value=record.get(key) if record else None
+            cells=self._triple_flaps[key]
+            digits="---" if value is None else f"{min(999,max(0,int(value))):03d}"
+            for i,(cell,digit) in enumerate(zip(cells,digits)):
+                # Unknown values retain all three visible cards. Each wheel
+                # traverses 0..9,- in order; 9 -> 0 always takes two flips.
+                cell.place(x=14+i*31,y=y,width=27,height=34)
+                cell.set(digit,animate=animate,delay=i*85,
+                         fast=self._latest_triple_preview is not None
+                              and self._latest_triple_preview.get("rounds_ago")==0)
+            c.create_text(117,y+17,text=unit,anchor="w",fill="#E7D39C",
+                          font=(Theme.FONT_CJK,12,"bold"))
+        if record and record.get("rounds_ago") is not None and record["rounds_ago"]>999:
+            c.create_text(85,184,text=f"实际 {record['rounds_ago']} 局前",
+                          fill="#C5D1C8",font=(Theme.FONT_CJK,8))
+
+
+    def _draw_latest_triple_symbols(self, c, index):
+        source=self._card_sources.get(index)
+        for i in range(3):
+            x=17+i*47
+            c.create_rectangle(x, 34, x+40, 86, fill="#FFFCF3", outline="#D8B46A", width=1)
+            if source is not None and ImageTk is not None:
+                photo=ImageTk.PhotoImage(ImageOps.contain(source, (38, 50)), master=self.root)
+                self._latest_triple_images.append(photo)
+                c.create_image(x+20, 60, image=photo)
+            else:
+                # Match CARD_ASSET_NAMES even when the original artwork is absent.
+                suit=("♠", "♣", "♦", "♥", "♦", "♣")[index]
+                color="#BD3333" if suit in ("♥", "♦") else "#202822"
+                c.create_text(x+20, 48, text=CARDS[index], fill=color, font=("Arial", 13, "bold"))
+                c.create_text(x+20, 71, text=suit, fill=color, font=("Arial", 18))
 
     def show_game_instructions(self):
         existing=getattr(self,"_instruction_window",None)
@@ -852,26 +1183,30 @@ class RedPacketRainGame:
     def _draw_plinko_guide(c):
         scale=18;ox=22;oy=32
         c.create_rectangle(ox,oy,ox+18*scale,oy+20*scale,fill="#15332e",outline="#e7d36c",width=2)
-        c.create_line(ox+18,oy+12,ox+18*scale-18,oy+12,fill="#e7d36c",arrow=tk.BOTH,width=2)
-        c.create_rectangle(ox+7.3*scale,oy+5,ox+8.7*scale,oy+15,fill="#FFDE35",outline="#B8860B")
+        c.create_line(ox+9*scale,oy,ox,oy+2.8*scale,fill="#e7d36c",width=2)
+        c.create_line(ox+9*scale,oy,ox+18*scale,oy+2.8*scale,fill="#e7d36c",width=2)
+        c.create_rectangle(ox+8.3*scale,oy+5,ox+9.7*scale,oy+15,fill="#FFDE35",outline="#B8860B")
         for row in range(12):
             for col in range(18 if row%2==0 else 17):
                 x=ox+(col+(.5 if row%2==0 else 1))*scale;y=oy+(3+row*1.1)*scale
-                c.create_oval(x-2,y-2,x+2,y+2,fill="#dfdbc6",outline="")
-        for i in range(18):
-            x=ox+i*scale
+                if all(math.hypot(col+(.5 if row%2==0 else 1)-rx,3+row*1.1-ry)>1.25 for rx,ry,_ in PlinkoPhysics.ROTORS):
+                    c.create_oval(x-2,y-2,x+2,y+2,fill="#dfdbc6",outline="")
+        draw_plinko_rotors(c,ox,oy,scale,0)
+        for i in range(PlinkoPhysics.BIN_COUNT):
+            x=ox+i*PlinkoPhysics.BIN_WIDTH*scale
             c.create_line(x,oy+17*scale,x,oy+20*scale,fill="#D8B46A",width=1)
-            c.create_rectangle(x,oy+19*scale,x+scale,oy+20*scale,fill="#426658",outline="#D8B46A")
-            c.create_text(x+scale/2,oy+19.5*scale,text=str(10+i%3),fill="white",font=("Arial",8,"bold"))
-        c.create_oval(ox+8*scale-4,oy+1.4*scale-4,ox+8*scale+4,oy+1.4*scale+4,fill="#FFDE35",outline="#B8860B")
-        for y,title,body in ((70,"① 黄色长条左右移动","快速往返随机 2–3 秒，停止后原位放球。"),
-                             (180,"② 小球碰撞钉板","球按重力与碰撞反弹，向底部落下。"),
-                             (290,"③ 落入 18 个出口之一","该出口数字就是本次派奖倍数。")):
+            c.create_rectangle(x,oy+18.2*scale,x+PlinkoPhysics.BIN_WIDTH*scale,oy+20*scale,fill="#426658",outline="#D8B46A")
+            c.create_text(x+PlinkoPhysics.BIN_WIDTH*scale/2,oy+19.1*scale,text="1\n0\n0",fill="white",font=("Arial",10,"bold"),justify="center")
+        c.create_oval(ox+9*scale-4,oy+1.4*scale-4,ox+9*scale+4,oy+1.4*scale+4,fill="#FFDE35",outline="#B8860B")
+        for y,title,body in ((70,"① 中央固定放球","球始终从上方中央进入漏斗。"),
+                             (180,"② 小球碰撞钉板和风车","风车持续单向旋转，球按碰撞与重力落下。"),
+                             (290,"③ 落入 15 个出口之一","各出口按自己的概率抽取 5／10／20／50／100 倍。")):
             c.create_text(400,y,text=title,anchor="nw",fill="#e7d36c",font=(Theme.FONT_CJK,16,"bold"))
             c.create_text(400,y+35,text=body,anchor="nw",width=475,fill="#c1cbc6",font=(Theme.FONT_CJK,14))
-        c.create_text(ox,oy+20*scale+20,text="示意图，出口倍数每局随机",anchor="nw",fill="#c1cbc6",font=(Theme.FONT_CJK,12))
+        c.create_text(ox,oy+20*scale+20,text="示意图，各出口倍数按独立概率每局抽取",anchor="nw",fill="#c1cbc6",font=(Theme.FONT_CJK,12))
 
     def update_display(self):
+        self._draw_latest_triple()
         self.bet_per_draw=sum(self.bets,Decimal(0))
         self.balance_var.set(f"余额: ${self.balance:,.2f}")
         self.stage_var.set(("Ball Drop" if self._bonus_active else "落球中") if self.game_active else ("已结算" if self._settled else "下注中"))
@@ -1065,6 +1400,7 @@ class RedPacketRainGame:
         if not self.game_active or self._result is None:return
         if self._result.bonus_multiplier and not self._bonus_done and not force:
             if not self._bonus_active:
+                self._show_pending_triple()
                 self._bonus_active=True;self._bonus_started=time.monotonic()
                 self._poses=self._frames[-1]
                 self.update_display();self._animate_plinko()
@@ -1094,6 +1430,8 @@ class RedPacketRainGame:
             messagebox.showerror("无法保存游戏记录",f"余额已结算，但历史记录保存失败。\n{exc}",parent=self.root)
         self.history=self.history_store.recent()
         self.draw_statistics()
+        self._latest_triple_preview=None
+        self._triple_reveal_requested=False
         self._settled=True
         self.draw_history()
         self._flash_step=0
@@ -1174,8 +1512,9 @@ class RedPacketRainGame:
         frame=int(progress)
         if frame>=len(self._bonus_frames)-1:
             self._bonus_pose=self._bonus_frames[-1];self._bonus_done=True
+            self._reveal_latest_triple()
             self.draw_plinko()
-            self._job=self.root.after(1200,self._finish_round)
+            self._wait_for_latest_triple()
             return
         a,b=self._bonus_frames[frame:frame+2];alpha=progress-frame
         self._bonus_pose=tuple(x+(y-x)*alpha for x,y in zip(a,b))
@@ -1184,19 +1523,26 @@ class RedPacketRainGame:
     def draw_plinko(self):
         c=self.canvas;c.delete("all")
         w,h=c.winfo_width(),c.winfo_height()
-        scale=min((w-32)/18,(h-100)/20);ox=(w-18*scale)/2;oy=60
-        c.create_text(w/2,24,text="BALL DROP · 三球同格奖励",fill="#F2E6C9",font=(Theme.FONT_CJK,18,"bold"))
+        # The top right of the board is occupied by the card panel.
+        top=160;bottom=42
+        scale=max(1,min((w-32)/18,(h-top-bottom)/20))
+        ox=max(8,(w-18*scale)/2);oy=top
+        c.create_text(12,27,anchor="w",text="BALL DROP · 三球同格奖励",fill="#F2E6C9",font=(Theme.FONT_CJK,18,"bold"))
         c.create_rectangle(ox,oy,ox+18*scale,oy+20*scale,fill="#15332e",outline="#D8B46A",width=2)
+        c.create_line(ox+9*scale,oy,ox,oy+2.8*scale,fill="#D8B46A",width=3)
+        c.create_line(ox+9*scale,oy,ox+18*scale,oy+2.8*scale,fill="#D8B46A",width=3)
         for x,y in self._bonus_model.pegs:
             r=PlinkoPhysics.PEG_RADIUS*scale
             c.create_oval(ox+x*scale-r,oy+y*scale-r,ox+x*scale+r,oy+y*scale+r,fill="#dfdbc6",outline="")
+        elapsed=max(0,time.monotonic()-self._bonus_started)
+        spin_time=max(0,elapsed-self._bonus_model.launch_duration)
+        draw_plinko_rotors(c,ox,oy,scale,spin_time)
         selected=self._result.bonus_slot if self._bonus_done or (self._bonus_pose and self._bonus_pose[1]>19.7) else -1
         for i,value in enumerate(self._bonus_model.multipliers):
-            x=ox+i*scale
-            c.create_rectangle(x,oy+19*scale,x+scale,oy+20*scale,fill="#F0C452" if i==selected else "#426658",outline="#D8B46A")
-            c.create_text(x+scale/2,oy+19.5*scale,text=str(value),fill="black" if i==selected else "white",font=("Arial",max(7,int(scale*.28)),"bold"))
+            x=ox+i*PlinkoPhysics.BIN_WIDTH*scale
+            c.create_rectangle(x,oy+18.2*scale,x+PlinkoPhysics.BIN_WIDTH*scale,oy+20*scale,fill="#F0C452" if i==selected else "#426658",outline="#D8B46A")
+            c.create_text(x+PlinkoPhysics.BIN_WIDTH*scale/2,oy+19.1*scale,text="\n".join(str(value)),fill="black" if i==selected else "white",font=("Arial",max(10,int(scale*.43)),"bold"),justify="center")
             if i:c.create_line(x,oy+17*scale,x,oy+20*scale,fill="#D8B46A",width=max(1,.05*scale))
-        elapsed=max(0,time.monotonic()-self._bonus_started)
         launch_x=self._bonus_model.launcher_x(elapsed)
         c.create_rectangle(ox+(launch_x-.7)*scale,oy+.3*scale,
                            ox+(launch_x+.7)*scale,oy+.7*scale,
@@ -1305,6 +1651,7 @@ class RedPacketRainGame:
         self._finish_round(force=True)
         self._cancel_jobs()
         self._closed = True
+        self._unbind_start_keys()
         self._restore_window_close()
         finish = getattr(self.root, "finish", None)
         if callable(finish):
@@ -1317,6 +1664,7 @@ class RedPacketRainGame:
     def _on_destroy(self, event):
         if event.widget is not self.root:
             return
+        self._unbind_start_keys()
         self._restore_window_close()
         self._cancel_jobs()
         if self._result is not None:

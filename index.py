@@ -923,343 +923,361 @@ LANGUAGE_OPTIONS = {
     "eo": "Esperanto",
 }
 
-# Only widgets owned by this file and the four uploaded hub files are passed
-# through this table.  Games imported by those hubs deliberately keep their
-# own language and appearance.
-_TRANSLATIONS = {
-    "en": {
-        "游戏中心": "Game Center", "欢迎": "Welcome",
-        "请选择下一步以继续使用游戏中心。": "Choose how you would like to continue.",
-        "已有账号": "Already registered", "登录账号": "Sign in",
-        "第一次使用？": "New here?", "创建新账号": "Create account",
-        "体验账号": "Guest account", "账号登录": "Account sign-in",
-        "请输入已注册的用户名与密码。": "Enter your registered username and password.",
-        "用户名": "Username", "密码": "Password", "还没注册？注册！": "Need an account? Register",
-        "← 返回欢迎页": "← Back to welcome", "确认密码": "Confirm password",
-        "用户名不可重复，密码需要输入两次确认。": "Choose a unique username and confirm the password.",
-        "注册": "Register", "返回": "Back", "我的最爱": "Favorites",
-        "尚未收藏游戏。\n可在游戏图片右上角点击 ♡。": "No favorites yet.\nSelect ♡ on a game card to add one.",
-        "赌场游戏": "Casino Games", "街机小游戏": "Arcade Games",
-        "刮刮乐": "Scratch Cards", "老虎机": "Slot Machines",
-        "账号服务": "Account & Settings", "安全登出": "Sign out",
-        "← 返回主目录": "← Back to home", "账户管理": "Account management",
-        "余额概览": "Balance overview", "充值": "Deposit", "提款": "Withdraw",
-        "更改密码": "Change password", "设置": "Settings", "可用余额": "Available balance",
-        "余额资料已更新。": "Balance updated.", "当前密码": "Current password",
-        "新密码": "New password", "更新密码": "Update password",
-        "外观与语言": "Appearance & language",
-        "这些选项只影响本次上传的五个界面文件。": "These options affect only the five uploaded interface files.",
-        "黑暗模式": "Dark mode", "语言": "Language", "选择语言": "Choose language",
-        "赌场游戏中心": "Casino Games", "街机小游戏中心": "Arcade Games",
-        "刮刮乐中心": "Scratch Cards", "老虎机中心": "Slot Machines",
-        "游戏分类": "Categories", "请选择游戏": "Choose a game",
-        "游戏运行中…": "Game running…",
-        "扑克": "Poker", "桌面游戏": "Table games", "骰子游戏": "Dice games",
-        "轮盘与转盘": "Roulette & wheels", "街机动作": "Arcade action",
-        "运气与博弈": "Luck & wagering", "模拟与策略": "Simulation & strategy",
-        "经典老虎机": "Classic slots", "特色老虎机": "Featured slots",
-        "奖池老虎机": "Jackpot slots",
-    },
-    "zh_CN": {},
-    "zh_TW": {
-        "游戏中心": "遊戲中心", "欢迎": "歡迎", "请选择下一步以继续使用游戏中心。": "請選擇下一步以繼續使用遊戲中心。",
-        "已有账号": "已有帳號", "登录账号": "登入帳號", "第一次使用？": "第一次使用？",
-        "创建新账号": "建立新帳號", "体验账号": "體驗帳號", "账号登录": "帳號登入",
-        "请输入已注册的用户名与密码。": "請輸入已註冊的使用者名稱與密碼。", "用户名": "使用者名稱",
-        "密码": "密碼", "确认密码": "確認密碼", "注册": "註冊", "返回": "返回",
-        "还没注册？注册！": "還沒註冊？立即註冊！", "← 返回欢迎页": "← 返回歡迎頁",
-        "我的最爱": "我的最愛", "赌场游戏": "賭場遊戲", "街机小游戏": "街機小遊戲",
-        "刮刮乐": "刮刮樂", "老虎机": "老虎機", "账号服务": "帳號與設定",
-        "安全登出": "安全登出", "← 返回主目录": "← 返回主目錄", "账户管理": "帳戶管理",
-        "余额概览": "餘額概覽", "充值": "儲值", "提款": "提款", "更改密码": "更改密碼",
-        "设置": "設定", "可用余额": "可用餘額", "余额资料已更新。": "餘額資料已更新。",
-        "尚未收藏游戏。\n可在游戏图片右上角点击 ♡。": "尚未收藏遊戲。\n可在遊戲圖片右上角點擊 ♡。",
-        "当前密码": "目前密碼", "新密码": "新密碼", "更新密码": "更新密碼",
-        "外观与语言": "外觀與語言", "这些选项只影响本次上传的五个界面文件。": "這些選項只影響本次上傳的五個介面檔案。",
-        "黑暗模式": "黑暗模式", "语言": "語言", "选择语言": "選擇語言",
-        "赌场游戏中心": "賭場遊戲中心", "街机小游戏中心": "街機小遊戲中心",
-        "刮刮乐中心": "刮刮樂中心", "老虎机中心": "老虎機中心", "游戏分类": "遊戲分類",
-        "请选择游戏": "請選擇遊戲", "游戏运行中…": "遊戲執行中…",
-        "扑克": "撲克", "桌面游戏": "桌面遊戲", "骰子游戏": "骰子遊戲",
-        "轮盘与转盘": "輪盤與轉盤", "街机动作": "街機動作", "运气与博弈": "運氣與博弈",
-        "模拟与策略": "模擬與策略", "经典老虎机": "經典老虎機", "特色老虎机": "特色老虎機",
-        "奖池老虎机": "獎池老虎機",
-    },
-    "mi": {
-        "游戏中心": "Pokapū Kēmu", "欢迎": "Nau mai", "请选择下一步以继续使用游戏中心。": "Kōwhiria te huarahi hei haere tonu.",
-        "已有账号": "He pūkete kē tāu", "登录账号": "Takiuru", "第一次使用？": "He kaiwhakamahi hou?",
-        "创建新账号": "Waihanga pūkete", "体验账号": "Pūkete manuhiri", "账号登录": "Takiuru pūkete",
-        "请输入已注册的用户名与密码。": "Tāurua tō ingoa kaiwhakamahi me tō kupuhipa.", "用户名": "Ingoa kaiwhakamahi",
-        "密码": "Kupuhipa", "确认密码": "Whakaū kupuhipa", "注册": "Rēhita", "返回": "Hoki",
-        "还没注册？注册！": "Kāore anō kia rēhita? Rēhita", "← 返回欢迎页": "← Hoki ki te nau mai",
-        "我的最爱": "Ngā tino pai", "赌场游戏": "Ngā kēmu whare petipeti", "街机小游戏": "Ngā kēmu ā-arcade",
-        "刮刮乐": "Kāri waruwaru", "老虎机": "Mīhini moni", "账号服务": "Pūkete me ngā tautuhinga",
-        "安全登出": "Takiputa", "← 返回主目录": "← Hoki ki te kāinga", "账户管理": "Whakahaere pūkete",
-        "余额概览": "Tirohanga toenga", "充值": "Tāpiri moni", "提款": "Tango moni",
-        "更改密码": "Huri kupuhipa", "设置": "Tautuhinga", "可用余额": "Toenga wātea",
-        "当前密码": "Kupuhipa o nāianei", "新密码": "Kupuhipa hou",
-        "更新密码": "Whakahōu kupuhipa",
-        "外观与语言": "Āhua me te reo", "这些选项只影响本次上传的五个界面文件。": "Ka pā ēnei kōwhiringa ki ngā kōnae atanga e rima kua tukuake anake.",
-        "余额资料已更新。": "Kua whakahōutia ngā raraunga toenga.",
-        "尚未收藏游戏。\n可在游戏图片右上角点击 ♡。": "Kāore anō he kēmu tino pai.\nPāwhiria te ♡ i runga matau o te kāri kēmu.",
-        "黑暗模式": "Aratau pōuri", "语言": "Reo", "选择语言": "Kōwhiria te reo",
-        "赌场游戏中心": "Kēmu whare petipeti", "街机小游戏中心": "Kēmu ā-arcade",
-        "刮刮乐中心": "Kāri waruwaru", "老虎机中心": "Mīhini moni", "游戏分类": "Ngā kāwai",
-        "请选择游戏": "Kōwhiria he kēmu", "游戏运行中…": "Kei te haere te kēmu…",
-        "扑克": "Poker", "桌面游戏": "Kēmu tēpu", "骰子游戏": "Kēmu mataono",
-        "轮盘与转盘": "Roulette me ngā wīra", "街机动作": "Mahi arcade", "运气与博弈": "Waimarie me te petipeti",
-        "模拟与策略": "Whakatairite me te rautaki",
-    },
-    "eo": {
-        "游戏中心": "Ludcentro", "欢迎": "Bonvenon", "请选择下一步以继续使用游戏中心。": "Elektu kiel vi volas daŭrigi.",
-        "已有账号": "Jam registrita", "登录账号": "Ensaluti", "第一次使用？": "Ĉu nova uzanto?",
-        "创建新账号": "Krei konton", "体验账号": "Gasta konto", "账号登录": "Kontensaluto",
-        "请输入已注册的用户名与密码。": "Enigu vian registritan uzantnomon kaj pasvorton.", "用户名": "Uzantnomo",
-        "密码": "Pasvorto", "确认密码": "Konfirmi pasvorton", "注册": "Registri", "返回": "Reen",
-        "还没注册？注册！": "Ĉu sen konto? Registriĝu", "← 返回欢迎页": "← Reen al bonveno",
-        "我的最爱": "Ŝatataj", "赌场游戏": "Kazinaj ludoj", "街机小游戏": "Arkadaj ludoj",
-        "刮刮乐": "Skrapkartoj", "老虎机": "Monludiloj", "账号服务": "Konto kaj agordoj",
-        "安全登出": "Elsaluti", "← 返回主目录": "← Reen al hejmo", "账户管理": "Konta administrado",
-        "余额概览": "Saldo", "充值": "Deponi", "提款": "Elpreni", "更改密码": "Ŝanĝi pasvorton",
-        "设置": "Agordoj", "可用余额": "Disponebla saldo", "外观与语言": "Aspekto kaj lingvo",
-        "当前密码": "Nuna pasvorto", "新密码": "Nova pasvorto",
-        "更新密码": "Ĝisdatigi pasvorton",
-        "余额资料已更新。": "La saldaj datumoj estas ĝisdatigitaj.",
-        "尚未收藏游戏。\n可在游戏图片右上角点击 ♡。": "Ankoraŭ neniu ŝatata ludo.\nAlklaku ♡ supre dekstre de ludkarto.",
-        "这些选项只影响本次上传的五个界面文件。": "Ĉi tiuj elektoj influas nur la kvin alŝutitajn interfacajn dosierojn.",
-        "黑暗模式": "Malhela reĝimo", "语言": "Lingvo", "选择语言": "Elekti lingvon",
-        "赌场游戏中心": "Kazinaj ludoj", "街机小游戏中心": "Arkadaj ludoj",
-        "刮刮乐中心": "Skrapkartoj", "老虎机中心": "Monludiloj", "游戏分类": "Kategorioj",
-        "请选择游戏": "Elektu ludon", "游戏运行中…": "Ludo funkcias…",
-        "扑克": "Pokero", "桌面游戏": "Tabloludoj", "骰子游戏": "Ĵetkubaj ludoj",
-        "轮盘与转盘": "Ruleto kaj radoj", "街机动作": "Arkada agado", "运气与博弈": "Ŝanco kaj vetado",
-        "模拟与策略": "Simulado kaj strategio",
-    },
-}
+# Translations owned by index.py. Each hub maintains its own vocabulary.
+_TRANSLATIONS = {'en': {'游戏中心': 'Game Center',
+        '欢迎': 'Welcome',
+        '请选择下一步以继续使用游戏中心。': 'Choose how you would like to continue.',
+        '已有账号': 'Already registered',
+        '登录账号': 'Sign in',
+        '第一次使用？': 'New here?',
+        '创建新账号': 'Create account',
+        '体验账号': 'Guest account',
+        '账号登录': 'Account sign-in',
+        '请输入已注册的用户名与密码。': 'Enter your registered username and password.',
+        '用户名': 'Username',
+        '密码': 'Password',
+        '还没注册？注册！': 'Need an account? Register',
+        '← 返回欢迎页': '← Back to welcome',
+        '确认密码': 'Confirm password',
+        '用户名不可重复，密码需要输入两次确认。': 'Choose a unique username and enter the password twice.',
+        '注册': 'Register',
+        '返回': 'Back',
+        '我的最爱': 'Favorites',
+        '尚未收藏游戏。\n可在游戏图片右上角点击 ♡。': 'No favorites yet.\nSelect ♡ on a game card to add one.',
+        '赌场游戏': 'Casino Games',
+        '街机小游戏': 'Arcade Games',
+        '刮刮乐': 'Scratch Cards',
+        '老虎机': 'Slot Machines',
+        '账号服务': 'Account & Settings',
+        '安全登出': 'Sign out',
+        '← 返回主目录': '← Back to home',
+        '账户管理': 'Account management',
+        '余额概览': 'Balance overview',
+        '充值': 'Deposit',
+        '提款': 'Withdraw',
+        '更改密码': 'Change password',
+        '设置': 'Settings',
+        '可用余额': 'Available balance',
+        '余额资料已更新。': 'Balance updated.',
+        '当前密码': 'Current password',
+        '新密码': 'New password',
+        '更新密码': 'Update password',
+        '外观与语言': 'Appearance & language',
+        '这些选项只影响本次上传的五个界面文件。': 'These options affect only the five uploaded interface files.',
+        '黑暗模式': 'Dark mode',
+        '语言': 'Language',
+        '选择语言': 'Choose language',
+        '游戏、账户与余额，\n集中在一个清晰的入口。': 'Games, accounts and balances,\nall in one clear place.',
+        '桌面游戏与扑克专区': 'Table games and poker',
+        '轻量、快速的休闲游戏': 'Quick casual games',
+        '选择票券并即时开奖': 'Choose a ticket for an instant result',
+        '浏览并进入老虎机游戏': 'Browse and open slot games',
+        '余额、充值、提款与密码': 'Balance, deposits, withdrawals and password',
+        '保存资料并返回登录页': 'Save and return to sign-in',
+        '创建账号': 'Create account',
+        '请输入用户名和密码。': 'Enter a username and password.',
+        '用户名至少需要 3 个字符。': 'Username must contain at least 3 characters.',
+        '用户名已存在，请选择其他用户名。': 'That username already exists; choose another.',
+        '密码不能为空。': 'Password cannot be empty.',
+        '两次输入的密码不一致。': 'The passwords do not match.',
+        '你的账户资料已从本地记录重新载入。': 'Your account was reloaded from the local record.',
+        '密码在当前页面完成验证与更新，不会打开弹窗。': 'Verify and update the password on this page.',
+        '当前密码不正确。': 'Current password is incorrect.',
+        '新密码不能为空。': 'New password cannot be empty.',
+        '两次输入的新密码不一致。': 'The new passwords do not match.',
+        '密码已成功更新。': 'Password updated.',
+        '管理员': 'Administrator',
+        '管理密码': 'Administrator password',
+        '充值金额': 'Deposit amount',
+        '提款金额': 'Withdrawal amount',
+        '确认充值': 'Confirm deposit',
+        '确认提款': 'Confirm withdrawal',
+        '管理员账号或密码不正确。': 'Administrator username or password is incorrect.',
+        '请输入有效金额。': 'Enter a valid amount.',
+        '金额必须大于 0。': 'The amount must be greater than 0.',
+        '提款金额不能超过当前余额。': 'The withdrawal cannot exceed the current balance.',
+        '确定': 'OK',
+        '确认': 'Confirm',
+        '游戏运行中': 'Game running',
+        '请先关闭独立运行中的赌场游戏。': 'Close the running casino game first.',
+        '无法打开收藏游戏《{name}》：\n\n{error}': 'Could not open favorite “{name}”:\n\n{error}',
+        '无法打开{name}：\n\n{error}': 'Could not open {name}:\n\n{error}'},
+ 'zh_TW': {'游戏中心': '遊戲中心',
+           '欢迎': '歡迎',
+           '请选择下一步以继续使用游戏中心。': '請選擇下一步以繼續使用遊戲中心。',
+           '已有账号': '已有帳號',
+           '登录账号': '登入帳號',
+           '第一次使用？': '第一次使用？',
+           '创建新账号': '建立新帳號',
+           '体验账号': '體驗帳號',
+           '账号登录': '帳號登入',
+           '请输入已注册的用户名与密码。': '請輸入已註冊的使用者名稱與密碼。',
+           '用户名': '使用者名稱',
+           '密码': '密碼',
+           '还没注册？注册！': '還沒註冊？立即註冊！',
+           '← 返回欢迎页': '← 返回歡迎頁',
+           '确认密码': '確認密碼',
+           '用户名不可重复，密码需要输入两次确认。': '使用者名稱不可重複，密碼需要輸入兩次確認。',
+           '注册': '註冊',
+           '返回': '返回',
+           '我的最爱': '我的最愛',
+           '尚未收藏游戏。\n可在游戏图片右上角点击 ♡。': '尚未收藏遊戲。\n可在遊戲圖片右上角點擊 ♡。',
+           '赌场游戏': '賭場遊戲',
+           '街机小游戏': '街機小遊戲',
+           '刮刮乐': '刮刮樂',
+           '老虎机': '老虎機',
+           '账号服务': '帳號與設定',
+           '安全登出': '安全登出',
+           '← 返回主目录': '← 返回主目錄',
+           '账户管理': '帳戶管理',
+           '余额概览': '餘額概覽',
+           '充值': '儲值',
+           '提款': '提款',
+           '更改密码': '更改密碼',
+           '设置': '設定',
+           '可用余额': '可用餘額',
+           '余额资料已更新。': '餘額資料已更新。',
+           '当前密码': '目前密碼',
+           '新密码': '新密碼',
+           '更新密码': '更新密碼',
+           '外观与语言': '外觀與語言',
+           '这些选项只影响本次上传的五个界面文件。': '這些選項只影響本次上傳的五個介面檔案。',
+           '黑暗模式': '黑暗模式',
+           '语言': '語言',
+           '选择语言': '選擇語言',
+           '游戏、账户与余额，\n集中在一个清晰的入口。': '遊戲、帳號與餘額，\n集中在一個清晰的入口。',
+           '桌面游戏与扑克专区': '桌面遊戲與撲克專區',
+           '轻量、快速的休闲游戏': '輕量、快速的休閒遊戲',
+           '选择票券并即时开奖': '選擇票券並即時開獎',
+           '浏览并进入老虎机游戏': '瀏覽並進入老虎機遊戲',
+           '余额、充值、提款与密码': '餘額、儲值、提款與密碼',
+           '保存资料并返回登录页': '儲存資料並返回登入頁',
+           '创建账号': '建立帳號',
+           '请输入用户名和密码。': '請輸入使用者名稱和密碼。',
+           '用户名至少需要 3 个字符。': '使用者名稱至少需要 3 個字元。',
+           '用户名已存在，请选择其他用户名。': '使用者名稱已存在，請選擇其他名稱。',
+           '密码不能为空。': '密碼不能為空。',
+           '两次输入的密码不一致。': '兩次輸入的密碼不一致。',
+           '你的账户资料已从本地记录重新载入。': '你的帳戶資料已從本機記錄重新載入。',
+           '密码在当前页面完成验证与更新，不会打开弹窗。': '密碼會在目前頁面完成驗證與更新。',
+           '当前密码不正确。': '目前密碼不正確。',
+           '新密码不能为空。': '新密碼不能為空。',
+           '两次输入的新密码不一致。': '兩次輸入的新密碼不一致。',
+           '密码已成功更新。': '密碼已成功更新。',
+           '管理员': '管理員',
+           '管理密码': '管理員密碼',
+           '充值金额': '儲值金額',
+           '提款金额': '提款金額',
+           '确认充值': '確認儲值',
+           '确认提款': '確認提款',
+           '管理员账号或密码不正确。': '管理員帳號或密碼不正確。',
+           '请输入有效金额。': '請輸入有效金額。',
+           '金额必须大于 0。': '金額必須大於 0。',
+           '提款金额不能超过当前余额。': '提款金額不能超過目前餘額。',
+           '确定': '確定',
+           '确认': '確認',
+           '游戏运行中': '遊戲執行中',
+           '请先关闭独立运行中的赌场游戏。': '請先關閉獨立執行中的賭場遊戲。',
+           '无法打开收藏游戏《{name}》：\n\n{error}': '無法開啟收藏遊戲《{name}》：\n\n{error}',
+           '无法打开{name}：\n\n{error}': '無法開啟{name}：\n\n{error}'},
+ 'mi': {'游戏中心': 'Pokapū Kēmu',
+        '欢迎': 'Nau mai',
+        '请选择下一步以继续使用游戏中心。': 'Kōwhiria te huarahi hei haere tonu.',
+        '已有账号': 'He pūkete kē tāu',
+        '登录账号': 'Takiuru',
+        '第一次使用？': 'He kaiwhakamahi hou?',
+        '创建新账号': 'Waihanga pūkete',
+        '体验账号': 'Pūkete manuhiri',
+        '账号登录': 'Takiuru pūkete',
+        '请输入已注册的用户名与密码。': 'Tāurua tō ingoa kaiwhakamahi me tō kupuhipa.',
+        '用户名': 'Ingoa kaiwhakamahi',
+        '密码': 'Kupuhipa',
+        '还没注册？注册！': 'Kāore anō kia rēhita? Rēhita',
+        '← 返回欢迎页': '← Hoki ki te nau mai',
+        '确认密码': 'Whakaū kupuhipa',
+        '用户名不可重复，密码需要输入两次确认。': 'Me ahurei te ingoa kaiwhakamahi, ā, tāurua te kupuhipa.',
+        '注册': 'Rēhita',
+        '返回': 'Hoki',
+        '我的最爱': 'Ngā tino pai',
+        '尚未收藏游戏。\n可在游戏图片右上角点击 ♡。': 'Kāore anō he kēmu tino pai.\nPāwhiria te ♡ i runga matau o te kāri kēmu.',
+        '赌场游戏': 'Ngā kēmu whare petipeti',
+        '街机小游戏': 'Ngā kēmu ā-arcade',
+        '刮刮乐': 'Kāri waruwaru',
+        '老虎机': 'Mīhini moni',
+        '账号服务': 'Pūkete me ngā tautuhinga',
+        '安全登出': 'Takiputa',
+        '← 返回主目录': '← Hoki ki te kāinga',
+        '账户管理': 'Whakahaere pūkete',
+        '余额概览': 'Tirohanga toenga',
+        '充值': 'Tāpiri moni',
+        '提款': 'Tango moni',
+        '更改密码': 'Huri kupuhipa',
+        '设置': 'Tautuhinga',
+        '可用余额': 'Toenga wātea',
+        '余额资料已更新。': 'Kua whakahōutia ngā raraunga toenga.',
+        '当前密码': 'Kupuhipa o nāianei',
+        '新密码': 'Kupuhipa hou',
+        '更新密码': 'Whakahōu kupuhipa',
+        '外观与语言': 'Āhua me te reo',
+        '这些选项只影响本次上传的五个界面文件。': 'Ka pā ēnei kōwhiringa ki ngā kōnae atanga e rima kua tukuake anake.',
+        '黑暗模式': 'Aratau pōuri',
+        '语言': 'Reo',
+        '选择语言': 'Kōwhiria te reo',
+        '游戏、账户与余额，\n集中在一个清晰的入口。': 'Ngā kēmu, ngā pūkete me ngā toenga,\nkei te wāhi kotahi.',
+        '桌面游戏与扑克专区': 'Ngā kēmu tēpu me te poker',
+        '轻量、快速的休闲游戏': 'Ngā kēmu tere, māmā',
+        '选择票券并即时开奖': 'Kōwhiria he tīkiti mō te hua inamata',
+        '浏览并进入老虎机游戏': 'Tirotiro ka whakatuwhera kēmu mīhini',
+        '余额、充值、提款与密码': 'Toenga, moni tāpiri, tango moni me te kupuhipa',
+        '保存资料并返回登录页': 'Tiakina ka hoki ki te takiuru',
+        '创建账号': 'Waihanga pūkete',
+        '请输入用户名和密码。': 'Tāurua te ingoa kaiwhakamahi me te kupuhipa.',
+        '用户名至少需要 3 个字符。': 'Kia 3 neke atu ngā pūāhua o te ingoa kaiwhakamahi.',
+        '用户名已存在，请选择其他用户名。': 'Kei te whakamahia taua ingoa; kōwhiria tētahi atu.',
+        '密码不能为空。': 'Kaua te kupuhipa e noho putua.',
+        '两次输入的密码不一致。': 'Kāore ngā kupuhipa e ōrite ana.',
+        '你的账户资料已从本地记录重新载入。': 'Kua uta anō tō pūkete mai i te pūkete paetata.',
+        '密码在当前页面完成验证与更新，不会打开弹窗。': 'Manatokohia ka whakahou i te kupuhipa ki tēnei whārangi.',
+        '当前密码不正确。': 'Kei te hē te kupuhipa o nāianei.',
+        '新密码不能为空。': 'Kaua te kupuhipa hou e noho putua.',
+        '两次输入的新密码不一致。': 'Kāore ngā kupuhipa hou e ōrite ana.',
+        '密码已成功更新。': 'Kua whakahōutia te kupuhipa.',
+        '管理员': 'Kaiwhakahaere',
+        '管理密码': 'Kupuhipa kaiwhakahaere',
+        '充值金额': 'Moni tāpiri',
+        '提款金额': 'Moni tango',
+        '确认充值': 'Whakaū moni tāpiri',
+        '确认提款': 'Whakaū moni tango',
+        '管理员账号或密码不正确。': 'Kei te hē te pūkete kaiwhakahaere, te kupuhipa rānei.',
+        '请输入有效金额。': 'Tāurua he moni whaimana.',
+        '金额必须大于 0。': 'Me nui ake te moni i te 0.',
+        '提款金额不能超过当前余额。': 'Kāore te moni tango e āhei ki te nui ake i te toenga.',
+        '确定': 'Whakaū',
+        '确认': 'Whakaū',
+        '游戏运行中': 'Kei te haere te kēmu',
+        '请先关闭独立运行中的赌场游戏。': 'Katia te kēmu whare petipeti e haere ana i te tuatahi.',
+        '无法打开收藏游戏《{name}》：\n\n{error}': 'Kāore i taea te whakatuwhera te tino pai “{name}”:\n\n{error}',
+        '无法打开{name}：\n\n{error}': 'Kāore i taea te whakatuwhera {name}:\n\n{error}'},
+ 'eo': {'游戏中心': 'Ludcentro',
+        '欢迎': 'Bonvenon',
+        '请选择下一步以继续使用游戏中心。': 'Elektu kiel vi volas daŭrigi.',
+        '已有账号': 'Jam registrita',
+        '登录账号': 'Ensaluti',
+        '第一次使用？': 'Ĉu nova uzanto?',
+        '创建新账号': 'Krei konton',
+        '体验账号': 'Gasta konto',
+        '账号登录': 'Kontensaluto',
+        '请输入已注册的用户名与密码。': 'Enigu vian registritan uzantnomon kaj pasvorton.',
+        '用户名': 'Uzantnomo',
+        '密码': 'Pasvorto',
+        '还没注册？注册！': 'Ĉu sen konto? Registriĝu',
+        '← 返回欢迎页': '← Reen al bonveno',
+        '确认密码': 'Konfirmi pasvorton',
+        '用户名不可重复，密码需要输入两次确认。': 'Elektu unikan uzantnomon kaj enigu la pasvorton dufoje.',
+        '注册': 'Registri',
+        '返回': 'Reen',
+        '我的最爱': 'Ŝatataj',
+        '尚未收藏游戏。\n可在游戏图片右上角点击 ♡。': 'Ankoraŭ neniu ŝatata ludo.\nAlklaku ♡ supre dekstre de ludkarto.',
+        '赌场游戏': 'Kazinaj ludoj',
+        '街机小游戏': 'Arkadaj ludoj',
+        '刮刮乐': 'Skrapkartoj',
+        '老虎机': 'Monludiloj',
+        '账号服务': 'Konto kaj agordoj',
+        '安全登出': 'Elsaluti',
+        '← 返回主目录': '← Reen al hejmo',
+        '账户管理': 'Konta administrado',
+        '余额概览': 'Saldo',
+        '充值': 'Deponi',
+        '提款': 'Elpreni',
+        '更改密码': 'Ŝanĝi pasvorton',
+        '设置': 'Agordoj',
+        '可用余额': 'Disponebla saldo',
+        '余额资料已更新。': 'La saldaj datumoj estas ĝisdatigitaj.',
+        '当前密码': 'Nuna pasvorto',
+        '新密码': 'Nova pasvorto',
+        '更新密码': 'Ĝisdatigi pasvorton',
+        '外观与语言': 'Aspekto kaj lingvo',
+        '这些选项只影响本次上传的五个界面文件。': 'Ĉi tiuj elektoj influas nur la kvin alŝutitajn interfacajn dosierojn.',
+        '黑暗模式': 'Malhela reĝimo',
+        '语言': 'Lingvo',
+        '选择语言': 'Elekti lingvon',
+        '游戏、账户与余额，\n集中在一个清晰的入口。': 'Ludoj, kontoj kaj saldoj,\nĉio en unu klara loko.',
+        '桌面游戏与扑克专区': 'Tabloludoj kaj pokero',
+        '轻量、快速的休闲游戏': 'Rapidaj neformalaj ludoj',
+        '选择票券并即时开奖': 'Elektu bileton por tuja rezulto',
+        '浏览并进入老虎机游戏': 'Foliumu kaj malfermu monludilojn',
+        '余额、充值、提款与密码': 'Saldo, deponoj, elprenoj kaj pasvorto',
+        '保存资料并返回登录页': 'Konservu kaj revenu al ensaluto',
+        '创建账号': 'Krei konton',
+        '请输入用户名和密码。': 'Enigu uzantnomon kaj pasvorton.',
+        '用户名至少需要 3 个字符。': 'La uzantnomo bezonas almenaŭ 3 signojn.',
+        '用户名已存在，请选择其他用户名。': 'Tiu uzantnomo jam ekzistas; elektu alian.',
+        '密码不能为空。': 'La pasvorto ne povas esti malplena.',
+        '两次输入的密码不一致。': 'La pasvortoj ne kongruas.',
+        '你的账户资料已从本地记录重新载入。': 'Via konto estis reŝargita el la loka registro.',
+        '密码在当前页面完成验证与更新，不会打开弹窗。': 'Kontrolu kaj ĝisdatigu la pasvorton en ĉi tiu paĝo.',
+        '当前密码不正确。': 'La nuna pasvorto estas malĝusta.',
+        '新密码不能为空。': 'La nova pasvorto ne povas esti malplena.',
+        '两次输入的新密码不一致。': 'La novaj pasvortoj ne kongruas.',
+        '密码已成功更新。': 'Pasvorto ĝisdatigita.',
+        '管理员': 'Administranto',
+        '管理密码': 'Administra pasvorto',
+        '充值金额': 'Depona sumo',
+        '提款金额': 'Elprena sumo',
+        '确认充值': 'Konfirmi deponon',
+        '确认提款': 'Konfirmi elprenon',
+        '管理员账号或密码不正确。': 'La administra konto aŭ pasvorto estas malĝusta.',
+        '请输入有效金额。': 'Enigu validan sumon.',
+        '金额必须大于 0。': 'La sumo devas esti pli granda ol 0.',
+        '提款金额不能超过当前余额。': 'La elpreno ne povas superi la nunan saldon.',
+        '确定': 'Bone',
+        '确认': 'Konfirmi',
+        '游戏运行中': 'Ludo funkcias',
+        '请先关闭独立运行中的赌场游戏。': 'Unue fermu la rulantan kazinan ludon.',
+        '无法打开收藏游戏《{name}》：\n\n{error}': 'Ne eblis malfermi ŝatatan ludon “{name}”:\n\n{error}',
+        '无法打开{name}：\n\n{error}': 'Ne eblis malfermi {name}:\n\n{error}'},
+ 'zh_CN': {}}
 
-# Display names from the four uploaded hub files.  International casino names
-# stay recognisable where a customary Māori/Esperanto title is not established,
-# but no simplified-Chinese name is left behind in those language modes.
-_GAME_TRANSLATION_ROWS = [
-    # Casino categories and games
-    ("百家乐", "Baccarat", "百家樂", "Baccarat", "Bakarao"),
-    ("黑杰克", "Blackjack", "黑傑克", "Blackjack", "Nigra Joĉjo"),
-    ("骰子", "Dice", "骰子", "Mataono", "Ĵetkuboj"),
-    ("对决", "Head-to-head", "對決", "Whakataetae", "Duelo"),
-    ("轮盘赌", "Roulette", "輪盤賭", "Roulette", "Ruleto"),
-    ("地区特色", "Regional Specialties", "地區特色", "Ngā Motuhake ā-Rohe", "Regionaj Specialaĵoj"),
-    ("中国", "China", "中國", "Haina", "Ĉinio"),
-    ("菲律宾", "Philippines", "菲律賓", "Piripīni", "Filipinoj"),
-    ("颜色骰子", "Color Sicbo", "顏色骰子", "Sic Bo Tae", "Kolora Sic Bo"),
-    ("乒乓落球", "Ping Pong Drop", "乒乓落球", "Poro Tukituki", "Pingponga Falo"),
-    ("三张牌扑克", "Three Card Poker", "三張牌撲克", "Poker Kāri Toru", "Trikarta Pokero"),
-    ("三公", "San Gong", "三公", "San Gong", "San Gong"),
-    ("视频扑克", "Video Poker", "視訊撲克", "Poker Ataata", "Videopokero"),
-    ("加勒比梭哈扑克", "Caribbean Stud Poker", "加勒比梭哈撲克", "Poker Stud Karapīpiana", "Karibia Stud-Pokero"),
-    ("月亮梭哈扑克", "Lunar Stud Poker", "月亮梭哈撲克", "Poker Stud Marama", "Luna Stud-Pokero"),
-    ("四张牌扑克", "Four Card Poker", "四張牌撲克", "Poker Kāri Whā", "Kvarkarta Pokero"),
-    ("赌场扑克", "Casino Hold'em", "賭場撲克", "Hold'em Whare Petipeti", "Kazina Hold'em"),
-    ("DJ Wild梭哈扑克", "DJ Wild Stud Poker", "DJ Wild梭哈撲克", "Poker Stud DJ Wild", "DJ Wild Stud-Pokero"),
-    ("密西西比梭哈扑克", "Mississippi Stud Poker", "密西西比梭哈撲克", "Poker Stud Misisipi", "Misisipa Stud-Pokero"),
-    ("纵横交叉扑克", "Criss Cross Poker", "縱橫交叉撲克", "Poker Whakawhiti", "Kruc-Pokero"),
-    ("任逍遥扑克", "Let It Ride Poker", "任逍遙撲克", "Poker Let It Ride", "Let It Ride-Pokero"),
-    ("单挑扑克", "Heads Up Hold'em", "單挑撲克", "Hold'em Kanohi-ki-te-kanohi", "Duopa Hold'em"),
-    ("迷你终极德州扑克", "Mini Ultimate Texas Hold'em", "迷你終極德州撲克", "Texas Hold'em Whakamutunga Iti", "Mini Ultimate Texas Hold'em"),
-    ("终极德州扑克", "Ultimate Texas Hold'em", "終極德州撲克", "Texas Hold'em Whakamutunga", "Ultimate Texas Hold'em"),
-    ("终极奥马哈扑克", "Ultimate Omaha", "終極奧馬哈撲克", "Omaha Whakamutunga", "Ultimate Omaha"),
-    ("内外注", "In or Out", "內外注", "Ki Roto, Ki Waho rānei", "Ene aŭ Ekstere"),
-    ("牌九扑克", "Pai Gow Poker", "牌九撲克", "Poker Pai Gow", "Pai Gow-Pokero"),
-    ("王牌五张扑克", "Wild Five Card Poker", "王牌五張撲克", "Poker Kāri Rima Wild", "Sovaĝa Kvinkarta Pokero"),
-    ("终极三张牌扑克", "Ultimate Three Card Poker", "終極三張牌撲克", "Poker Kāri Toru Whakamutunga", "Ultimate Trikarta Pokero"),
-    ("赌场战争", "Casino War", "賭場戰爭", "Pakanga Whare Petipeti", "Kazina Milito"),
-    ("我爱同花", "I Love Suits", "我愛同花", "E Aroha Ana Au ki ngā Momo Kāri", "Mi Amas Samkolorojn"),
-    ("特殊百家乐", "Special Baccarat", "特殊百家樂", "Baccarat Motuhake", "Speciala Bakarao"),
-    ("龙虎斗", "Dragon Tiger", "龍虎鬥", "Tarakona me te Taika", "Drako kaj Tigro"),
-    ("龙虎凤", "Dragon Tiger Phoenix", "龍虎鳳", "Tarakona, Taika me te Manu Ahi", "Drako Tigro Fenikso"),
-    ("简单黑杰克", "Easy Blackjack", "簡單黑傑克", "Blackjack Māmā", "Facila Nigra Joĉjo"),
-    ("经典黑杰克", "Classic Blackjack", "經典黑傑克", "Blackjack Tauhira", "Klasika Nigra Joĉjo"),
-    ("双副牌黑杰克", "Double Deck Blackjack", "雙副牌黑傑克", "Blackjack Pūkei Takirua", "Du-Ferdeka Nigra Joĉjo"),
-    ("永6 黑杰克", "Always 6 Blackjack", "永6 黑傑克", "Blackjack Ono Tonu", "Ĉiam-6 Nigra Joĉjo"),
-    ("西班牙式黑杰克", "Spanish Blackjack", "西班牙式黑傑克", "Blackjack Pāniora", "Hispana Nigra Joĉjo"),
-    ("双向黑杰克", "Breakout Blackjack", "雙向黑傑克", "Blackjack Breakout", "Breakout Nigra Joĉjo"),
-    ("免费黑杰克", "Free Blackjack", "免費黑傑克", "Blackjack Koreutu", "Senpaga Nigra Joĉjo"),
-    ("免牌加倍黑杰克", "No Card Double Blackjack", "免牌加倍黑傑克", "Blackjack Whakarua Kāri-Kore", "Senkarta Duobla Blackjack"),
-    ("倍注黑杰克", "Power Blackjack", "倍注黑傑克", "Blackjack Mana", "Potenca Nigra Joĉjo"),
-    ("无限加倍黑杰克", "Unlimited Double Blackjack", "無限加倍黑傑克", "Blackjack Whakarua Mutunga Kore", "Senlima Duobla Nigra Joĉjo"),
-    ("豪赢黑杰克", "Multiply Blackjack", "豪贏黑傑克", "Blackjack Whakarea", "Multobliga Nigra Joĉjo"),
-    ("闪电黑杰克", "Lightning Blackjack", "閃電黑傑克", "Blackjack Uira", "Fulma Nigra Joĉjo"),
-    ("投注叠堆黑杰克", "Bet Stacker Blackjack", "投注疊堆黑傑克", "Blackjack Tāpae Peti", "Vet-Stakiga Nigra Joĉjo"),
-    ("骰宝", "Sic Bo", "骰寶", "Sic Bo", "Sic Bo"),
-    ("超级骰宝", "Super Sic Bo", "超級骰寶", "Sic Bo Nui", "Supera Sic Bo"),
-    ("花旗骰", "Craps", "花旗骰", "Craps", "Krapso"),
-    ("骰子百家乐", "Bac Bo", "骰子百家樂", "Bac Bo", "Bac Bo"),
-    ("德州扑克双人对决", "Texas Hold'em Duel", "德州撲克雙人對決", "Tauwhāinga Texas Hold'em", "Texas Hold'em-Duelo"),
-    ("梭哈扑克双人对决", "Stud Poker Duel", "梭哈撲克雙人對決", "Tauwhāinga Poker Stud", "Stud-Pokera Duelo"),
-    ("德州扑克彩票购买", "Texas Hold'em Ticket", "德州撲克彩票購買", "Tīkiti Texas Hold'em", "Texas Hold'em-Bileto"),
-    ("美式轮盘", "American Roulette", "美式輪盤", "Roulette Amerikana", "Usona Ruleto"),
-    ("欧式轮盘", "European Roulette", "歐式輪盤", "Roulette Ūropi", "Eŭropa Ruleto"),
-    ("大六之轮", "Big Six Wheel", "大六之輪", "Wīra Ono Nui", "Granda Ses-Rado"),
-    ("温州牌九", "Wenzhou Pai Gow", "溫州牌九", "Pai Gow Wenzhou", "Wenzhou Pai Gow"),
-    ("经典牌九", "Classic Pai Gow", "經典牌九", "Pai Gow Tauhira", "Klasika Pai Gow"),
-    ("经典翻摊", "Classic Fan Tan", "經典翻攤", "Fan Tan Tauhira", "Klasika Fan Tan"),
-    # Scratch cards
-    ("验钞机", "Banknote Detector", "驗鈔機", "Kaitiro Moni Pepa", "Monbileta Kontrolilo"),
-    ("高尔夫球", "Golf", "高爾夫球", "Korowha", "Golfo"),
-    ("过三关", "Three Levels", "過三關", "Ngā Taumata e Toru", "Tri Niveloj"),
-    ("叠叠乐", "Stack Up", "疊疊樂", "Tāpae", "Stakado"),
-    ("100X 现金大挑战", "100X Cash Challenge", "100X 現金大挑戰", "Wero Moni 100X", "Kontanta Defio 100X"),
-    ("1 元 / 特易中奖", "$1 / Very easy to win", "1 元／特易中獎", "$1 / He tino māmā te toa", "$1 / Tre facile gajni"),
-    ("每局 1 元", "$1 per game", "每局 1 元", "$1 ia kēmu", "$1 por ludo"),
-    ("每局 5 元", "$5 per game", "每局 5 元", "$5 ia kēmu", "$5 por ludo"),
-    ("大奖 1,000", "Top prize 1,000", "大獎 1,000", "Tohu nui 1,000", "Ĉefa premio 1,000"),
-    ("大奖 10,000", "Top prize 10,000", "大獎 10,000", "Tohu nui 10,000", "Ĉefa premio 10,000"),
-    ("大奖 50,000", "Top prize 50,000", "大獎 50,000", "Tohu nui 50,000", "Ĉefa premio 50,000"),
-    ("请选择一张刮刮卡", "Choose a scratch card", "請選擇一張刮刮卡", "Kōwhiria he kāri waruwaru", "Elektu skrapkarton"),
-    # Slot machines
-    ("数字老虎机", "Number Slot Machine", "數字老虎機", "Mīhini Moni Tau", "Nombra Monludilo"),
-    ("旋转扑克", "Spin Poker", "旋轉撲克", "Poker Takataka", "Turna Pokero"),
-    ("21 BELL老虎机", "21 BELL Slot Machine", "21 BELL老虎機", "Mīhini 21 BELL", "Monludilo 21 BELL"),
-    ("21点老虎机", "Blackjack Slot Machine", "21點老虎機", "Mīhini Moni Blackjack", "Nigra-Joĉja Monludilo"),
-    ("现金老虎机", "Cash Machine", "現金老虎機", "Mīhini Moni", "Kontanta Monludilo"),
-    ("双倍钻石老虎机", "Double Diamond", "雙倍鑽石老虎機", "Taimana Takirua", "Duobla Diamanto"),
-    ("最高奖金老虎机", "Top Dollar", "最高獎金老虎機", "Tāra Nui", "Plej Alta Premio"),
-    # Small games
-    ("小鸡过马路", "Chicken Crossing", "小雞過馬路", "Heihei Whakawhiti Rori", "Kokido Transiras Vojon"),
-    ("点球大战", "Penalty Shootout", "點球大戰", "Whana Whiu", "Penalta Konkurso"),
-    ("上塔游戏", "Tower Climb", "上塔遊戲", "Piki Pourewa", "Turgrimpado"),
-    ("火箭升空", "Rocket Launch", "火箭升空", "Whakarewa Tākirirangi", "Raketlanĉo"),
-    ("扫雷", "Minesweeper", "踩地雷", "Kimi Maina", "Minforigilo"),
-    ("小钢珠跌落", "Plinko", "小鋼珠跌落", "Plinko", "Plinko"),
-    ("幸运数字", "Lucky Number", "幸運數字", "Tau Waimarie", "Bonŝanca Numero"),
-    ("猜颜色", "Guess the Colour", "猜顏色", "Matapae Tae", "Divenu la Koloron"),
-    ("三杯球", "Three Cups", "三杯球", "Ngā Kapu Toru", "Tri Tasoj"),
-    ("猜数字", "Guess the Number", "猜數字", "Matapae Tau", "Divenu la Numeron"),
-    ("基诺", "Keno", "基諾", "Keno", "Keno"),
-    ("宾果", "Bingo", "賓果", "Bingo", "Bingo"),
-    ("打地鼠", "Whack-a-Mole", "打地鼠", "Patua te Kiore Matapo", "Frapu la Talpon"),
-    ("剪刀石头布", "Rock Paper Scissors", "剪刀石頭布", "Kutikuti Pepa Kōhatu", "Tondilo Papero Ŝtono"),
-    ("红包雨", "Red Packet Rain", "紅包雨", "Ua Kōpaki Whero", "Ruĝ-Paketa Pluvo"),
-    ("足球弹珠", "Football Pinball", "足球彈珠", "Pinipōro Whutupōro", "Futbala Pinbalo"),
-    ("股市大风云", "Stock Market", "股市大風雲", "Mākete Hea", "Borso"),
-    ("扑克足球", "Poker Football", "撲克足球", "Whutupōro Poker", "Pokera Futbalo"),
-    ("成交与否", "Deal or No Deal", "成交與否", "Whakaae, Kāo rānei", "Interkonsento aŭ Ne"),
-]
-
-for _source, _en, _zh_tw, _mi, _eo in _GAME_TRANSLATION_ROWS:
-    _TRANSLATIONS["en"][_source] = _en
-    _TRANSLATIONS["zh_TW"][_source] = _zh_tw
-    _TRANSLATIONS["mi"][_source] = _mi
-    _TRANSLATIONS["eo"][_source] = _eo
-
-_EXTRA_TRANSLATION_ROWS = [
-    ("游戏、账户与余额，\n集中在一个清晰的入口。", "Games, accounts and balances,\nall in one clear place.", "遊戲、帳號與餘額，\n集中在一個清晰的入口。", "Ngā kēmu, ngā pūkete me ngā toenga,\nkei te wāhi kotahi.", "Ludoj, kontoj kaj saldoj,\nĉio en unu klara loko."),
-    ("桌面游戏与扑克专区", "Table games and poker", "桌面遊戲與撲克專區", "Ngā kēmu tēpu me te poker", "Tabloludoj kaj pokero"),
-    ("轻量、快速的休闲游戏", "Quick casual games", "輕量、快速的休閒遊戲", "Ngā kēmu tere, māmā", "Rapidaj neformalaj ludoj"),
-    ("选择票券并即时开奖", "Choose a ticket for an instant result", "選擇票券並即時開獎", "Kōwhiria he tīkiti mō te hua inamata", "Elektu bileton por tuja rezulto"),
-    ("浏览并进入老虎机游戏", "Browse and open slot games", "瀏覽並進入老虎機遊戲", "Tirotiro ka whakatuwhera kēmu mīhini", "Foliumu kaj malfermu monludilojn"),
-    ("余额、充值、提款与密码", "Balance, deposits, withdrawals and password", "餘額、儲值、提款與密碼", "Toenga, moni tāpiri, tango moni me te kupuhipa", "Saldo, deponoj, elprenoj kaj pasvorto"),
-    ("保存资料并返回登录页", "Save and return to sign-in", "儲存資料並返回登入頁", "Tiakina ka hoki ki te takiuru", "Konservu kaj revenu al ensaluto"),
-    ("创建账号", "Create account", "建立帳號", "Waihanga pūkete", "Krei konton"),
-    ("用户名不可重复，密码需要输入两次确认。", "Choose a unique username and enter the password twice.", "使用者名稱不可重複，密碼需要輸入兩次確認。", "Me ahurei te ingoa kaiwhakamahi, ā, tāurua te kupuhipa.", "Elektu unikan uzantnomon kaj enigu la pasvorton dufoje."),
-    ("请输入用户名和密码。", "Enter a username and password.", "請輸入使用者名稱和密碼。", "Tāurua te ingoa kaiwhakamahi me te kupuhipa.", "Enigu uzantnomon kaj pasvorton."),
-    ("用户名至少需要 3 个字符。", "Username must contain at least 3 characters.", "使用者名稱至少需要 3 個字元。", "Kia 3 neke atu ngā pūāhua o te ingoa kaiwhakamahi.", "La uzantnomo bezonas almenaŭ 3 signojn."),
-    ("用户名已存在，请选择其他用户名。", "That username already exists; choose another.", "使用者名稱已存在，請選擇其他名稱。", "Kei te whakamahia taua ingoa; kōwhiria tētahi atu.", "Tiu uzantnomo jam ekzistas; elektu alian."),
-    ("密码不能为空。", "Password cannot be empty.", "密碼不能為空。", "Kaua te kupuhipa e noho putua.", "La pasvorto ne povas esti malplena."),
-    ("两次输入的密码不一致。", "The passwords do not match.", "兩次輸入的密碼不一致。", "Kāore ngā kupuhipa e ōrite ana.", "La pasvortoj ne kongruas."),
-    ("你的账户资料已从本地记录重新载入。", "Your account was reloaded from the local record.", "你的帳戶資料已從本機記錄重新載入。", "Kua uta anō tō pūkete mai i te pūkete paetata.", "Via konto estis reŝargita el la loka registro."),
-    ("密码在当前页面完成验证与更新，不会打开弹窗。", "Verify and update the password on this page.", "密碼會在目前頁面完成驗證與更新。", "Manatokohia ka whakahou i te kupuhipa ki tēnei whārangi.", "Kontrolu kaj ĝisdatigu la pasvorton en ĉi tiu paĝo."),
-    ("当前密码不正确。", "Current password is incorrect.", "目前密碼不正確。", "Kei te hē te kupuhipa o nāianei.", "La nuna pasvorto estas malĝusta."),
-    ("新密码不能为空。", "New password cannot be empty.", "新密碼不能為空。", "Kaua te kupuhipa hou e noho putua.", "La nova pasvorto ne povas esti malplena."),
-    ("两次输入的新密码不一致。", "The new passwords do not match.", "兩次輸入的新密碼不一致。", "Kāore ngā kupuhipa hou e ōrite ana.", "La novaj pasvortoj ne kongruas."),
-    ("密码已成功更新。", "Password updated.", "密碼已成功更新。", "Kua whakahōutia te kupuhipa.", "Pasvorto ĝisdatigita."),
-    ("管理员", "Administrator", "管理員", "Kaiwhakahaere", "Administranto"),
-    ("管理密码", "Administrator password", "管理員密碼", "Kupuhipa kaiwhakahaere", "Administra pasvorto"),
-    ("充值金额", "Deposit amount", "儲值金額", "Moni tāpiri", "Depona sumo"),
-    ("提款金额", "Withdrawal amount", "提款金額", "Moni tango", "Elprena sumo"),
-    ("确认充值", "Confirm deposit", "確認儲值", "Whakaū moni tāpiri", "Konfirmi deponon"),
-    ("确认提款", "Confirm withdrawal", "確認提款", "Whakaū moni tango", "Konfirmi elprenon"),
-    ("管理员账号或密码不正确。", "Administrator username or password is incorrect.", "管理員帳號或密碼不正確。", "Kei te hē te pūkete kaiwhakahaere, te kupuhipa rānei.", "La administra konto aŭ pasvorto estas malĝusta."),
-    ("请输入有效金额。", "Enter a valid amount.", "請輸入有效金額。", "Tāurua he moni whaimana.", "Enigu validan sumon."),
-    ("金额必须大于 0。", "The amount must be greater than 0.", "金額必須大於 0。", "Me nui ake te moni i te 0.", "La sumo devas esti pli granda ol 0."),
-    ("提款金额不能超过当前余额。", "The withdrawal cannot exceed the current balance.", "提款金額不能超過目前餘額。", "Kāore te moni tango e āhei ki te nui ake i te toenga.", "La elpreno ne povas superi la nunan saldon."),
-    ("体验账号不会储存收藏。", "Guest accounts do not save favorites.", "體驗帳號不會儲存我的最愛。", "Kāore ngā pūkete manuhiri e tiaki tino pai.", "Gastaj kontoj ne konservas ŝatatajn ludojn."),
-    ("我的最爱最多只能储存 8 个游戏。", "Favorites can contain up to 8 games.", "我的最愛最多只能儲存 8 個遊戲。", "E waru rawa ngā kēmu tino pai ka taea te tiaki.", "Ŝatataj povas enhavi maksimume 8 ludojn."),
-    ("找不到玩家资料，无法储存收藏。", "Player data was not found; the favorite could not be saved.", "找不到玩家資料，無法儲存我的最愛。", "Kāore i kitea ngā raraunga kaitākaro; kāore i tiakina te tino pai.", "Ludantaj datumoj ne estis trovitaj; la ŝatata ludo ne konserviĝis."),
-    ("应用", "Apply", "套用", "Hoatu", "Apliki"),
-    ("确定", "OK", "確定", "Whakaū", "Bone"),
-    ("请选择老虎机", "Choose a slot machine", "請選擇老虎機", "Kōwhiria he mīhini moni", "Elektu monludilon"),
-    ("维护", "Maintenance", "維護", "Tiaki", "Prizorgado"),
-    ("提示", "Notice", "提示", "Pānui", "Avizo"),
-    ("确认", "Confirm", "確認", "Whakaū", "Konfirmi"),
-]
-
-for _source, _en, _zh_tw, _mi, _eo in _EXTRA_TRANSLATION_ROWS:
-    _TRANSLATIONS["en"][_source] = _en
-    _TRANSLATIONS["zh_TW"][_source] = _zh_tw
-    _TRANSLATIONS["mi"][_source] = _mi
-    _TRANSLATIONS["eo"][_source] = _eo
-
-_DYNAMIC_PHRASES = {
-    "en": {
-        "已启动：": "Started: ", "已结束，余额已更新": " finished; balance updated",
-        "已关闭": " closed", "已加入我的最爱：": "Added to favorites: ",
-        "已从我的最爱移除：": "Removed from favorites: ", "余额": "Balance",
-        "维护通知": "Maintenance", "目前正在维护。": " is under maintenance.",
-        "启动失败": "Launch failed", "无法打开": "Could not open ",
-        "游戏运行出错": "Game error", "请选择游戏": "Choose a game",
-        "没有设置对应的程序模块。": " has no program module configured.",
-        "请先关闭当前运行中的游戏。": "Close the running game first.",
-        "未正常结束：": " did not finish normally: ",
-        "账号 ": "Account ", " 已被锁定，请联系管理员。": " is locked; contact an administrator.",
-        "登录失败三次，该账号已被锁定。": "Three failed sign-ins; this account is now locked.",
-        "用户名或密码错误，还可尝试 ": "Incorrect username or password; attempts remaining: ",
-        " 次。": ".", " 已建立，请登录。": " created; please sign in.",
-    },
-    "zh_TW": {
-        "已启动：": "已啟動：", "已结束，余额已更新": "已結束，餘額已更新",
-        "已关闭": "已關閉", "已加入我的最爱：": "已加入我的最愛：",
-        "已从我的最爱移除：": "已從我的最愛移除：", "余额": "餘額",
-        "维护通知": "維護通知", "目前正在维护。": "目前正在維護。",
-        "启动失败": "啟動失敗", "无法打开": "無法開啟", "游戏运行出错": "遊戲執行出錯",
-        "没有设置对应的程序模块。": "沒有設定對應的程式模組。",
-        "请先关闭当前运行中的游戏。": "請先關閉目前執行中的遊戲。",
-        "未正常结束：": "未正常結束：",
-        "账号 ": "帳號 ", " 已被锁定，请联系管理员。": " 已被鎖定，請聯絡管理員。",
-        "登录失败三次，该账号已被锁定。": "登入失敗三次，該帳號已被鎖定。",
-        "用户名或密码错误，还可尝试 ": "使用者名稱或密碼錯誤，還可嘗試 ",
-        " 次。": " 次。", " 已建立，请登录。": " 已建立，請登入。",
-    },
-    "mi": {
-        "已启动：": "Kua tīmata: ", "已结束，余额已更新": " kua mutu; kua whakahōutia te toenga",
-        "已关闭": " kua katia", "已加入我的最爱：": "Kua tāpiritia ki ngā tino pai: ",
-        "已从我的最爱移除：": "Kua tangohia i ngā tino pai: ", "余额": "Toenga",
-        "维护通知": "Pānui tiaki", "目前正在维护。": " kei te tiakina ināianei.",
-        "启动失败": "I rahua te tīmata", "无法打开": "Kāore i taea te whakatuwhera ",
-        "游戏运行出错": "Hapa kēmu",
-        "没有设置对应的程序模块。": " kāore he kōwae papatono kua whakaritea.",
-        "请先关闭当前运行中的游戏。": "Katia te kēmu e haere ana i te tuatahi.",
-        "未正常结束：": " kāore i mutu tika: ",
-        "账号 ": "Pūkete ", " 已被锁定，请联系管理员。": " kua maukati; whakapā atu ki te kaiwhakahaere.",
-        "登录失败三次，该账号已被锁定。": "E toru ngā takiuru rahua; kua maukati te pūkete.",
-        "用户名或密码错误，还可尝试 ": "He ingoa, he kupuhipa rānei kei te hē; ngā whakamātau e toe ana: ",
-        " 次。": ".", " 已建立，请登录。": " kua hangaia; takiuru mai.",
-    },
-    "eo": {
-        "已启动：": "Lanĉita: ", "已结束，余额已更新": " finiĝis; saldo ĝisdatigita",
-        "已关闭": " fermiĝis", "已加入我的最爱：": "Aldonita al ŝatataj: ",
-        "已从我的最爱移除：": "Forigita el ŝatataj: ", "余额": "Saldo",
-        "维护通知": "Prizorga avizo", "目前正在维护。": " estas nun prizorgata.",
-        "启动失败": "Lanĉo malsukcesis", "无法打开": "Ne eblis malfermi ",
-        "游戏运行出错": "Luderaro",
-        "没有设置对应的程序模块。": " ne havas agorditan programmodulon.",
-        "请先关闭当前运行中的游戏。": "Unue fermu la rulantan ludon.",
-        "未正常结束：": " ne finiĝis normale: ",
-        "账号 ": "Konto ", " 已被锁定，请联系管理员。": " estas ŝlosita; kontaktu administranton.",
-        "登录失败三次，该账号已被锁定。": "Tri malsukcesaj ensalutoj; la konto nun estas ŝlosita.",
-        "用户名或密码错误，还可尝试 ": "Malĝusta uzantnomo aŭ pasvorto; restantaj provoj: ",
-        " 次。": ".", " 已建立，请登录。": " kreita; bonvolu ensaluti.",
-    },
-}
+_DYNAMIC_PHRASES = {'en': {'余额': 'Balance',
+        '启动失败': 'Launch failed',
+        '无法打开': 'Could not open ',
+        '请先关闭当前运行中的游戏。': 'Close the running game first.',
+        '账号 ': 'Account ',
+        ' 已被锁定，请联系管理员。': ' is locked; contact an administrator.',
+        '登录失败三次，该账号已被锁定。': 'Three failed sign-ins; this account is now locked.',
+        '用户名或密码错误，还可尝试 ': 'Incorrect username or password; attempts remaining: ',
+        ' 次。': '.',
+        ' 已建立，请登录。': ' created; please sign in.'},
+ 'zh_TW': {'余额': '餘額',
+           '启动失败': '啟動失敗',
+           '无法打开': '無法開啟',
+           '请先关闭当前运行中的游戏。': '請先關閉目前執行中的遊戲。',
+           '账号 ': '帳號 ',
+           ' 已被锁定，请联系管理员。': ' 已被鎖定，請聯絡管理員。',
+           '登录失败三次，该账号已被锁定。': '登入失敗三次，該帳號已被鎖定。',
+           '用户名或密码错误，还可尝试 ': '使用者名稱或密碼錯誤，還可嘗試 ',
+           ' 次。': ' 次。',
+           ' 已建立，请登录。': ' 已建立，請登入。'},
+ 'mi': {'余额': 'Toenga',
+        '启动失败': 'I rahua te tīmata',
+        '无法打开': 'Kāore i taea te whakatuwhera ',
+        '请先关闭当前运行中的游戏。': 'Katia te kēmu e haere ana i te tuatahi.',
+        '账号 ': 'Pūkete ',
+        ' 已被锁定，请联系管理员。': ' kua maukati; whakapā atu ki te kaiwhakahaere.',
+        '登录失败三次，该账号已被锁定。': 'E toru ngā takiuru rahua; kua maukati te pūkete.',
+        '用户名或密码错误，还可尝试 ': 'He ingoa, he kupuhipa rānei kei te hē; ngā whakamātau e toe ana: ',
+        ' 次。': '.',
+        ' 已建立，请登录。': ' kua hangaia; takiuru mai.'},
+ 'eo': {'余额': 'Saldo',
+        '启动失败': 'Lanĉo malsukcesis',
+        '无法打开': 'Ne eblis malfermi ',
+        '请先关闭当前运行中的游戏。': 'Unue fermu la rulantan ludon.',
+        '账号 ': 'Konto ',
+        ' 已被锁定，请联系管理员。': ' estas ŝlosita; kontaktu administranton.',
+        '登录失败三次，该账号已被锁定。': 'Tri malsukcesaj ensalutoj; la konto nun estas ŝlosita.',
+        '用户名或密码错误，还可尝试 ': 'Malĝusta uzantnomo aŭ pasvorto; restantaj provoj: ',
+        ' 次。': '.',
+        ' 已建立，请登录。': ' kreita; bonvolu ensaluti.'}}
 
 _DARK_COLOURS = {
     "#F7F3EA": "#15171C", "#FFFFFF": "#20232A", "#FFF9FC": "#292C34",
@@ -1347,15 +1365,6 @@ def translate_text(text: str, language: str) -> str:
         )
 
     result = text
-    # Longest names first prevents a short title such as “百家乐” from
-    # consuming part of “特殊百家乐”.
-    game_names = sorted(
-        ((source, _TRANSLATIONS[language][source])
-         for source, *_rest in _GAME_TRANSLATION_ROWS),
-        key=lambda item: len(item[0]), reverse=True,
-    )
-    for source, target in game_names:
-        result = result.replace(source, target)
     for source, target in sorted(
         _DYNAMIC_PHRASES.get(language, {}).items(),
         key=lambda item: len(item[0]), reverse=True,
@@ -1471,7 +1480,7 @@ def user_favorites(user: Optional[dict]) -> list[dict]:
     return result
 
 
-def resolve_favorite(favorite: dict) -> dict:
+def resolve_favorite(favorite: dict, language: Optional[str] = None) -> dict:
     """Resolve transient hub/name data from the saved module path."""
     module_name = str(favorite.get("module", "")).strip()
     prefix_to_hub = {
@@ -1495,15 +1504,28 @@ def resolve_favorite(favorite: dict) -> dict:
                         display_name = str(game.get("name", display_name))
                         break
             else:
-                for games in getattr(hub_module, "GAME_SECTIONS", {}).values():
-                    match = next(
-                        (name for name, module, _maintenance in games
-                         if module == module_name),
-                        None,
-                    )
-                    if match is not None:
-                        display_name = str(match)
+                found = False
+                for section_name in ("GAME_SECTIONS", "REGION_SECTIONS"):
+                    sections = getattr(hub_module, section_name, {})
+                    if not isinstance(sections, dict):
+                        continue
+                    for games in sections.values():
+                        if not isinstance(games, (list, tuple)):
+                            continue
+                        match = next(
+                            (name for name, module, _maintenance in games
+                             if module == module_name),
+                            None,
+                        )
+                        if match is not None:
+                            display_name = str(match)
+                            found = True
+                            break
+                    if found:
                         break
+            translator = getattr(hub_module, "translate_text", None)
+            if language is not None and callable(translator):
+                display_name = translator(display_name, language)
         except (ImportError, AttributeError, TypeError, ValueError):
             pass
     return {"module": module_name, "hub": hub, "name": display_name}
@@ -1614,7 +1636,7 @@ class HomeDashboard(tk.Frame):
                     cursor="hand2", padx=0, pady=0,
                 )
                 heart.pack(side="left", padx=(10, 7), pady=7)
-                name = tk.Label(row, text=tr(favorite["name"]), anchor="w",
+                name = tk.Label(row, text=favorite["name"], anchor="w",
                                 justify="left", wraplength=210,
                                 font=("Microsoft YaHei UI", 9, "bold"),
                                 bg=surface, fg=text_colour, cursor="hand2")
@@ -1783,9 +1805,19 @@ class GameCenterApp(tk.Tk):
             return
 
         language = self._effective_language()
-        uploaded_scope = bool(getattr(page, "_uploaded_scope", False))
+        # Account sections inherit ownership from their containing index page.
+        owner = page
+        while owner is not None and not (
+            getattr(owner, "_index_owned", False) or
+            getattr(owner, "_uploaded_scope", False)
+        ):
+            owner = getattr(owner, "master", None)
+        uploaded_scope = bool(getattr(owner, "_uploaded_scope", False))
+        translate_owned = bool(getattr(owner, "_index_owned", False)) and not uploaded_scope
 
         def visit(widget: tk.Widget) -> None:
+            if widget is not page and getattr(widget, "_uploaded_scope", False):
+                return
             try:
                 options = set(widget.keys())
                 # The hover guard is needed only by uploaded hub pages. Adding
@@ -1795,19 +1827,19 @@ class GameCenterApp(tk.Tk):
                     bindtags = widget.bindtags()
                     if "UploadedDarkGuard" not in bindtags:
                         widget.bindtags(("UploadedDarkGuard",) + bindtags)
-                if "text" in options:
+                if translate_owned and "text" in options:
                     current = str(widget.cget("text"))
                     translated = translate_text(current, language)
                     if translated != current:
                         widget.configure(text=translated)
-                if "textvariable" in options:
+                if translate_owned and "textvariable" in options:
                     variable_name = str(widget.cget("textvariable"))
                     if variable_name:
                         current = str(widget.getvar(variable_name))
                         translated = translate_text(current, language)
                         if translated != current:
                             widget.setvar(variable_name, translated)
-                if isinstance(widget, tk.Canvas):
+                if translate_owned and isinstance(widget, tk.Canvas):
                     for item_id in widget.find_all():
                         try:
                             current = widget.itemcget(item_id, "text")
@@ -2208,7 +2240,8 @@ class GameCenterApp(tk.Tk):
         ]
         favorites = (
             [] if self.is_guest else
-            [resolve_favorite(item) for item in user_favorites(self.current_user)]
+            [resolve_favorite(item, self._effective_language())
+             for item in user_favorites(self.current_user)]
         )
         page = HomeDashboard(
             self, self.username, self.balance, actions,
@@ -2300,7 +2333,7 @@ class GameCenterApp(tk.Tk):
                 user=self.username,
                 on_back=lambda value: (self.set_balance(value), self.show_main_menu()),
                 on_balance_change=self.set_balance,
-                translator=self.translate_ui,
+                language=self._effective_language(),
             )
             if hub == "lotto":
                 hub_page.launch_game(display_name, module_name)
@@ -2308,8 +2341,8 @@ class GameCenterApp(tk.Tk):
                 hub_page.launch_game(display_name, module_name, False)
         except Exception as exc:
             messagebox.showerror(
-                "启动失败",
-                f"无法打开收藏游戏《{display_name}》：\n\n{type(exc).__name__}: {exc}",
+                self.translate_ui("启动失败"),
+                self.translate_ui('无法打开收藏游戏《{name}》：\n\n{error}').format(name=resolve_favorite(favorite, self._effective_language())["name"], error=f"{type(exc).__name__}: {exc}"),
                 parent=self,
             )
 
@@ -2321,7 +2354,7 @@ class GameCenterApp(tk.Tk):
             user=self.username,
             on_back=self.return_from_casino,
             on_balance_change=self.set_balance,
-            translator=self.translate_ui,
+            language=self._effective_language(),
         )
         self.casino_page = page
         self.replace_page(page)
@@ -2355,7 +2388,7 @@ class GameCenterApp(tk.Tk):
                 user=self.username,
                 on_back=self.return_from_game_hub,
                 on_balance_change=self.set_balance,
-                translator=self.translate_ui,
+                language=self._effective_language(),
             )
             if not isinstance(page, tk.Widget):
                 raise TypeError(f"{module_name}.main() 必须返回 Tkinter Widget/Frame")
@@ -2364,8 +2397,8 @@ class GameCenterApp(tk.Tk):
             self.replace_page(page)
         except Exception as exc:
             messagebox.showerror(
-                "启动失败",
-                f"无法打开{title}：\n\n{type(exc).__name__}: {exc}",
+                self.translate_ui("启动失败"),
+                self.translate_ui('无法打开{name}：\n\n{error}').format(name=self.translate_ui(title), error=f"{type(exc).__name__}: {exc}"),
                 parent=self,
             )
 
@@ -2710,8 +2743,8 @@ class GameCenterApp(tk.Tk):
     def close_application(self):
         if self.casino_page is not None and getattr(self.casino_page, "process", None):
             messagebox.showwarning(
-                "游戏运行中",
-                "请先关闭独立运行中的赌场游戏。",
+                self.translate_ui("游戏运行中"),
+                self.translate_ui("请先关闭独立运行中的赌场游戏。"),
                 parent=self,
             )
             return
@@ -2719,8 +2752,8 @@ class GameCenterApp(tk.Tk):
             self.game_hub_page, "process", None
         ):
             messagebox.showwarning(
-                "游戏运行中",
-                "请先关闭当前运行中的游戏。",
+                self.translate_ui("游戏运行中"),
+                self.translate_ui("请先关闭当前运行中的游戏。"),
                 parent=self,
             )
             return

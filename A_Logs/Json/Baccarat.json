@@ -1666,11 +1666,11 @@
                 "5"
             ]
         ],
-        "current_index": 142,
+        "current_index": 148,
         "cut_threshold": 53,
-        "remaining_cards": 274,
+        "remaining_cards": 268,
         "burn_complete": true,
-        "updated_at": "2026-09-19 23:20:39"
+        "updated_at": "2026-09-22 00:11:08"
     },
     "temp_finish_data": {
         "records": [
@@ -3246,12 +3246,71 @@
                         "5"
                     ]
                 ]
+            },
+            {
+                "time": "2026-09-22 00:11:14",
+                "winner": "Player",
+                "player_score": 9,
+                "banker_score": 1,
+                "natural": false,
+                "mode": "classic",
+                "player_pair": false,
+                "banker_pair": false,
+                "specials": [
+                    "Dragon P"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Dragon P"
+                    ],
+                    "tiger": [],
+                    "ez": [
+                        "Divine 9",
+                        "Dragon P"
+                    ],
+                    "2to1": [
+                        "Dragon P"
+                    ],
+                    "lucky7": [],
+                    "monkey": [],
+                    "goldendice": [],
+                    "treasure": [],
+                    "xxx": []
+                },
+                "player_hand": [
+                    [
+                        "Spade",
+                        "Q"
+                    ],
+                    [
+                        "Club",
+                        "A"
+                    ],
+                    [
+                        "Club",
+                        "8"
+                    ]
+                ],
+                "banker_hand": [
+                    [
+                        "Diamond",
+                        "2"
+                    ],
+                    [
+                        "Heart",
+                        "10"
+                    ],
+                    [
+                        "Diamond",
+                        "9"
+                    ]
+                ]
             }
         ]
     },
     "statistic_data": {
-        "total_game": 5690,
-        "player_win": 2533,
+        "total_game": 5691,
+        "player_win": 2534,
         "banker_win": 2638,
         "tie_win": 519
     }

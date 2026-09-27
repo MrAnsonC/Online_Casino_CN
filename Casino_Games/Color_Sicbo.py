@@ -16,7 +16,8 @@ from tkinter import messagebox, simpledialog
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from dataclasses import dataclass
 
-VERSION = "ColorGame-ScreenTray-R10"
+VERSION = "ColorGame-ScreenTray-R11-FlapCycle-v6"
+FLAP_REVISION = "2026-09-22-v6-fast-reveal"
 
 class Theme:
     """Shared interface colours and fonts."""
@@ -59,6 +60,122 @@ def chip_amount_text(amount):
     whole,decimal=divmod(tenths,10)
     label=str(whole)+(f".{decimal}" if decimal else "")
     return label+suffix+("+" if remainder else "")
+
+
+
+class SplitFlapDigit(tk.Frame):
+    """A hinged card: old upper half falls, then the new lower half unfolds."""
+    WIDTH, HALF, DURATION = 27, 17, .60
+    HOLD_MS = 200
+    DASH_DURATION = .20
+    DASH_HOLD_MS = 70
+    SYMBOLS = "0123456789-"
+
+    def __init__(self, master):
+        super().__init__(master, width=27, height=34, bg="#0B100E",
+                         highlightbackground="#647269", highlightthickness=1)
+        self.pack_propagate(False)
+        self._value="-"
+        self._target="-"
+        self._next=None
+        self._job=None
+        self._dead=False
+        self._top=tk.Canvas(self, bg="#28332D", highlightthickness=0)
+        self._bottom=tk.Canvas(self, bg="#141C17", highlightthickness=0)
+        self._leaf=tk.Canvas(self, bg="#28332D", highlightthickness=0)
+        self._top.place(x=0,y=0,width=27,height=17)
+        self._bottom.place(x=0,y=17,width=27,height=17)
+        self._hinge=tk.Frame(self,bg="#080C09",height=1)
+        self._hinge.place(x=0,y=17,width=27,height=1)
+        self.bind("<Destroy>",self._on_destroy,add="+")
+        self._paint_rest()
+
+    @staticmethod
+    def _paint_half(canvas, digit, upper, height=17, shade=None):
+        # Each half is a separate clipping surface.  The moving card's height
+        # follows a cosine projection around the horizontal hinge.
+        canvas.delete("all")
+        if shade is not None:canvas.configure(bg=shade)
+        canvas.create_text(13.5,height if upper else 0,text=digit,
+                           fill="#F7F2D9",font=("Courier",max(1,round(23*height/17)),"bold"))
+        canvas.create_line(1,0 if upper else height-1,26,0 if upper else height-1,
+                           fill="#526055")
+
+    def _paint_rest(self):
+        self._leaf.place_forget()
+        self._paint_half(self._top,self._value,True)
+        self._paint_half(self._bottom,self._value,False)
+        self._hinge.lift()
+
+    def set(self, value, *, animate=True, delay=0, fast=False):
+        value=str(value)
+        if value not in self.SYMBOLS or len(value)!=1:
+            raise ValueError("翻牌字符必须是 0–9 或 -")
+        if not animate:
+            self._cancel()
+            self._value=self._target=value
+            self._next=None
+            self._paint_rest()
+            return
+        if value==self._target:return
+        self._target=value
+        self._fast=fast
+        # Never jump to a previous target or cut a falling card in half.
+        # An in-flight step finishes before following the latest destination.
+        if self._job is None:
+            self._job=self.after(delay,self._advance)
+
+    def is_animating(self):
+        return self._job is not None or self._value!=self._target
+
+    def _advance(self):
+        self._job=None
+        if self._dead or self._value==self._target:return
+        self._next=self.SYMBOLS[(self.SYMBOLS.index(self._value)+1)%len(self.SYMBOLS)]
+        # Trips to unknown dashes and the explicit bonus reveal use fast timing.
+        # Ordinary numeric increments (including 9 -> - -> 0) stay standard.
+        # Snapshot each step so repainting/retargeting cannot change it mid-fall.
+        self._step_duration=self.DASH_DURATION if self._target=="-" or getattr(self,"_fast",False) else self.DURATION
+        self._step_hold_ms=self.DASH_HOLD_MS if self._target=="-" or getattr(self,"_fast",False) else self.HOLD_MS
+        self._start=time.monotonic()
+        self._tick()
+
+    def _tick(self):
+        self._job=None
+        if self._dead:return
+        progress=max(0.,min(1.,(time.monotonic()-self._start)/self._step_duration))
+        if progress>=1:
+            self._value=self._next
+            self._next=None
+            self._paint_rest()
+            # Every intermediate card stays legible, even after a slow frame.
+            # A late timer never skips intermediate symbols to catch up.
+            self._job=self.after(self._step_hold_ms,self._advance)
+            return
+        self._paint_half(self._top,self._next,True)
+        self._paint_half(self._bottom,self._value,False)
+        angle=math.pi*progress**.8
+        upper=angle<math.pi/2
+        height=max(1,round(self.HALF*abs(math.cos(angle))))
+        y=self.HALF-height if upper else self.HALF
+        tone=round(20+22*abs(math.cos(angle)))
+        shade=f"#{tone:02x}{tone+8:02x}{tone+2:02x}"
+        self._leaf.place(x=0,y=y,width=self.WIDTH,height=height)
+        self._paint_half(self._leaf,self._value if upper else self._next,upper,height,shade)
+        self._leaf.tk.call("raise",self._leaf._w)
+        self._hinge.lift()
+        self._job=self.after(16,self._tick)
+
+    def _cancel(self):
+        if self._job is not None:
+            try:self.after_cancel(self._job)
+            except tk.TclError:pass
+            self._job=None
+
+    def _on_destroy(self,event):
+        if event.widget is self:
+            self._dead=True
+            self._cancel()
 
 
 class ModernButton(tk.Button):
@@ -400,18 +517,65 @@ class ColorHistory:
             if not isinstance(data,dict) or not isinstance(data.get("Record2"),dict):
                 raise ValueError("Color Game 历史记录格式错误")
             self.data=data
+        self._restore_latest_triple()
+
+    @staticmethod
+    def _is_triple(outcomes, invalid=False):
+        return (not invalid and len(outcomes)==3
+                and all(type(i) is int and 0<=i<6 for i in outcomes)
+                and len(set(outcomes))==1)
+
+    def _restore_latest_triple(self):
+        """Migrate old logs; retain the summary after Record2's 1000-row cutoff."""
+        if "LatestTriple" in self.data:
+            return
+        self.data["LatestTriple"] = None
+        for entry in self.entries():
+            outcomes=entry.get("outcomes", [])
+            if self._is_triple(outcomes, entry.get("invalid", False)):
+                self.data["LatestTriple"]={
+                    "round":entry["round"], "outcomes":list(outcomes),
+                    "labels":[COLOR_NAMES[i] for i in outcomes],
+                    "rounds_ago":max(1, self.data["Total"]-entry["round"]+1),
+                    "multiplier":bonus_multiplier(entry["bonus_points"]) if entry.get("bonus_points") else None}
+                break
+
+    def latest_triple(self):
+        record=self.data.get("LatestTriple")
+        return dict(record) if record is not None else None
+
+    def _next_latest_triple(self, result, number):
+        record=self.latest_triple()
+        if self._is_triple(result.outcomes, result.invalid):
+            # Reset BEFORE counting this settlement: a new triple reads 001.
+            record={"round":number, "outcomes":list(result.outcomes),
+                    "labels":[COLOR_NAMES[i] for i in result.outcomes],
+                    "rounds_ago":0, "multiplier":bonus_multiplier(result.bonus_points)}
+        if record is not None:
+            record["rounds_ago"]+=1
+        return record
 
     def entries(self):
         return sorted(self.data["Record2"].values(),key=lambda e:e["round"],reverse=True)
 
     def add(self,result):
-        if result.invalid:return  # Invalid/cocked rounds never enter the JSON log.
+        if result.invalid:
+            # A refunded round is still a settlement for the latest-triple counter.
+            # Keep the existing rule: it does not enter Record1/Record2 or Total.
+            data=dict(self.data)
+            data["LatestTriple"]=self._next_latest_triple(result, self.data["Total"])
+            self._save_data(data)
+            return
         number=self.data["Total"]+1
         entry={"round":number,"outcomes":list(result.outcomes),"invalid":result.invalid,
                "bets":[str(v) for v in result.bets],"returned":str(result.returned),"net":str(result.net),"bonus_points":list(result.bonus_points)}
         recent=([entry]+self.entries())[:1000]
         data={"Total":number,"Record1":{f"{e['round']}_Data":e for e in recent[:15]},
-              "Record2":{f"{e['round']}_Data":e for e in recent}}
+              "Record2":{f"{e['round']}_Data":e for e in recent},
+              "LatestTriple":self._next_latest_triple(result, number)}
+        self._save_data(data)
+
+    def _save_data(self, data):
         if self.path:
             self.path.parent.mkdir(parents=True,exist_ok=True)
             with open(str(self.path),"w",encoding="utf-8") as f:json.dump(data,f,ensure_ascii=False,indent=4)
@@ -548,6 +712,7 @@ class ColorGame:
         board.pack(side="left",fill="both",expand=True,padx=(0,10))
         self.canvas=tk.Canvas(board,bg="#263d38",highlightthickness=0);self.canvas.pack(fill="both",expand=True)
         self.canvas.bind("<Configure>",lambda e:self.draw_scene())
+        self._create_latest_triple_panel(board)
         def section(title=None,padding=2):
             card=tk.Frame(right,bg=Theme.PANEL,bd=1,relief=tk.SOLID)
             card.pack(fill="x",pady=1)
@@ -579,7 +744,7 @@ class ColorGame:
         self.bet_canvas.bind("<Button-1>",self._bet_click)
         self.bet_canvas.bind("<Button-3>",self._bet_clear_click)
         self.bet_canvas.bind("<Key>",self._bet_key)
-        self.root.bind("<Return>",lambda e:self.start_game(),add="+")
+        self._bind_start_keys()
         action=section("操作",padding=2)
         tk.Label(action,textvariable=self.info_var,font=("Arial",10,"bold"),bg=Theme.PANEL,fg="#2A1B08",wraplength=370,height=1).pack(fill="x",pady=(0,3))
         buttons=tk.Frame(action,bg=Theme.PANEL);buttons.pack(fill="x")
@@ -608,6 +773,135 @@ class ColorGame:
         tk.Label(row_last,textvariable=self.last_win_var,font=("Arial",12),bg=Theme.PANEL,fg="black").pack(side="left")
         tk.Button(row_last,text="ℹ️",command=self.show_game_instructions,bg="#4B8BBE",fg="white",
                   font=("Arial",12),width=2,relief=tk.FLAT).pack(side="right")
+
+
+    def _bind_start_keys(self):
+        # Tk events include the toplevel tag, but NOT ancestor Frame tags.
+        self._key_window=self.root.winfo_toplevel()
+        self._start_key_bindings=[]
+        for sequence in ("<Return>", "<KP_Enter>"):
+            command=self._key_window.bind(sequence, self._on_start_key, add="+")
+            self._start_key_bindings.append((sequence, command))
+
+    def _on_start_key(self, event):
+        if self._closed or not self.root.winfo_ismapped():
+            return
+        # Do not start a game from another page or a child dialog.
+        widget=event.widget
+        if widget is not self._key_window:
+            while widget is not None and widget is not self.root:
+                if isinstance(widget, (tk.Tk, tk.Toplevel)):
+                    return
+                widget=getattr(widget, "master", None)
+            if widget is None:
+                return
+        try:
+            if self.root.grab_current() is not None:
+                return
+            if str(self.start_button.cget("state"))!=tk.DISABLED:
+                self.start_button.invoke()
+        except tk.TclError:
+            return
+        return "break"
+
+    def _unbind_start_keys(self):
+        for sequence, command in getattr(self, "_start_key_bindings", []):
+            try:
+                self._key_window.unbind(sequence, command)
+            except tk.TclError:
+                pass
+        self._start_key_bindings=[]
+
+    def _create_latest_triple_panel(self, board):
+        self.latest_triple_canvas=tk.Canvas(
+            board, width=170, height=192, bg="#172923",
+            highlightbackground="#D8B46A", highlightthickness=1)
+        self.latest_triple_canvas.place(relx=1.0, x=-10, y=10, anchor="ne")
+        self._latest_triple_images=[]
+        self._latest_triple_preview=None
+        self._triple_reveal_requested=False
+        self._triple_flaps={key:[SplitFlapDigit(self.latest_triple_canvas) for _ in range(3)]
+                            for key in ("rounds_ago","multiplier")}
+        self._draw_latest_triple(animate=False)
+
+    def _show_pending_triple(self):
+        """Called only when the visible color/card result has landed."""
+        r=self._result
+        if (self._latest_triple_preview is not None or r is None or r.invalid
+                or len(set(r.outcomes))!=1):return
+        self._latest_triple_preview={"outcomes":list(r.outcomes),
+                                    "rounds_ago":None,"multiplier":None}
+        self._draw_latest_triple()
+
+    def _wait_for_latest_triple(self):
+        """Settlement must not replace 000 while a multiplier card is falling."""
+        self._job=None
+        if self._closed or not self.game_active or self._result is None:return
+        if any(cell.is_animating() for cells in self._triple_flaps.values() for cell in cells):
+            self._job=self.root.after(50,self._wait_for_latest_triple)
+        elif self._triple_reveal_requested:
+            # Complete all six trips to '-' before assigning numeric targets.
+            self._reveal_latest_triple()
+            self._job=self.root.after(50,self._wait_for_latest_triple)
+        else:
+            # All six cards have landed; keep the result readable before +1.
+            self._job=self.root.after(800,self._finish_round)
+
+    def _reveal_latest_triple(self):
+        """Reveal 000 and the FINAL multiplier after the bonus animation ends."""
+        r=self._result
+        if r is None or r.invalid or len(set(r.outcomes))!=1:return
+        if any(cell.is_animating() for cells in self._triple_flaps.values() for cell in cells):
+            # The bonus can finish before the slowest card reaches '-'.
+            # Keep that destination intact; the existing wait loop reveals later.
+            self._triple_reveal_requested=True
+            return
+        self._triple_reveal_requested=False
+        self._latest_triple_preview={"outcomes":list(r.outcomes),
+                                    "rounds_ago":0,"multiplier":bonus_multiplier(r.bonus_points)}
+        self._draw_latest_triple()
+
+    def _draw_latest_triple(self, animate=True):
+        c=self.latest_triple_canvas
+        c.delete("all")
+        self._latest_triple_images=[]
+        c.create_text(85,17,text="最近豹子是",fill="#E7D39C",
+                      font=(Theme.FONT_CJK,13,"bold"))
+        record=self._latest_triple_preview
+        if record is None:record=self.history_store.latest_triple()
+        if record is None:
+            c.create_text(85,56,text="暂无豹子记录",fill="#C5D1C8",
+                          font=(Theme.FONT_CJK,10))
+        else:
+            self._draw_latest_triple_symbols(c,record["outcomes"][0])
+        for y,key,unit in ((96,"rounds_ago","局前"),(139,"multiplier","X")):
+            value=record.get(key) if record else None
+            cells=self._triple_flaps[key]
+            digits="---" if value is None else f"{min(999,max(0,int(value))):03d}"
+            for i,(cell,digit) in enumerate(zip(cells,digits)):
+                # Unknown values retain all three visible cards. Each wheel
+                # traverses 0..9,- in order; 9 -> 0 always takes two flips.
+                cell.place(x=14+i*31,y=y,width=27,height=34)
+                cell.set(digit,animate=animate,delay=i*85,
+                         fast=self._latest_triple_preview is not None
+                              and self._latest_triple_preview.get("rounds_ago")==0)
+            c.create_text(117,y+17,text=unit,anchor="w",fill="#E7D39C",
+                          font=(Theme.FONT_CJK,12,"bold"))
+        if record and record.get("rounds_ago") is not None and record["rounds_ago"]>999:
+            c.create_text(85,184,text=f"实际 {record['rounds_ago']} 局前",
+                          fill="#C5D1C8",font=(Theme.FONT_CJK,8))
+
+
+    def _draw_latest_triple_symbols(self, c, index):
+        for i in range(3):
+            x=16+i*48
+            c.create_polygon(x,43,x+7,36,x+43,36,x+36,43,
+                             fill=COLOR_HEX[index], outline="#D8B46A")
+            c.create_polygon(x+36,43,x+43,36,x+43,72,x+36,79,
+                             fill=COLOR_HEX[index], outline="#D8B46A")
+            c.create_rectangle(x,43,x+36,79,fill=COLOR_HEX[index],outline="#D8B46A",width=2)
+            c.create_text(x+18,61,text=COLOR_NAMES[index],fill=HISTORY_TEXT[COLOR_NAMES[index]],
+                          font=(Theme.FONT_CJK,12,"bold"))
 
     def show_game_instructions(self):
         existing=getattr(self,"_instruction_window",None)
@@ -690,6 +984,7 @@ class ColorGame:
             c.create_text(x+23,394,text=COLOR_NAMES[i],fill="#18201c",font=(Theme.FONT_CJK,12,"bold"))
 
     def update_display(self):
+        self._draw_latest_triple()
         self.bet_per_draw=sum(self.bets,Decimal(0))
         self.balance_var.set(f"余额: ${self.balance:,.2f}")
         self.stage_var.set("掷骰中" if self.game_active else ("已结算" if self._settled else "下注中"))
@@ -966,6 +1261,7 @@ class ColorGame:
         self._show_cocked_overlay=False
         if elapsed>=duration:
             if not self._point_frames:self._finish_round();return
+            self._show_pending_triple()
             transfer=elapsed-duration
             self._gate_elapsed=0.
             if transfer<.9:
@@ -985,7 +1281,17 @@ class ColorGame:
         self._gate_elapsed=clock
         self._gate_return_at=self._point_gate_return if self._dice_kind=="points" else self._color_gate_return
         frame=int(clock/DicePhysics.FRAME_DT)
-        if frame>=len(frames)-1:self._finish_round();return
+        if frame>=len(frames)-1:
+            # Final point roll is now visible; do not leak its precomputed value.
+            self._poses=frames[-1]
+            self._show_cocked_overlay=False
+            self._display_point_total=bonus_multiplier(self._result.bonus_points)
+            self._gate_elapsed=0.
+            self._reveal_latest_triple()
+            self.draw_scene()
+            # Wait for every sequential card flip before settlement adds 1.
+            self._wait_for_latest_triple()
+            return
         if self._dice_kind=="points":
             self._show_cocked_overlay=frame in self._point_cocked_idx
             self._display_point_total,self._gate_elapsed,self._gate_return_at=self._point_timeline[frame]
@@ -1027,13 +1333,15 @@ class ColorGame:
         else:
             self.result_var.set(f"净赢 {r.net:+,.2f} · 返还 {r.returned:,.2f}")
             self.info_var.set("你赢啦" if r.net>0 else "下局加油")
-        # 无效轮不写入历史记录
+        # Every settlement advances LatestTriple; invalid rolls remain outside history.
+        try:self.history_store.add(r)
+        except (OSError,ValueError) as exc:
+            messagebox.showerror("无法保存游戏记录",f"余额已结算，但历史记录保存失败。\n{exc}",parent=self.root)
         if not r.invalid:
-            try:self.history_store.add(r)
-            except (OSError,ValueError) as exc:
-                messagebox.showerror("无法保存游戏记录",f"余额已结算，但历史记录保存失败。\n{exc}",parent=self.root)
             self.history=self.history_store.recent()
             self.draw_statistics()
+        self._latest_triple_preview=None
+        self._triple_reveal_requested=False
         self._settled=True
         self.draw_history()
         self._flash_step=0
@@ -1225,6 +1533,7 @@ class ColorGame:
         self._finish_round(force=True)
         self._cancel_jobs()
         self._closed=True
+        self._unbind_start_keys()
         self._restore_window_close()
         finish=getattr(self.root,"finish",None)
         if callable(finish):
@@ -1237,6 +1546,7 @@ class ColorGame:
     def _on_destroy(self,event):
         if event.widget is not self.root:
             return
+        self._unbind_start_keys()
         self._restore_window_close()
         self._cancel_jobs()
         if self._result is not None:

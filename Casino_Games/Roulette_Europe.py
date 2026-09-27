@@ -12,8 +12,9 @@ del _install_secure_json, _account_root, _AccountPath, _account_sys
 import json
 import math
 import os
-import uuid
+import secrets
 import time
+from datetime import date
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -21,15 +22,6 @@ try:
     from PIL import ImageColor
 except Exception:
     ImageColor = None
-
-def uuid_uniform(a: float, b: float) -> float:
-    """使用 uuid4 的随机位生成 [a, b) 范围内的浮点数"""
-    # uuid4 返回 128 位随机整数，取高 64 位足够了
-    rand_int = uuid.uuid4().int >> 64   # 取高 64 位
-    # 映射到 [0, 1) 区间
-    rand_float = rand_int / (1 << 64)
-    return a + (b - a) * rand_float
-
 
 # =========================================================
 # Constants for scaling the betting board
@@ -127,6 +119,505 @@ ROULETTE_SEQUENCE = [
     "29", "7", "28", "12", "35", "3", "26",
 ]
 assert len(ROULETTE_SEQUENCE) == 37, f"Wheel sequence must have 37 items, got {len(ROULETTE_SEQUENCE)}"
+assert set(ROULETTE_SEQUENCE) == {str(i) for i in range(37)}
+
+def pocket_index(ball_angle: float, wheel_angle: float) -> int:
+    """将球与转盘的相对角度映射到等宽的欧式单零槽位。"""
+    return int(((ball_angle - wheel_angle) % 360.0) // (360.0 / 37))
+
+# SI units: metres, radians and seconds. The renderer alone converts to pixels.
+# Ideal level wheel: equal pockets/materials, no number-dependent parameters.
+WHEEL_RUN_MIN_SECONDS = 125.0
+WHEEL_RUN_MAX_SECONDS = 150.0
+WHEEL_ACCEL_SECONDS = 4.0
+WHEEL_TILT = 0.80
+WHEEL_METRE_SCALE = 465.0
+RESULT_FLASH_PERIOD_MS = 1500
+RESULT_FLASH_COUNT = 3
+
+
+def startup_date_pocket(local_date=None):
+    """Initial display only: use the day from the computer's local calendar."""
+    return ROULETTE_SEQUENCE.index(str((local_date or date.today()).day))
+
+
+# Monoline digit outlines in local glyph coordinates (x right, y down).
+WHEEL_DIGIT_STROKES = {
+    "0": (((.25,0),(.75,0),(1,.2),(1,.8),(.75,1),(.25,1),(0,.8),(0,.2),(.25,0)),),
+    "1": (((.1,.2),(.55,0),(.55,1)),((.1,1),(1,1))),
+    "2": (((0,.2),(.2,0),(.8,0),(1,.2),(1,.35),(0,1),(1,1)),),
+    "3": (((0,0),(1,0),(.5,.45),(.85,.5),(1,.65),(1,.8),(.8,1),(.15,1),(0,.85)),),
+    "4": (((.8,1),(.8,0),(0,.65),(1,.65)),),
+    "5": (((1,0),(0,0),(0,.45),(.75,.45),(1,.65),(1,.8),(.8,1),(.2,1),(0,.85)),),
+    "6": (((1,.05),(.75,0),(.25,0),(0,.25),(0,.8),(.2,1),(.8,1),(1,.8),(1,.65),(.8,.45),(0,.45)),),
+    "7": (((0,0),(1,0),(.3,1)),),
+    "8": (((.2,.5),(0,.3),(0,.15),(.2,0),(.8,0),(1,.15),(1,.3),(.8,.5),(.2,.5),(0,.7),(0,.85),(.2,1),(.8,1),(1,.85),(1,.7),(.8,.5)),),
+    "9": (((1,.55),(.2,.55),(0,.35),(0,.15),(.2,0),(.8,0),(1,.2),(1,.75),(.75,1),(.1,1)),),
+}
+
+# Outline lettering uses the same rigid plane projection as the number ring.
+# Coordinates are local to each glyph (x right, y down); no rotated Tk font
+# bounding boxes or screen-space bevel offsets change as the rotor turns.
+WHEEL_TITLE_STROKES = {
+    "E": (((1,0),(0,0),(0,1),(1,1)),((0,.5),(.8,.5))),
+    "U": (((0,0),(0,.8),(.2,1),(.8,1),(1,.8),(1,0)),),
+    "R": (((0,1),(0,0),(.8,0),(1,.2),(1,.35),(.8,.5),(0,.5)),((.5,.5),(1,1))),
+    "O": (((.2,0),(.8,0),(1,.2),(1,.8),(.8,1),(.2,1),(0,.8),(0,.2),(.2,0)),),
+    "P": (((0,1),(0,0),(.8,0),(1,.2),(1,.35),(.8,.5),(0,.5)),),
+    "A": (((0,1),(.5,0),(1,1)),((.2,.6),(.8,.6))),
+    "N": (((0,1),(0,0),(1,1),(1,0)),),
+    "L": (((0,0),(0,1),(1,1)),),
+    "T": (((0,0),(1,0)),((.5,0),(.5,1))),
+    "欧": (((.05,.12),(.54,.12)),((.07,.12),(.07,.9),(.55,.9)),
+           ((.18,.28),(.45,.7)),((.46,.26),(.18,.73)),
+           ((.72,.05),(.57,.38)),((.65,.25),(.96,.25),(.86,.43)),
+           ((.76,.37),(.73,.65),(.61,.84),(.5,.96)),
+           ((.75,.59),(.85,.83),(.98,.95))),
+    "洲": (((.06,.12),(.19,.23)),((.02,.4),(.16,.49)),
+           ((.05,.94),(.2,.64)),((.3,.35),(.26,.56)),
+           ((.39,.08),(.39,.65),(.35,.83),(.27,.97)),
+           ((.48,.35),(.53,.55)),((.63,.12),(.63,.92)),
+           ((.72,.35),(.77,.55)),((.88,.05),(.88,.97))),
+    "轮": (((.02,.2),(.46,.2)),((.28,.05),(.09,.52),(.47,.52)),
+           ((.01,.75),(.48,.68)),((.3,.36),(.3,.98)),
+           ((.72,.05),(.59,.27),(.47,.4)),((.72,.05),(.85,.28),(.98,.4)),
+           ((.61,.43),(.61,.88),(.67,.95),(.91,.95),(.96,.86),(.96,.76)),
+           ((.91,.46),(.77,.61),(.61,.68))),
+    "盘": (((.45,.03),(.36,.15)),((.2,.66),(.26,.5),(.26,.16),(.79,.16),(.79,.59),(.7,.65)),
+           ((.1,.4),(.94,.4)),((.44,.24),(.55,.32)),((.44,.47),(.55,.56)),
+           ((.18,.91),(.18,.72),(.83,.72),(.83,.91)),
+           ((.39,.72),(.39,.91)),((.61,.72),(.61,.91)),((.06,.94),(.96,.94))),
+}
+
+
+def wheel_title_paths(cx, cy, text, angle, radius, char_w, char_h, gap):
+    """Project lettering fixed to the central plate, including foreshortening."""
+    a = math.radians(angle)
+    sine, cosine = math.sin(a), math.cos(a)
+    width = len(text)*char_w+(len(text)-1)*gap
+    paths = []
+    for index, char in enumerate(text):
+        for stroke in WHEEL_TITLE_STROKES.get(char, ()):
+            points = []
+            for u,v in stroke:
+                tangent = -width/2+index*(char_w+gap)+u*char_w
+                radial = radius+(.5-v)*char_h
+                points.extend((cx+radial*sine+tangent*cosine,
+                               cy-WHEEL_TILT*(radial*cosine-tangent*sine)-2))
+            paths.append(points)
+    return paths
+
+
+def wheel_number_paths(cx, cy, symbol, angle):
+    """Continuous plane projection of digits, rigidly fixed to a numbered sector."""
+    a = math.radians(angle)
+    sine, cosine = math.sin(a), math.cos(a)
+    char_w, char_h, gap = 6.4, 14.0, 1.6
+    width = len(symbol)*char_w+(len(symbol)-1)*gap
+    paths = []
+    for digit_index,digit in enumerate(symbol):
+        for stroke in WHEEL_DIGIT_STROKES[digit]:
+            points = []
+            for u,v in stroke:
+                tangent = -width/2+digit_index*(char_w+gap)+u*char_w
+                radius = 152.0-(v-.5)*char_h
+                points.extend((cx+radius*sine+tangent*cosine,
+                               cy-WHEEL_TILT*(radius*cosine-tangent*sine)
+                               -RoulettePhysics.surface_height(math.hypot(radius,tangent)/WHEEL_METRE_SCALE)*WHEEL_METRE_SCALE))
+            paths.append(points)
+    return paths
+
+
+class RoulettePhysics:
+    """Reduced rigid-contact model with a driven rotor and dissipative ball.
+
+    The rotor accelerates under constant torque, then coasts under constant
+    friction torque for a randomly chosen total of 125–150 seconds per spin.
+    A rolling sphere leaves the
+    rim when centripetal support is insufficient, rolls down the conical bowl,
+    collides with fixed deflectors and drops into a moving pocket. Pocket
+    contacts use restitution and damping. This is an idealised simulation,
+    not a calibrated replica of any particular manufacturer's wheel.
+
+    Equal pocket geometry and contact constants are shared by every number.
+    Launch conditions use an independent system RNG. The rotor can be driven
+    again from its current angle and speed without a discontinuity; the
+    dynamics never use colour, stake, balance or previous winning numbers.
+    """
+    TAU = 2 * math.pi
+    STEP = TAU / 37
+    DT = 1.0 / 240.0
+    G = 9.81
+    RIM = 0.423
+    POCKET_OUTER = 0.300
+    BALL_R = 0.010
+    POCKET_INNER = 109.0 / WHEEL_METRE_SCALE
+    POCKET_CENTRE = POCKET_INNER + BALL_R + 0.0015
+    POCKET_DEPTH = 0.018
+    DEFLECTOR_R = 0.383
+    DEFLECTOR_LENGTH = 0.018  # half length of alternating radial/tangential diamonds
+    DEFLECTOR_WIDTH = 0.0045
+    DEFLECTOR_HEIGHT = 0.004  # low, bevelled diamond; height above the bowl
+    SLOPE = math.radians(15.0)
+    DEFLECTORS = tuple(i * math.pi / 4 + math.pi / 8 for i in range(8))
+
+    def __init__(self, rng=None, *, initial_angle=None, initial_speed=0.0):
+        rng = rng if rng is not None else secrets.SystemRandom()
+        self.run_seconds = rng.uniform(WHEEL_RUN_MIN_SECONDS, WHEEL_RUN_MAX_SECONDS)
+        self.initial_phase = ((rng.randrange(37) + rng.random()) * self.STEP
+                              if initial_angle is None else initial_angle % self.TAU)
+        self.start_speed = max(0.0, initial_speed)
+        # Slower drive, capped at 65 deg/s across repeated rounds. Preserve an
+        # inherited speed without a jump, even if a caller supplies a faster one.
+        self.peak_speed = max(self.start_speed, min(math.radians(65.0),
+                              max(math.radians(rng.uniform(45.0,60.0)),
+                                  self.start_speed+math.radians(4.0))))
+        self.t = 0.0
+        self.remainder = 0.0
+        self.wheel_angle = self.initial_phase
+        self.wheel_speed = self.start_speed
+        self.theta = rng.random() * self.TAU
+        self.omega = -rng.uniform(10.5, 12.5)
+        self.r = self.RIM
+        self.vr = 0.0
+        self.z = 0.0
+        self.vz = 0.0
+        self.mode = "rim"
+        self.pocket = None
+        self.result_index = None
+        self.settled_at = None
+        self.relative_angle = 0.0
+        self.relative_speed = 0.0
+        self.deflector_hits = 0
+        self.divider_hits = 0
+        self.vertical_bounces = 0
+        self.last_deflector_at = None
+        self.scatter_entered_at = None
+        self._display_previous = None
+
+    def _display_state(self):
+        return (self.theta,self.omega,self.r,self.surface_height(self.r)+self.z)
+
+    def render_state(self):
+        """Interpolate fixed physics steps for smooth, irregular UI frames."""
+        current = self._display_state()
+        if self._display_previous is None:
+            return (self.wheel_angle,self.wheel_speed,self.theta,self.omega,self.r,self.z)
+        previous = self._display_previous
+        alpha = min(1.0,max(0.0,self.remainder/self.DT))
+        delta = (current[0]-previous[0]+math.pi)%self.TAU-math.pi
+        theta = (previous[0]+alpha*delta)%self.TAU
+        omega,radius,height = (previous[i]+alpha*(current[i]-previous[i]) for i in (1,2,3))
+        wheel,speed = self.rotor_at(max(0.0,self.t-self.DT+self.remainder))
+        return wheel,speed,theta,omega,radius,max(0.0,height-self.surface_height(radius))
+
+    def rotor_at(self, elapsed):
+        t = min(max(0.0, elapsed), self.run_seconds)
+        a = WHEEL_ACCEL_SECONDS
+        if t < a:
+            acceleration = (self.peak_speed-self.start_speed)/a
+            speed = self.start_speed + acceleration*t
+            travel = self.start_speed*t + acceleration*t*t/2
+        else:
+            coast = self.run_seconds - a
+            u = t - a
+            speed = self.peak_speed * max(0.0, 1.0 - u / coast)
+            travel = ((self.start_speed+self.peak_speed)*a/2
+                      + self.peak_speed*(u-u*u/(2*coast)))
+        return (self.initial_phase + travel) % self.TAU, speed
+
+    def advance(self, seconds):
+        """Fixed-step contacts; accumulated time is never discarded on slow frames."""
+        self.remainder += max(0.0, seconds)
+        while self.remainder + 1e-12 >= self.DT:
+            # Once captured, only analytic rotor motion remains.
+            if self.result_index is not None or self.mode == "display":
+                self._display_previous = None
+                self.t += self.remainder
+                self.remainder = 0.0
+                self.wheel_angle, self.wheel_speed = self.rotor_at(self.t)
+                self.theta = (self.wheel_angle + (self.pocket + .5)*self.STEP
+                              + self.relative_angle) % self.TAU
+                self.omega = self.wheel_speed
+                break
+            self.remainder = max(0.0, self.remainder - self.DT)
+            self._display_previous = self._display_state()
+            self.t += self.DT
+            self.wheel_angle, self.wheel_speed = self.rotor_at(self.t)
+            if self.mode == "pocket":
+                self._step_pocket(self.DT)
+            elif self.mode == "scatter":
+                self._step_scatter(self.DT)
+            else:
+                self._step_bowl(self.DT)
+
+    @classmethod
+    def surface_height(cls, radius):
+        """One continuous support surface for both motion and drawing (metres).
+
+        The pocket floor slopes to its inner end. A Hermite join matches the
+        bowl slope at the entrance, so crossing it never changes world height.
+        """
+        if radius >= cls.POCKET_OUTER:
+            return (radius-cls.POCKET_OUTER)*math.tan(cls.SLOPE)
+        span = cls.POCKET_OUTER-cls.POCKET_CENTRE
+        u = max(0.0,min(1.0,(radius-cls.POCKET_CENTRE)/span))
+        return (-cls.POCKET_DEPTH + cls.POCKET_DEPTH*(3*u*u-2*u*u*u)
+                + span*math.tan(cls.SLOPE)*(u*u*u-u*u))
+
+    @classmethod
+    def surface_slope(cls, radius):
+        if radius >= cls.POCKET_OUTER:
+            return math.tan(cls.SLOPE)
+        span = cls.POCKET_OUTER-cls.POCKET_CENTRE
+        u = max(0.0,min(1.0,(radius-cls.POCKET_CENTRE)/span))
+        return (cls.POCKET_DEPTH*(6*u-6*u*u)/span
+                + math.tan(cls.SLOPE)*(3*u*u-2*u))
+
+    def _horizontal_velocity(self):
+        sine,cosine = math.sin(self.theta),math.cos(self.theta)
+        return (self.vr*sine+self.r*self.omega*cosine,
+                -self.vr*cosine+self.r*self.omega*sine)
+
+    def _set_horizontal(self, x, y, vx, vy):
+        self.r = math.hypot(x,y)
+        self.theta = math.atan2(x,-y) % self.TAU
+        self.vr = vx*math.sin(self.theta)-vy*math.cos(self.theta)
+        self.omega = (vx*math.cos(self.theta)+vy*math.sin(self.theta))/self.r
+
+    def _step_bowl(self, dt):
+        """Continuous rolling/flight integration across bowl and pocket apron."""
+        support = self.surface_height(self.r)
+        world_height = support+self.z
+        slope = self.surface_slope(self.r)
+        airborne = self.z > 1e-7 or self.vz-slope*self.vr > .015
+        if airborne:
+            vx,vy = self._horizontal_velocity()
+            x = self.r*math.sin(self.theta)+vx*dt
+            y = -self.r*math.cos(self.theta)+vy*dt
+            self._set_horizontal(x,y,vx,vy)
+            world_height += self.vz*dt-.5*self.G*dt*dt
+            self.vz -= self.G*dt
+        else:
+            self._step_rolling_bowl(dt)
+            world_height = self.surface_height(self.r)
+            self.vz = self.surface_slope(self.r)*self.vr
+        # Real inner/outer rails; no invisible outer scatter boundary.
+        for boundary,sign in ((self.POCKET_INNER+self.BALL_R,1),(self.RIM,-1)):
+            if (self.r-boundary)*sign < 0:
+                self.r = boundary
+                if self.vr*sign < 0:
+                    self.vr = -self.vr*.24
+        floor = self.surface_height(self.r)
+        self.z = max(0.0,world_height-floor)
+        if world_height <= floor and airborne:
+            # Resolve landing against the sloped floor normal. Tangential
+            # velocity is preserved instead of abruptly resetting the ball.
+            slope = self.surface_slope(self.r)
+            norm = math.sqrt(1+slope*slope)
+            vn = (self.vz-slope*self.vr)/norm
+            if vn < 0:
+                restitution = .24 if -vn > .16 else 0.0
+                impulse = -(1+restitution)*vn
+                self.vr -= impulse*slope/norm
+                self.vz += impulse/norm
+                if restitution:
+                    self.vertical_bounces += 1
+        self._collide_deflectors()
+        self._collide_separators()
+        if self.mode != "rim":
+            self.mode = "scatter" if self.r <= self.POCKET_OUTER else "bowl"
+        if self.mode == "scatter":
+            if self.scatter_entered_at is None:
+                self.scatter_entered_at = self.t
+            self._try_capture()
+
+    def _step_rolling_bowl(self, dt):
+        in_pockets = self.r < self.POCKET_OUTER
+        target_speed = self.wheel_speed if in_pockets else 0.0
+        relative = self.omega-target_speed
+        drag = 1.8 if in_pockets else (.19 if self.mode == "rim" else .12)
+        resistance = 0.0 if in_pockets else (.22 if self.mode == "rim" else .14)
+        relative *= math.exp(-drag*dt)
+        if resistance:
+            relative = math.copysign(max(0.0,abs(relative)-resistance*dt),relative)
+        self.omega = target_speed+relative
+        slope = self.surface_slope(self.r)
+        if self.mode == "rim" and self.r*self.omega**2 < self.G*slope:
+            self.mode = "bowl"
+        if self.mode != "rim":
+            ar = (self.r*self.omega**2-self.G*slope)/(1+slope*slope)/1.4
+            self.vr = (self.vr+ar*dt)*math.exp(-(3.5 if in_pockets else 1.6)*dt)
+            old_r = self.r
+            self.r += self.vr*dt
+            # Radial motion transports angular momentum continuously.
+            self.omega *= (old_r/self.r)**2
+        self.theta = (self.theta+self.omega*dt) % self.TAU
+
+    @classmethod
+    def deflector_vertices(cls, index):
+        """Shared physical/render geometry: one radial, one tangential."""
+        angle = cls.DEFLECTORS[index]
+        radial = (math.sin(angle),-math.cos(angle))
+        tangent = (math.cos(angle),math.sin(angle))
+        u,v = (radial,tangent) if index % 2 == 0 else (tangent,radial)
+        cx,cy = cls.DEFLECTOR_R*radial[0],cls.DEFLECTOR_R*radial[1]
+        return tuple((cx+u[0]*a+v[0]*b,cy+u[1]*a+v[1]*b)
+                     for a,b in ((cls.DEFLECTOR_LENGTH,0),(0,cls.DEFLECTOR_WIDTH),
+                                 (-cls.DEFLECTOR_LENGTH,0),(0,-cls.DEFLECTOR_WIDTH)))
+
+    @staticmethod
+    def _closest_triangle(point, a, b, c):
+        """Closest point on a finite 3-D face, including its edges and tip."""
+        def sub(u,v):
+            return tuple(x-y for x,y in zip(u,v))
+        def dot(u,v):
+            return sum(x*y for x,y in zip(u,v))
+        ab, ac, ap = sub(b,a), sub(c,a), sub(point,a)
+        aa, bb, cc = dot(ab,ab), dot(ab,ac), dot(ac,ac)
+        d, e = dot(ap,ab), dot(ap,ac)
+        denominator = aa*cc-bb*bb
+        u, v = (cc*d-bb*e)/denominator, (aa*e-bb*d)/denominator
+        if u >= 0 and v >= 0 and u+v <= 1:
+            return tuple(a[i]+u*ab[i]+v*ac[i] for i in range(3))
+        candidates = []
+        for start,end in ((a,b),(b,c),(c,a)):
+            edge = sub(end,start)
+            t = max(0.0,min(1.0,dot(sub(point,start),edge)/dot(edge,edge)))
+            candidates.append(tuple(start[i]+t*edge[i] for i in range(3)))
+        return min(candidates,key=lambda q: dot(sub(point,q),sub(point,q)))
+
+    def _collide_deflectors(self):
+        # z is the sphere's underside above the bowl, not its centre height.
+        # Once the underside clears the tip there is no invisible tall wall.
+        if self.z > self.DEFLECTOR_HEIGHT:
+            return
+        if abs(self.r-self.DEFLECTOR_R) > self.DEFLECTOR_LENGTH+self.BALL_R:
+            return
+        x,y = self.r*math.sin(self.theta),-self.r*math.cos(self.theta)
+        vx = self.vr*math.sin(self.theta)+self.r*self.omega*math.cos(self.theta)
+        vy = -self.vr*math.cos(self.theta)+self.r*self.omega*math.sin(self.theta)
+        for index in range(len(self.DEFLECTORS)):
+            polygon = self.deflector_vertices(index)
+            apex = (sum(p[0] for p in polygon)/4,
+                    sum(p[1] for p in polygon)/4,
+                    self.surface_height(self.DEFLECTOR_R)+self.DEFLECTOR_HEIGHT)
+            centre = (x,y,self.surface_height(math.hypot(x,y))+self.z+self.BALL_R)
+            closest = None
+            for a,b in zip(polygon,polygon[1:]+polygon[:1]):
+                q = self._closest_triangle(centre,
+                    (*a,self.surface_height(math.hypot(*a))),
+                    (*b,self.surface_height(math.hypot(*b))),apex)
+                distance = math.sqrt(sum((p-r)**2 for p,r in zip(centre,q)))
+                if closest is None or distance < closest[0]:
+                    closest = (distance,q)
+            distance,q = closest
+            if 1e-12 < distance < self.BALL_R:
+                nx,ny,nz = ((p-r)/distance for p,r in zip(centre,q))
+                correction = self.BALL_R-distance+1e-8
+                x, y = x+nx*correction, y+ny*correction
+                self.z = max(0.0,centre[2]+nz*correction-self.BALL_R
+                             -self.surface_height(math.hypot(x,y)))
+                vn = vx*nx+vy*ny+self.vz*nz
+                if vn < 0:
+                    # One restitution impulse along the sloped 3-D normal:
+                    # horizontal motion can become lift without adding energy.
+                    vx -= 1.60*vn*nx
+                    vy -= 1.60*vn*ny
+                    self.vz -= 1.60*vn*nz
+                    self.deflector_hits += 1
+                    self.last_deflector_at = self.t
+        self.r = math.hypot(x,y)
+        self.theta = math.atan2(x,-y) % self.TAU
+        self.vr = vx*math.sin(self.theta)-vy*math.cos(self.theta)
+        self.omega = (vx*math.cos(self.theta)+vy*math.sin(self.theta))/self.r
+
+    def _collide_separators(self):
+        """Sphere contact with finite rotating rails, including their top edges.
+
+        A ball above a rail can cross it; a low ball meets its actual wall.
+        Closest-point contacts replace the old sector-centre angle clamps.
+        """
+        if self.r > self.POCKET_OUTER+self.BALL_R:
+            return
+        x,y = self.r*math.sin(self.theta),-self.r*math.cos(self.theta)
+        height = self.surface_height(self.r)+self.z+self.BALL_R
+        if height > self.BALL_R:
+            return
+        vx,vy = self._horizontal_velocity()
+        sector = int(((self.theta-self.wheel_angle)%self.TAU)/self.STEP)
+        for boundary in (sector,sector+1):
+            angle = self.wheel_angle+boundary*self.STEP
+            sine,cosine = math.sin(angle),math.cos(angle)
+            radius = max(self.POCKET_INNER,min(self.POCKET_OUTER,x*sine-y*cosine))
+            qx,qy = radius*sine,-radius*cosine
+            qz = max(self.surface_height(radius),min(0.0,height))
+            dx,dy,dz = x-qx,y-qy,height-qz
+            distance = math.sqrt(dx*dx+dy*dy+dz*dz)
+            if 1e-10 < distance < self.BALL_R:
+                nx,ny,nz = dx/distance,dy/distance,dz/distance
+                correction = self.BALL_R-distance+1e-8
+                x,y,height = x+nx*correction,y+ny*correction,height+nz*correction
+                rail_vx,rail_vy = -self.wheel_speed*qy,self.wheel_speed*qx
+                vn = (vx-rail_vx)*nx+(vy-rail_vy)*ny+self.vz*nz
+                if vn < 0:
+                    impulse = -1.28*vn
+                    vx,vy = vx+impulse*nx,vy+impulse*ny
+                    self.vz += impulse*nz
+                    self.divider_hits += 1
+        self._set_horizontal(x,y,vx,vy)
+        self.z = max(0.0,height-self.BALL_R-self.surface_height(self.r))
+
+    def _step_scatter(self, dt):
+        self._step_bowl(dt)
+
+    def _try_capture(self):
+        local = ((self.theta-self.wheel_angle)%self.STEP)-self.STEP/2
+        limit = self.STEP/2-self.BALL_R/self.r
+        if (self.r < self.POCKET_CENTRE+.012 and self.z < .0001
+                and abs(self.vz)<.05 and abs(self.vr)<.06
+                and abs(self.omega-self.wheel_speed)*self.r<.055
+                and abs(local)<limit):
+            self.mode = "pocket"
+            self.pocket = int(((self.theta-self.wheel_angle)%self.TAU)/self.STEP)
+            self.relative_angle = local
+            self.relative_speed = self.omega-self.wheel_speed
+
+    def _step_pocket(self, dt):
+        """Damped seating at the inner, lowest end of the captured groove."""
+        # Near-critical damping eases into the bottom, preserving incoming
+        # velocity. Tight settlement tolerances avoid the former visible snap.
+        self.vr += (-55*(self.r-self.POCKET_CENTRE)-15*self.vr)*dt
+        self.r += self.vr*dt
+        self.r = max(self.POCKET_INNER+self.BALL_R,min(self.POCKET_OUTER,self.r))
+        self.relative_speed += (-42*self.relative_angle-13*self.relative_speed)*dt
+        self.relative_angle += self.relative_speed*dt
+        limit = self.STEP/2-self.BALL_R/self.r
+        if abs(self.relative_angle)>limit:
+            self.relative_angle = math.copysign(limit,self.relative_angle)
+            if self.relative_speed*self.relative_angle > 0:
+                self.relative_speed *= -.16
+                self.divider_hits += 1
+        self.z = 0.0
+        self.vz = self.surface_slope(self.r)*self.vr
+        self.theta = (self.wheel_angle+(self.pocket+.5)*self.STEP
+                      +self.relative_angle) % self.TAU
+        self.omega = self.wheel_speed+self.relative_speed
+        if (abs(self.relative_speed)<.003 and abs(self.relative_angle)<.0003
+                and abs(self.vr)<.001 and abs(self.r-self.POCKET_CENTRE)<.00015):
+            self.result_index = self.pocket
+            self.mode = "settled"
+            self.settled_at = self.t
+            self.r = self.POCKET_CENTRE
+            self.relative_angle = self.relative_speed = 0.0
+            self.theta = (self.wheel_angle+(self.pocket+.5)*self.STEP) % self.TAU
+            self.omega = self.wheel_speed
+            self.vr = self.vz = self.z = 0.0
+
+    @property
+    def stopped(self):
+        return self.t >= self.run_seconds - 1e-9
+
 
 RED_NUMBERS = {
     1, 3, 5, 7, 9, 12, 14, 16, 18,
@@ -148,8 +639,62 @@ BET_ODDS = {
     "high_low": 1,
 }
 
+# Standard announced bets: (table type, covered numbers, unit-chip count).
+# Source: Spielbanken Bayern, Roulette rules, March 2023, series bets table.
+# https://www.spielbanken-bayern.de/storage/filemanager/files/shares/Spielregeln/Englisch/Spielregeln_Roulette_2023_eng.pdf
+FRENCH_BETS = {
+    "voisins": {
+        "label": "Voisins du Zéro", "title": "Voisins\ndu Zéro", "zh": "零旁注板",
+        "legs": (("street", (0, 2, 3), 2), ("split", (4, 7), 1),
+                 ("split", (12, 15), 1), ("split", (18, 21), 1),
+                 ("split", (19, 22), 1), ("corner", (25, 26, 28, 29), 2),
+                 ("split", (32, 35), 1)),
+    },
+    "tiers": {
+        "label": "Tiers du Cylindre", "title": "Tiers du\nCylindre", "zh": "三分之一轮板",
+        "legs": tuple(("split", pair, 1) for pair in
+                      ((5, 8), (10, 11), (13, 16), (23, 24), (27, 30), (33, 36))),
+    },
+    "orphelins": {
+        "label": "Orphelins", "title": "Orphelins", "zh": "孤儿序列",
+        "legs": (("straight", (1,), 1), ("split", (6, 9), 1),
+                 ("split", (14, 17), 1), ("split", (17, 20), 1),
+                 ("split", (31, 34), 1)),
+    },
+    "zero": {
+        "label": "Jeu Zéro", "title": "Jeu Zéro", "zh": "零号游戏",
+        "legs": (("split", (0, 3), 1), ("split", (12, 15), 1),
+                 ("straight", (26,), 1), ("split", (32, 35), 1)),
+    },
+}
+CHIP_TRANSFER_SECONDS = 0.75
+# Rotate only the racetrack display; retain European wheel order.
+# Racetrack betting selector follows the European wheel order.
+# Start at 33 to center the seven-number zero shortcut on the right cap.
+# Wheel physics keep ROULETTE_SEQUENCE.
+_track_start = ROULETTE_SEQUENCE.index("33")
+RACETRACK_SEQUENCE = ROULETTE_SEQUENCE[_track_start:] + ROULETTE_SEQUENCE[:_track_start]
+del _track_start
+RACETRACK_REGION_ORDER = ("tiers", "orphelins", "voisins", "zero")
+RACETRACK_LEFT, RACETRACK_RIGHT, RACETRACK_CY = 106.0, 402.0, 108.0
+RACETRACK_OUTER_R, RACETRACK_INNER_R = 94.0, 50.0
+RACETRACK_NUMBER_R, RACETRACK_CHIP_R = 83.0, 61.0
+# Preserve each region's normal fill; hover uses a shared light-blue fill,
+# dark text and a dark-blue outline with a light halo for clear state contrast.
+RACETRACK_REGION_COLORS = {
+    "tiers": ("#164E63", "#B9E1EE"),
+    "orphelins": ("#312E81", "#B9E1EE"),
+    "voisins": ("#065F46", "#B9E1EE"),
+    "zero": ("#78350F", "#B9E1EE"),
+}
+RACETRACK_REGION_TEXT = "#FFFFFF"
+RACETRACK_REGION_HOVER_TEXT = "#102A38"
+RACETRACK_REGION_FOCUS = "#0B4A6B"
+RACETRACK_REGION_EDGE = "#CBD5E1"
+RACETRACK_FOCUS_HALO = "#E0F2FE"
+
 OUTCOME_COLORS = {
-    "0": "TEAL",
+    "0": "#008A68",
 }
 
 OUTCOME_TEXT_COLORS = {
@@ -367,6 +912,23 @@ class RouletteHistory:
 # =========================================================
 
 ROOT_BG = "#1B3D31"
+RACETRACK_CONTROLS_BG = "#C6E9F5"
+# Symmetric distance from the hovered number: centre retains the accepted
+# blue; each outward step is lighter, with a blue tint even at distance five.
+RACETRACK_NEIGHBOR_HOVER_FILLS = (
+    "#B9E1EE", "#C3E6F1", "#CDEBF4", "#D7EFF6", "#E1F3F9", "#EAF6FB",
+)
+RACETRACK_NEIGHBOR_HOVER_FILL = RACETRACK_NEIGHBOR_HOVER_FILLS[0]
+RACETRACK_NEIGHBOR_HOVER_TEXT = "#102A38"
+RACETRACK_NEIGHBOR_HOVER_EDGE = "#0B4A6B"
+RACETRACK_NEIGHBOR_COLORS = (
+    "#F5D68A",  # centre: gold
+    "#40B8E0",  # +/-1: cyan-blue, then progressively lighter
+    "#70CBEA",
+    "#9FDCF2",
+    "#C7EBF8",
+    "#EAF8FD",
+)
 CYAN = "#007502"
 TEXT = "#ffffff"
 RED = "#ff2a23"
@@ -663,7 +1225,7 @@ class RouletteGameGUI(tk.Frame):
 
     def __init__(self, parent, initial_balance=1_000_000, username="Guest",
                  on_back=None, on_balance_change=None):
-        super().__init__(parent, bg=ROOT_BG, width=1150, height=750)
+        super().__init__(parent, bg=ROOT_BG, width=1150, height=757)
         self.pack_propagate(False)
         self.parent = parent
         self.root = self.winfo_toplevel()
@@ -674,7 +1236,7 @@ class RouletteGameGUI(tk.Frame):
         self._previous_geometry = self.root.geometry()
         self._previous_close_protocol = self.root.protocol("WM_DELETE_WINDOW")
         self.root.title("欧式轮盘")
-        self.root.geometry("1150x750+50+10")
+        self.root.geometry("1150x757+50+10")
         self.root.resizable(False, False)
         self.root.configure(bg=ROOT_BG)
 
@@ -697,22 +1259,39 @@ class RouletteGameGUI(tk.Frame):
         self.betting_deadline = None
         self._countdown_job = None
         self._spin_job = None
+        self._round_settled = True
+        self.physics = None
+        self.ball_height = 0.0
+        self.ball_visible = False
 
         self.last_bets = {}
         self.last_bet_colors = {}
+        self.betting_view = "table"
+        self.last_betting_view = "table"
+        self.racetrack_neighbors = 2
+        self.racetrack_hover = None
+        self.region_hover = None
+        # Actual table stakes live in current_bets; these track only their origin.
+        self.region_bets = {}
+        self.last_region_bets = {}
+        self._chip_transfer_job = None
+        self._chip_transfer_active = False
+        self._chip_transfer_items = []
         self.timer_paused = False
         self.paused_remaining = 0
 
-        self.current_wheel_offset = 0.0
+        self.current_wheel_offset = (secrets.randbelow(37)+secrets.randbits(53)/2**53)*360/37
         self.wheel_velocity = 0.0
         self.wheel_acceleration = 0.0
         self._last_physics_time = None
         self.is_spinning = False
 
-        self.pointer_angle = 0.0
+        self.pointer_angle = 0.0  # 小球相对正上方的角度
         self.pointer_velocity = 0.0
         self.pointer_acceleration = 0.0
         self.is_pointer_spinning = False
+        self.ball_radius = 192.0
+        self.ball_pocket_index = None
 
         self.current_round_result = None
         self.current_round_index = None
@@ -726,16 +1305,13 @@ class RouletteGameGUI(tk.Frame):
         self.result_chip_display = {}
         self._result_flash_job = None
         self._result_flash_state = False
+        self._result_flash_step = 0
         self._result_flash_spot_ids = set()
 
         self.distribution_display_count = 50   # 默认分析最近50局
         self.distribution_frame = None         # 分布面板主框架
         self.distribution_labels = {}          # 存储各统计标签的引用
 
-        # 用于存储最后一局的开奖物理数据
-        self.last_spin_data = None
-        # 结果弹窗防重复
-        self.detail_window = None
 
         # 饼图模式: "sector" 区间分布(1-12/13-24/25-36/0) 或 "row" 每行分布
         self.pie_mode = "sector"
@@ -743,6 +1319,7 @@ class RouletteGameGUI(tk.Frame):
         self._build_ui()
         self._sync_marker_from_history()
         self._start_new_round()
+        self._start_startup_rotation()
 
         self.focus_force()                         # 确保窗口获得焦点
         self.bind("<Return>", lambda event: self.start_game())
@@ -784,6 +1361,18 @@ class RouletteGameGUI(tk.Frame):
         )
         self.wheel_canvas.pack(fill=tk.X)
 
+        # Joined selectors sit between the wheel and the active betting board.
+        view_bar = tk.Frame(parent, bg="#D8B46A", bd=1, relief=tk.SOLID)
+        view_bar.pack(pady=(0, 4))
+        self.betting_view_buttons = {}
+        for mode, label in (("table", "轮盘布局 Roulette Layout"), ("racetrack", "跑道盘 Racetrack")):
+            button = tk.Button(
+                view_bar, text=label, width=26, font=("Arial", 10, "bold"),
+                relief=tk.FLAT, bd=0, pady=3, cursor="hand2",
+                command=lambda selected=mode: self._switch_betting_view(selected))
+            button.pack(side=tk.LEFT, fill=tk.Y)
+            self.betting_view_buttons[mode] = button
+
         betting_area = tk.Frame(parent, bg=ROOT_BG)
         betting_area.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 8))
 
@@ -809,6 +1398,527 @@ class RouletteGameGUI(tk.Frame):
 
         self.board_canvas.bind("<Button-1>", self.on_board_click)
         self.board_canvas.bind("<Button-3>", self.on_board_right_click)
+
+        self.racetrack_canvas = tk.Canvas(
+            parent, width=BOARD_W, height=BOARD_H, bg=ROOT_BG,
+            highlightthickness=0, bd=0)
+        self.racetrack_canvas.bind("<Button-1>", self._on_racetrack_click)
+        self.racetrack_canvas.bind("<Button-3>", self._on_racetrack_right_click)
+        self.racetrack_canvas.bind("<Motion>", self._on_racetrack_motion)
+        self.racetrack_canvas.bind("<Leave>", self._on_racetrack_leave)
+
+        self.racetrack_controls = tk.Frame(self.racetrack_canvas, bg=RACETRACK_CONTROLS_BG)
+        tk.Label(self.racetrack_controls, text="邻号: ", bg=RACETRACK_CONTROLS_BG,
+                 fg="#173F58", font=("Arial", 14, "bold")).pack(side=tk.LEFT, padx=(0, 8))
+        choices = tk.Frame(self.racetrack_controls, bg=RACETRACK_CONTROLS_BG)
+        choices.pack(side=tk.LEFT)
+        self.racetrack_neighbor_buttons = {}
+        for count in range(6):
+            button = tk.Button(
+                choices, text=str(count), width=3, bd=0, pady=2,
+                font=("Arial", 13, "bold"), cursor="hand2",
+                relief=tk.FLAT, highlightthickness=1,
+                highlightbackground="#99C6DA", highlightcolor="#2F759B",
+                activebackground="#D4EAF6", activeforeground="#173F58",
+                disabledforeground="#718795",
+                command=lambda n=count: self._set_racetrack_neighbors(n))
+            button.pack(side=tk.LEFT, padx=2)
+            self.racetrack_neighbor_buttons[count] = button
+        self._draw_racetrack()
+        self._update_betting_view_controls()
+
+    def _can_switch_betting_view(self):
+        return self.round_state == "betting" and not self._chip_transfer_active
+
+    def _switch_betting_view(self, mode):
+        if mode not in ("table", "racetrack"):
+            return
+        if not self._can_switch_betting_view():
+            return
+        self.betting_view = mode
+        self.racetrack_hover = None
+        self.region_hover = None
+        self.board_canvas.pack_forget()
+        self.racetrack_canvas.pack_forget()
+        active = self.board_canvas if mode == "table" else self.racetrack_canvas
+        active.pack(anchor="n")
+        self._repaint_all_chips()
+        self._update_betting_view_controls()
+        self._update_repeat_button_state()
+
+    def _update_betting_view_controls(self):
+        locked = not self._can_switch_betting_view()
+        for mode, button in self.betting_view_buttons.items():
+            selected = mode == self.betting_view
+            button.config(
+                state=tk.DISABLED if locked else tk.NORMAL,
+                bg="#D8B46A" if selected else "#284C40",
+                fg="#2A1B08" if selected else "white",
+                disabledforeground="#65502B" if selected else "#9AA99F",
+                activebackground="#E8C67F", cursor="arrow" if locked else "hand2")
+        for count, button in self.racetrack_neighbor_buttons.items():
+            button.config(state=tk.NORMAL if self.round_state == "betting" else tk.DISABLED,
+                          bg="#438EB7" if count == self.racetrack_neighbors else "#E8F5FB",
+                          fg="white" if count == self.racetrack_neighbors else "#173F58",
+                          disabledforeground="white" if count == self.racetrack_neighbors else "#718795",
+                          activebackground="#438EB7" if count == self.racetrack_neighbors else "#D4EAF6",
+                          activeforeground="white" if count == self.racetrack_neighbors else "#173F58",
+                          highlightbackground="#2F759B" if count == self.racetrack_neighbors else "#99C6DA",
+                          cursor="hand2" if self.round_state == "betting" else "arrow")
+
+    def _set_racetrack_neighbors(self, count):
+        if self.round_state != "betting" or count not in range(6):
+            return
+        self.racetrack_neighbors = count
+        self._update_betting_view_controls()
+        self._draw_racetrack()
+
+    def _racetrack_numbers(self, number):
+        index = ROULETTE_SEQUENCE.index(number)
+        return [ROULETTE_SEQUENCE[(index + offset) % len(ROULETTE_SEQUENCE)]
+                for offset in range(-self.racetrack_neighbors, self.racetrack_neighbors + 1)]
+
+    @staticmethod
+    def _racetrack_distance(number, center):
+        distance = abs(ROULETTE_SEQUENCE.index(number) - ROULETTE_SEQUENCE.index(center))
+        return min(distance, len(ROULETTE_SEQUENCE) - distance)
+
+    def _racetrack_amount(self, numbers):
+        # Same base-unit limits as the main board; cap every leg equally.
+        remaining = [self._bet_limit_for_spot(self._find_spot_by_id("straight_" + number))
+                     - self.current_bets.get("straight_" + number, 0) for number in numbers]
+        return max(0, min(int(self.selected_bet_amount), *remaining))
+
+    @staticmethod
+    def _racetrack_point(fraction, radius):
+        """Sample matching boundaries of a stadium-shaped ring, clockwise."""
+        left, right, cy = RACETRACK_LEFT, RACETRACK_RIGHT, RACETRACK_CY
+        mid_radius = (RACETRACK_OUTER_R + RACETRACK_INNER_R) / 2
+        straight = right - left
+        arc = math.pi * mid_radius
+        distance = (fraction % 1.0) * (2 * straight + 2 * arc)
+        if distance < straight:
+            return left + distance, cy - radius
+        distance -= straight
+        if distance < arc:
+            angle = -math.pi / 2 + distance / mid_radius
+            return right + radius * math.cos(angle), cy + radius * math.sin(angle)
+        distance -= arc
+        if distance < straight:
+            return right - distance, cy + radius
+        angle = math.pi / 2 + (distance - straight) / mid_radius
+        return left + radius * math.cos(angle), cy + radius * math.sin(angle)
+
+    def _draw_racetrack(self):
+        canvas = self.racetrack_canvas
+        canvas.delete("track")
+        region_selected = self.region_hover in FRENCH_BETS and self.round_state == "betting"
+        number_selected = (not region_selected and self.racetrack_hover in ROULETTE_SEQUENCE
+                           and self.round_state == "betting")
+        hovered = ({str(n) for _, numbers, _ in FRENCH_BETS[self.region_hover]["legs"] for n in numbers}
+                   if region_selected else set(self._racetrack_numbers(self.racetrack_hover))
+                   if number_selected else set())
+        # Region stakes stay grouped on this view, including during spin/result.
+        pending = self._region_contributions()
+        highlights = []
+        for index, number in enumerate(RACETRACK_SEQUENCE):
+            fractions = [(index + step / 6) / len(RACETRACK_SEQUENCE) for step in range(7)]
+            points = [self._racetrack_point(t, RACETRACK_OUTER_R) for t in fractions]
+            points += [self._racetrack_point(t, RACETRACK_INNER_R) for t in reversed(fractions)]
+            tags = ("track", "track_number:" + number)
+            winning = self.round_state == "result" and self.center_display_result == number
+            flashing = winning and self._result_flash_state
+            neighbor_hover = number_selected and number in hovered
+            primary = number_selected and number == self.racetrack_hover
+            # A region can cover numbers far beyond the five neighbour colours.
+            # Only number-neighbour selection uses distance-based colours.
+            distance = self._racetrack_distance(number, self.racetrack_hover) if number_selected and number in hovered else 0
+            color_index = min(max(0, distance), len(RACETRACK_NEIGHBOR_COLORS) - 1)
+            highlight_color = (RACETRACK_NEIGHBOR_HOVER_EDGE if neighbor_hover else
+                               RACETRACK_REGION_FOCUS if region_selected else RACETRACK_NEIGHBOR_COLORS[color_index])
+            canvas.create_polygon(
+                *[coord for point in points for coord in point],
+                fill="#ffffff" if flashing else (RACETRACK_NEIGHBOR_HOVER_FILLS[min(distance, 5)] if neighbor_hover else OUTCOME_COLORS[number]),
+                outline=RACETRACK_NEIGHBOR_HOVER_EDGE if neighbor_hover else "#CFD6D0", width=2, tags=tags)
+            if number in hovered or winning:
+                highlights.append((primary or winning, points, highlight_color, tags))
+            center = (index + 0.5) / len(RACETRACK_SEQUENCE)
+            x, y = self._racetrack_point(center, RACETRACK_NUMBER_R)
+            # Neighbour hover changes only the selected pockets; result flashing stays unchanged.
+            text_color = "black" if flashing else (RACETRACK_NEIGHBOR_HOVER_TEXT if neighbor_hover else "white")
+            canvas.create_text(x, y, text=number, fill=text_color,
+                               font=("Arial", 10, "bold"), tags=tags)
+            spot_id = "straight_" + number
+            amount = self.current_bets.get(spot_id, 0) - pending.get(spot_id, 0)
+            if amount > 0:
+                fill = self._chip_fill_color_for_amount(amount)
+                text_color = self._spot_text_color(fill)
+                info = self.result_chip_display.get(spot_id)
+                if self.round_state == "result" and info and self._result_flash_state:
+                    amount = amount * (BET_ODDS["straight"] + 1)
+                    fill, text_color = self._result_chip_style(amount)
+                x, y = self._racetrack_point(center, RACETRACK_CHIP_R)
+                canvas.create_oval(x - 10, y - 9, x + 10, y + 9,
+                                   fill=fill, outline="#D8B46A", width=1, tags=tags)
+                canvas.create_text(x, y, text=self._format_win_amount(amount), fill=text_color,
+                                   font=("Arial", 7, "bold"), tags=tags)
+        # Paint outlines after the pockets, with the central selection on top.
+        for primary, points, color, tags in sorted(highlights, key=lambda entry: entry[0]):
+            if region_selected:
+                canvas.create_line(
+                    *[coord for point in points + [points[0]] for coord in point],
+                    fill=RACETRACK_FOCUS_HALO, width=6, joinstyle=tk.ROUND, tags=tags)
+            canvas.create_line(
+                *[coord for point in points + [points[0]] for coord in point],
+                fill=color, width=3, joinstyle=tk.ROUND, tags=tags)
+        x1, y1, x2, y2, radius = BOARD_W / 2 - 190, 214, BOARD_W / 2 + 190, 266, 10
+        canvas.create_polygon(
+            x1 + radius, y1, x2 - radius, y1, x2, y1, x2, y1 + radius,
+            x2, y2 - radius, x2, y2, x2 - radius, y2, x1 + radius, y2,
+            x1, y2, x1, y2 - radius, x1, y1 + radius, x1, y1,
+            smooth=True, splinesteps=12,
+            fill=RACETRACK_CONTROLS_BG, outline="#9DCFE3", width=1,
+            tags=("track", "neighbor_background"))
+        if not hasattr(self, "racetrack_controls_item"):
+            self.racetrack_controls_item = canvas.create_window(
+                BOARD_W / 2, 239, window=self.racetrack_controls)
+        self._add_help_button_on_racetrack()
+        self._draw_french_regions()
+
+    def _add_help_button_on_racetrack(self):
+        canvas = self.racetrack_canvas
+        cx, cy, radius = 34, 239, 10
+        tags = ("track", "racetrack_help")
+        canvas.create_oval(cx - radius, cy - radius, cx + radius, cy + radius,
+                           fill="#F5E6B8", outline="#D4AF37", width=2, tags=tags)
+        canvas.create_text(cx, cy, text="?", font=("Arial", 12, "bold"),
+                           fill="#2A1B08", tags=tags)
+        canvas.tag_bind("racetrack_help", "<Enter>", lambda e: canvas.config(cursor="hand2"))
+        canvas.tag_bind("racetrack_help", "<Leave>", lambda e: canvas.config(cursor=""))
+        canvas.tag_bind("racetrack_help", "<Button-1>", lambda e: self.show_game_instructions())
+
+    def _racetrack_number_at(self, x, y):
+        for index, number in enumerate(RACETRACK_SEQUENCE):
+            fractions = [(index + step / 6) / len(RACETRACK_SEQUENCE) for step in range(7)]
+            points = [self._racetrack_point(t, RACETRACK_OUTER_R) for t in fractions]
+            points += [self._racetrack_point(t, RACETRACK_INNER_R) for t in reversed(fractions)]
+            inside = False
+            for (x1, y1), (x2, y2) in zip(points, points[1:] + points[:1]):
+                cross = (x - x1) * (y2 - y1) - (y - y1) * (x2 - x1)
+                if (abs(cross) < 1e-7 and min(x1, x2) - 1e-7 <= x <= max(x1, x2) + 1e-7
+                        and min(y1, y2) - 1e-7 <= y <= max(y1, y2) + 1e-7):
+                    return number
+                if (y1 > y) != (y2 > y) and x < x1 + (y - y1) * (x2 - x1) / (y2 - y1):
+                    inside = not inside
+            if inside:
+                return number
+        return None
+
+    def _on_racetrack_motion(self, event):
+        region = self._racetrack_region_at(event.x, event.y)
+        # At shared edges, a sector takes precedence over an underlying pocket tag.
+        number = None if region is not None else self._racetrack_number_at(event.x, event.y)
+        if number != self.racetrack_hover or region != self.region_hover:
+            self.racetrack_hover, self.region_hover = number, region
+            self.racetrack_canvas.config(cursor="hand2" if number or region else "")
+            self._draw_racetrack()
+
+    def _on_racetrack_leave(self, event):
+        self.racetrack_hover = None
+        self.region_hover = None
+        self._draw_racetrack()
+
+    def _on_racetrack_click(self, event):
+        region = self._racetrack_region_at(event.x, event.y)
+        if region is not None:
+            self._place_region_bet(region)
+            return
+        number = self._racetrack_number_at(event.x, event.y)
+        if number is not None:
+            self._place_racetrack_bet(number)
+
+    def _on_racetrack_right_click(self, event):
+        if self.round_state != "betting" or self.betting_view != "racetrack":
+            return
+        region = self._racetrack_region_at(event.x, event.y)
+        if region is not None:
+            self._clear_region_bet(region)
+            return
+        number = self._racetrack_number_at(event.x, event.y)
+        if number is not None:
+            self.clear_single_bet("straight_" + number)
+
+    def _place_racetrack_bet(self, number):
+        if self.round_state != "betting" or self.betting_view != "racetrack":
+            return
+        numbers = self._racetrack_numbers(number)
+        amount = self._racetrack_amount(numbers)
+        if amount <= 0:
+            messagebox.showwarning("下注上限", "组合中有号码已达下注上限，请调整邻号或清除该号码下注。")
+            return
+        total = amount * len(numbers) * self.bet_multiplier
+        if self.balance < total:
+            messagebox.showwarning("余额不足", f"整组下注需要 ${total:,.0f}，余额不足。")
+            return
+        # Commit the whole group only after all limits and funds are checked.
+        self.balance -= total
+        for selected in numbers:
+            spot_id = "straight_" + selected
+            self.current_bets[spot_id] = self.current_bets.get(spot_id, 0) + amount
+            self.current_bet_colors[spot_id] = self._chip_fill_color_for_amount(self.current_bets[spot_id])
+        self._refresh_balance_display()
+        self._refresh_bet_totals()
+        self._repaint_all_chips()
+
+    def _region_polygon(self, region):
+        """Tile the capsule using the *same* inner edges as the number pockets.
+
+        Cut endpoints are derived from European number transitions, never from
+        guessed x coordinates. Jeu Zero is the displayed subset of Voisins;
+        selecting Voisins still bets all 17 numbers, including that subset.
+        """
+        count = len(RACETRACK_SEQUENCE)
+        boundary = {number: i for i, number in enumerate(RACETRACK_SEQUENCE)}
+
+        def arc(first, stop):
+            start = boundary[first]
+            end = boundary[stop]
+            if end <= start:
+                end += count
+            # Identical six subdivisions per pocket to _draw_racetrack.
+            return [self._racetrack_point((step / 6) / count, RACETRACK_INNER_R)
+                    for step in range(start * 6, end * 6 + 1)]
+
+        if region == "tiers":
+            # 6|27 ... 33|1: the twelve-number arc opposite zero.
+            return arc("27", "1")
+        if region == "orphelins":
+            # Two disjoint wheel arcs joined across the inner capsule.
+            return arc("1", "22") + arc("17", "27")
+        if region == "voisins":
+            # The remaining Voisins arcs, with the Jeu Zero shortcut cut out.
+            return arc("22", "12") + [(RACETRACK_RIGHT - 40, RACETRACK_CY)] + arc("19", "17")
+        if region == "zero":
+            # 28|12 ... 15|19: seven pockets around zero, including both ends.
+            # Share a short inward point with Voisins to fit both fixed label
+            # lines. Outer endpoints still meet 28|12 and 15|19 exactly.
+            return arc("12", "19") + [(RACETRACK_RIGHT - 40, RACETRACK_CY)]
+        raise KeyError(region)
+
+    def _region_center(self, region):
+        """Area centroid: chip origins follow the real curved/slanted region."""
+        points = self._region_polygon(region)
+        twice_area = cx = cy = 0.0
+        for (x1, y1), (x2, y2) in zip(points, points[1:] + points[:1]):
+            cross = x1 * y2 - x2 * y1
+            twice_area += cross
+            cx += (x1 + x2) * cross
+            cy += (y1 + y2) * cross
+        return cx / (3 * twice_area), cy / (3 * twice_area)
+
+    def _region_legs(self, region):
+        legs = []
+        for kind, numbers, units in FRENCH_BETS[region]["legs"]:
+            covered = {str(n) for n in numbers}
+            spot = next(s for s in self.bet_spots if s["type"] == kind and s["numbers"] == covered)
+            legs.append((spot, units))
+        return legs
+
+    def _region_contributions(self):
+        amounts = {}
+        for region, unit_amount in self.region_bets.items():
+            for spot, units in self._region_legs(region):
+                amounts[spot["id"]] = amounts.get(spot["id"], 0) + unit_amount * units
+        return amounts
+
+    def _draw_french_regions(self):
+        canvas = self.racetrack_canvas
+        for region in RACETRACK_REGION_ORDER:
+            info = FRENCH_BETS[region]
+            points = self._region_polygon(region)
+            cx, cy = self._region_center(region)
+            tags = ("track", "track_region:" + region)
+            selected = self.region_hover == region and self.round_state == "betting"
+            winning_region = self.round_state == "result" and any(
+                self.center_display_result in spot["numbers"]
+                for spot, _ in self._region_legs(region))
+            flashing = winning_region and self._result_flash_state
+            region_fill = "#E0F2FE" if flashing else RACETRACK_REGION_COLORS[region][int(selected)]
+            label_fill = "#0F172A" if flashing else (RACETRACK_REGION_HOVER_TEXT if selected else RACETRACK_REGION_TEXT)
+            edge_fill = "#0F172A" if flashing else (RACETRACK_REGION_FOCUS if selected else RACETRACK_REGION_EDGE)
+            canvas.create_polygon(*[v for point in points for v in point],
+                                  fill=region_fill, outline=edge_fill, width=2, tags=tags)
+            # Fixed bilingual labels: chips are intentionally painted over them.
+            # Fixed offsets keep the two wider labels inside the slanted edges.
+            # Neither placement nor font size depends on the presence of a chip.
+            dx, dy = {"tiers": (-6, 9), "voisins": (-8, -8)}.get(region, (0, 0))
+            label_x, label_y = cx + dx, cy + dy
+            canvas.create_text(label_x, label_y - 9, text=info["label"], fill=label_fill,
+                               font=("Arial", 9, "bold"), tags=tags)
+            canvas.create_text(label_x, label_y + 10, text=info["zh"], fill=label_fill,
+                               font=("Microsoft YaHei", 9), tags=tags)
+            unit_amount = self.region_bets.get(region, 0)
+            amount = unit_amount * sum(leg[2] for leg in info["legs"])
+            if self.round_state == "result" and amount:
+                payout = sum(unit_amount * units * (spot["payout"] + 1)
+                             for spot, units in self._region_legs(region)
+                             if self.center_display_result in spot["numbers"])
+                if not payout:
+                    amount = 0
+                elif self._result_flash_state:
+                    amount = payout
+            if amount:
+                fill = self._chip_fill_color_for_amount(amount)
+                text_color = self._spot_text_color(fill)
+                if self.round_state == "result" and self._result_flash_state:
+                    fill, text_color = self._result_chip_style(amount)
+                canvas.create_oval(cx - 14, cy - 12, cx + 14, cy + 12,
+                                   fill=fill, outline="#D8B46A", width=2, tags=tags)
+                canvas.create_text(cx, cy, text=self._format_win_amount(amount),
+                                   fill=text_color, font=("Arial", 8, "bold"), tags=tags)
+        # Draw focus last so adjacent sectors cannot overpaint its shared edge.
+        if self.region_hover in FRENCH_BETS and self.round_state == "betting":
+            points = self._region_polygon(self.region_hover)
+            coords = [v for point in points + points[:1] for v in point]
+            tags = ("track", "track_region:" + self.region_hover)
+            canvas.create_line(*coords, fill=RACETRACK_FOCUS_HALO, width=6,
+                               joinstyle=tk.ROUND, tags=tags)
+            canvas.create_line(*coords, fill=RACETRACK_REGION_FOCUS, width=3,
+                               joinstyle=tk.ROUND, tags=tags)
+
+    def _racetrack_region_at(self, x, y):
+        # Ray casting follows the same polygons as drawing, including the diagonal
+        # and both curved ends; number pockets outside the capsule stay separate.
+        for region in RACETRACK_REGION_ORDER:
+            points = self._region_polygon(region)
+            inside = False
+            for (x1, y1), (x2, y2) in zip(points, points[1:] + points[:1]):
+                if (y1 > y) != (y2 > y):
+                    edge_x = x1 + (y - y1) * (x2 - x1) / (y2 - y1)
+                    if x < edge_x:
+                        inside = not inside
+            if inside:
+                return region
+        return None
+
+    def _place_region_bet(self, region):
+        if self.round_state != "betting" or self.betting_view != "racetrack":
+            return
+        unit_amount = int(self.selected_bet_amount)
+        if unit_amount <= 0 or region not in FRENCH_BETS:
+            return
+        legs = self._region_legs(region)
+        # Cap the unit stake at the tightest remaining table leg. Preserve the
+        # standard 2:1 legs and account for direct bets and overlapping regions.
+        remaining_units = min(max(0, (self._bet_limit_for_spot(spot)
+                              - self.current_bets.get(spot["id"], 0)) // units)
+                              for spot, units in legs)
+        unit_amount = min(unit_amount, int(remaining_units))
+        if unit_amount <= 0:
+            return
+        total = unit_amount * sum(units for _, units in legs) * self.bet_multiplier
+        if total > self.balance:
+            return
+        self.balance -= total
+        self.region_bets[region] = self.region_bets.get(region, 0) + unit_amount
+        for spot, units in legs:
+            key = spot["id"]
+            self.current_bets[key] = self.current_bets.get(key, 0) + unit_amount * units
+            self.current_bet_colors[key] = self._chip_fill_color_for_amount(self.current_bets[key])
+        self._refresh_balance_display()
+        self._refresh_bet_totals()
+        self._repaint_all_chips()
+
+    def _clear_region_bet(self, region):
+        if self.round_state != "betting":
+            return
+        amount = self.region_bets.pop(region, 0)
+        for spot, units in self._region_legs(region):
+            key = spot["id"]
+            remaining = self.current_bets.get(key, 0) - amount * units
+            self.balance += amount * units * self.bet_multiplier
+            if remaining > 0:
+                self.current_bets[key] = remaining
+                self.current_bet_colors[key] = self._chip_fill_color_for_amount(remaining)
+            else:
+                self.current_bets.pop(key, None)
+                self.current_bet_colors.pop(key, None)
+        self._refresh_balance_display()
+        self._refresh_bet_totals()
+        self._repaint_all_chips()
+
+    def _animate_chips_to_table(self):
+        """Visual-only transfer: stakes were already charged once when accepted."""
+        self._cancel_chip_transfer()
+        pending = self._region_contributions()
+        transfers = []
+        for region, amount in self.region_bets.items():
+            for spot, units in self._region_legs(region):
+                transfers.append((self._region_center(region), spot, amount * units))
+        if self.betting_view == "racetrack":
+            for index, number in enumerate(RACETRACK_SEQUENCE):
+                key = "straight_" + number
+                amount = self.current_bets.get(key, 0) - pending.get(key, 0)
+                if amount > 0:
+                    origin = self._racetrack_point((index + 0.5) / len(RACETRACK_SEQUENCE), RACETRACK_CHIP_R)
+                    transfers.append((origin, self._find_spot_by_id(key), amount))
+        # Preserve the player's chosen view. Table coordinates/animation still
+        # update the shared board without replacing the visible racetrack.
+        self.racetrack_hover = None
+        self.region_hover = None
+        self._draw_racetrack()
+        self._update_betting_view_controls()
+        if not transfers:
+            self._repaint_all_chips()
+            return
+        self._chip_transfer_active = True
+        moving = {}
+        for _, spot, amount in transfers:
+            moving[spot["id"]] = moving.get(spot["id"], 0) + amount
+        self.board_canvas.delete("chips")
+        self.placed_chip_items = {}
+        for key, amount in self.current_bets.items():
+            stationary = amount - moving.get(key, 0)
+            if stationary > 0:
+                self._draw_chip_on_spot(self._find_spot_by_id(key), stationary)
+        for origin, spot, amount in transfers:
+            x, y = origin
+            radius = self._chip_radius_for_spot(spot)
+            fill = self._chip_fill_color_for_amount(amount)
+            oval = self.board_canvas.create_oval(x-radius, y-radius, x+radius, y+radius,
+                        fill=fill, outline="#D4AF37", width=2, tags="chip_transfer")
+            label = self.board_canvas.create_text(x, y, text=self._format_win_amount(amount),
+                        fill=self._spot_text_color(fill), font=("Arial", 7, "bold"), tags="chip_transfer")
+            self._chip_transfer_items.append((oval, label, origin, spot["center"], radius))
+        self._chip_transfer_started = time.perf_counter()
+        self._chip_transfer_tick()
+
+    def _chip_transfer_tick(self):
+        self._chip_transfer_job = None
+        if not self._chip_transfer_active:
+            return
+        elapsed = time.perf_counter() - self._chip_transfer_started
+        progress = min(1.0, elapsed / CHIP_TRANSFER_SECONDS)
+        eased = progress * progress * (3.0 - 2.0 * progress)
+        for oval, label, (sx, sy), (tx, ty), radius in self._chip_transfer_items:
+            x, y = sx + (tx - sx) * eased, sy + (ty - sy) * eased
+            self.board_canvas.coords(oval, x-radius, y-radius, x+radius, y+radius)
+            self.board_canvas.coords(label, x, y)
+        if progress >= 1.0:
+            self._cancel_chip_transfer()
+            self._repaint_all_chips()
+        else:
+            remaining_ms = max(1, int(math.ceil((CHIP_TRANSFER_SECONDS - elapsed) * 1000)))
+            self._chip_transfer_job = self.after(min(16, remaining_ms), self._chip_transfer_tick)
+
+    def _cancel_chip_transfer(self):
+        if self._chip_transfer_job is not None:
+            self.after_cancel(self._chip_transfer_job)
+            self._chip_transfer_job = None
+        self._chip_transfer_active = False
+        self._chip_transfer_items = []
+        if hasattr(self, "board_canvas"):
+            self.board_canvas.delete("chip_transfer")
 
     def _add_help_button_on_board(self):
         """在棋盘上0格子下方、1-18格子左侧添加一个帮助按钮"""
@@ -1041,6 +2151,8 @@ class RouletteGameGUI(tk.Frame):
             # 有下注：存储新的记录
             self.last_bets = self.current_bets.copy()
             self.last_bet_colors = self.current_bet_colors.copy()
+            self.last_region_bets = self.region_bets.copy()
+            self.last_betting_view = self.betting_view
         else:
             # 没有下注：保持原有 last_bets 不变（不清空）
             pass
@@ -1065,48 +2177,21 @@ class RouletteGameGUI(tk.Frame):
             self.repeat_last_btn.config(state=tk.NORMAL)
 
     def _repeat_last_bet(self):
-        """重复上一局的下注（复制到当前局）"""
-        if self.round_state != "betting":
-            messagebox.showwarning("提示", "只能在投注阶段重复上局下注")
+        if self.round_state != "betting" or not self.last_bets:
             return
-        if not self.last_bets:
-            messagebox.showwarning("提示", "没有上一局下注记录")
+        total = sum(self.last_bets.values()) * self.bet_multiplier
+        if total > self.balance + sum(self.current_bets.values()) * self.bet_multiplier:
+            messagebox.showwarning("余额不足", f"重复上局下注需要 ${total:,.0f}。")
             return
-
-        total_last = sum(self.last_bets.values()) * self.bet_multiplier
-        if total_last > self.balance + sum(self.current_bets.values()) * self.bet_multiplier:
-            messagebox.showwarning("提示", f"余额不足，重复上局下注需要 ${total_last:,.0f}")
-            return
-
-        # 清除当前下注
         self.clear_bets()
-
-        # 复制上局下注
-        for spot_id, amount in self.last_bets.items():
-            spot = self._find_spot_by_id(spot_id)
-            if not spot:
-                continue
-
-            limit = self._bet_limit_for_spot(spot)
-            existing = self.current_bets.get(spot_id, 0)
-            remaining_limit = limit - existing
-            actual_amount = min(amount, remaining_limit)
-
-            if actual_amount <= 0:
-                continue
-            if self.balance < actual_amount * self.bet_multiplier:
-                break
-
-            self.balance -= actual_amount * self.bet_multiplier
-            self.current_bets[spot_id] = existing + actual_amount
-            self.current_bet_colors[spot_id] = self._chip_fill_color_for_amount(self.current_bets[spot_id])
-
+        self.balance -= total
+        self.current_bets = self.last_bets.copy()
+        self.current_bet_colors = self.last_bet_colors.copy()
+        self.region_bets = self.last_region_bets.copy()
+        self._switch_betting_view("racetrack" if self.region_bets else self.last_betting_view)
         self._refresh_balance_display()
         self._refresh_bet_totals()
         self._repaint_all_chips()
-
-        total_bet = sum(self.current_bets.values()) * self.bet_multiplier
-        self._show_round_amount("本局下注金额", sum(self.current_bets.values()))
 
     def _toggle_pause_timer(self):
         """暂停/继续倒计时"""
@@ -1125,12 +2210,7 @@ class RouletteGameGUI(tk.Frame):
             self.paused_remaining = max(0, self.betting_deadline - time.time())
             self.timer_paused = True
             self.pause_timer_btn.config(text="开始倒计时", bg="#4A90E2")
-            # 显示暂停剩余时间
-            if hasattr(self, "wheel_timer_id") and self.wheel_timer_id:
-                try:
-                    self.wheel_canvas.itemconfig(self.wheel_timer_id, text=f"{int(self.paused_remaining)}s (暂停)")
-                except Exception:
-                    pass
+            self._draw_wheel_status()
         else:
             # 继续倒计时
             if self.paused_remaining <= 0:
@@ -2045,278 +3125,242 @@ class RouletteGameGUI(tk.Frame):
         self._update_hot_cold_display()
 
     # =====================================================
-    # Wheel drawing (unchanged)
+    # Fixed metal bowl; numbered rotor, recessed pockets and spindle rotate.
     # =====================================================
+    def _wheel_point(self, cx, cy, radius, angle, z=0):
+        a = math.radians(angle)
+        return cx+radius*math.sin(a), cy-WHEEL_TILT*radius*math.cos(a)-z
+
+    def _wheel_band(self, cx, cy, inner, outer, start, end, z=0, **style):
+        points = []
+        divisions = max(2, int(abs(end-start)/3))
+        for j in range(divisions+1):
+            points.extend(self._wheel_point(cx, cy, outer,
+                          start+(end-start)*j/divisions, z(outer) if callable(z) else z))
+        for j in range(divisions, -1, -1):
+            points.extend(self._wheel_point(cx, cy, inner,
+                          start+(end-start)*j/divisions, z(inner) if callable(z) else z))
+        return self.wheel_canvas.create_polygon(*points, **style)
+
+    def _wheel_oval(self, cx, cy, r, z=0, **style):
+        return self.wheel_canvas.create_oval(cx-r, cy-WHEEL_TILT*r-z,
+                         cx+r, cy+WHEEL_TILT*r-z, **style)
+
+    @staticmethod
+    def _surface_pixels(radius):
+        return RoulettePhysics.surface_height(radius/WHEEL_METRE_SCALE)*WHEEL_METRE_SCALE
+
     def _draw_wheel(self):
-        # 强制处理 pending 的布局事件，确保能获取到正确的画布尺寸
-        self.update_idletasks()
-
-        canvas_w = max(int(self.wheel_canvas.winfo_width()), 1)
-        canvas_h = max(int(self.wheel_canvas.winfo_height()), 1)
-
-        # 如果画布尺寸过小（通常窗口尚未完全映射），延迟重试
-        if canvas_w <= 10 or canvas_h <= 10:
+        c = self.wheel_canvas
+        width, height = c.winfo_width(), c.winfo_height()
+        if width <= 10 or height <= 10:
             self.after(50, self._draw_wheel)
             return
+        cx, cy = width/2, height/2-1
+        self.wheel_timer_id = None
+        if getattr(self, "_wheel_static_size", None) != (width,height):
+            c.delete("all")
+            self._wheel_static_size = (width,height)
+            static = {"tags": ("wheel_static",)}
+            c.create_rectangle(0,0,width,height,fill="#073B25",outline="",**static)
+            # Graphite shell and satin-steel rims, without grain or wood sectors.
+            for z, colour in ((-19,"#080F16"),(-13,"#192630"),(-7,"#354651")):
+                self._wheel_oval(cx,cy,216,z,fill=colour,outline="#647681",width=1,**static)
+            self._wheel_oval(cx,cy,216,self._surface_pixels(216),
+                             fill="#8A9CA8",outline="#DBE5EB",width=2,**static)
+            for outer,inner,colour in ((213,205,"#344855"),(205,197,"#293D4A"),
+                    (197,187,"#223440"),(187,175,"#1D2F3A"),(175,164,"#192B36")):
+                self._wheel_band(cx,cy,inner,outer,0,360,self._surface_pixels,
+                                 fill=colour,outline="",**static)
+            for r,col,w in ((212,"#E0E8ED",1.5),(205,"#879CA9",1),
+                            (197,"#526875",1),(164,"#C9D5DC",2)):
+                self._wheel_oval(cx,cy,r,self._surface_pixels(r),
+                                 fill="",outline=col,width=w,**static)
+            # Low bevelled diamonds share the finite 3-D collision geometry.
+            for index in range(len(RoulettePhysics.DEFLECTORS)):
+                points = [(cx+x*WHEEL_METRE_SCALE,
+                           cy+y*WHEEL_METRE_SCALE*WHEEL_TILT
+                           -self._surface_pixels(math.hypot(x,y)*WHEEL_METRE_SCALE))
+                          for x,y in RoulettePhysics.deflector_vertices(index)]
+                apex = self._wheel_point(cx,cy,
+                    RoulettePhysics.DEFLECTOR_R*WHEEL_METRE_SCALE,
+                    math.degrees(RoulettePhysics.DEFLECTORS[index]),
+                    self._surface_pixels(RoulettePhysics.DEFLECTOR_R*WHEEL_METRE_SCALE)
+                    +RoulettePhysics.DEFLECTOR_HEIGHT*WHEEL_METRE_SCALE)
+                for j in range(4):
+                    c.create_polygon(*points[j],*points[(j+1)%4],*apex,
+                        fill=("#BEC4C7","#8F999F","#D9DEE0","#E9ECEC")[j],
+                        outline="#B6BDC1",width=.5,**static)
+        c.delete("wheel_rotor","wheel_ball","wheel_hud","wheel_fixed")
+        self._draw_wheel_segments(cx,cy,164,107,self.current_wheel_offset)
+        self._draw_orbiting_pointer(cx,cy,164)
+        self._draw_pocket_occlusion(cx,cy)
+        self._draw_wheel_status()
 
-        self.wheel_canvas.delete("all")
+    def _draw_center_title(self, cx, cy, offset_deg):
+        """Engrave the permanent title into the rotating metal plate above 0.
 
-        # ===== 背景：赌场风格深色舞台 + 轻微渐层感 =====
-        self.wheel_canvas.create_rectangle(
-            0, 0, canvas_w, canvas_h,
-            fill=ROOT_BG,
-            outline="",
-            tags=("wheel_bg",)
-        )
+        The title is rotor geometry, not a screen-fixed HUD element: its position
+        and orientation follow the same metal plate as the 0 pocket.
+        """
+        c = self.wheel_canvas
+        step = 360.0 / 37.0
+        zero_index = ROULETTE_SEQUENCE.index("0")
+        zero_mid = offset_deg + (zero_index + .5) * step
+        for radius, text, char_w, char_h, gap, weight in (
+                (85,"欧洲轮盘",18.0,20.0,3.5,1.45),
+                (69,"EUROPEAN ROULETTE",3.2,7.5,1.0,.95)):
+            for points in wheel_title_paths(cx,cy,text,zero_mid,radius,char_w,char_h,gap):
+                c.create_line(*points,fill="#DCE8EF",width=weight,
+                              capstyle="round",joinstyle="round",tags=("wheel_rotor",))
 
-        # 轻微装饰光圈
-        cx = canvas_w / 2
-        cy = canvas_h / 2 - 2
-
-        for r, fill, width in [
-            (220, "#173F66", 2),
-            (205, "#0E241E", 2),
-        ]:
-            self.wheel_canvas.create_oval(
-                cx - r, cy - r,
-                cx + r, cy + r,
-                fill="",
-                outline=fill,
-                width=width,
-                tags=("wheel_bg",)
-            )
-
-        # 轮盘本体参数
-        outer_r = 174
-        inner_r = 70
-
-        # 外围金属底座
-        self.wheel_canvas.create_oval(
-            cx - outer_r - 28, cy - outer_r - 28,
-            cx + outer_r + 28, cy + outer_r + 28,
-            fill="#2D2214",
-            outline="#D4AF37",
-            width=6,
-            tags=("wheel",)
-        )
-        self.wheel_canvas.create_oval(
-            cx - outer_r - 18, cy - outer_r - 18,
-            cx + outer_r + 18, cy + outer_r + 18,
-            fill="",
-            outline="#8B6B24",
-            width=2,
-            tags=("wheel",)
-        )
-
-        # 轮盘转盘阴影层
-        self.wheel_canvas.create_oval(
-            cx - outer_r - 8, cy - outer_r - 8,
-            cx + outer_r + 8, cy + outer_r + 8,
-            fill="#1A1A1A",
-            outline="",
-            tags=("wheel",)
-        )
-
-        # 轮盘扇区
-        self._draw_wheel_segments(cx, cy, outer_r, inner_r, self.current_wheel_offset)
-
-        # 轮盘外圈细金边
-        self.wheel_canvas.create_oval(
-            cx - outer_r, cy - outer_r, cx + outer_r, cy + outer_r,
-            outline="#E6C15A",
-            width=3,
-            tags=("wheel",)
-        )
-        self.wheel_canvas.create_oval(
-            cx - inner_r, cy - inner_r, cx + inner_r, cy + inner_r,
-            outline="#E6C15A",
-            width=2,
-            tags=("wheel",)
-        )
-
-        # 外圈刻痕 / 螺钉感装饰
-        for i in range(len(ROULETTE_SEQUENCE)):
-            ang = math.radians(i * (360.0 / len(ROULETTE_SEQUENCE)))
-            r1 = outer_r + 6
-            r2 = outer_r + 14
-            x1 = cx + r1 * math.sin(ang)
-            y1 = cy - r1 * math.cos(ang)
-            x2 = cx + r2 * math.sin(ang)
-            y2 = cy - r2 * math.cos(ang)
-            self.wheel_canvas.create_line(
-                x1, y1, x2, y2,
-                fill="#C9A24A",
-                width=2,
-                tags=("wheel",)
-            )
-
-        # 中心金属盘
-        self.wheel_canvas.create_oval(
-            cx - inner_r - 15, cy - inner_r - 15,
-            cx + inner_r + 15, cy + inner_r + 15,
-            fill="#6B4D1B",
-            outline="#E6C15A",
-            width=3,
-            tags=("wheel",)
-        )
-        self.wheel_canvas.create_oval(
-            cx - inner_r - 7, cy - inner_r - 7,
-            cx + inner_r + 7, cy + inner_r + 7,
-            fill="#F3E8C9",
-            outline="#1A1A1A",
-            width=2,
-            tags=("wheel",)
-        )
-
-        # 中心显示
-        if self.center_display_result is not None:
-            result = self.center_display_result
-            bg_color = OUTCOME_COLORS.get(result, "#FFFFFF")
-            inner_bg_r = inner_r - 10
-            self.wheel_canvas.create_oval(
-                cx - inner_bg_r, cy - inner_bg_r,
-                cx + inner_bg_r, cy + inner_bg_r,
-                fill=bg_color,
-                outline="#111111",
-                width=2,
-                tags=("wheel",)
-            )
-            font_size = 34 if len(result) == 2 else 36
-            font = ("Arial", font_size, "bold")
-            self.wheel_canvas.create_text(
-                cx, cy,
-                text=result,
-                fill=OUTCOME_TEXT_COLORS.get(result, "white"),
-                font=font,
-                tags=("wheel",)
-            )
+    def _draw_wheel_status(self):
+        """One fixed top-left display: 30-second betting timer or winning number."""
+        c = self.wheel_canvas
+        c.delete("wheel_hud")
+        bg, fg = "#14222D", "#E0EBF2"
+        if self.round_state == "result":
+            title, text = "结果", str(self.center_display_result)
+            bg = OUTCOME_COLORS.get(text,"#171B20")
+            fg = "#FFFFFF"
+        elif self.round_state == "spinning":
+            title, text = "开奖", "…"
         else:
-            self.wheel_canvas.create_text(
-                cx, cy - 10,
-                text="欧式轮盘",
-                font=("Arial", 24, "bold"),
-                fill="#2A1B08",
-                tags=("wheel",)
-            )
+            title = "暂停" if self.timer_paused else "下注"
+            remaining = (self.paused_remaining if self.timer_paused else
+                         max(0.0,(self.betting_deadline or time.time())-time.time()))
+            text = f"{math.ceil(remaining):02d}s"
+        tags = ("wheel_hud",)
+        c.create_rectangle(10,8,96,69,fill=bg,outline="#91AABA",width=2,tags=tags)
+        c.create_text(53,20,text=title,fill=fg,font=("Arial",10,"bold"),tags=tags)
+        self.wheel_timer_id = c.create_text(53,47,text=text,fill=fg,
+                                font=("Arial",23,"bold"),tags=tags)
 
-            if self.round_state == "betting" and self.betting_deadline is not None:
-                remaining = max(0, int(math.ceil(self.betting_deadline - time.time())))
-                timer_text = f"{remaining:02d}s"
-            elif self.round_state == "spinning":
-                timer_text = "开奖中"
-            else:
-                timer_text = "等待开奖"
+    def _draw_wheel_number(self, cx, cy, symbol, mid, style):
+        # Vector digits use the SAME world-to-screen transform as the rotor.
+        # No per-frame rotated-font bounding box, pixel baseline or text anchor.
+        for points in wheel_number_paths(cx,cy,symbol,mid):
+            self.wheel_canvas.create_line(*points,fill="#EDF3F7",width=1.45,
+                                           capstyle="round",joinstyle="round",**style)
 
-            self.wheel_timer_id = self.wheel_canvas.create_text(
-                cx, cy + 28,
-                text=timer_text,
-                font=("Arial", 16, "bold"),
-                fill="#2A1B08",
-                tags=("timer",)
-            )
-
-        # 逆时针绕轮盘旋转的指针
-        self._draw_orbiting_pointer(cx, cy, outer_r)
 
     def _draw_wheel_segments(self, cx, cy, outer_r, inner_r, offset_deg):
-        self.wheel_canvas.delete("wheel_segments")
+        c = self.wheel_canvas
+        style = {"tags": ("wheel_rotor",)}
+        self._wheel_oval(cx,cy,164,self._surface_pixels(164),
+                         fill="#182832",outline="#D0DCE3",width=2,**style)
+        step = 360/37
+        # One shared sloping pocket floor, lowest at the inner end.
+        floor_radii = (109,115,122,130,139.5)
+        floor_colours = ("#17232D","#202F3B","#2A3B47","#354955")
+        for i,symbol in enumerate(ROULETTE_SEQUENCE):
+            start,end = offset_deg+i*step,offset_deg+(i+1)*step
+            colour = "#117A5A" if symbol == "0" else ("#A92835" if int(symbol) in RED_NUMBERS else "#101A24")
+            self._wheel_band(cx,cy,140,163,start,end,self._surface_pixels,
+                             fill=colour,outline="#A9BAC5",width=.8,**style)
+            self._draw_wheel_number(cx,cy,symbol,(start+end)/2,style)
+            for j in range(len(floor_radii)-1):
+                self._wheel_band(cx,cy,floor_radii[j],floor_radii[j+1],start,end,
+                                 self._surface_pixels,fill=floor_colours[j],outline="",**style)
+            # Inner rail wall connects the deep bed to the top rim.
+            points = [self._wheel_point(cx,cy,109,a,z) for a,z in
+                      ((start,0),(end,0),(end,self._surface_pixels(109)),
+                       (start,self._surface_pixels(109)))]
+            c.create_polygon(*[v for pt in points for v in pt],
+                             fill="#617784",outline="",**style)
+        # Paint every identical silver separator after all pocket floors.
+        boundaries = [offset_deg+i*step for i in range(37)]
+        boundaries.sort(key=lambda a: self._wheel_point(cx,cy,124,a)[1])
+        for start in boundaries:
+            top = [self._wheel_point(cx,cy,r,start,0) for r in (109,139.5)]
+            bottom = [self._wheel_point(cx,cy,r,start,self._surface_pixels(r))
+                      for r in reversed(floor_radii)]
+            c.create_polygon(*[v for pt in top+bottom for v in pt],
+                             fill="#687F8D",outline="",**style)
+            c.create_line(*top[0],*top[1],fill="#DDE7ED",width=1.8,**style)
+        # Smooth graphite central plate: no rotating wedge colours or grain.
+        for radius,colour in ((107,"#849AA8"),(105,"#203340"),(98,"#1E313E"),
+                              (83,"#1D303D"),(64,"#1C2F3C")):
+            self._wheel_oval(cx,cy,radius,2,fill=colour,outline="",**style)
+        self._wheel_oval(cx,cy,106,2,fill="",outline="#B6C8D3",width=1.5,**style)
+        self._draw_center_title(cx,cy,offset_deg)
+        for j in range(4):
+            angle = offset_deg+45+j*90
+            tip = self._wheel_point(cx,cy,76,angle,14)
+            left = self._wheel_point(cx,cy,15,angle-30,17)
+            right = self._wheel_point(cx,cy,15,angle+30,17)
+            c.create_line(cx+3,cy-8,tip[0]+3,tip[1]+6,fill="#0B1720",width=7,**style)
+            c.create_polygon(*left,*tip,*right,fill="#AEBFCB",outline="#E4EDF2",width=1,**style)
+            c.create_line(cx,cy-17,*tip,fill="#F1F6F9",width=1.5,**style)
+            x,y = tip
+            c.create_oval(x-3.5,y-2.5,x+3.5,y+2.5,fill="#DAE5EC",outline="#728B9C",**style)
+        self._wheel_oval(cx,cy,14,19,fill="#6C8596",outline="#D1DFE8",width=2,**style)
+        self._wheel_oval(cx,cy,9,22,fill="#C1D2DD",outline="#EDF4F8",width=1,**style)
 
-        n = len(ROULETTE_SEQUENCE)
-        step = 360.0 / n
+    def _draw_pocket_occlusion(self, cx, cy):
+        """Draw only walls in front of the ball, so it sits inside the groove."""
+        if not self.ball_visible or self.ball_radius>RoulettePhysics.POCKET_OUTER*WHEEL_METRE_SCALE:
+            return
+        if self._surface_pixels(self.ball_radius)+self.ball_height*WHEEL_METRE_SCALE > 1:
+            return
+        c = self.wheel_canvas
+        step = 360/37
+        index = self.ball_pocket_index
+        if index is None:
+            index = pocket_index(self.pointer_angle,self.current_wheel_offset)
+        start = self.current_wheel_offset+index*step
+        mid = start+step/2
+        style = {"tags": ("wheel_ball",)}
+        # The inner wall is foreground only on the far half of the wheel.
+        if math.cos(math.radians(mid))>0:
+            pts = [self._wheel_point(cx,cy,109,a,z) for a,z in
+                   ((start,0),(start+step,0),(start+step,self._surface_pixels(109)),
+                    (start,self._surface_pixels(109)))]
+            c.create_polygon(*[v for pt in pts for v in pt],fill="#617784",outline="",**style)
+            self._wheel_band(cx,cy,107,109,start,start+step,0,
+                             fill="#A7BAC6",outline="#DDE7ED",width=.7,**style)
+        # One side separator is in front of the sphere; the opposite stays behind.
+        ball_ground_y = self._wheel_point(cx,cy,self.ball_radius,self.pointer_angle)[1]
+        for a in (start,start+step):
+            if self._wheel_point(cx,cy,self.ball_radius,a)[1] <= ball_ground_y:
+                continue
+            top = [self._wheel_point(cx,cy,r,a,0) for r in (109,139.5)]
+            bottom = [self._wheel_point(cx,cy,r,a,self._surface_pixels(r))
+                      for r in (139.5,130,122,115,109)]
+            c.create_polygon(*[v for pt in top+bottom for v in pt],fill="#687F8D",outline="",**style)
+            c.create_line(*top[0],*top[1],fill="#DDE7ED",width=1.8,**style)
 
-        # 先画一层底色，避免扇区之间露出空隙
-        self.wheel_canvas.create_oval(
-            cx - outer_r, cy - outer_r,
-            cx + outer_r, cy + outer_r,
-            fill="#1A1A1A",
-            outline="",
-            tags=("wheel_segments",)
-        )
+    def _draw_orbiting_pointer(self, cx, cy, outer_r):
+        """Draw the ball above the bowl, or inside the independent recessed bed."""
+        if not getattr(self,"ball_visible",True):
+            return
+        c = self.wheel_canvas
+        radius = self.ball_radius
+        # Always use the same continuous support as the solver, even in flight.
+        in_grooves = radius <= RoulettePhysics.POCKET_OUTER*WHEEL_METRE_SCALE
+        surface = self._surface_pixels(radius)
+        x,ground_y = self._wheel_point(cx,cy,radius,self.pointer_angle,surface)
+        height = getattr(self,"ball_height",0.0)*WHEEL_METRE_SCALE
+        ball_r = RoulettePhysics.BALL_R*WHEEL_METRE_SCALE
+        y = ground_y-ball_r-height
+        style = {"tags": ("wheel_ball",)}
+        shadow_r = 6+min(4,height*.10)
+        shadow_colour = "#344753" if height > 6 else "#080F16"
+        if in_grooves and height < 2:
+            shadow_r = ball_r*.90
+        c.create_oval(x-shadow_r,ground_y-1.5,x+shadow_r,ground_y+2,
+                      fill=shadow_colour,outline="",**style)
+        c.create_oval(x-ball_r,y-ball_r,x+ball_r,y+ball_r,
+                      fill="#CBD4DA",outline="#F4F8FB",width=1,**style)
+        # A broad, soft oval highlight reads as specular reflection at wheel
+        # scale; tiny near-square spots rasterise as hard white pixels.
+        c.create_oval(x-ball_r*.68,y-ball_r*.72,
+                      x-ball_r*.08,y-ball_r*.24,
+                      fill="#E2EAF0",outline="",**style)
+        c.create_oval(x-ball_r*.55,y-ball_r*.68,
+                      x-ball_r*.20,y-ball_r*.43,
+                      fill="#F4F7F9",outline="",**style)
 
-        for i, symbol in enumerate(ROULETTE_SEQUENCE):
-            start = (offset_deg + i * step) % 360.0
-            end = start + step
-
-            # 扇形多边形：中心点 + 外圈两点
-            points = [cx, cy]
-            for ang in (start, end):
-                rad = math.radians(ang)
-                x = cx + outer_r * math.sin(rad)
-                y = cy - outer_r * math.cos(rad)
-                points.extend([x, y])
-
-            fill_color = OUTCOME_COLORS[symbol]
-            outline_color = "#2A2A2A"
-
-            self.wheel_canvas.create_polygon(
-                points,
-                fill=fill_color,
-                outline=outline_color,
-                width=1,
-                smooth=False,
-                tags=("wheel_segments",)
-            )
-
-            # 扇区高光线，增加层次感
-            rad1 = math.radians(start)
-            x1 = cx + inner_r * math.sin(rad1)
-            y1 = cy - inner_r * math.cos(rad1)
-            x2 = cx + outer_r * math.sin(rad1)
-            y2 = cy - outer_r * math.cos(rad1)
-            self.wheel_canvas.create_line(
-                x1, y1, x2, y2,
-                fill="#F6F1D0",
-                width=1,
-                tags=("wheel_segments",)
-            )
-
-            # 号码文字
-            mid = (start + end) / 2.0
-            rad = math.radians(mid)
-            text_r = outer_r * 0.83
-            tx = cx + text_r * math.sin(rad)
-            ty = cy - text_r * math.cos(rad)
-
-            is_zero = symbol in {"0"}
-            text_font = ("Arial", 11, "bold")
-            text_fill = OUTCOME_TEXT_COLORS[symbol]
-
-            # 轻微文字阴影
-            self.wheel_canvas.create_text(
-                tx + 1, ty + 1,
-                text=symbol,
-                font=text_font,
-                fill="#000000",
-                tags=("wheel_segments",)
-            )
-            self.wheel_canvas.create_text(
-                tx, ty,
-                text=symbol,
-                font=text_font,
-                fill=text_fill,
-                tags=("wheel_segments",)
-            )
-
-        # 最内圈边界
-        self.wheel_canvas.create_oval(
-            cx - inner_r, cy - inner_r,
-            cx + inner_r, cy + inner_r,
-            outline="#F3E8C9",
-            width=2,
-            tags=("wheel_segments",)
-        )
-
-        # 外圈边界
-        self.wheel_canvas.create_oval(
-            cx - outer_r, cy - outer_r,
-            cx + outer_r, cy + outer_r,
-            outline="#F3E8C9",
-            width=2,
-            tags=("wheel_segments",)
-        )
-
-        # 让轮盘层在最上面
-        self.wheel_canvas.tag_raise("wheel_segments")
 
     # =====================================================
     # Bet spots / hit testing / chips (chip radius enlarged by 20%)
@@ -2825,21 +3869,32 @@ class RouletteGameGUI(tk.Frame):
     def _repaint_all_chips(self):
         if not hasattr(self, "board_canvas"):
             return
+        if self._chip_transfer_active:
+            return
+        pending = self._region_contributions() if self.round_state == "betting" else {}
         self.board_canvas.delete("chips")
         self.placed_chip_items = {}
         for spot_id, amount in self.current_bets.items():
+            amount -= pending.get(spot_id, 0)
             if amount > 0:
                 spot = self._find_spot_by_id(spot_id)
                 if spot:
                     fill = self.current_bet_colors.get(spot_id, self._chip_fill_color_for_amount(amount))
                     self._draw_chip_on_spot(spot, amount, fill)
+        self.board_canvas.delete("pending_regions")
+        if pending:
+            self.board_canvas.create_text(BOARD_W / 2, 256,
+                text="当前在跑道盘中有下注，开局时自动拆分", fill="#F5D68A",
+                font=("Arial", 9), tags="pending_regions")
+        self._draw_racetrack()
+        self._update_betting_view_controls()
 
     # =====================================================
     # Board click handling
     # =====================================================
 
     def on_board_click(self, event):
-        if self.round_state != "betting":
+        if self.round_state != "betting" or self.betting_view != "table":
             return
         spot = self._spot_by_point(event.x, event.y)
         if not spot:
@@ -2847,7 +3902,7 @@ class RouletteGameGUI(tk.Frame):
         self.place_bet(spot["id"])
 
     def on_board_right_click(self, event):
-        if self.round_state != "betting":
+        if self.round_state != "betting" or self.betting_view != "table":
             return
         spot = self._spot_by_point(event.x, event.y)
         if not spot:
@@ -2859,7 +3914,7 @@ class RouletteGameGUI(tk.Frame):
     # =====================================================
 
     def place_bet(self, spot_id: str):
-        if self.round_state != "betting":
+        if self.round_state != "betting" or self.betting_view != "table":
             return
         spot = self._find_spot_by_id(spot_id)
         if not spot:
@@ -2901,6 +3956,7 @@ class RouletteGameGUI(tk.Frame):
         if refund > 0:
             self.balance += refund
 
+        self.region_bets.clear()
         self.current_bets.clear()
         self.current_bet_colors.clear()
 
@@ -2913,14 +3969,21 @@ class RouletteGameGUI(tk.Frame):
     def clear_single_bet(self, spot_id: str):
         if self.round_state != "betting":
             return
-        amount = self.current_bets.get(spot_id, 0)
+        pending = self._region_contributions().get(spot_id, 0)
+        amount = self.current_bets.get(spot_id, 0) - pending
         if amount > 0:
             self.balance += amount * self.bet_multiplier
-            self.current_bets.pop(spot_id, None)
-            self.current_bet_colors.pop(spot_id, None)
+            if pending:
+                self.current_bets[spot_id] = pending
+                self.current_bet_colors[spot_id] = self._chip_fill_color_for_amount(pending)
+            else:
+                self.current_bets.pop(spot_id, None)
+                self.current_bet_colors.pop(spot_id, None)
             self._refresh_balance_display()
             self._refresh_bet_totals()
             self._repaint_all_chips()
+        elif pending:
+            messagebox.showinfo("区域下注", "请在跑道盘对应区域按右键，撤销完整区域下注。")
 
     def _show_round_amount(self, title, base_amount):
         total = base_amount * self.bet_multiplier
@@ -2951,6 +4014,7 @@ class RouletteGameGUI(tk.Frame):
         self.multiplier_display.config(text=f"×{new_multiplier}")
         self._refresh_balance_display()
         self._refresh_bet_totals()
+        self._draw_racetrack()
 
     def _refresh_bet_totals(self):
         base_total = sum(self.current_bets.values())
@@ -2986,11 +4050,12 @@ class RouletteGameGUI(tk.Frame):
     # Game flow
     # =====================================================
     def _start_new_round(self):
-        # 重新添加帮助按钮（因为上面delete了all）
-        self._add_help_button_on_board()
+        self.ball_visible = self.physics is not None
+        self._cancel_chip_transfer()
+        self.region_bets = {}
+        self.racetrack_hover = None
+        self.region_hover = None
 
-        # 清除上一局的数据，避免在新局点击依然弹出旧数据
-        self.last_spin_data = None
         self._stop_result_flash()
 
         # 重置暂停相关标志
@@ -3011,22 +4076,15 @@ class RouletteGameGUI(tk.Frame):
                 pass
             self._countdown_job = None
 
-        if self._spin_job is not None:
-            try:
-                self.after_cancel(self._spin_job)
-            except Exception:
-                pass
-            self._spin_job = None
-
         self.round_state = "betting"
         self._refresh_bet_totals()
         self.current_round_result = None
         self.current_round_index = None
 
-        # 重置指针状态：下一局从顶部重新开始
-        self.pointer_velocity = 0.0
-        self.pointer_acceleration = 0.0
+        # Keep the previous ball in its captured pocket through betting.
         self.is_pointer_spinning = False
+        if self.physics is not None:
+            self._sync_physics_display()
 
         self._enable_amount_buttons()
         self._set_control_buttons_state(tk.NORMAL)
@@ -3034,10 +4092,10 @@ class RouletteGameGUI(tk.Frame):
 
         self._refresh_bet_totals()
 
-        self._draw_wheel()
-        self._repaint_all_chips()
-
         self.betting_deadline = time.time() + self.BETTING_SECONDS
+        self._draw_wheel()
+        self._redraw_board_for_result_flash(flash_on=False)
+        self._add_help_button_on_board()
         self._update_countdown()
         
     def _update_countdown(self):
@@ -3049,11 +4107,7 @@ class RouletteGameGUI(tk.Frame):
         if remaining < 0:
             remaining = 0
 
-        if hasattr(self, "wheel_timer_id") and self.wheel_timer_id:
-            try:
-                self.wheel_canvas.itemconfig(self.wheel_timer_id, text=f"{remaining:02d}s")
-            except Exception:
-                pass
+        self._draw_wheel_status()
 
         if remaining <= 0:
             self._countdown_job = None
@@ -3063,10 +4117,11 @@ class RouletteGameGUI(tk.Frame):
         self._countdown_job = self.after(self.TIMER_TICK_MS, self._update_countdown)
 
     def _lock_bets_and_spin(self):
-        # 如果弹窗还开着，关掉它（可选）
-        if self.detail_window and self.detail_window.winfo_exists():
-            self.detail_window.destroy()
-            self.detail_window = None
+        if self.round_state != "betting":
+            return
+        if self._countdown_job is not None:
+            self.after_cancel(self._countdown_job)
+            self._countdown_job = None
         # 存储当前下注数据作为上一局记录（若无下注则保留旧记录）
         self._store_current_bets_as_last()
 
@@ -3079,146 +4134,88 @@ class RouletteGameGUI(tk.Frame):
         self._set_bet_buttons_state(tk.DISABLED)
         self._disable_amount_buttons()
         self._set_control_buttons_state(tk.DISABLED)   # 禁用所有游戏按钮
+        self.board_canvas.delete("pending_regions")
+        self._animate_chips_to_table()
         self._start_physical_spin()
 
-    def _start_physical_spin(self):
-        # 轮盘：保持原本顺时针旋转
-        self.wheel_velocity = uuid_uniform(450, 750)
-        self.wheel_acceleration = -uuid_uniform(70, 125)
-
-        # 指针：改为逆时针绕着轮盘旋转，速度/减速度同样随机
-        self.pointer_angle = 0.0 if not hasattr(self, "pointer_angle") else self.pointer_angle % 360.0
-        self.pointer_velocity = uuid_uniform(675, 1075)
-        self.pointer_acceleration = -uuid_uniform(115, 180)
-
-        self.is_spinning = True
-        self.is_pointer_spinning = True
-        self._last_physics_time = time.time()
+    def _start_startup_rotation(self):
+        """Decorative loading motion: date pocket, with no result or payout."""
+        if self._spin_job is not None:
+            self.after_cancel(self._spin_job)
+        self._spin_job = None
+        p = RoulettePhysics(initial_angle=math.radians(self.current_wheel_offset),
+                            initial_speed=math.radians(18.0))
+        p.pocket = startup_date_pocket()
+        p.mode = "display"
+        p.r = p.POCKET_CENTRE
+        p.theta = (p.wheel_angle+(p.pocket+.5)*p.STEP) % p.TAU
+        p.omega = p.wheel_speed
+        p.vr = p.z = p.vz = 0.0
+        self.physics = p
+        self._round_settled = True
+        self.ball_visible = True
+        self.is_pointer_spinning = False
+        self._last_physics_time = time.monotonic()
         self._physics_update()
 
-    def _physics_update(self):
-        now = time.time()
-        dt = min(0.05, now - self._last_physics_time)
+    def _start_physical_spin(self):
+        # Continue the moving rotor at the exact current angle and velocity.
+        now = time.monotonic()
+        if self._spin_job is not None:
+            self.after_cancel(self._spin_job)
+        self._spin_job = None
+        if self.physics is not None:
+            self.physics.advance(max(0.0,now-self._last_physics_time))
+            angle, speed = self.physics.wheel_angle, self.physics.wheel_speed
+        else:
+            angle, speed = math.radians(self.current_wheel_offset), 0.0
+        self.physics = RoulettePhysics(initial_angle=angle, initial_speed=speed)
+        self._round_settled = False
+        self.is_spinning = True
+        self.is_pointer_spinning = True
+        self.ball_visible = True
         self._last_physics_time = now
+        self._physics_update()
 
-        # 轮盘：顺时针
-        self.wheel_velocity = max(0.0, self.wheel_velocity + self.wheel_acceleration * dt)
-        self.current_wheel_offset = (self.current_wheel_offset + self.wheel_velocity * dt) % 360.0
+    def _sync_physics_display(self):
+        p = self.physics
+        wheel,speed,theta,omega,radius,height = p.render_state()
+        self.current_wheel_offset = math.degrees(wheel) % 360
+        self.wheel_velocity = math.degrees(speed)
+        self.pointer_angle = math.degrees(theta) % 360
+        self.pointer_velocity = math.degrees(omega)
+        self.ball_radius = radius*WHEEL_METRE_SCALE
+        self.ball_height = height
+        self.ball_pocket_index = p.pocket
 
-        # 指针：逆时针绕轮盘转
-        self.pointer_velocity = max(0.0, self.pointer_velocity + self.pointer_acceleration * dt)
-        self.pointer_angle = (self.pointer_angle - self.pointer_velocity * dt) % 360.0
-
-        self._draw_wheel()
-
-        # 两者都停下后再结算
-        if self.wheel_velocity <= 0 and self.pointer_velocity <= 0:
+    def _physics_update(self):
+        self._spin_job = None
+        now = time.monotonic()
+        self.physics.advance(max(0.0,now-self._last_physics_time))
+        self._last_physics_time = now
+        self._sync_physics_display()
+        if (self.round_state == "spinning" and self.physics.result_index is not None
+                and not self._round_settled):
             self._finish_physical_spin()
+        self.is_spinning = not self.physics.stopped
+        self._draw_wheel()
+        # Betting/settlement never stop the rotor. Only its own coast curve does.
+        if (self.physics.stopped and
+                (self.physics.result_index is not None or self.physics.mode == "display")):
             return
-
-        self._spin_job = self.after(max(16, int(dt * 1000)), self._physics_update)
+        self._spin_job = self.after(16,self._physics_update)
 
     def _finish_physical_spin(self):
-        self.is_spinning = False
+        """Settle the captured ball exactly once; keep rotor animation running."""
+        if self._round_settled or self.physics.result_index is None:
+            return
+        self._round_settled = True
         self.is_pointer_spinning = False
-        self.wheel_velocity = 0.0
-        self.pointer_velocity = 0.0
-        self.current_wheel_offset %= 360.0
-        self.pointer_angle %= 360.0
-
-        if self._spin_job is not None:
-            try:
-                self.after_cancel(self._spin_job)
-            except Exception:
-                pass
-            self._spin_job = None
-
-        self._draw_wheel()
-
-        # 中奖结果 = 轮盘当前角度 与 指针当前角度 的相对位置
-        step = 360.0 / len(ROULETTE_SEQUENCE)
-        raw_index = ((self.pointer_angle - self.current_wheel_offset) / step - 0.5) % len(ROULETTE_SEQUENCE)
-        self.current_round_index = int(round(raw_index)) % len(ROULETTE_SEQUENCE)
+        self.current_round_index = self.physics.result_index
         self.current_round_result = ROULETTE_SEQUENCE[self.current_round_index]
-
         self._finish_round(self.current_round_result)
 
-    def _draw_orbiting_pointer(self, cx, cy, outer_r):
-        """
-        绕着轮盘旋转的指针：
-        - 白金色金属风格
-        - 三角指针始终朝向轮盘中心
-        - 带一点赌场灯光感
-        """
-        angle = getattr(self, "pointer_angle", 0.0) % 360.0
-        rad = math.radians(angle)
 
-        # 指针所在点相对轮盘中心的外向单位向量
-        ux = math.sin(rad)
-        uy = -math.cos(rad)
-
-        # 切线方向
-        tx = math.cos(rad)
-        ty = math.sin(rad)
-
-        orbit_r = outer_r + 2
-        pcx = cx + ux * orbit_r
-        pcy = cy + uy * orbit_r
-
-        # 指针几何
-        tip_len = 18
-        base_len = 19
-        half_width = 15
-
-        tip_x = pcx - ux * tip_len
-        tip_y = pcy - uy * tip_len
-
-        base_center_x = pcx + ux * base_len
-        base_center_y = pcy + uy * base_len
-
-        left_x = base_center_x + tx * half_width
-        left_y = base_center_y + ty * half_width
-
-        right_x = base_center_x - tx * half_width
-        right_y = base_center_y - ty * half_width
-
-        # 指针阴影
-        shadow_dx = 3
-        shadow_dy = 3
-        self.wheel_canvas.create_polygon(
-            left_x + shadow_dx, left_y + shadow_dy,
-            right_x + shadow_dx, right_y + shadow_dy,
-            tip_x + shadow_dx, tip_y + shadow_dy,
-            fill="#000000",
-            outline="",
-            tags=("pointer_shadow",)
-        )
-
-        # 指针主体
-        self.wheel_canvas.create_polygon(
-            left_x, left_y,
-            right_x, right_y,
-            tip_x, tip_y,
-            fill="#F8F4E8",
-            outline="#B08B2D",
-            width=2,
-            tags=("pointer",)
-        )
-
-        # 指针中线高光
-        mid_x = (left_x + right_x) / 2
-        mid_y = (left_y + right_y) / 2
-        self.wheel_canvas.create_line(
-            mid_x, mid_y,
-            tip_x, tip_y,
-            fill="#FFFFFF",
-            width=1,
-            tags=("pointer",)
-        )
-
-        self.wheel_canvas.tag_raise("pointer_shadow")
-        self.wheel_canvas.tag_raise("pointer")
-    
     def _get_winning_spot_ids(self, result: str):
         """
         Only straight up bets and outside bets flash.
@@ -3242,48 +4239,20 @@ class RouletteGameGUI(tk.Frame):
                 winning.add(spot["id"])
         return winning
 
-    def _stop_result_flash(self):
-        if self._result_flash_job is not None:
-            try:
-                self.after_cancel(self._result_flash_job)
-            except Exception:
-                pass
-            self._result_flash_job = None
-        self._result_flash_state = False
-        self._result_flash_spot_ids = set()
-
-    def _redraw_board_for_result_flash(self, flash_on=False):
-        if not hasattr(self, "board_canvas"):
-            return
-
-        self.board_canvas.delete("all")
-        draw_roulette_static(self.board_canvas, scale=BOARD_SCALE)
-
-        if flash_on and self._result_flash_spot_ids:
-            for spot_id in self._result_flash_spot_ids:
-                spot = self._find_spot_by_id(spot_id)
-                if not spot:
-                    continue
-                x1, y1, x2, y2 = spot["bounds"]
-                self.board_canvas.create_rectangle(
-                    int(x1), int(y1), int(x2), int(y2),
-                    fill="#ffffff",
-                    outline="#000000",
-                    width=2,
-                    tags=("result_flash",)
-                )
-                self._draw_flash_label(spot, fill="#000000")
-
-        self._repaint_all_chips()
-
     def _result_flash_tick(self):
+        self._result_flash_job = None
         if self.round_state != "result":
             self._stop_result_flash()
             return
-
-        self._result_flash_state = not self._result_flash_state
+        self._result_flash_step += 1
+        # One bright/dim pulse is 1500 ms; three pulses finish at 4.5 s.
+        if self._result_flash_step >= RESULT_FLASH_COUNT*2:
+            self._start_new_round()
+            return
+        self._result_flash_state = self._result_flash_step % 2 == 0
         self._redraw_board_for_result_flash(flash_on=self._result_flash_state)
-        self._result_flash_job = self.after(1000, self._result_flash_tick)
+        self._result_flash_job = self.after(RESULT_FLASH_PERIOD_MS//2,
+                                           self._result_flash_tick)
 
     def _is_flashable_spot(self, spot):
         return spot and spot.get("type") in {
@@ -3443,108 +4412,11 @@ class RouletteGameGUI(tk.Frame):
         self._result_flash_spot_ids = winning_spots
         self._result_flash_state = True
 
-        # 先显示“原色”，下一秒切到白色，再循环
+        self._result_flash_step = 0
         self._redraw_board_for_result_flash(flash_on=True)
-        self._result_flash_job = self.after(1000, self._result_flash_tick)
-
-        self.last_spin_data = {
-            "result": result,
-            "pointer_angle": self.pointer_angle,               # 指针最终角度（0~360）
-            "wheel_offset": self.current_wheel_offset,         # 轮盘最终偏移角度
-            "result_index": self.current_round_index,          # 在 ROULETTE_SEQUENCE 中的索引
-        }
-        # 绑定中心点击事件（如果尚未绑定）
-        if not hasattr(self, "_center_click_bound"):
-            self.wheel_canvas.bind("<Button-1>", self._on_wheel_click)
-            self._center_click_bound = True
-
-        self.after(6000, self._start_new_round)
-
-    def _on_wheel_click(self, event):
-        """点击轮盘画布时，判断是否点中中心区域，且处于结果展示阶段"""
-        if self.round_state != "result":
-            return
-        if not self.last_spin_data:
-            return
-
-        # 获取画布上轮盘中心坐标
-        cx = self.wheel_canvas.winfo_width() / 2
-        cy = self.wheel_canvas.winfo_height() / 2 - 8   # 与 _draw_wheel 中的 cy 一致
-        dx = event.x - cx
-        dy = event.y - cy
-        # 内圆半径大约 70（从 _draw_wheel 中 inner_r = 70）
-        inner_r = 70
-        if (dx * dx + dy * dy) <= inner_r * inner_r:
-            self._show_result_details()
-
-    def _show_result_details(self):
-        """弹出新窗口，显示本局的技术数据"""
-        if self.detail_window is not None and self.detail_window.winfo_exists():
-            self.detail_window.lift()
-            return
-
-        data = self.last_spin_data
-        result = data["result"]
-        pointer = data["pointer_angle"]
-        offset = data["wheel_offset"]
-        idx = data["result_index"]
-
-        step = 360.0 / len(ROULETTE_SEQUENCE)   # 每个扇区角度跨度
-        # 扇区边界算法：假设轮盘上第 i 个扇区的起始边界（相对于轮盘自身0点）为 i * step
-        # 绝对坐标下的起始边界 = (i * step + offset) % 360
-        def sector_range(i):
-            start = (i * step + offset) % 360
-            end = (start + step) % 360
-            return start, end
-
-        cur_start, cur_end = sector_range(idx)
-        prev_idx = (idx - 1) % len(ROULETTE_SEQUENCE)
-        prev_start, prev_end = sector_range(prev_idx)
-        next_idx = (idx + 1) % len(ROULETTE_SEQUENCE)
-        next_start, next_end = sector_range(next_idx)
-
-        # 构建弹窗
-        self.detail_window = tk.Toplevel(self)
-        self.detail_window.title("开奖详情")
-        self.detail_window.geometry("500x420")
-        self.detail_window.resizable(False, False)
-
-        text = f"""
-    【本局开奖结果】: {result}
-
-    【指针最终角度】: {pointer:.4f}°
-
-    【上一个数字】: {ROULETTE_SEQUENCE[prev_idx]}
-        角度范围: {prev_start:.4f}° ～ {prev_end:.4f}°
-
-    【中奖数字扇区】: {result}
-        角度范围: {cur_start:.4f}° ～ {cur_end:.4f}°
-
-    【下一个数字】: {ROULETTE_SEQUENCE[next_idx]}
-        角度范围: {next_start:.4f}° ～ {next_end:.4f}°
-
-    说明:
-    - 角度以正上方为 0°，顺时针增加。
-    - 指针角度是它的绝对方向
-    - 扇区范围是轮盘上该数字占据的绝对角度区间。
-    - 若结果落在指针指向的扇区内，即为中奖。
-        """
-
-        frm = tk.Frame(self.detail_window)
-        frm.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
-        txt = tk.Text(frm, font=("Consolas", 12), wrap=tk.WORD)
-        txt.insert(tk.END, text)
-        txt.config(state=tk.DISABLED)
-        txt.pack(fill=tk.BOTH, expand=True)
-        tk.Button(self.detail_window, text="关闭", command=self.detail_window.destroy, font=("Arial", 10)).pack(pady=8)
-
-        # 窗口关闭时清空引用
-        self.detail_window.protocol("WM_DELETE_WINDOW", self._close_detail_window)
-
-    def _close_detail_window(self):
-        if self.detail_window:
-            self.detail_window.destroy()
-            self.detail_window = None
+        self._draw_wheel_status()
+        self._result_flash_job = self.after(RESULT_FLASH_PERIOD_MS//2,
+                                           self._result_flash_tick)
 
     # =====================================================
     # Misc / controls
@@ -3578,6 +4450,7 @@ class RouletteGameGUI(tk.Frame):
         # 如果是在投注阶段启用按钮，重复按钮还需要根据余额和上一局数据单独控制
         if state == tk.NORMAL:
             self._update_repeat_button_state()
+        self._update_betting_view_controls()
 
     def _refresh_balance_display(self):
         self.balance_label_side.config(text=f"余额: ${self.balance:,.2f}")
@@ -3586,6 +4459,7 @@ class RouletteGameGUI(tk.Frame):
         self._update_repeat_button_state()
 
     def on_close(self):
+        self._cancel_chip_transfer()
         # 父窗口继续运行时，取消属于当前游戏页面的所有定时回调。
         for job in self.tk.splitlist(self.tk.call("after", "info")):
             try:
@@ -3625,38 +4499,626 @@ class RouletteGameGUI(tk.Frame):
             self.root.destroy()
 
     def show_game_instructions(self):
-        win = tk.Toplevel(self)
-        win.title("欧式轮盘 玩法说明")
-        win.geometry("720x560")
-        win.resizable(False, False)
-        text = (
-            "欧式轮盘 玩法说明\n\n"
-            "1. 每局下注时间为 30 秒。\n"
-            "2. 时间结束后，所有下注会锁定，轮盘开始旋转。\n"
-            "3. 轮盘停止时，指针指向的格子为中奖结果。\n\n"
-            "4. 单注类型和赔率（净赢）：\n"
-            "   - 直注 Straight Up：35:1\n"
-            "   - 分注 Split：17:1\n"
-            "   - 街注 Street：11:1\n"
-            "   - 角注 Corner：8:1\n"
-            "   - 六线注 Six Line：5:1\n"
-            "   - 打一打 / Dozen：2:1\n"
-            "   - 选号列 / Column：2:1\n"
-            "   - 红 / 黑：1:1\n"
-            "   - 单 / 双：1:1\n"
-            "   - 大 / 小（1-18 / 19-36）：1:1\n"
-            "5. 下注区按基础金额计算限额（200/500）；实际扣款与含本金派奖均乘以倍数。\n"
-            "   例如基础下注200、10倍，实际扣款2000；投注期间改倍数补扣或退还差额。\n"
-            "   开转后倍数锁定；重复下注使用当前选择的倍数。\n"
-            "6. 标记路会显示每次开奖结果的颜色与号码。\n"
+        """一次展示全部主盘落点、四个跑道区域及邻号说明。"""
+        import tkinter as tk
+        from tkinter import ttk
+
+        old = getattr(self, "_instruction_window", None)
+        if old is not None:
+            try:
+                if old.winfo_exists():
+                    old.lift()
+                    old.focus_set()
+                    return
+            except tk.TclError:
+                pass
+
+        root = self.winfo_toplevel()
+        root.update_idletasks()
+
+        win = tk.Toplevel(root)
+        self._instruction_window = win
+        win.title("欧式轮盘 · 下注图解")
+        win.transient(root)
+        win.configure(bg="#EDF2F7")
+
+        width = min(1100, root.winfo_screenwidth() - 40)
+        height = min(680, root.winfo_screenheight() - 30)
+
+        # 根据当前 Tk 窗口的位置和尺寸计算居中坐标。
+        x = root.winfo_rootx() + (root.winfo_width() - width) // 2
+        y = root.winfo_rooty() + (root.winfo_height() - height) // 2
+
+        win.geometry(f"{width}x{height}+{x}+{y}")
+
+        FONT = "Microsoft YaHei UI"
+        INK, MUTED = "#173247", "#526477"
+        BLUE, BORDER = "#B9E1EE", "#0B4A6B"
+        GOLD, GREEN = "#FFE08A", "#24463B"
+        regions = ("voisins", "tiers", "orphelins", "zero")
+
+        def close():
+            if getattr(self, "_instruction_window", None) is win:
+                self._instruction_window = None
+            win.destroy()
+
+        # ==================== 固定标题栏 ====================
+        header = tk.Frame(win, bg="#142D40")
+        header.pack(fill="x")
+
+        title_box = tk.Frame(header, bg="#142D40")
+        title_box.pack(side="left", padx=24, pady=15)
+
+        tk.Label(
+            title_box,
+            text="欧式轮盘  /  下注图解",
+            bg="#142D40",
+            fg="white",
+            font=(FONT, 20, "bold"),
+        ).pack(anchor="w")
+
+        tk.Label(
+            title_box,
+            text="全部落点直接展示 · 向下滚动查看跑道盘",
+            bg="#142D40",
+            fg="#C7D9E8",
+            font=(FONT, 11),
+        ).pack(anchor="w", pady=(5, 0))
+
+        tk.Button(
+            header,
+            text="关闭  Esc",
+            command=close,
+            bg="#29485F",
+            fg="white",
+            activebackground="#3A617C",
+            activeforeground="white",
+            relief="flat",
+            font=(FONT, 11),
+            padx=14,
+            pady=8,
+        ).pack(side="right", padx=24)
+
+        # ==================== 连续滚动页面 ====================
+        host = tk.Frame(win, bg="#EDF2F7")
+        host.pack(fill="both", expand=True)
+
+        cv = tk.Canvas(
+            host,
+            bg="#EDF2F7",
+            highlightthickness=0,
+            yscrollincrement=28,
         )
-        frm = tk.Frame(win)
-        frm.pack(fill=tk.BOTH, expand=True, padx=16, pady=16)
-        txt = tk.Text(frm, font=("Arial", 13), wrap=tk.WORD)
-        txt.insert(tk.END, text)
-        txt.config(state=tk.DISABLED)
-        txt.pack(fill=tk.BOTH, expand=True)
-        tk.Button(win, text="关闭", command=win.destroy, font=("Arial", 12, "bold"), width=10).pack(pady=10)
+        ys = ttk.Scrollbar(
+            host, orient="vertical", command=cv.yview
+        )
+        xs = ttk.Scrollbar(
+            host, orient="horizontal", command=cv.xview
+        )
+
+        cv.configure(
+            yscrollcommand=ys.set,
+            xscrollcommand=xs.set,
+        )
+        cv.grid(row=0, column=0, sticky="nsew")
+        ys.grid(row=0, column=1, sticky="ns")
+        xs.grid(row=1, column=0, sticky="ew")
+
+        host.grid_rowconfigure(0, weight=1)
+        host.grid_columnconfigure(0, weight=1)
+
+        # ==================== 共用绘图工具 ====================
+        def text(
+            x, y, value, size=12, color=INK,
+            bold=False, anchor="nw", wrap=None
+        ):
+            opts = {
+                "text": value,
+                "fill": color,
+                "anchor": anchor,
+                "justify": "center" if anchor == "center" else "left",
+                "font": (FONT, size, "bold" if bold else "normal"),
+            }
+            if wrap:
+                opts["width"] = wrap
+            return cv.create_text(x, y, **opts)
+
+        def card(x, y, w, h):
+            cv.create_rectangle(
+                x, y, x + w, y + h,
+                fill="white",
+                outline="#D5DFE8",
+            )
+            cv.create_rectangle(
+                x, y, x + w, y + 4,
+                fill=BORDER,
+                outline="",
+            )
+
+        def section(y, number, title, subtitle):
+            cv.create_rectangle(
+                24, y, 63, y + 34,
+                fill=BORDER,
+                outline="",
+            )
+            text(
+                43, y + 17, number,
+                13, "white", True, "center",
+            )
+            text(77, y - 1, title, 19, INK, True)
+            text(24, y + 46, subtitle, 12, MUTED)
+            return y + 86
+
+        outside = {
+            "outside_0": "小",
+            "outside_1": "双",
+            "outside_2": "红",
+            "outside_3": "黑",
+            "outside_4": "单",
+            "outside_5": "大",
+        }
+        dozens = {
+            "dozen_1": "第一打 1—12",
+            "dozen_2": "第二打 13—24",
+            "dozen_3": "第三打 25—36",
+        }
+
+        def table(left, top, marks=(), legs=()):
+            """使用游戏实际投注坐标，绘制全部指定落点。"""
+            scale = 0.95
+            covered = (
+                set().union(*(s["numbers"] for s, _ in legs))
+                if legs else set()
+            )
+
+            for s in self.bet_spots:
+                kind = s["type"]
+                if kind not in {
+                    "straight", "dozen", "column",
+                    "color", "odd_even", "high_low",
+                }:
+                    continue
+
+                x1, y1, x2, y2 = s["bounds"]
+                box = (
+                    left + x1 * scale,
+                    top + y1 * scale,
+                    left + x2 * scale,
+                    top + y2 * scale,
+                )
+
+                fill, ink = GREEN, "white"
+
+                if kind == "straight":
+                    label = next(iter(s["numbers"]))
+                    if label == "0":
+                        fill = "#096B57"
+                    elif int(label) in RED_NUMBERS:
+                        fill = "#B43B44"
+                    else:
+                        fill = "#17211C"
+
+                    if label in covered:
+                        fill, ink = BLUE, "#102A38"
+
+                elif kind == "dozen":
+                    label = dozens[s["id"]]
+
+                elif kind == "column":
+                    label = "2:1"
+
+                else:
+                    label = outside[s["id"]]
+                    if s["id"] == "outside_2":
+                        fill = "#B43B44"
+                    elif s["id"] == "outside_3":
+                        fill = "#17211C"
+
+                cv.create_rectangle(
+                    *box,
+                    fill=fill,
+                    outline="#92AA9F",
+                    width=1,
+                )
+                text(
+                    (box[0] + box[2]) / 2,
+                    (box[1] + box[3]) / 2,
+                    label,
+                    10 if kind == "dozen" else 11,
+                    ink,
+                    True,
+                    "center",
+                )
+
+            # 空心圆保留原有文字位置。
+            # 此类型的所有合法落点一次画出。
+            for s in marks:
+                sx, sy = s["center"]
+                x = left + sx * scale
+                y = top + sy * scale
+
+                if s["type"] == "straight":
+                    radius = 13
+                elif s["type"] in {
+                    "dozen", "column", "color",
+                    "odd_even", "high_low",
+                }:
+                    radius = 17
+                else:
+                    radius = 6
+
+                cv.create_oval(
+                    x - radius, y - radius,
+                    x + radius, y + radius,
+                    fill="",
+                    outline=GOLD,
+                    width=2,
+                )
+
+            # 跑道区域示例：每单位25。
+            for s, units in legs:
+                sx, sy = s["center"]
+                x = left + sx * scale
+                y = top + sy * scale
+
+                cv.create_oval(
+                    x - 12, y - 12,
+                    x + 12, y + 12,
+                    fill=GOLD,
+                    outline=INK,
+                    width=1,
+                )
+                text(
+                    x, y, str(25 * units),
+                    9, INK, True, "center",
+                )
+
+        # ==================== 01 主盘全部落点 ====================
+        groups = [
+            (
+                "直注", {"straight"}, "35:1",
+                "每个号码格中心，包括0。",
+            ),
+            (
+                "分注", {"split"}, "17:1",
+                "两个相邻号码的共用边，包括零区分注。",
+            ),
+            (
+                "街注与零区三号注", {"street"}, "11:1",
+                "12条街注，以及0/1/2、0/2/3两个三号注。",
+            ),
+            (
+                "角注", {"corner"}, "8:1",
+                "四个号码的交点；一次覆盖四个号码。",
+            ),
+            (
+                "六线注", {"six_line"}, "5:1",
+                "两条街的共用端点；一次覆盖六个号码。",
+            ),
+            (
+                "打注", {"dozen"}, "2:1",
+                "第一打1—12；第二打13—24；第三打25—36。",
+            ),
+            (
+                "列注", {"column"}, "2:1",
+                "右侧三个位置，每个位置覆盖对应一列的12个号码。",
+            ),
+            (
+                "大小、单双、红黑",
+                {"high_low", "odd_even", "color"},
+                "1:1",
+                "小1—18，大19—36；六个外围位置均不含0。",
+            ),
+        ]
+
+        total = sum(
+            1 for s in self.bet_spots
+            if any(s["type"] in group[1] for group in groups)
+        )
+
+        y = section(
+            24,
+            "01",
+            "主投注盘 · 全部下注位置",
+            f"共 {total} 个合法落点。金色空心圆就是下注中心；"
+            "下列8张图同时展示，无须切换。",
+        )
+
+        for i, (name, kinds, odds, hint) in enumerate(groups):
+            x = 24 + (i % 2) * 536
+            top = y + (i // 2) * 386
+            marks = [
+                s for s in self.bet_spots
+                if s["type"] in kinds
+            ]
+
+            card(x, top, 516, 366)
+
+            text(x + 18, top + 20, name, 15, INK, True)
+            text(
+                x + 18, top + 53,
+                f"{len(marks)}个落点   ·   净赢赔率 {odds}",
+                11, MUTED,
+            )
+
+            table(x + 12, top + 76, marks=marks)
+
+            text(
+                x + 18, top + 323,
+                hint, 11, MUTED, wrap=478,
+            )
+
+        y += 4 * 386 + 4
+
+        # ==================== 跑道共用绘图 ====================
+        def track(top, neighbor_center=None, count=2):
+            """保留游戏原有数字顺序、分区边界和跑道几何算法。"""
+            ox, oy, scale = 66, top, 1.9
+
+            def coords(points):
+                return [
+                    value
+                    for x, yy in points
+                    for value in (
+                        ox + x * scale,
+                        oy + yy * scale,
+                    )
+                ]
+
+            for i, number in enumerate(RACETRACK_SEQUENCE):
+                fractions = [
+                    (i + j / 6) / len(RACETRACK_SEQUENCE)
+                    for j in range(7)
+                ]
+                points = [
+                    self._racetrack_point(t, RACETRACK_OUTER_R)
+                    for t in fractions
+                ]
+                points += [
+                    self._racetrack_point(t, RACETRACK_INNER_R)
+                    for t in reversed(fractions)
+                ]
+
+                if number == "0":
+                    fill = "#096B57"
+                elif int(number) in RED_NUMBERS:
+                    fill = "#B43B44"
+                else:
+                    fill = "#17211C"
+
+                ink, edge = "white", "#92AA9F"
+
+                if neighbor_center is not None:
+                    distance = self._racetrack_distance(
+                        number, neighbor_center
+                    )
+                    if distance <= count:
+                        fills = RACETRACK_NEIGHBOR_HOVER_FILLS
+                        fill = fills[
+                            min(distance, len(fills) - 1)
+                        ]
+                        ink, edge = "#102A38", BORDER
+
+                cv.create_polygon(
+                    *coords(points),
+                    fill=fill,
+                    outline=edge,
+                    width=2,
+                )
+
+                xx, yy = self._racetrack_point(
+                    (i + 0.5) / len(RACETRACK_SEQUENCE),
+                    73,
+                )
+                text(
+                    ox + xx * scale,
+                    oy + yy * scale,
+                    number,
+                    14, ink, True, "center",
+                )
+
+            # 先画底色，再画文字。
+            for region in RACETRACK_REGION_ORDER:
+                cv.create_polygon(
+                    *coords(self._region_polygon(region)),
+                    fill=RACETRACK_REGION_COLORS[region][0],
+                    outline="#92AA9F",
+                    width=2,
+                )
+
+            for region in RACETRACK_REGION_ORDER:
+                cx, cy = self._region_center(region)
+                dx, dy = {
+                    "tiers": (-6, 9),
+                    "voisins": (-8, -8),
+                }.get(region, (0, 0))
+
+                xx = ox + (cx + dx) * scale
+                yy = oy + (cy + dy) * scale
+
+                text(
+                    xx, yy - 15,
+                    FRENCH_BETS[region]["label"],
+                    13, "white", True, "center",
+                )
+                text(
+                    xx, yy + 17,
+                    FRENCH_BETS[region]["zh"],
+                    13, "white", True, "center",
+                )
+
+        # ==================== 02 四个区域全部展开 ====================
+        y = section(
+            y,
+            "02",
+            "跑道盘 · 四个区域全部展开",
+            "下图展示区域边界；随后四张图分别列出各组合"
+            "在主投注盘上的全部筹码落点。",
+        )
+
+        card(24, y, 1052, 426)
+        track(y + 10)
+        y += 448
+
+        for i, region in enumerate(regions):
+            x = 24 + (i % 2) * 536
+            top = y + (i // 2) * 442
+
+            legs = self._region_legs(region)
+            units = sum(n for _, n in legs)
+            covered = set().union(
+                *(s["numbers"] for s, _ in legs)
+            )
+
+            # 同一号码命中多笔子注时，合并计算返还。
+            returns = sorted({
+                sum(
+                    25 * n * (s["payout"] + 1)
+                    for s, n in legs
+                    if number in s["numbers"]
+                )
+                for number in covered
+            })
+
+            card(x, top, 516, 422)
+
+            text(
+                x + 18, top + 20,
+                FRENCH_BETS[region]["zh"],
+                16, INK, True,
+            )
+            text(
+                x + 18, top + 52,
+                FRENCH_BETS[region]["label"],
+                11, MUTED,
+            )
+            text(
+                x + 18, top + 79,
+                f"{units}单位 · {len(legs)}个落点 · "
+                f"覆盖{len(covered)}个号码",
+                11, BORDER, True,
+            )
+
+            table(x + 12, top + 102, legs=legs)
+
+            text(
+                x + 18, top + 353,
+                f"每单位25：总下注 ${25 * units}；筹码数字为金额。",
+                11, MUTED,
+            )
+            text(
+                x + 18, top + 382,
+                "命中返还："
+                + " / ".join(f"${value}" for value in returns)
+                + "（含中奖本金）",
+                11, INK,
+            )
+
+        y += 2 * 442 + 4
+
+        # ==================== 03 邻号说明 ====================
+        y = section(
+            y,
+            "03",
+            "邻号下注 · 按轮盘顺序覆盖",
+            "跑道上的37个号码都可作为中心。中心加左右各0—5个邻号，"
+            "分别形成1、3、5、7、9、11个直注。",
+        )
+
+        card(24, y, 1052, 482)
+        text(
+            44, y + 20,
+            "示例：以0为中心，左右各2个邻号",
+            15, INK, True,
+        )
+
+        track(y + 55, neighbor_center="0", count=2)
+
+        text(
+            44, y + 448,
+            "覆盖3、26、0、32、15；每号25，总下注125。"
+            "命中任一号返还900，本局净赢775。",
+            11, MUTED,
+        )
+        y += 506
+
+        # ==================== 04 操作与赔付 ====================
+        y = section(
+            y,
+            "04",
+            "下注与赔付须知",
+            "图解仅用于说明，打开此窗口不会改变你的下注或余额。",
+        )
+
+        notes = [
+            (
+                "标准赔率",
+                "赔率均为净赢赔率。"
+                "中奖返还＝中奖子注金额×（赔率＋1）×倍数；"
+                "本局净额＝全部返还－全部下注。",
+            ),
+            (
+                "组合赔付",
+                "区域下注拆成主盘子注后分别结算。"
+                "孤儿序列开出17会同时命中两笔分注；"
+                "未覆盖号码的返还为0。",
+            ),
+            (
+                "下注限额",
+                "区域下注超过上限时，按完整组合比例补至可用上限；"
+                "已有主盘下注及重叠区域共用限额。",
+            ),
+            (
+                "筹码与动画",
+                "区域筹码先放在区域中心。"
+                "开局保留当前视图，以0.75秒完成主盘筹码拆分定位；"
+                "中奖区域同步闪烁。",
+            ),
+            (
+                "零与倒计时",
+                "0不属于大小、单双、红黑、打注或列注。"
+                "说明窗口不会暂停倒计时，需要时请先暂停游戏。",
+            ),
+        ]
+
+        for title, body in notes:
+            card(24, y, 1052, 102)
+            text(44, y + 18, title, 14, INK, True)
+            text(
+                44, y + 49,
+                body, 12, MUTED, wrap=1008,
+            )
+            y += 116
+
+        text(
+            24, y + 4,
+            "金额示例统一使用倍数1；实际游戏按当前倍数结算。",
+            11, MUTED,
+        )
+
+        cv.configure(scrollregion=(0, 0, 1100, y + 60))
+
+        # ==================== 滚轮与关闭 ====================
+        def wheel(event):
+            if getattr(event, "num", None) in (4, 5):
+                steps = -3 if event.num == 4 else 3
+            else:
+                delta = getattr(event, "delta", 0)
+                if not delta:
+                    return
+                steps = max(1, int(abs(delta) / 120))
+                if delta > 0:
+                    steps = -steps
+
+            cv.yview_scroll(steps, "units")
+            return "break"
+
+        win.bind("<MouseWheel>", wheel)
+        win.bind("<Button-4>", wheel)
+        win.bind("<Button-5>", wheel)
+        win.bind("<Escape>", lambda event: close())
+        win.protocol("WM_DELETE_WINDOW", close)
+        win.after_idle(win.focus_set)
 
     def start_game(self):
         """强制开始游戏：下注阶段立即旋转，结果阶段跳转到新的一局"""

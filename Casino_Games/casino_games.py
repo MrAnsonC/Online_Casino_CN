@@ -26,7 +26,7 @@ except ImportError:
 from typing import Callable, Optional
 
 
-CASINO_GAMES_VERSION = "V25"
+CASINO_GAMES_VERSION = "V26"
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(THIS_DIR)
@@ -34,6 +34,195 @@ DATA_FILE = os.path.join(PROJECT_DIR, "A_Tools/Account/saving_data.json")
 
 if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
+
+
+# This page owns all of its translations. index.py passes only a language code.
+_TRANSLATION_ROWS = [
+    ('← 返回主目录', '← Back to home', '← 返回主目錄', '← Hoki ki te kāinga', '← Reen al hejmo'),
+    ('赌场游戏中心', 'Casino Games', '賭場遊戲中心', 'Kēmu whare petipeti', 'Kazinaj ludoj'),
+    ('游戏分类', 'Categories', '遊戲分類', 'Ngā kāwai', 'Kategorioj'),
+    ('请选择游戏', 'Choose a game', '請選擇遊戲', 'Kōwhiria he kēmu', 'Elektu ludon'),
+    ('游戏运行中…', 'Game running…', '遊戲執行中…', 'Kei te haere te kēmu…', 'Ludo funkcias…'),
+    ('扑克', 'Poker', '撲克', 'Poker', 'Pokero'),
+    ('百家乐', 'Baccarat', '百家樂', 'Baccarat', 'Bakarao'),
+    ('黑杰克', 'Blackjack', '黑傑克', 'Blackjack', 'Nigra Joĉjo'),
+    ('骰子', 'Dice', '骰子', 'Mataono', 'Ĵetkuboj'),
+    ('对决', 'Head-to-head', '對決', 'Whakataetae', 'Duelo'),
+    ('轮盘赌', 'Roulette', '輪盤賭', 'Roulette', 'Ruleto'),
+    ('地区特色', 'Regional Specialties', '地區特色', 'Ngā Motuhake ā-Rohe', 'Regionaj Specialaĵoj'),
+    ('中国', 'China', '中國', 'Haina', 'Ĉinio'),
+    ('菲律宾', 'Philippines', '菲律賓', 'Piripīni', 'Filipinoj'),
+    ('颜色骰子', 'Color Sicbo', '顏色骰子', 'Sic Bo Tae', 'Kolora Sic Bo'),
+    ('乒乓落球', 'Ping Pong Drop', '乒乓落球', 'Poro Tukituki', 'Pingponga Falo'),
+    ('红白落球', 'Red White Ball Drop', '紅白落球', 'Poro Whero me te Mā', 'Ruĝ-Blanka Pilka Falo'),
+    ('三张牌扑克', 'Three Card Poker', '三張牌撲克', 'Poker Kāri Toru', 'Trikarta Pokero'),
+    ('三公', 'San Gong', '三公', 'San Gong', 'San Gong'),
+    ('视频扑克', 'Video Poker', '視訊撲克', 'Poker Ataata', 'Videopokero'),
+    ('加勒比梭哈扑克', 'Caribbean Stud Poker', '加勒比梭哈撲克', 'Poker Stud Karapīpiana', 'Karibia Stud-Pokero'),
+    ('月亮梭哈扑克', 'Lunar Stud Poker', '月亮梭哈撲克', 'Poker Stud Marama', 'Luna Stud-Pokero'),
+    ('四张牌扑克', 'Four Card Poker', '四張牌撲克', 'Poker Kāri Whā', 'Kvarkarta Pokero'),
+    ('赌场扑克', "Casino Hold'em", '賭場撲克', "Hold'em Whare Petipeti", "Kazina Hold'em"),
+    ('DJ Wild梭哈扑克', 'DJ Wild Stud Poker', 'DJ Wild梭哈撲克', 'Poker Stud DJ Wild', 'DJ Wild Stud-Pokero'),
+    ('密西西比梭哈扑克', 'Mississippi Stud Poker', '密西西比梭哈撲克', 'Poker Stud Misisipi', 'Misisipa Stud-Pokero'),
+    ('纵横交叉扑克', 'Criss Cross Poker', '縱橫交叉撲克', 'Poker Whakawhiti', 'Kruc-Pokero'),
+    ('任逍遥扑克', 'Let It Ride Poker', '任逍遙撲克', 'Poker Let It Ride', 'Let It Ride-Pokero'),
+    ('单挑扑克', "Heads Up Hold'em", '單挑撲克', "Hold'em Kanohi-ki-te-kanohi", "Duopa Hold'em"),
+    ('迷你终极德州扑克', "Mini Ultimate Texas Hold'em", '迷你終極德州撲克', "Texas Hold'em Whakamutunga Iti", "Mini Ultimate Texas Hold'em"),
+    ('终极德州扑克', "Ultimate Texas Hold'em", '終極德州撲克', "Texas Hold'em Whakamutunga", "Ultimate Texas Hold'em"),
+    ('终极奥马哈扑克', 'Ultimate Omaha', '終極奧馬哈撲克', 'Omaha Whakamutunga', 'Ultimate Omaha'),
+    ('内外注', 'In or Out', '內外注', 'Ki Roto, Ki Waho rānei', 'Ene aŭ Ekstere'),
+    ('牌九扑克', 'Pai Gow Poker', '牌九撲克', 'Poker Pai Gow', 'Pai Gow-Pokero'),
+    ('王牌五张扑克', 'Wild Five Card Poker', '王牌五張撲克', 'Poker Kāri Rima Wild', 'Sovaĝa Kvinkarta Pokero'),
+    ('终极三张牌扑克', 'Ultimate Three Card Poker', '終極三張牌撲克', 'Poker Kāri Toru Whakamutunga', 'Ultimate Trikarta Pokero'),
+    ('赌场战争', 'Casino War', '賭場戰爭', 'Pakanga Whare Petipeti', 'Kazina Milito'),
+    ('我爱同花', 'I Love Suits', '我愛同花', 'E Aroha Ana Au ki ngā Momo Kāri', 'Mi Amas Samkolorojn'),
+    ('特殊百家乐', 'Special Baccarat', '特殊百家樂', 'Baccarat Motuhake', 'Speciala Bakarao'),
+    ('龙虎斗', 'Dragon Tiger', '龍虎鬥', 'Tarakona me te Taika', 'Drako kaj Tigro'),
+    ('龙虎凤', 'Dragon Tiger Phoenix', '龍虎鳳', 'Tarakona, Taika me te Manu Ahi', 'Drako Tigro Fenikso'),
+    ('简单黑杰克', 'Easy Blackjack', '簡單黑傑克', 'Blackjack Māmā', 'Facila Nigra Joĉjo'),
+    ('经典黑杰克', 'Classic Blackjack', '經典黑傑克', 'Blackjack Tauhira', 'Klasika Nigra Joĉjo'),
+    ('双副牌黑杰克', 'Double Deck Blackjack', '雙副牌黑傑克', 'Blackjack Pūkei Takirua', 'Du-Ferdeka Nigra Joĉjo'),
+    ('永6 黑杰克', 'Always 6 Blackjack', '永6 黑傑克', 'Blackjack Ono Tonu', 'Ĉiam-6 Nigra Joĉjo'),
+    ('西班牙式黑杰克', 'Spanish Blackjack', '西班牙式黑傑克', 'Blackjack Pāniora', 'Hispana Nigra Joĉjo'),
+    ('双向黑杰克', 'Breakout Blackjack', '雙向黑傑克', 'Blackjack Breakout', 'Breakout Nigra Joĉjo'),
+    ('免费黑杰克', 'Free Blackjack', '免費黑傑克', 'Blackjack Koreutu', 'Senpaga Nigra Joĉjo'),
+    ('免牌加倍黑杰克', 'No Card Double Blackjack', '免牌加倍黑傑克', 'Blackjack Whakarua Kāri-Kore', 'Senkarta Duobla Blackjack'),
+    ('倍注黑杰克', 'Power Blackjack', '倍注黑傑克', 'Blackjack Mana', 'Potenca Nigra Joĉjo'),
+    ('无限加倍黑杰克', 'Unlimited Double Blackjack', '無限加倍黑傑克', 'Blackjack Whakarua Mutunga Kore', 'Senlima Duobla Nigra Joĉjo'),
+    ('豪赢黑杰克', 'Multiply Blackjack', '豪贏黑傑克', 'Blackjack Whakarea', 'Multobliga Nigra Joĉjo'),
+    ('闪电黑杰克', 'Lightning Blackjack', '閃電黑傑克', 'Blackjack Uira', 'Fulma Nigra Joĉjo'),
+    ('投注叠堆黑杰克', 'Bet Stacker Blackjack', '投注疊堆黑傑克', 'Blackjack Tāpae Peti', 'Vet-Stakiga Nigra Joĉjo'),
+    ('骰宝', 'Sic Bo', '骰寶', 'Sic Bo', 'Sic Bo'),
+    ('超级骰宝', 'Super Sic Bo', '超級骰寶', 'Sic Bo Nui', 'Supera Sic Bo'),
+    ('花旗骰', 'Craps', '花旗骰', 'Craps', 'Krapso'),
+    ('骰子百家乐', 'Bac Bo', '骰子百家樂', 'Bac Bo', 'Bac Bo'),
+    ('德州扑克双人对决', "Texas Hold'em Duel", '德州撲克雙人對決', "Tauwhāinga Texas Hold'em", "Texas Hold'em-Duelo"),
+    ('梭哈扑克双人对决', 'Stud Poker Duel', '梭哈撲克雙人對決', 'Tauwhāinga Poker Stud', 'Stud-Pokera Duelo'),
+    ('德州扑克彩票购买', "Texas Hold'em Ticket", '德州撲克彩票購買', "Tīkiti Texas Hold'em", "Texas Hold'em-Bileto"),
+    ('美式轮盘', 'American Roulette', '美式輪盤', 'Roulette Amerikana', 'Usona Ruleto'),
+    ('欧式轮盘', 'European Roulette', '歐式輪盤', 'Roulette Ūropi', 'Eŭropa Ruleto'),
+    ('大六之轮', 'Big Six Wheel', '大六之輪', 'Wīra Ono Nui', 'Granda Ses-Rado'),
+    ('温州牌九', 'Wenzhou Pai Gow', '溫州牌九', 'Pai Gow Wenzhou', 'Wenzhou Pai Gow'),
+    ('经典牌九', 'Classic Pai Gow', '經典牌九', 'Pai Gow Tauhira', 'Klasika Pai Gow'),
+    ('经典翻摊', 'Classic Fan Tan', '經典翻攤', 'Fan Tan Tauhira', 'Klasika Fan Tan'),
+    ('体验账号不会储存收藏。', 'Guest accounts do not save favorites.', '體驗帳號不會儲存我的最愛。', 'Kāore ngā pūkete manuhiri e tiaki tino pai.', 'Gastaj kontoj ne konservas ŝatatajn ludojn.'),
+    ('我的最爱最多只能储存 8 个游戏。', 'Favorites can contain up to 8 games.', '我的最愛最多只能儲存 8 個遊戲。', 'E waru rawa ngā kēmu tino pai ka taea te tiaki.', 'Ŝatataj povas enhavi maksimume 8 ludojn.'),
+    ('找不到玩家资料，无法储存收藏。', 'Player data was not found; the favorite could not be saved.', '找不到玩家資料，無法儲存我的最愛。', 'Kāore i kitea ngā raraunga kaitākaro; kāore i tiakina te tino pai.', 'Ludantaj datumoj ne estis trovitaj; la ŝatata ludo ne konserviĝis.'),
+    ('维护', 'Maintenance', '維護', 'Tiaki', 'Prizorgado'),
+    ('提示', 'Notice', '提示', 'Pānui', 'Avizo'),
+    ('越南', 'Vietnam', '越南', 'Whitināmu', 'Vjetnamio'),
+    ('越南色碟', 'Xóc đĩa', '越南色碟', 'Xóc đĩa', 'Xóc đĩa'),
+    ('游戏运行中', 'Game running', '遊戲執行中', 'Kei te haere te kēmu', 'Ludo funkcias'),
+    ('无法打开《{name}》：\n\n{error}', 'Could not open “{name}”:\n\n{error}', '無法開啟《{name}》：\n\n{error}', 'Kāore i taea te whakatuwhera “{name}”:\n\n{error}', 'Ne eblis malfermi “{name}”:\n\n{error}'),
+    ('《{name}》目前正在维护。', '“{name}” is under maintenance.', '《{name}》目前正在維護。', 'Kei te tiakina “{name}” ināianei.', '“{name}” estas nun prizorgata.'),
+    ('《{name}》没有设置对应的程序模块。', 'No program module is configured for “{name}”.', '《{name}》沒有設定對應的程式模組。', 'Kāore he kōwae papatono kua whakaritea mō “{name}”.', 'Neniu programmodulo estas agordita por “{name}”.'),
+    ('{name} 未正常结束：\n\n{error}', '“{name}” did not finish normally:\n\n{error}', '《{name}》未正常結束：\n\n{error}', 'Kāore i mutu tika “{name}”:\n\n{error}', '“{name}” ne finiĝis normale:\n\n{error}'),
+    ('{file} 应由项目根目录的 index.py 启动。', 'Open {file} through index.py in the project root.', '{file} 應由專案根目錄的 index.py 啟動。', 'Whakatuwheratia {file} mā te index.py i te pūtake o te kaupapa.', 'Malfermu {file} per index.py en la projekta radiko.'),
+]
+
+_TRANSLATIONS = {code: {} for code in ("en", "zh_CN", "zh_TW", "mi", "eo")}
+for _source, _en, _zh_tw, _mi, _eo in _TRANSLATION_ROWS:
+    for _code, _text in zip(("en", "zh_TW", "mi", "eo"), (_en, _zh_tw, _mi, _eo)):
+        _TRANSLATIONS[_code][_source] = _text
+
+_GAME_NAMES = ('百家乐', '黑杰克', '骰子', '对决', '轮盘赌', '地区特色', '中国', '菲律宾', '颜色骰子', '乒乓落球', '红白落球', '三张牌扑克', '三公', '视频扑克', '加勒比梭哈扑克', '月亮梭哈扑克', '四张牌扑克', '赌场扑克', 'DJ Wild梭哈扑克', '密西西比梭哈扑克', '纵横交叉扑克', '任逍遥扑克', '单挑扑克', '迷你终极德州扑克', '终极德州扑克', '终极奥马哈扑克', '内外注', '牌九扑克', '王牌五张扑克', '终极三张牌扑克', '赌场战争', '我爱同花', '特殊百家乐', '龙虎斗', '龙虎凤', '简单黑杰克', '经典黑杰克', '双副牌黑杰克', '永6 黑杰克', '西班牙式黑杰克', '双向黑杰克', '免费黑杰克', '免牌加倍黑杰克', '倍注黑杰克', '无限加倍黑杰克', '豪赢黑杰克', '闪电黑杰克', '投注叠堆黑杰克', '骰宝', '超级骰宝', '花旗骰', '骰子百家乐', '德州扑克双人对决', '梭哈扑克双人对决', '德州扑克彩票购买', '美式轮盘', '欧式轮盘', '大六之轮', '温州牌九', '经典牌九', '经典翻摊', '越南色碟')
+_DYNAMIC_PHRASES = {'en': {'已启动：': 'Started: ',
+        '已结束，余额已更新': ' finished; balance updated',
+        '已关闭': ' closed',
+        '已加入我的最爱：': 'Added to favorites: ',
+        '已从我的最爱移除：': 'Removed from favorites: ',
+        '余额': 'Balance',
+        '维护通知': 'Maintenance',
+        '目前正在维护。': ' is under maintenance.',
+        '启动失败': 'Launch failed',
+        '无法打开': 'Could not open ',
+        '游戏运行出错': 'Game error',
+        '请选择游戏': 'Choose a game',
+        '没有设置对应的程序模块。': ' has no program module configured.',
+        '请先关闭当前运行中的游戏。': 'Close the running game first.',
+        '未正常结束：': ' did not finish normally: '},
+ 'zh_TW': {'已启动：': '已啟動：',
+           '已结束，余额已更新': '已結束，餘額已更新',
+           '已关闭': '已關閉',
+           '已加入我的最爱：': '已加入我的最愛：',
+           '已从我的最爱移除：': '已從我的最愛移除：',
+           '余额': '餘額',
+           '维护通知': '維護通知',
+           '目前正在维护。': '目前正在維護。',
+           '启动失败': '啟動失敗',
+           '无法打开': '無法開啟',
+           '游戏运行出错': '遊戲執行出錯',
+           '没有设置对应的程序模块。': '沒有設定對應的程式模組。',
+           '请先关闭当前运行中的游戏。': '請先關閉目前執行中的遊戲。',
+           '未正常结束：': '未正常結束：'},
+ 'mi': {'已启动：': 'Kua tīmata: ',
+        '已结束，余额已更新': ' kua mutu; kua whakahōutia te toenga',
+        '已关闭': ' kua katia',
+        '已加入我的最爱：': 'Kua tāpiritia ki ngā tino pai: ',
+        '已从我的最爱移除：': 'Kua tangohia i ngā tino pai: ',
+        '余额': 'Toenga',
+        '维护通知': 'Pānui tiaki',
+        '目前正在维护。': ' kei te tiakina ināianei.',
+        '启动失败': 'I rahua te tīmata',
+        '无法打开': 'Kāore i taea te whakatuwhera ',
+        '游戏运行出错': 'Hapa kēmu',
+        '没有设置对应的程序模块。': ' kāore he kōwae papatono kua whakaritea.',
+        '请先关闭当前运行中的游戏。': 'Katia te kēmu e haere ana i te tuatahi.',
+        '未正常结束：': ' kāore i mutu tika: '},
+ 'eo': {'已启动：': 'Lanĉita: ',
+        '已结束，余额已更新': ' finiĝis; saldo ĝisdatigita',
+        '已关闭': ' fermiĝis',
+        '已加入我的最爱：': 'Aldonita al ŝatataj: ',
+        '已从我的最爱移除：': 'Forigita el ŝatataj: ',
+        '余额': 'Saldo',
+        '维护通知': 'Prizorga avizo',
+        '目前正在维护。': ' estas nun prizorgata.',
+        '启动失败': 'Lanĉo malsukcesis',
+        '无法打开': 'Ne eblis malfermi ',
+        '游戏运行出错': 'Luderaro',
+        '没有设置对应的程序模块。': ' ne havas agorditan programmodulon.',
+        '请先关闭当前运行中的游戏。': 'Unue fermu la rulantan ludon.',
+        '未正常结束：': ' ne finiĝis normale: '}}
+
+
+def normalise_language(value) -> str:
+    aliases = {"sc": "zh_CN", "tc": "zh_TW", "zh-cn": "zh_CN", "zh-tw": "zh_TW",
+               "zh_cn": "zh_CN", "zh_tw": "zh_TW"}
+    code = aliases.get(str(value).lower(), str(value).lower())
+    return code if code in _TRANSLATIONS else "en"
+
+
+def translate_text(text: str, language: str = "en") -> str:
+    """Translate this page's UI and game names without importing index.py."""
+    text = str(text)
+    language = normalise_language(language)
+    if language == "zh_CN":
+        return text
+    translated = _TRANSLATIONS[language].get(text)
+    if translated is not None:
+        return translated
+    if text.startswith("余额  $"):
+        labels = {"en": "Balance", "zh_TW": "餘額", "mi": "Toenga", "eo": "Saldo"}
+        return f"{labels[language]}  ${text.split('$', 1)[1]}"
+    greetings = {
+        "en": ("Good morning", "Good morning", "Good afternoon", "Good evening"),
+        "zh_TW": ("凌晨好", "早安", "午安", "晚安"),
+        "mi": ("Ata mārie", "Ata mārie", "Kia ora i te ahiahi", "Pō mārie"),
+        "eo": ("Bonan matenon", "Bonan matenon", "Bonan posttagmezon", "Bonan vesperon"),
+    }
+    for index, prefix in enumerate(("凌晨好，", "早上好，", "中午好，", "晚上好，")):
+        if text.startswith(prefix) and text.endswith("！"):
+            name = text[len(prefix):-1]
+            if language == "zh_TW":
+                return f"{greetings[language][index]}，{name}！"
+            return f"{greetings[language][index]}, {name}!"
+    # Composite launch/favorite status messages contain this page's game names.
+    for source in sorted(_GAME_NAMES, key=len, reverse=True):
+        text = text.replace(source, _TRANSLATIONS[language].get(source, source))
+    for source, target in sorted(_DYNAMIC_PHRASES[language].items(),
+                                 key=lambda item: len(item[0]), reverse=True):
+        text = text.replace(source, target)
+    return text
 
 
 def greeting_for(username: str) -> str:
@@ -99,6 +288,8 @@ EMBEDDED_GAME_MODULES = {
     "Casino_Games.Blackjack_Bet_Stacker",
     "Casino_Games.Color_Sicbo",
     "Casino_Games.Hulog_Bola",
+    "Casino_Games.Pula_Puti",
+    "Casino_Games.Xóc_Dĩa",
 }
 
 
@@ -196,6 +387,10 @@ REGION_SECTIONS = {
     "菲律宾": [
         ("颜色骰子", "Casino_Games.Color_Sicbo", False),
         ("乒乓落球", "Casino_Games.Hulog_Bola", False),
+        ("红白落球", "Casino_Games.Pula_Puti", False),
+    ],
+    "越南": [
+        ("越南色碟", "Casino_Games.Xóc_Dĩa", False),
     ],
 }
 
@@ -363,6 +558,7 @@ class CasinoGamesPage(tk.Frame):
         on_balance_change: Optional[Callable[[float], None]] = None,
         on_preferences: Optional[Callable[[], None]] = None,
         translator: Optional[Callable[[str], str]] = None,
+        language: Optional[str] = None,
     ):
         for name in ("BG", "PANEL", "PANEL_2", "GOLD", "TEXT", "MUTED", "RED"):
             setattr(self, name, _ui_colour(master, getattr(type(self), name)))
@@ -378,7 +574,11 @@ class CasinoGamesPage(tk.Frame):
         self.on_back = on_back
         self.on_balance_change = on_balance_change
         self.on_preferences = on_preferences
-        self.translator = translator
+        # translator is accepted for compatibility; this page owns its translations.
+        self.language = normalise_language(
+            language if language is not None else
+            getattr(master.winfo_toplevel(), "language", "en")
+        )
 
         self.current_category = "扑克"
         self.process: Optional[subprocess.Popen] = None
@@ -404,10 +604,7 @@ class CasinoGamesPage(tk.Frame):
         self._preferences_ready = True
 
     def _tr(self, text: str) -> str:
-        if callable(self.translator):
-            return self.translator(text)
-        translator = getattr(self.winfo_toplevel(), "translate_ui", None)
-        return translator(text) if callable(translator) else text
+        return translate_text(text, self.language)
 
     def _build_ui(self) -> None:
         top = tk.Frame(self, bg=self.PANEL, height=82)
@@ -587,7 +784,7 @@ class CasinoGamesPage(tk.Frame):
         self.running_label.pack(side="right", padx=20)
 
     def _build_region_tabs(self) -> None:
-        """为“地区特色”分类建立中国 / 菲律宾两个子页面按钮。"""
+        """为“地区特色”分类建立中国 / 菲律宾 / 越南三个子页面按钮。"""
         for widget in self.region_tabs_frame.winfo_children():
             widget.destroy()
 
@@ -611,7 +808,7 @@ class CasinoGamesPage(tk.Frame):
             self.region_buttons[region] = button
 
     def _show_region_games(self, region: str) -> None:
-        """切换地区特色内的中国 / 菲律宾子页面。"""
+        """切换地区特色内的中国 / 菲律宾 / 越南子页面。"""
         if self.process is not None:
             return
         self.current_region = region
@@ -966,7 +1163,7 @@ class CasinoGamesPage(tk.Frame):
             )
 
         if category == "地区特色":
-        # 显示中国 / 菲律宾两个按钮（放在游戏网格上方）
+            # 显示中国 / 菲律宾 / 越南三个按钮（放在游戏网格上方）
             if not self._region_tabs_visible:
                 self.region_tabs_frame.pack(
                     fill="x", pady=(0, 12), before=self.games_container
@@ -1192,6 +1389,10 @@ class CasinoGamesPage(tk.Frame):
             username = self.username
             parent_back = self.on_back
             balance_callback = self.on_balance_change
+            language = self.language
+            preferences_callback = self.on_preferences
+            category = self.current_category
+            region = self.current_region
 
             returned_to_casino = False
 
@@ -1215,7 +1416,12 @@ class CasinoGamesPage(tk.Frame):
                     balance=new_balance,
                     on_back=parent_back,
                     on_balance_change=balance_callback,
+                    on_preferences=preferences_callback,
+                    language=language,
                 )
+                new_page.current_region = region
+                if new_page.current_category != category:
+                    new_page.show_category(category)
                 replace_page = getattr(master, "replace_page", None)
                 if not callable(replace_page):
                     raise RuntimeError("父窗口没有 replace_page(page) 方法。")
@@ -1259,9 +1465,8 @@ class CasinoGamesPage(tk.Frame):
 
         except Exception as exc:
             messagebox.showerror(
-                "启动失败",
-                f"无法打开《{display_name}》：\n\n"
-                f"{type(exc).__name__}: {exc}",
+                self._tr("启动失败"),
+                self._tr('无法打开《{name}》：\n\n{error}').format(name=self._tr(display_name), error=f"{type(exc).__name__}: {exc}"),
                 parent=self,
             )
 
@@ -1273,16 +1478,16 @@ class CasinoGamesPage(tk.Frame):
     ) -> None:
         if maintenance:
             messagebox.showinfo(
-                "维护通知",
-                f"《{display_name}》目前正在维护。",
+                self._tr("维护通知"),
+                self._tr('《{name}》目前正在维护。').format(name=self._tr(display_name)),
                 parent=self,
             )
             return
 
         if not module_name:
             messagebox.showerror(
-                "启动失败",
-                f"《{display_name}》没有设置对应的程序模块。",
+                self._tr("启动失败"),
+                self._tr('《{name}》没有设置对应的程序模块。').format(name=self._tr(display_name)),
                 parent=self,
             )
             return
@@ -1327,7 +1532,7 @@ class CasinoGamesPage(tk.Frame):
                 creationflags=creationflags,
             )
         except OSError as exc:
-            messagebox.showerror("启动失败", str(exc), parent=self)
+            messagebox.showerror(self._tr("启动失败"), self._tr(str(exc)), parent=self)
             self.process = None
             return
 
@@ -1396,8 +1601,8 @@ class CasinoGamesPage(tk.Frame):
             self.status_var.set(self._tr(f"{old_name} 已关闭"))
             if error:
                 messagebox.showerror(
-                    "游戏运行出错",
-                    f"{old_name} 未正常结束：\n\n{error}",
+                    self._tr("游戏运行出错"),
+                    self._tr('{name} 未正常结束：\n\n{error}').format(name=self._tr(old_name), error=error),
                     parent=self,
                 )
 
@@ -1434,12 +1639,14 @@ class CasinoGamesPage(tk.Frame):
     def back_to_main(self) -> None:
         if self.process is not None:
             messagebox.showwarning(
-                "游戏运行中",
-                "请先关闭当前运行中的游戏。",
+                self._tr("游戏运行中"),
+                self._tr("请先关闭当前运行中的游戏。"),
                 parent=self,
             )
             return
         self.on_back(self.balance)
+
+    on_close = back_to_main
 
 
 def main(
@@ -1450,6 +1657,7 @@ def main(
     on_balance_change: Optional[Callable[[float], None]] = None,
     on_preferences: Optional[Callable[[], None]] = None,
     translator: Optional[Callable[[str], str]] = None,
+    language: Optional[str] = None,
 ) -> CasinoGamesPage:
     """
     供 index.py 使用。不会创建 Tk 或 mainloop。
@@ -1462,6 +1670,7 @@ def main(
         on_balance_change=on_balance_change,
         on_preferences=on_preferences,
         translator=translator,
+        language=language,
     )
 
 
@@ -1479,8 +1688,8 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.withdraw()
     messagebox.showinfo(
-        "提示",
-        "casino_games.py 应由项目根目录的 index.py 启动。",
+        translate_text("提示"),
+        translate_text("{file} 应由项目根目录的 index.py 启动。").format(file='casino_games.py'),
         parent=root,
     )
     root.destroy()
