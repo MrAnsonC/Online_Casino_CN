@@ -11,6 +11,7 @@ del _install_secure_json, _account_root, _AccountPath, _account_sys
 
 import copy
 import json
+import math
 import os
 import random
 import re
@@ -124,14 +125,31 @@ class DragonTigerEngine:
 
     MODE_ROWS = {
         'classic': (
+            ('Gap 0-2', 'Gap 3-5', 'Gap 6-9', 'Gap 10-12'),
             ('Both Red', 'Red Black', 'Both Black'),
             ('Small', 'Perfect Suited Tie', 'Big'),
         ),
         'treasure': (
+            ('Gap 0-2', 'Gap 3-5', 'Gap 6-9', 'Gap 10-12'),
             ('Both Red', 'Red Black', 'Both Black'),
             ('Small', 'Perfect Suited Tie', 'Big'),
         ),
     }
+
+    # User-specified net-profit odds, shared by the board and actual settlement.
+    GAP_RANGES = {'Gap 0-2': (0, 2), 'Gap 3-5': (3, 5),
+                  'Gap 6-9': (6, 9), 'Gap 10-12': (10, 12)}
+    GAP_PROFIT_ODDS = {
+        'classic': {'Gap 0-2': 1.7, 'Gap 3-5': 1.95,
+                    'Gap 6-9': 2.6, 'Gap 10-12': 12.0},
+        'treasure': {'Gap 0-2': 1.05, 'Gap 3-5': 1.25,
+                     'Gap 6-9': 1.65, 'Gap 10-12': 7.5},
+    }
+    for _key, (_low, _high) in GAP_RANGES.items():
+        DISPLAY_NAMES[_key] = f'区间 {_low}–{_high}'
+        for _mode in ('classic', 'treasure'):
+            ODDS_TEXT[_mode][_key] = f'{GAP_PROFIT_ODDS[_mode][_key]:g}:1'
+    del _key, _low, _high, _mode
 
     # Treasure Pot first chooses which golden condition(s) are active this round.
     # Suit only 34%, rank only 44%, both suit + rank 22%.
@@ -331,6 +349,10 @@ class DragonTigerEngine:
             factors['Perfect Suited Tie'] = 1.0 + range_profit['Perfect Suited Tie']
         if 10 <= result_rank <= 13:
             factors['Big'] = 1.0 + range_profit['Big']
+        gap = abs(ds - ts)
+        for key, (low, high) in cls.GAP_RANGES.items():
+            if low <= gap <= high:
+                factors[key] = 1.0 + cls.GAP_PROFIT_ODDS[mode][key]
         return factors
 
     @staticmethod
@@ -387,6 +409,10 @@ class DragonTigerEngine:
         # Colour wagers concern both physical cards, so both cards may add both
         # the suit and point multipliers.
         if bet_type in ('Both Red', 'Red Black', 'Both Black'):
+            return max(1, card_multiplier(dragon) * card_multiplier(tiger))
+
+        # A difference depends on both physical cards, including both conditions.
+        if bet_type in cls.GAP_RANGES:
             return max(1, card_multiplier(dragon) * card_multiplier(tiger))
 
         # Small / Big are settled from the winning rank (or tied rank).  The
@@ -447,8 +473,7 @@ class DragonTigerEngine:
         return 0.0
 
     @classmethod
-    def resolve_bets(cls, bets, result, mode, jackpot_amount=0.0):
-        del jackpot_amount
+    def resolve_bets(cls, bets, result, mode):
         side_factors = cls.side_return_factors(result, mode, bets)
         outcomes = []
         credit = 0.0
@@ -509,7 +534,6 @@ class DragonTigerEngine:
             'net': gross_profit - lost_stake,
             'outcomes': outcomes,
             'side_factors': side_factors,
-            'jackpot_win': 0.0,
         }
 
 
@@ -564,6 +588,14 @@ class BubbleDragonTigerGame(tk.Frame):
     HISTORY_X1 = 1138
     BOARD_INNER_X0 = 22
     BOARD_INNER_X1 = 760
+    # Keep the original table footprint; only the betting rows are compacted.
+    BOARD_BOUNDS = (GAME_X0, 316, GAME_X1, 620)
+    MODE_SELECTOR_BOUNDS = (18, 322, 764, 350)
+    BOARD_HEADER_Y = 376
+    BETTING_BOUNDS = (BOARD_INNER_X0, 398, BOARD_INNER_X1, 608)
+    BETTING_TRANSITION_BOUNDS = (GAME_X0 + 2, 352, GAME_X1 - 2, 618)
+    # Baccarat's 738x234 layout: 6-unit columns, 4/6-unit row gaps.
+    BETTING_LOGICAL_HEIGHT = 234
 
     # Only genuinely mode-specific results belong in the special-data page.
     # Dragon Bonus and Perfect Pair are normal side bets, so they are deliberately
@@ -592,6 +624,15 @@ class BubbleDragonTigerGame(tk.Frame):
     TIE_FLASH_DARK = '#23874b'
     TIE_FLASH_LIGHT = '#78e49a'
 
+    CHIP_MOVE_DURATION_MS = 200
+    CHIP_MOVE_STEPS = 10
+    WAGER_CHIP_RADIUS = 23
+    MOTION_CHIP_RADIUS = 22
+    SELECTOR_CHIP_DIAMETER = 56
+    MODE_TRANSITION_MS = 360
+    MODE_FRAME_MS = 16
+    GOLDEN_RETURN_DURATION_MS = 1500
+
     MIN_BET = 100.0
     MAX_TABLE_BET = 2_000_000.0
     MAX_RECORDS = 300
@@ -612,9 +653,35 @@ class BubbleDragonTigerGame(tk.Frame):
     MODE_SHORT = {'classic': '经典版', 'treasure': '聚宝盆'}
 
     BET_COLORS = {
-        'Dragon': '#d94a4e', 'Tie': '#43a665', 'Tiger': '#8f6200',
-        'Both Red': '#b8323e', 'Red Black': '#9b6b35', 'Both Black': '#292929',
-        'Small': '#487a63', 'Perfect Suited Tie': '#8459a7', 'Big': '#8d6632',
+        'Dragon': '#bf0711', 'Tie': '#006a35', 'Tiger': '#8f6200',
+        'Both Red': '#e9b1bf', 'Red Black': '#97d3c5', 'Both Black': '#f8ecd3',
+        'Small': '#f3d180', 'Perfect Suited Tie': '#c8afe0', 'Big': '#9fc7e8',
+    }
+    BET_TEXT_COLORS = {
+        'Both Red': '#7f1523', 'Red Black': '#103d36', 'Both Black': '#292929',
+        'Small': '#503809', 'Perfect Suited Tie': '#3f2359', 'Big': '#153b60',
+    }
+    # Presentation only: keys, odds and settlement remain in DragonTigerEngine.
+    BET_LABELS = {
+        'Both Red': ('双方红色', 'BOTH RED', '双方均为红色牌'),
+        'Red Black': ('红黑各一', 'RED / BLACK', '一张红色牌、一张黑色牌'),
+        'Both Black': ('双方黑色', 'BOTH BLACK', '双方均为黑色牌'),
+        'Small': ('小', 'SMALL', '胜方点数 A–9 · 和局取同点数'),
+        'Perfect Suited Tie': ('完美同花', 'PERFECT SUITED TIE', '双方点数及花色完全相同'),
+        'Big': ('大', 'BIG', '胜方点数 10–K · 和局取同点数'),
+        'Dragon': ('龙', 'DRAGON', ''),
+        'Tie': ('和局', 'TIE', ''),
+        'Tiger': ('虎', 'TIGER', ''),
+    }
+    GAP_COLORS = ('#d6eaff', '#9eccf7', '#65a6dc', '#255f8d')
+    for _index, (_key, (_low, _high)) in enumerate(DragonTigerEngine.GAP_RANGES.items()):
+        BET_LABELS[_key] = (f'区间 {_low}–{_high}', f'DIFF {_low}–{_high}', '两张牌点数差的绝对值')
+        BET_COLORS[_key] = GAP_COLORS[_index]
+        BET_TEXT_COLORS[_key] = '#153b60' if _index < 3 else '#f8ecd3'
+    del _index, _key, _low, _high
+    MODE_HEADER_TITLES = {
+        'classic': '经典龙虎  DRAGON TIGER',
+        'treasure': '聚宝盆龙虎  TREASURE DRAGON TIGER',
     }
 
     def __init__(self, parent, balance=10000, user=None, on_back=None,
@@ -644,11 +711,20 @@ class BubbleDragonTigerGame(tk.Frame):
         self.chip_selector_items = {}
         self.control_buttons = {}
         self.mode_button_items = {}
+        self._mode_transition = None
+        self._mode_transition_after = None
+        self._mode_transition_item = None
+        self._mode_transition_photo = None
+        self._mode_fee_visuals = []
 
         self.accept_bets = True
         self.animation_running = False
         self.settlement_running = False
         self.animation_after_ids = []
+        self.chip_motion_after_ids = set()
+        self.chip_motion_serial = 0
+        self.chip_motion_items = {}
+        self.pending_bet_visual_amounts = {}
         self.settlement_after_id = None
         self.flash_mode = None
         self.flash_winning_keys = set()
@@ -678,6 +754,11 @@ class BubbleDragonTigerGame(tk.Frame):
         self.treasure_panel_multiplier_items = []
         self.bet_fee_state = {}
         self.pre_deal_fee_total = 0.0
+        self.pending_fee_visuals = {}
+        self._fee_visual_serial = 0
+        self._fee_collected = False
+        self._treasure_board_geometry = None
+        self._treasure_round_positions = None
 
         self.history_panel_mode = 'roads'
         # V12: Big Road is a 50-column logical board viewed through a
@@ -708,8 +789,6 @@ class BubbleDragonTigerGame(tk.Frame):
         # the winning point value by clicking anywhere on the bead grid.
         self.bead_show_scores = False
 
-        self.jackpot_file = self.get_jackpot_file()
-        self.jackpot_amount = self.load_jackpot()
 
         # Prefer the original external card artwork. If the project
         # assets are unavailable, draw the temporary V4-style cards instead.
@@ -724,14 +803,10 @@ class BubbleDragonTigerGame(tk.Frame):
         self.load_golden_card_assets()
 
         top = self.winfo_toplevel()
-        try:
-            top.geometry('1150x750+50+10')
-            top.resizable(False, False)
-        except tk.TclError:
-            pass
 
         top.bind('<Return>', self.handle_enter_deal)
         self.bind('<Escape>', lambda _event: self.exit_game())
+        self.bind('<Destroy>', self._on_game_destroy, add='+')
 
         self.create_ui()
         self.select_chip(self.selected_chip)
@@ -898,18 +973,71 @@ class BubbleDragonTigerGame(tk.Frame):
             'top': ny0 + header_h, 'row_h': row_h,
         }
 
-        # Explain the asterisk used by main-bet odds.  Keep this directly under
-        # the Small Road in white so it is visible without adding another panel.
-        self.road_asterisk_note_item = c.create_text(
-            (panel_x0 + panel_x1) / 2, row4_y + row4_h + 5,
-            anchor='n', width=panel_w - 8,
-            text=self._asterisk_note_text(),
-            font=('Arial', 28, 'bold'), fill='white', justify='center',
-            tags='history_panel_content'
-        )
+        self._draw_road_summary(panel_x0, panel_x1, row4_y + row4_h + 32)
 
-    def _asterisk_note_text(self):
-        return '* 龙/虎遇和输一半'
+    def _marker_road_records(self):
+        """Use the same saved 72-record window as the bead plate."""
+        return self._drawable_history_records(self.last_72_data)[-self.BEAD_MAX_RECORDS:]
+
+    def _draw_road_summary(self, x0, x1, y):
+        """BacBo's two-row record counter, adapted to Dragon/Tiger markets."""
+        c = self.canvas
+        c.delete('road_summary')
+        tags = ('history_panel_content', 'road_summary')
+        self._road_summary_items = {
+            'round': c.create_text(x0+36, y, text='#0',
+                font=('Arial', -20, 'bold'), fill='white', tags=tags),
+        }
+        group_width = (x1-x0-72)/3
+        for index, (key, caption, color, foreground) in enumerate((
+                ('Dragon', '龙', self.DRAGON_RED, 'white'),
+                ('Tiger', '虎', self.TIGER_YELLOW, '#000000'),
+                ('Tie', '和', self.TIE_GREEN, 'white'),
+                ('Small', '小', self.BET_COLORS['Small'], self.BET_TEXT_COLORS['Small']),
+                ('Big', '大', self.BET_COLORS['Big'], self.BET_TEXT_COLORS['Big']),
+                ('Perfect Suited Tie', '同', self.BET_COLORS['Perfect Suited Tie'],
+                 self.BET_TEXT_COLORS['Perfect Suited Tie']))):
+            row, column = divmod(index, 3)
+            cy = y-14 if row == 0 else y+14
+            cx = x0+72+(column+.5)*group_width-22
+            icon_tags = tags+(f'road_summary_{key.replace(" ", "_")}',)
+            c.create_oval(cx-12, cy-12, cx+12, cy+12,
+                fill=color, outline='#eadfc9', width=1, tags=icon_tags)
+            c.create_text(cx, cy, text=caption, font=('Arial', -15, 'bold'),
+                fill=foreground, tags=icon_tags)
+            self._road_summary_items[key] = c.create_text(cx+20, cy,
+                text='0', anchor='w', font=('Arial', -18, 'bold'),
+                fill='white', tags=tags)
+        self._update_road_summary(self._marker_road_records())
+
+    def _update_road_summary(self, records):
+        items = getattr(self, '_road_summary_items', {})
+        if not items:
+            return
+        counts = {'Dragon': 0, 'Tiger': 0, 'Tie': 0,
+                  'Small': 0, 'Big': 0, 'Perfect Suited Tie': 0}
+        for record in records:
+            winner = record.get('winner')
+            if winner not in ('Dragon', 'Tiger', 'Tie'):
+                continue
+            counts[winner] += 1
+            rank = DragonTigerEngine.result_rank(record)
+            counts['Small'] += int(1 <= rank <= 9)
+            counts['Big'] += int(10 <= rank <= 13)
+            dragon, tiger = record.get('dragon_hand') or [], record.get('tiger_hand') or []
+            valid_cards = (isinstance(dragon, (list, tuple)) and dragon
+                           and isinstance(tiger, (list, tuple)) and tiger
+                           and isinstance(dragon[0], (list, tuple)) and len(dragon[0]) == 2
+                           and isinstance(tiger[0], (list, tuple)) and len(tiger[0]) == 2)
+            if valid_cards:
+                perfect = tuple(dragon[0]) == tuple(tiger[0]) and winner == 'Tie'
+            else:
+                perfect = winner == 'Tie' and 'Perfect Suited Tie' in (record.get('specials') or [])
+            counts['Perfect Suited Tie'] += int(perfect)
+        total = counts['Dragon']+counts['Tiger']+counts['Tie']
+        self.canvas.itemconfigure(items['round'], text=f'#{total}')
+        for key, count in counts.items():
+            self.canvas.itemconfigure(items[key], text=str(count))
 
     def _draw_big_road_scrollbar(self, x0, y0, width):
         """Draw a functional horizontal scrollbar for the 50-column Big Road."""
@@ -1454,18 +1582,7 @@ class BubbleDragonTigerGame(tk.Frame):
     def update_history_table(self):
         if not hasattr(self, 'canvas'):
             return
-        if getattr(self, 'treasure_panel_active', False):
-            return
         self.canvas.delete('history_dynamic')
-        # Mode switching can change the meaning of the '*' shown beside main
-        # bet odds, so refresh the white note even when the road layout itself
-        # does not need to be rebuilt.
-        note_item = getattr(self, 'road_asterisk_note_item', None)
-        if note_item is not None:
-            try:
-                self.canvas.itemconfigure(note_item, text=self._asterisk_note_text())
-            except tk.TclError:
-                pass
         # temp_finish_data remains the source for Big Road, derived roads,
         # predictions and pie charts. Only the Bead Plate uses last_72_record.
         records = self._drawable_history_records(self.history_data)[-self.MAX_RECORDS:]
@@ -1476,9 +1593,9 @@ class BubbleDragonTigerGame(tk.Frame):
         self._draw_big_road(big_cells)
         self._draw_derived_road('eye', self._derive_road(records, 1), 'ring')
         self._draw_derived_road('cockroach', self._derive_road(records, 3), 'slash')
-        bead_records = self._drawable_history_records(
-            self.last_72_data)[-self.BEAD_MAX_RECORDS:]
+        bead_records = self._marker_road_records()
         self._draw_bead_plate(bead_records)
+        self._update_road_summary(bead_records)
         self._draw_derived_road('small', self._derive_road(records, 2), 'dot')
         self._draw_next_round_indicator(records)
 
@@ -1551,7 +1668,7 @@ class BubbleDragonTigerGame(tk.Frame):
                                         self._next_road_color(records, 'Tiger', offset), style)
 
     def find_original_card_asset_dir(self):
-        """Locate the original card-asset project A_Tools/Card/Poker1 directory."""
+        """Locate the original Baccarat.py A_Tools/Card/Poker1 directory."""
         current = os.path.dirname(os.path.abspath(__file__))
         candidates = [
             os.path.join(current, 'A_Tools', 'Card', 'Poker1'),
@@ -1559,66 +1676,61 @@ class BubbleDragonTigerGame(tk.Frame):
             os.path.join(os.path.dirname(os.path.dirname(current)), 'A_Tools', 'Card', 'Poker1'),
         ]
         for directory in candidates:
-            if os.path.isdir(directory) and os.path.exists(os.path.join(directory, 'Background.png')):
+            if os.path.isdir(directory):
                 return directory
         return None
 
     def load_original_card_assets(self):
-        """Use the original 100x140 external card artwork when available."""
-        if Image is None or ImageTk is None:
-            return
+        """Load faces independently, preserving a supplied background.png back."""
         self.external_card_pil = {}
         self.external_back_pil = None
+        self.card_back_path = None
+        if Image is None or ImageTk is None:
+            return
         card_size = (100, 140)
         directory = self.find_original_card_asset_dir()
+        self.card_asset_dir = directory
         resample = getattr(Image, 'Resampling', Image).LANCZOS
-
-        if directory:
-            try:
-                for suit in DragonTigerEngine.SUITS:
-                    for rank in DragonTigerEngine.RANKS:
-                        path = os.path.join(directory, f'{suit}{rank}.png')
-                        if not os.path.exists(path):
-                            continue
-                        base = Image.open(path).convert('RGBA').resize(card_size, resample)
-                        self.external_card_pil[(suit, rank)] = base
-                        self.external_card_images[(suit, rank)] = ImageTk.PhotoImage(base, master=self)
-                        self.external_card_images_rotated[(suit, rank)] = ImageTk.PhotoImage(
-                            base.rotate(90, expand=True), master=self)
-                back_path = os.path.join(directory, 'Background.png')
-                if os.path.exists(back_path):
-                    back = Image.open(back_path).convert('RGBA').resize(card_size, resample)
-                    self.external_back_pil = back
-                    self.external_back_image = ImageTk.PhotoImage(back, master=self)
-                if self.external_card_images and self.external_back_image is not None:
-                    self.card_asset_dir = directory
-                    return
-            except Exception:
-                self.external_card_images.clear()
-                self.external_card_images_rotated.clear()
-                self.external_card_pil.clear()
-                self.external_back_image = None
-                self.external_back_pil = None
-                self.card_asset_dir = None
-
-        # Temporary fallback only when the original external images do not exist.
-        try:
+        # A back next to this script may override the project's shared artwork.
+        # Lower-case spelling is checked first on case-sensitive filesystems.
+        back_dirs = [os.path.dirname(os.path.abspath(__file__))]
+        if directory and directory not in back_dirs:
+            back_dirs.append(directory)
+        for back_dir in back_dirs:
+            if self.external_back_pil is not None:
+                break
+            for name in ('background.png', 'Background.png'):
+                path = os.path.join(back_dir, name)
+                if not os.path.isfile(path):
+                    continue
+                try:
+                    with Image.open(path) as source:
+                        self.external_back_pil = source.convert('RGBA').resize(card_size, resample)
+                    self.card_back_path = path
+                    break
+                except (OSError, ValueError):
+                    continue
+        if self.external_back_pil is None:
             self.external_back_pil = self._make_fallback_card_pil(None, face_up=False)
-            self.external_back_image = ImageTk.PhotoImage(self.external_back_pil, master=self)
-            for suit in DragonTigerEngine.SUITS:
-                for rank in DragonTigerEngine.RANKS:
-                    card = (suit, rank)
+        self.external_back_image = ImageTk.PhotoImage(self.external_back_pil, master=self)
+        self._rotated_back_image = None
+        for suit in DragonTigerEngine.SUITS:
+            for rank in DragonTigerEngine.RANKS:
+                card = (suit, rank)
+                base = None
+                path = os.path.join(directory, f'{suit}{rank}.png') if directory else ''
+                if os.path.isfile(path):
+                    try:
+                        with Image.open(path) as source:
+                            base = source.convert('RGBA').resize(card_size, resample)
+                    except (OSError, ValueError):
+                        pass
+                if base is None:
                     base = self._make_fallback_card_pil(card, face_up=True)
-                    self.external_card_pil[card] = base
-                    self.external_card_images[card] = ImageTk.PhotoImage(base, master=self)
-                    self.external_card_images_rotated[card] = ImageTk.PhotoImage(
-                        base.rotate(90, expand=True), master=self)
-        except Exception:
-            self.external_card_images.clear()
-            self.external_card_images_rotated.clear()
-            self.external_card_pil = {}
-            self.external_back_image = None
-            self.external_back_pil = None
+                self.external_card_pil[card] = base
+                self.external_card_images[card] = ImageTk.PhotoImage(base, master=self)
+                self.external_card_images_rotated[card] = ImageTk.PhotoImage(
+                    base.rotate(90, expand=True), master=self)
 
     def load_golden_card_assets(self):
         """Load A_Tools/Card/Poker1/Golden face art for Treasure Pot.
@@ -1751,6 +1863,8 @@ class BubbleDragonTigerGame(tk.Frame):
         self._temp_flip_images = {}
 
     def clear_card_display(self):
+        self.canvas.delete('dealt_golden_multiplier')
+        self.canvas.delete('golden_light')
         for item in self.card_item_ids:
             try:
                 self.canvas.delete(item)
@@ -1812,26 +1926,39 @@ class BubbleDragonTigerGame(tk.Frame):
 
     def draw_board(self):
         c = self.canvas
-        c.create_rectangle(self.GAME_X0, 316, self.GAME_X1, 620, fill=self.FELT,
+        c.create_rectangle(*self.BOARD_BOUNDS, fill=self.FELT,
                            outline=self.LINE, width=2, tags='static')
         self.draw_mode_selector()
         self.draw_mode_betting_board()
 
+    @staticmethod
+    def _rounded_points(x0, y0, x1, y1, radius=7):
+        return (x0 + radius, y0, x1 - radius, y0, x1, y0,
+                x1, y0 + radius, x1, y1 - radius, x1, y1,
+                x1 - radius, y1, x0 + radius, y1, x0, y1,
+                x0, y1 - radius, x0, y0 + radius, x0, y0)
+
     def draw_mode_selector(self):
         c = self.canvas
-        x0, y0, x1, y1 = 18, 322, 764, 350
-        gap = 4
-        width = (x1 - x0 - gap * (len(self.MODE_ORDER) - 1)) / len(self.MODE_ORDER)
+        c.delete('mode_selector')
+        self.mode_button_items = {}
+        x0, y0, x1, y1 = self.MODE_SELECTOR_BOUNDS
+        width = (x1 - x0) / len(self.MODE_ORDER)
+        c.create_polygon(*self._rounded_points(x0, y0, x1, y1, 12),
+                         smooth=True, splinesteps=24, fill='#102C22',
+                         outline='#627652', width=1,
+                         tags=('mode_selector', 'static'))
         for index, mode in enumerate(self.MODE_ORDER):
-            bx0 = x0 + index * (width + gap)
+            bx0 = x0 + index * width
             bx1 = bx0 + width
             tag = f'mode_button_{mode}'
-            rect = c.create_rectangle(bx0, y0, bx1, y1, fill='#30271f',
-                                      outline='#8d765e', width=1,
-                                      tags=(tag, 'mode_selector', 'static'))
+            rect = c.create_polygon(
+                *self._rounded_points(bx0 + 3, y0 + 3, bx1 - 3, y1 - 3, 8),
+                smooth=True, splinesteps=24, fill='#16372A', outline='', width=1,
+                tags=(tag, 'mode_selector', 'static'))
             txt = c.create_text((bx0 + bx1) / 2, (y0 + y1) / 2,
                                 text=self.MODE_SHORT[mode], font=('Arial', 10, 'bold'),
-                                fill='#d9c8af', tags=(tag, 'mode_selector', 'static'))
+                                fill='#CCD4BF', tags=(tag, 'mode_selector', 'static'))
             self.mode_button_items[mode] = (rect, txt)
             c.tag_bind(tag, '<Button-1>', lambda _e, m=mode: self.change_game_mode(m))
             c.tag_bind(tag, '<Enter>', lambda _e: c.configure(cursor='hand2'))
@@ -1840,21 +1967,47 @@ class BubbleDragonTigerGame(tk.Frame):
 
     def update_mode_selector_style(self):
         for mode, (rect, txt) in self.mode_button_items.items():
-            selected = mode == self.game_mode
+            target = self._mode_transition['target'] if self._mode_transition else self.game_mode
+            selected = mode == target
             self.canvas.itemconfigure(rect,
-                                      fill='#a57e38' if selected else '#30271f',
-                                      outline='#f2d77c' if selected else '#8d765e',
-                                      width=2 if selected else 1)
-            self.canvas.itemconfigure(txt, fill='#111111' if selected else '#d9c8af')
+                                      fill='#D8B46A' if selected else '#16372A',
+                                      outline='#F0D18D' if selected else '', width=1)
+            self.canvas.itemconfigure(txt, fill='#2A1B08' if selected else '#CCD4BF')
 
     def change_game_mode(self, mode):
-        """经典版与聚宝盆使用完全相同的下注区域，切换时保留全部下注。"""
+        """Fade out, commit the latest requested mode once, then reveal its board."""
+        transition = self._mode_transition
+        if (self._closing or mode not in self.MODE_ORDER or self.animation_running
+                or self.settlement_running or not self.accept_bets and transition is None):
+            return
+        if transition is not None:
+            if transition['phase'] == 'apply' or mode == transition['target']:
+                return
+            transition['target'] = mode
+            if transition['phase'] == 'in':
+                transition.update(phase='out', started=time.monotonic(), start=transition['level'])
+            self.update_control_states()
+            return
         if mode == self.game_mode:
             return
-        if not self.accept_bets or self.animation_running or self.settlement_running:
+        self._mode_transition = dict(target=mode, phase='out', started=time.monotonic(),
+                                     start=0.0, level=0.0)
+        # Existing wager/deal guards lock the table while it is covered. The main
+        # mode selector remains available so quick clicks can retarget the fade.
+        self.accept_bets = False
+        self.update_control_states()
+        self._step_mode_transition()
+
+
+    def _apply_game_mode(self, mode):
+        """切换布局并保留相同注项的全部下注。"""
+        if mode == self.game_mode:
+            return
+        if self._closing or self.animation_running or self.settlement_running:
             return
         if mode not in self.MODE_ORDER:
             return
+        fee_transfers = []
         old_mode = self.game_mode
         entering_treasure = mode == 'treasure' and old_mode != 'treasure'
         leaving_treasure = old_mode == 'treasure' and mode != 'treasure'
@@ -1871,62 +2024,158 @@ class BubbleDragonTigerGame(tk.Frame):
                 self.balance -= fee
                 self.bet_fee_state[bet_type] = fee
                 self.treasure_pot_amount += fee
+                fee_transfers.append((bet_type, fee))
         elif leaving_treasure:
             fee_refund = sum(float(v) for v in self.bet_fee_state.values())
             self.balance += fee_refund
             self.bet_fee_state.clear()
             self.treasure_pot_amount = 0.0
 
+        self._cancel_fee_visuals()
+        self._fee_collected = False
         self.game_mode = mode
         self.undo_stack.clear()
         self.summary_mode = 'bet'
         self.draw_mode_betting_board()
+        self._mode_fee_visuals = [self._register_fee_visual(bt, fee)
+                                  for bt, fee in fee_transfers]
         self.update_mode_selector_style()
         self.update_display()
         self.save_balance()
 
+    def _paint_mode_overlay(self, level):
+        c = self.canvas
+        tag = 'mode_transition_overlay'
+        x0, y0, x1, y1 = self.BETTING_TRANSITION_BOUNDS
+        if Image is not None and ImageTk is not None:
+            rgb = tuple(int(self.FELT[i:i+2], 16) for i in (1, 3, 5))
+            layer = Image.new('RGBA', (x1-x0, y1-y0), rgb+(round(level*255),))
+            self._mode_transition_photo = ImageTk.PhotoImage(layer, master=self)
+            if self._mode_transition_item is None:
+                self._mode_transition_item = c.create_image(x0, y0, anchor='nw', tags=tag)
+            c.itemconfigure(self._mode_transition_item, image=self._mode_transition_photo)
+        else:
+            # Keep a smooth cover/reveal on installations without Pillow.
+            if self._mode_transition_item is None:
+                self._mode_transition_item = c.create_rectangle(x0,y0,x0,y1,
+                    fill=self.FELT, outline='', width=0, tags=tag)
+            c.coords(self._mode_transition_item, x0, y0, x0+(x1-x0)*level, y1)
+            c.itemconfigure(self._mode_transition_item, state='normal' if level > 0 else 'hidden')
+        c.tag_raise(tag)
+        c.tag_raise('mode_selector')
+
+
+    def _step_mode_transition(self):
+        self._mode_transition_after = None
+        transition = self._mode_transition
+        if self._closing or transition is None:
+            return
+        progress = min(1.0, (time.monotonic()-transition['started'])*2000/self.MODE_TRANSITION_MS)
+        eased = progress*progress*(3-2*progress)
+        goal = 1.0 if transition['phase'] == 'out' else 0.0
+        transition['level'] = transition['start']+(goal-transition['start'])*eased
+        self._paint_mode_overlay(transition['level'])
+        if progress >= 1.0:
+            if transition['phase'] == 'out':
+                transition['phase'] = 'apply'
+                self.update_control_states()
+                try:
+                    self._apply_game_mode(transition['target'])
+                except Exception as exc:
+                    messagebox.showerror('模式切换失败', str(exc), parent=self.winfo_toplevel())
+                if self._closing or self._mode_transition is not transition:
+                    return
+                transition.update(target=self.game_mode, phase='in', started=time.monotonic(), start=1.0)
+                self.update_control_states()
+            else:
+                self._finish_mode_transition()
+                return
+        self._mode_transition_after = self.after(self.MODE_FRAME_MS, self._step_mode_transition)
+
+
+    def _finish_mode_transition(self):
+        fees = list(self._mode_fee_visuals)
+        self._cancel_mode_transition()
+        if self._closing:
+            return
+        self.accept_bets = not self.animation_running and not self.settlement_running
+        self.update_display()
+        for token in fees:
+            self._start_fee_visual(token)
+
+
+    def _cancel_mode_transition(self):
+        if self._mode_transition_after is not None:
+            try:
+                self.after_cancel(self._mode_transition_after)
+            except (tk.TclError, ValueError):
+                pass
+        self._mode_transition_after = None
+        self._mode_transition = None
+        self._mode_transition_item = None
+        self._mode_transition_photo = None
+        self._mode_fee_visuals = []
+        try:
+            self.canvas.delete('mode_transition_overlay')
+        except tk.TclError:
+            pass
+
+
+    def _on_game_destroy(self, event):
+        if event.widget is self:
+            self._closing = True
+            self.cancel_pending_callbacks()
+
     def draw_mode_betting_board(self):
+        self._cancel_chip_motion()
+        self._cancel_fee_visuals()
         c = self.canvas
         c.delete('board_dynamic')
         c.delete('bet_chip_dynamic')
+        c.delete('golden_bet_dynamic')
         self.bet_spots = {}
-        rows = DragonTigerEngine.MODE_ROWS[self.game_mode]
-        odds = DragonTigerEngine.ODDS_TEXT[self.game_mode]
-
-        c.create_text(30, 363, anchor='w',
-                      text=DragonTigerEngine.MODE_NAMES[self.game_mode],
-                      font=('Arial', 14, 'bold'), fill=self.GOLD,
+        self.treasure_pool_display = None
+        self._draw_betting_board(self.game_mode)
+        c.create_text(30, self.BOARD_HEADER_Y, anchor='w',
+                      text=self.MODE_HEADER_TITLES[self.game_mode],
+                      font=('Arial', 16, 'bold'), fill=self.GOLD,
                       tags='board_dynamic')
-        if self.game_mode == 'lucky7':
-            c.create_text(754, 363, anchor='e',
-                          text=f'奖池 ${self.jackpot_amount:,.0f}',
-                          font=('Arial', 11, 'bold'), fill='#71edb5',
-                          tags=('board_dynamic', 'jackpot_display'))
-        elif self.game_mode == 'treasure':
-            self.treasure_pool_display = c.create_text(754, 363, anchor='e',
-                          text=f'聚宝盆 本局 ${self.treasure_pot_amount:,.0f}',
-                          font=('Arial', 11, 'bold'), fill='#ffd84a',
-                          tags=('board_dynamic', 'treasure_pool_display'))
-
-        # Give the two side-bet bands more breathing room and larger text.
-        # The main Dragon/Tie/Tiger band is intentionally shorter so the board
-        # reads as two information-rich side-bet rows over one compact main row.
-        self.draw_bet_row(rows[0], self.BOARD_INNER_X0, 374, 442, odds)
-        self.draw_bet_row(rows[1], self.BOARD_INNER_X0, 446, 514, odds)
-
-        main = ('Dragon', 'Tie', 'Tiger')
-        x0, x1 = self.BOARD_INNER_X0, self.BOARD_INNER_X1
-        y0, y1 = 518, 602
-        widths = (0.4, 0.2, 0.4)
-        cursor = x0
-        for index, bet_type in enumerate(main):
-            width = (x1 - x0) * widths[index]
-            bx0 = cursor
-            bx1 = x1 if index == len(main) - 1 else cursor + width
-            self.draw_bet_spot(
-                bet_type, bx0, y0, bx1, y1, odds.get(bet_type, ''), main=True)
-            cursor = bx1
+        self.update_golden_bet_visuals()
+        self._refresh_treasure_pool_text()
         self.update_bet_chips()
+        c.tag_raise('mode_selector')
+
+    def _draw_betting_board(self, mode, canvas=None, bounds=None, interactive=True):
+        """Use Baccarat's spacing and frames; Classic's side bets span the width."""
+        c = self.canvas if canvas is None else canvas
+        bx0, by0, bx1, by1 = self.BETTING_BOUNDS if bounds is None else bounds
+        sx, sy = (bx1-bx0)/738.0, (by1-by0)/self.BETTING_LOGICAL_HEIGHT
+        scale = min(sx, sy)
+        odds, spots = DragonTigerEngine.ODDS_TEXT[mode], {}
+
+        def box(left, top, right, bottom):
+            return bx0+left*sx, by0+top*sy, bx0+right*sx, by0+bottom*sy
+
+        c.create_rectangle(*box(-8,-2,746,244), fill=self.FELT, outline='',
+                           tags=('board_dynamic','bet_board_background'))
+        # Baccarat(7): 6-unit horizontal gutters; 0-76, 80-156, 162-232 rows.
+        columns = ((0,180),(186,366),(372,552),(558,738)) if mode == 'classic' else (
+                   (0,116),(122,241),(497,616),(622,738))
+        rows = ((0,76),(80,156))
+        for row, keys in enumerate((tuple(DragonTigerEngine.GAP_RANGES),
+                                    ('Both Red','Red Black','Perfect Suited Tie','Both Black'))):
+            for key, (left, right) in zip(keys, columns):
+                spots[key] = self.draw_bet_spot(key,
+                    *box(left,rows[row][0],right,rows[row][1]),odds[key],
+                    canvas=c,scale=scale,interactive=interactive,layout='bottom')
+        self._draw_treasure_card_area(c, (bx0,by0,bx1,by1), interactive, mode)
+        for key, left, right in (('Small',0,122), ('Dragon',128,306),
+                                 ('Tie',312,426), ('Tiger',432,610), ('Big',616,738)):
+            spots[key] = self.draw_bet_spot(key, *box(left,162,right,232), odds[key],
+                main=key in ('Dragon','Tie','Tiger'), canvas=c, scale=scale,
+                interactive=interactive, layout='bottom')
+        return spots
+
 
     def draw_bet_row(self, bet_types, x0, y0, y1, odds):
         count = len(bet_types)
@@ -1952,54 +2201,94 @@ class BubbleDragonTigerGame(tk.Frame):
             'label': label, 'tag': self.spot_tag(key),
         }
 
-    def draw_bet_spot(self, bet_type, x0, y0, x1, y1, odds_text, main=False):
-        c = self.canvas
+    def draw_bet_spot(self, bet_type, x0, y0, x1, y1, odds_text, main=False,
+                      canvas=None, scale=1.0, interactive=True, layout=None,
+                      outline=None, shadow=True):
+        c = self.canvas if canvas is None else canvas
         tag = self.spot_tag((bet_type, None))
-        fill = self.BET_COLORS.get(bet_type, '#45665c')
-        fg = '#111111' if bet_type == 'Panda 8' else 'white'
-        outline = '#f0cf54' if bet_type == 'Golden Hunter' else '#d5cbbd'
-        outline_width = 2 if bet_type == 'Golden Hunter' else 1
-        rect_id = c.create_rectangle(
-            x0 + 2, y0 + 2, x1 - 2, y1 - 2,
-            fill=fill, outline=outline, width=outline_width,
-            tags=('board_dynamic', tag))
+        tags = ('board_dynamic', tag)
+        cream, ink = '#f8ecd3', '#110b07'
+        outline = cream if outline is None else outline
+        fill = self.BET_COLORS.get(bet_type, self.FELT_2)
+        fg = self.BET_TEXT_COLORS.get(bet_type, cream)
+        outline_width = 1.2
+        radius = 7 * scale
+        shape = self._rounded_points(x0, y0, x1, y1, radius)
+        if shadow:
+            c.create_polygon(
+                *self._rounded_points(x0 - 2 * scale, y0 - scale,
+                                      x1 + 2 * scale, y1 + 2 * scale, radius),
+                smooth=True, fill=ink, outline=ink, width=2, tags=tags)
+        rect_id = c.create_polygon(*shape, smooth=True, fill=fill,
+                                   outline=outline, width=outline_width, tags=tags)
+        frame_id = c.create_polygon(*shape, smooth=True, fill='', outline=outline,
+                                    width=outline_width, tags=tags + ('bet_board_frame',))
+        c.create_polygon(
+            *self._rounded_points(x0 + 2 * scale, y0 + 2 * scale,
+                                  x1 - 2 * scale, y1 - 2 * scale, radius),
+            smooth=True, fill='', outline=fill, width=.7,
+            tags=tags + ('bet_board_frame', 'bet_board_inner_frame'))
 
+        cx, height = (x0 + x1) / 2, y1 - y0
+        chinese, english, condition = self.BET_LABELS[bet_type]
         label = DragonTigerEngine.DISPLAY_NAMES.get(bet_type, bet_type)
-        if main:
-            label_item = c.create_text(
-                (x0 + x1) / 2, y0 + 27, text=label,
-                font=('Arial', 23, 'bold'), fill=fg,
-                tags=('board_dynamic', tag))
-            odds_item = c.create_text(
-                (x0 + x1) / 2, y1 - 15, text=odds_text,
-                font=('Arial', 18, 'bold'), fill=fg,
-                tags=('board_dynamic', tag))
-            odds_y = y1 - 15
-        else:
-            label_item = c.create_text(
-                (x0 + x1) / 2, y0 + 23, text=label,
-                font=('Arial', 15, 'bold'), fill=fg,
-                tags=('board_dynamic', tag))
-            odds_item = c.create_text(
-                (x0 + x1) / 2, y1 - 13, text=odds_text,
-                font=('Arial', 11, 'bold'), fill=fg,
-                tags=('board_dynamic', tag))
-            odds_y = y1 - 13
 
-        chip_y = (y0 + y1) / 2
-        self.register_spot(
-            bet_type, x0 + 2, y0 + 2, x1 - 2, y1 - 2,
-            ((x0 + x1) / 2, chip_y), label)
-        spot = self.bet_spots[(bet_type, None)]
-        spot.update({
-            'rect_id': rect_id, 'label_item': label_item, 'odds_item': odds_item,
-            'base_odds': odds_text, 'odds_y': odds_y, 'odds_base_x': (x0 + x1) / 2, 'main': bool(main),
-            'normal_outline': outline, 'normal_outline_width': outline_width,
-        })
-        c.tag_bind(tag, '<Button-1>', lambda _e, bt=bet_type: self.place_bet(bt))
-        c.tag_bind(tag, '<Button-3>', lambda _e, bt=bet_type: self.clear_single_bet(bt))
-        c.tag_bind(tag, '<Enter>', lambda _e: c.configure(cursor='hand2'))
-        c.tag_bind(tag, '<Leave>', lambda _e: c.configure(cursor=''))
+        def text(y, value, size, family='Arial'):
+            return c.create_text(cx, y, text=value, fill=fg,
+                                 font=(family, -max(6, round(size * scale)), 'bold'),
+                                 anchor='center', justify='center', tags=tags)
+
+        if layout == 'tall':
+            english, condition = {
+                'Both Red': ('BOTH\nRED', '双方均为红色牌'),
+                'Red Black': ('RED / BLACK', '一红一黑'),
+                'Both Black': ('BOTH\nBLACK', '双方均为黑色牌'),
+                'Perfect Suited Tie': ('PERFECT\nSUITED TIE', '同点数 · 同花色'),
+            }[bet_type]
+            label_item = text(y0 + height * 26 / 156, chinese, 19, 'Microsoft YaHei UI')
+            text(y0 + height * 53 / 156, english, 10)
+            odds_y = y0 + height * 128 / 156
+            odds_item = text(odds_y, odds_text, 20)
+            text(y0 + height * 146 / 156, condition, 10, 'Microsoft YaHei UI')
+        elif main or layout == 'bottom':
+            if bet_type in ('Small', 'Big'):
+                english += ' (A–9)' if bet_type == 'Small' else ' (10–K)'
+            label_item = text(y0 + height * 19 / 70, chinese,
+                              23 if bet_type in ('Dragon', 'Tiger') else 18, 'Microsoft YaHei UI')
+            text(y0 + height * 37 / 70, english, 11)
+            odds_y = y0 + height * 56 / 70
+            if bet_type in DragonTigerEngine.GAP_RANGES:
+                size = min(14, (x1-x0-8) / (len(odds_text)*.67) / scale)
+                odds_item = text(odds_y, odds_text, size)
+            else:
+                odds_item = text(odds_y, odds_text, 14)
+        else:
+            label_item = text(y0 + height * 14 / 76, chinese, 20, 'Microsoft YaHei UI')
+            text(y0 + height * 29 / 76, english, 11)
+            text(y0 + height * 47 / 76, condition, 10, 'Microsoft YaHei UI')
+            odds_y = y0 + height * 64 / 76
+            odds_item = text(odds_y, odds_text, 16)
+
+        spot = {
+            'bounds': (x0, y0, x1, y1),
+            'chip_pos': (cx, y0 + height * 89 / 156 if layout == 'tall' else (y0 + y1) / 2),
+            'label': label, 'tag': tag, 'rect_id': rect_id, 'frame_id': frame_id,
+            'label_item': label_item, 'odds_item': odds_item,
+            'base_odds': odds_text, 'odds_y': odds_y, 'odds_base_x': cx,
+            'main': bool(main), 'normal_outline': outline,
+            'normal_odds_color': fg,
+            'normal_outline_width': outline_width, 'classic_shape_coords': shape,
+            'chip_radius': min(self.WAGER_CHIP_RADIUS,height*.38),
+        }
+        if interactive:
+            self.register_spot(bet_type, x0, y0, x1, y1, spot['chip_pos'], label)
+            self.bet_spots[(bet_type, None)].update(spot)
+            spot = self.bet_spots[(bet_type, None)]
+            c.tag_bind(tag, '<Button-1>', lambda _e, bt=bet_type: self.place_bet(bt))
+            c.tag_bind(tag, '<Button-3>', lambda _e, bt=bet_type: self.clear_single_bet(bt))
+            c.tag_bind(tag, '<Enter>', lambda _e: c.configure(cursor='hand2'))
+            c.tag_bind(tag, '<Leave>', lambda _e: c.configure(cursor=''))
+        return spot
 
     # ------------------------------------------------------------- bottom controls
     def draw_bottom_controls(self):
@@ -2056,6 +2345,8 @@ class BubbleDragonTigerGame(tk.Frame):
         self.update_control_states()
 
     def show_game_instructions(self):
+        """Game rules dialog with the Baccarat instruction layout."""
+        parent = self.winfo_toplevel()
         existing = getattr(self, '_intro_window', None)
         try:
             if existing is not None and existing.winfo_exists():
@@ -2065,117 +2356,280 @@ class BubbleDragonTigerGame(tk.Frame):
         except tk.TclError:
             pass
 
-        window = tk.Toplevel(self.winfo_toplevel())
-        self._intro_window = window
-        window.title('龙虎 · 游戏简介')
-        window.configure(bg='#120f0d')
-        window.resizable(False, False)
-        window.transient(self.winfo_toplevel())
+        dialog = tk.Toplevel(parent)
+        self._intro_window = dialog
+        engine = DragonTigerEngine
+        mode = self.game_mode
+        mode_title = engine.MODE_NAMES.get(mode, mode)
+        info = {'title': '龙虎',
+         'subtitle': '玩法 · 下注区 · 赔率 · 限红 · 历史记录',
+         'intro': [('比较点数', '龙、虎各发一张；A 最小，K 最大；同点数为和局。花色不影响胜负。'),
+                   ('胜方点数', '小 / 大按胜方牌的点数结算；和局时按两张相同点数结算。'),
+                   ('区间下注', '按两张牌点数差的绝对值结算：0–2、3–5、6–9、10–12；A=1、J=11、Q=12、K=13。例如 J 对 5，11−5=6，区间 6–9 中奖；J 对 J，差为 0，区间 0–2 中奖；实际最大差为 12。')],
+         'main_classic': [('龙／虎独赢', '1:1'), ('龙／虎遇和局', '返还 50% 本金'), ('和局', '10:1')],
+         'main_treasure': [('龙／虎独赢', '1:1 × 命中倍率'), ('龙／虎遇和局', '固定返还 50% 本金'), ('和局', '8:1 × 命中倍率')],
+         'specials': [('聚宝盆费用', '聚宝盆模式按每笔下注额额外收取 10% 费用；清除未开牌下注时连同费用退回。当局净收益会扣除此费用。'),
+                      ('黄金条件',
+                       '每局抽选：仅花色 34%、仅点数 44%、花色与点数同时 22%。花色倍率为 2 / 3 / 4 倍；点数倍率为 2 / 3 / 4 / 5 / 8 '
+                       '倍。'),
+                      ('倍率结算', '只放大中奖注项的利润赔率，不放大本金；适用牌张命中花色或点数时倍率相乘。龙／虎主注在和局时固定半输。')],
+         'history': [('道路页', '大路、派生路与珠盘路记录开牌结果；珠盘单击可切换文字与胜方点数。'),
+                     ('数据页', '显示最近 300 局的胜负、大小与完美同花分布。'),
+                     ('珠盘容量', '独立保留 72 局；超过时按整列移除最旧 6 局。'),
+                     ('底部记录栏', '采用 BacBo 同款两行计数：总局数、龙／虎／和、小／大／完美同花；与当前保存的珠盘记录同步。')],
+         'extra': [('完美同花', '两张牌点数和花色均相同；八副牌可出现同一牌面。'),
+                   ('颜色注', '红色为红心／方块，黑色为黑桃／梅花；按双方牌的颜色组合结算。'),
+                   ('连续洗牌机', '8 副牌、15 仓连续洗牌；每局结算后牌张归还机器。')],
+         'main_bets': ('Dragon', 'Tie', 'Tiger')}
+        dialog.title(f"{info['title']} · 游戏说明 · {mode_title}")
+        dialog.configure(bg='#0a1414')
+        dialog.resizable(False, False)
+        dialog.transient(parent)
+        win_w, win_h = 1000, 650
+        parent.update_idletasks()
+        pos_x = parent.winfo_rootx() + (max(1, parent.winfo_width()) - win_w) // 2
+        pos_y = parent.winfo_rooty() + (max(1, parent.winfo_height()) - win_h) // 2
+        dialog.geometry(f'{win_w}x{win_h}+{pos_x}+{pos_y}')
+        font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
+        bg, sidebar_bg, panel, border = '#0a1414', '#0e1a1a', '#132020', '#3d5a55'
+        gold, fg, muted = '#f0d48b', '#eef4f4', '#a8bdbd'
 
-        width, height = 860, 720
-        try:
-            parent = self.winfo_toplevel()
-            x = parent.winfo_rootx() + max(0, (parent.winfo_width() - width) // 2)
-            y = parent.winfo_rooty() + max(0, (parent.winfo_height() - height) // 2)
-            window.geometry(f'{width}x{height}+{x}+{y}')
-        except tk.TclError:
-            window.geometry(f'{width}x{height}')
-
-        header = tk.Frame(window, bg='#352417', height=96,
-                          highlightbackground='#a7844d', highlightthickness=1)
-        header.pack(fill='x', padx=12, pady=(12, 8))
+        header = tk.Frame(dialog, bg='#0f1c1c', height=82)
+        header.pack(fill=tk.X)
         header.pack_propagate(False)
-        tk.Label(header, text='龙  虎', bg='#352417', fg='#f2d37b',
-                 font=('Arial', 28, 'bold')).place(x=24, y=14)
-        tk.Label(header, text='DRAGON  ·  TIGER', bg='#352417', fg='#bda98d',
-                 font=('Arial', 10, 'bold')).place(x=27, y=61)
-        mode_name = DragonTigerEngine.MODE_NAMES.get(self.game_mode, self.game_mode)
-        tk.Label(header, text=f'当前玩法  {mode_name}', bg='#a77a31', fg='#130f0b',
-                 padx=18, pady=7, font=('Arial', 12, 'bold')).place(x=630, y=28)
+        tk.Label(header, text=f"{info['title']}  {mode_title}", bg='#0f1c1c',
+                 fg=gold, font=(font_name, 20, 'bold')).place(x=24, y=10)
+        tk.Label(header, text=info['subtitle'], bg='#0f1c1c', fg=muted,
+                 font=(font_name, 14)).place(x=25, y=48)
+        close_btn = tk.Button(header, text='关闭  ESC', font=(font_name, 14, 'bold'),
+                              bg='#2a3330', fg=fg, activebackground='#3a4644',
+                              activeforeground='white', relief=tk.FLAT, bd=0,
+                              cursor='hand2')
+        close_btn.place(x=850, y=20, width=120, height=42)
+        tk.Frame(dialog, bg=gold, height=3).pack(fill=tk.X)
 
-        content = tk.Frame(window, bg='#120f0d')
-        content.pack(fill='both', expand=True, padx=12)
-        left = tk.Frame(content, bg='#120f0d')
-        right = tk.Frame(content, bg='#120f0d')
-        left.pack(side='left', fill='both', expand=True, padx=(0, 5))
-        right.pack(side='right', fill='both', expand=True, padx=(5, 0))
+        body = tk.Frame(dialog, bg=bg)
+        body.pack(fill=tk.BOTH, expand=True)
+        sidebar = tk.Frame(body, bg=sidebar_bg, width=220)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+        tk.Frame(body, bg=border, width=1).pack(side=tk.LEFT, fill=tk.Y)
+        tk.Label(sidebar, text='主题', bg=sidebar_bg, fg=gold,
+                 font=(font_name, 14, 'bold'), anchor='w').pack(fill=tk.X, padx=16, pady=(18, 10))
 
-        def section(parent, title, accent, body, height_px):
-            frame = tk.Frame(parent, bg='#201914', height=height_px,
-                             highlightbackground='#58483a', highlightthickness=1)
-            frame.pack(fill='x', pady=(0, 8))
-            frame.pack_propagate(False)
-            tk.Frame(frame, bg=accent, width=5).pack(side='left', fill='y')
-            inner = tk.Frame(frame, bg='#201914')
-            inner.pack(side='left', fill='both', expand=True, padx=14, pady=10)
-            tk.Label(inner, text=title, bg='#201914', fg=accent,
-                     font=('Arial', 13, 'bold'), anchor='w').pack(fill='x')
-            tk.Label(inner, text=body, bg='#201914', fg='#e9dfd4',
-                     font=('Arial', 10), justify='left', anchor='nw',
-                     wraplength=360).pack(fill='both', expand=True, pady=(7, 0))
-            return frame
+        wrap = tk.Frame(body, bg=bg)
+        wrap.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        wrap.grid_rowconfigure(0, weight=1)
+        wrap.grid_columnconfigure(0, weight=1)
+        canvas = tk.Canvas(wrap, bg=bg, highlightthickness=0, bd=0, yscrollincrement=40)
+        bar = tk.Scrollbar(wrap, orient=tk.VERTICAL, command=canvas.yview,
+                           bg='#1f2a29', troughcolor='#0d1515', activebackground=gold,
+                           relief=tk.FLAT, bd=0, width=12)
+        canvas.configure(yscrollcommand=bar.set)
+        canvas.grid(row=0, column=0, sticky='nsew', padx=(0, 4), pady=6)
+        bar.grid(row=0, column=1, sticky='ns', padx=(0, 8), pady=6)
+        content = tk.Frame(canvas, bg=bg)
+        content_id = canvas.create_window((0, 0), window=content, anchor='nw')
+        content.bind('<Configure>', lambda _e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>', lambda e: canvas.itemconfigure(content_id, width=e.width))
 
-        section(
-            left, '一眼看懂', '#e25a60',
-            '龙、虎各发 1 张牌，比较点数大小。\n'
-            'A 最小，依次到 K 最大；同点数即为和局。\n'
-            '龙／虎主注赔率 1:1；遇和时各输一半。', 128)
+        def wheel(event):
+            delta = getattr(event, 'delta', 0)
+            units = -int(delta / 120) if delta else (1 if event.num == 5 else -1)
+            if units:
+                canvas.yview_scroll(units, 'units')
+            return 'break'
 
-        rank_frame = tk.Frame(left, bg='#201914', height=92,
-                              highlightbackground='#58483a', highlightthickness=1)
-        rank_frame.pack(fill='x', pady=(0, 8))
-        rank_frame.pack_propagate(False)
-        tk.Label(rank_frame, text='牌面顺序', bg='#201914', fg='#f2d37b',
-                 font=('Arial', 12, 'bold')).pack(anchor='w', padx=14, pady=(8, 4))
-        ranks = tk.Frame(rank_frame, bg='#201914')
-        ranks.pack(fill='x', padx=12)
-        for rank in ('A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'):
-            tk.Label(ranks, text=rank, bg='#3b3028', fg='white', width=2,
-                     font=('Arial', 9, 'bold'), padx=1, pady=4).pack(side='left', padx=1)
+        for sequence in ('<MouseWheel>', '<Button-4>', '<Button-5>'):
+            dialog.bind(sequence, wheel)
 
-        section(
-            left, '边注速查', '#56b58b',
-            '小：胜方点数 A–9    ｜    大：胜方点数 10–K\n'
-            '完美同花：两张牌点数及花色完全相同\n'
-            '颜色注：双方红色／红黑各一／双方黑色', 126)
-        section(
-            left, '操作与记录', '#70a9d6',
-            '左键下注 · 右键清除单区 · Enter 开牌\n'
-            '「道路」查看珠盘及派生路；「数据」查看最近 300 局饼图。\n'
-            '珠盘独立保留 72 局；第 73 局时按整列移除最旧 6 局。', 120)
+        def title(text, note=''):
+            row = tk.Frame(content, bg=bg)
+            row.pack(fill=tk.X, padx=24, pady=(14, 0))
+            tk.Label(row, text=text, bg=bg, fg=gold,
+                     font=(font_name, 18, 'bold')).pack(side=tk.LEFT)
+            if note:
+                tk.Label(row, text=note, bg=bg, fg=muted,
+                         font=(font_name, 12)).pack(side=tk.RIGHT)
+            tk.Frame(content, bg=border, height=1).pack(fill=tk.X, padx=24, pady=(10, 16))
 
-        section(
-            right, '经典版赔率', '#d6aa58',
-            '和局 10:1　｜　完美同花 50:1\n'
-            '双方红色 2.9:1　｜　红黑各一 0.95:1\n'
-            '双方黑色 2.9:1　｜　小 1:1　｜　大 0.9:1', 120)
-        section(
-            right, '聚宝盆赔率', '#b884e0',
-            '和局 8:1　｜　完美同花 30:1\n'
-            '双方红／双方黑 2:1　｜　红黑各一 0.75:1\n'
-            '小 0.75:1　｜　大 0.55:1\n'
-            '命中黄金花色或点数时，按当局倍率加乘。', 140)
-        section(
-            right, '黄金条件', '#f0c84d',
-            '仅花色 34%　｜　仅点数 44%　｜　两者 22%\n'
-            '花色倍率：2X / 3X / 4X\n'
-            '点数倍率：2X / 3X / 4X / 5X / 8X', 116)
-        section(
-            right, '连续洗牌机', '#68c9c0',
-            '8 副牌 · 15 仓 CSM 连续洗牌。\n'
-            '每局由机器提供牌张，结算后自动归还；不使用本地 JSON 牌靴。', 96)
+        def card(heading):
+            block = tk.Frame(content, bg=panel, highlightbackground=border,
+                             highlightthickness=1)
+            block.pack(fill=tk.X, padx=24, pady=(0, 16))
+            tk.Label(block, text=heading, bg=panel, fg=gold,
+                     font=(font_name, 16, 'bold'), anchor='w').pack(
+                         fill=tk.X, padx=22, pady=(16, 10))
+            return block
 
-        footer = tk.Frame(window, bg='#120f0d', height=54)
-        footer.pack(fill='x', padx=12, pady=(4, 10))
-        tk.Label(footer, text=f'版本 {DRAGON_TIGER_VERSION}', bg='#120f0d',
-                 fg='#756b62', font=('Arial', 9)).pack(side='left', padx=4)
-        tk.Button(footer, text='知道了', command=window.destroy,
-                  bg='#a77a31', fg='#130f0b', activebackground='#d1a750',
-                  relief='flat', padx=28, pady=7,
-                  font=('Arial', 11, 'bold')).pack(side='right')
-        window.protocol('WM_DELETE_WINDOW', window.destroy)
-        window.bind('<Escape>', lambda _event: window.destroy())
-        window.after(20, window.focus_force)
+        def rule(block, heading, description):
+            line = tk.Frame(block, bg=panel)
+            line.pack(fill=tk.X, padx=22, pady=(0, 14))
+            tk.Frame(line, bg=gold, width=4).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 16))
+            text_box = tk.Frame(line, bg=panel)
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(text_box, text=heading, bg=panel, fg=fg, anchor='w',
+                     font=(font_name, 15, 'bold')).pack(fill=tk.X)
+            tk.Label(text_box, text=description, bg=panel, fg=muted,
+                     anchor='w', justify=tk.LEFT, wraplength=630,
+                     font=(font_name, 14)).pack(fill=tk.X, pady=(5, 0))
+
+        def table(block, heading, rows):
+            grid = tk.Frame(block, bg='#1a2a2a', highlightbackground='#2b3d3d',
+                            highlightthickness=1)
+            grid.pack(fill=tk.X, padx=16, pady=(4, 16))
+            tk.Label(grid, text=heading, bg=gold, fg='#111111', anchor='w',
+                     font=(font_name, 14, 'bold'), padx=16, pady=8).pack(fill=tk.X)
+            cells = tk.Frame(grid, bg='#1a2a2a')
+            cells.pack(fill=tk.X)
+            cells.grid_columnconfigure(0, weight=1)
+            cells.grid_columnconfigure(1, minsize=165)
+            for i, (label, value) in enumerate(rows):
+                shade = '#162424' if i % 2 == 0 else '#1a2a2a'
+                tk.Label(cells, text=label, bg=shade, fg=fg, anchor='w',
+                         font=(font_name, 14), padx=18, pady=10).grid(
+                             row=i, column=0, sticky='nsew', padx=(0, 1), pady=(0, 1))
+                tk.Label(cells, text=value, bg=shade, fg=gold,
+                         font=(font_name, 14, 'bold'), padx=8, pady=10).grid(
+                             row=i, column=1, sticky='nsew', pady=(0, 1))
+
+        def page_rules():
+            title('玩法与胜负规则', 'A < 2 < … < 10 < J < Q < K')
+            block = card('基本流程')
+            for heading, desc in info['intro']:
+                rule(block, heading, desc)
+            block = card('牌面与附加条件')
+            for heading, desc in info['extra'][:2]:
+                rule(block, heading, desc)
+
+        def page_board():
+            title('下注区示意', '读取当前模式的真实下注区与赔率')
+            block = card('下注位置')
+            board = tk.Canvas(block, width=680, height=352, bg=panel, highlightthickness=0)
+            board.pack(padx=12, pady=(4, 16))
+            board.create_rectangle(6, 6, 674, 346, fill='#0e3d3d', outline='#3d6a68', width=2)
+            board.create_text(24, 28, anchor='w', text=f'{mode_title} · 下注区',
+                              font=(font_name, 14, 'bold'), fill=fg)
+            self._draw_betting_board(mode, canvas=board, bounds=(22, 56, 658, 326),
+                                     interactive=False)
+            block = card('操作')
+            for heading, desc in (
+                ('左键下注', '点击下注区投入当前选中的筹码。'),
+                ('右键清除', '右键点击下注区，退还该区域尚未开牌的下注。'),
+                ('清除 / 重复 / 开牌', '底部按钮可清除本局、重复上一局下注或开牌；Enter 也可开牌。'),
+            ):
+                rule(block, heading, desc)
+
+        def page_main():
+            title('主注赔率', '表内为净利润赔率；返还时另含本金')
+            block = card(mode_title)
+            table(block, '开奖结果 · 下注回报',
+                  info['main_treasure'] if mode == 'treasure' else info['main_classic'])
+            if mode == 'treasure':
+                block = card('倍率说明')
+                rule(block, '中奖利润乘倍率', info['specials'][2][1])
+            elif info['title'] == '龙虎凤':
+                block = card('并列最高')
+                rule(block, '例子', info['extra'][0][1])
+
+        def page_side():
+            title('边注赔率表', f'{mode_title} · 以实际下注区为准')
+            odds = engine.ODDS_TEXT.get(mode, {})
+            main = set(info['main_bets']) | {'Tie'}
+            for group_name, keys in zip(('区间下注', '颜色下注', '大小／特殊下注'), engine.MODE_ROWS.get(mode, ())):
+                selected = [(engine.DISPLAY_NAMES.get(key, key), odds.get(key, ''))
+                            for key in keys if key not in main]
+                if selected:
+                    table(card(group_name), '下注条件 · 净利润赔率', selected)
+            if info['title'] == '龙虎凤':
+                rule(card('和局注'), '和局赔率', '两家并列最高 7:1；三家同点 20:1。')
+            else:
+                rule(card('边注判定'), '完美同花与大小',
+                     '完美同花须点数及花色均相同；大小按胜方点数，和局按共同点数。')
+            rule(card('区间判定'), '区间 = 两张牌点数差的绝对值', info['intro'][2][1])
+            rule(card('区间赔率'), '净利润赔率以表内四档为准',
+                 '经典版依次为 1.7、1.95、2.6、12 赔 1；聚宝盆依次为 1.05、1.25、1.65、7.5 赔 1。中奖返还另含本金，聚宝盆仍额外收取 10% 手续费。')
+            if mode == 'treasure':
+                rule(card('倍率斜带'), '所有适用格子显示潜在中奖倍率',
+                     '区间注与颜色注取两张牌的黄金条件倍率乘积；大小注取胜方牌，和局时取双方。斜带在未中奖格同样保留，只有实际中奖才按格内赔率派彩。龙／虎遇和仍固定返还一半本金。')
+
+        def page_limits():
+            title('下注限制与操作', '每局总下注上限 $2,000,000')
+            table(card('限红'), '下注区 · 上限', [
+                ('下注单位', '$100 或 $100 的倍数'),
+                ('龙／虎' + ('／凤' if info['title'] == '龙虎凤' else '') + ' 各区', '$500,000'),
+                ('和局', '$100,000'),
+                ('每个边注', '$30,000'),
+                ('每局总下注', '$2,000,000'),
+            ] + ([('聚宝盆费用', '下注额额外 10%')] if mode == 'treasure' else []))
+            block = card('下注操作')
+            for heading, desc in (
+                ('筹码与调整', '下注超出余额或限红时，系统按 $100 单位向下调整。'),
+                ('清除 / 撤销', '开牌前可清除单区或本局下注，也可撤销最近一次下注。'),
+                ('重复下注', '按上一局注额重新投入，仍受当前余额及限红限制。'),
+                ('开牌与切牌', '点击开牌或按 Enter；新牌靴的切牌画面可拖动切牌卡。'),
+            ):
+                rule(block, heading, desc)
+
+        def page_history():
+            title('历史记录说明', '右侧面板')
+            block = card('道路与数据')
+            for heading, desc in info['history']:
+                rule(block, heading, desc)
+
+        def page_notes():
+            title('重要提示', mode_title)
+            block = card('结算与机器')
+            for heading, desc in info['specials'] + info['extra'][2:]:
+                rule(block, heading, desc)
+
+        themes = (
+            ('玩法与胜负规则', page_rules), ('下注区示意', page_board),
+            ('主注赔率', page_main), ('边注赔率表', page_side),
+            ('下注限制与操作', page_limits), ('历史记录说明', page_history),
+            ('重要提示', page_notes),
+        )
+        buttons = {}
+        current = [None]
+
+        def select_theme(name):
+            if current[0] == name:
+                return
+            current[0] = name
+            for key, button in buttons.items():
+                active = key == name
+                button.configure(bg='#1e3433' if active else sidebar_bg,
+                                 fg=gold if active else muted)
+            for child in content.winfo_children():
+                child.destroy()
+            for key, builder in themes:
+                if key == name:
+                    builder()
+                    break
+            canvas.update_idletasks()
+            canvas.yview_moveto(0)
+
+        for name, _builder in themes:
+            button = tk.Button(sidebar, text=name, command=lambda n=name: select_theme(n),
+                               font=(font_name, 14), fg=muted, bg=sidebar_bg,
+                               activebackground='#24403e', activeforeground=gold,
+                               relief=tk.FLAT, bd=0, anchor='w', padx=20, pady=12,
+                               cursor='hand2')
+            button.pack(fill=tk.X)
+            buttons[name] = button
+        select_theme(themes[0][0])
+
+        def close():
+            self._intro_window = None
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
+
+        close_btn.configure(command=close)
+        dialog.protocol('WM_DELETE_WINDOW', close)
+        dialog.bind('<Escape>', lambda _event: close())
+        dialog.after(30, dialog.focus_force)
 
     def show_help_window(self):
         self.show_game_instructions()
@@ -2298,10 +2752,148 @@ class BubbleDragonTigerGame(tk.Frame):
 
     def update_control_states(self):
         enabled = self.accept_bets and not self.animation_running and not self.settlement_running
+        self.update_mode_selector_style()
         for attr in ('clear_button', 'repeat_button', 'deal_button'):
             tag = getattr(self, attr, None)
             if tag:
                 self.set_control_button_state(tag, enabled)
+
+    # -------------------------------------------------------------- chip motion
+    def _schedule_chip_motion(self, delay_ms, callback, motion_tag):
+        """Track each flight's next frame so it can be cancelled independently."""
+        holder = {}
+
+        def run():
+            after_id = holder.get('id')
+            self.chip_motion_after_ids.discard(after_id)
+            motion = self.chip_motion_items.get(motion_tag)
+            if self._closing or motion is None:
+                return
+            motion['after_id'] = None
+            callback()
+
+        after_id = self.after(max(0, int(delay_ms)), run)
+        holder['id'] = after_id
+        self.chip_motion_after_ids.add(after_id)
+        self.chip_motion_items[motion_tag]['after_id'] = after_id
+        return after_id
+
+    def _cancel_chip_motion(self, key=None, role=None):
+        """Remove incoming chips for one spot, or finish all pending visuals."""
+        for tag, motion in list(self.chip_motion_items.items()):
+            if key is not None and motion['key'] != key:
+                continue
+            if role is not None and motion.get('role', 'wager') != role:
+                continue
+            after_id = motion.get('after_id')
+            if after_id is not None:
+                try:
+                    self.after_cancel(after_id)
+                except (tk.TclError, ValueError):
+                    pass
+                self.chip_motion_after_ids.discard(after_id)
+            try:
+                self.canvas.delete(tag)
+            except tk.TclError:
+                pass
+            self.chip_motion_items.pop(tag, None)
+        if role in (None, 'wager'):
+            if key is None:
+                self.pending_bet_visual_amounts.clear()
+            else:
+                self.pending_bet_visual_amounts.pop(key, None)
+
+    def _chip_rack_source_position(self):
+        """Return the centre of the selected chip in the bottom chip rack."""
+        items = self.chip_selector_items.get(self.selected_chip)
+        if items:
+            try:
+                coords = self.canvas.coords(items[1])
+                if len(coords) >= 4:
+                    return ((coords[0] + coords[2]) / 2.0,
+                            (coords[1] + coords[3]) / 2.0)
+            except tk.TclError:
+                pass
+        return (self.WIDTH / 2.0, 674.0)
+
+    def _animate_amount_chip(self, amount, start_xy, target_xy,
+                             on_complete=None, key=None, role='wager'):
+        """Use Baccarat_Special's 0.2-second smooth chip flight."""
+        if self._closing:
+            return
+        amount = float(amount)
+        if amount <= 0:
+            if callable(on_complete):
+                on_complete()
+            return
+
+        self.chip_motion_serial += 1
+        tag = f'chip_motion_{self.chip_motion_serial}'
+        self.chip_motion_items[tag] = {'key': key, 'after_id': None, 'role': role}
+        x, y = map(float, start_xy)
+        tx, ty = map(float, target_xy)
+        spot = self.bet_spots.get(key, {})
+        radius = float(spot.get('chip_radius', self.MOTION_CHIP_RADIUS))
+        if role == 'fee':
+            radius = min(radius, float(self.MOTION_CHIP_RADIUS))
+        chip_color = self.bet_chip_color(amount)
+        text_color = self.contrast_text_color(chip_color)
+        outer = self.canvas.create_oval(
+            x - radius, y - radius, x + radius, y + radius,
+            fill='#292522', outline='#151311', width=1,
+            tags=(tag, 'chip_motion'))
+        inner = self.canvas.create_oval(
+            x - radius + 3, y - radius + 3, x + radius - 3, y + radius - 3,
+            fill=chip_color, outline='#e2ddd5', width=1,
+            tags=(tag, 'chip_motion'))
+        caption = self._compact_amount(amount)
+        chip_font = ('Arial',9,'bold')
+        text = self.canvas.create_text(
+            x, y, text=caption,
+            font=chip_font, fill=text_color,
+            tags=(tag, 'chip_motion'))
+        steps = max(1, int(self.CHIP_MOVE_STEPS))
+        frame_ms = max(1, int(round(self.CHIP_MOVE_DURATION_MS / steps)))
+
+        def place_items(cx, cy):
+            self.canvas.coords(outer, cx - radius, cy - radius,
+                               cx + radius, cy + radius)
+            self.canvas.coords(inner, cx - radius + 3, cy - radius + 3,
+                               cx + radius - 3, cy + radius - 3)
+            self.canvas.coords(text, cx, cy)
+            self.canvas.tag_raise(tag)
+
+        def frame(step):
+            if self._closing or tag not in self.chip_motion_items:
+                return
+            ratio = min(1.0, max(0.0, step / steps))
+            eased = ratio * ratio * (3.0 - 2.0 * ratio)
+            cx = x + (tx - x) * eased
+            cy = y + (ty - y) * eased
+            place_items(cx, cy)
+            if step >= steps:
+                self.canvas.delete(tag)
+                self.chip_motion_items.pop(tag, None)
+                if callable(on_complete):
+                    on_complete()
+                return
+            self._schedule_chip_motion(frame_ms, lambda: frame(step + 1), tag)
+
+        place_items(x, y)
+        self._schedule_chip_motion(frame_ms, lambda: frame(1), tag)
+        return tag
+
+    def _complete_pending_bet_visual(self, key, amount):
+        pending = max(0.0, float(self.pending_bet_visual_amounts.get(key, 0.0))
+                      - float(amount))
+        if pending > 1e-9:
+            self.pending_bet_visual_amounts[key] = pending
+        else:
+            self.pending_bet_visual_amounts.pop(key, None)
+        if not self._closing:
+            self.update_bet_chips()
+            self.canvas.tag_raise('controls')
+            self.canvas.tag_raise('chip_motion')
 
     # --------------------------------------------------------------- bet actions
     def select_chip(self, amount):
@@ -2328,12 +2920,7 @@ class BubbleDragonTigerGame(tk.Frame):
         return 0.10 if self.game_mode == 'treasure' else 0.0
 
     def _refresh_treasure_pool_text(self):
-        item = getattr(self, 'treasure_pool_display', None)
-        if item:
-            try:
-                self.canvas.itemconfigure(item, text=f'聚宝盆 本局 ${self.treasure_pot_amount:,.0f}')
-            except tk.TclError:
-                pass
+        self._draw_fee_chips()
 
     def _current_round_total_cost(self):
         """本局总支出 = 下注额 + 聚宝盆10%费用。"""
@@ -2373,6 +2960,11 @@ class BubbleDragonTigerGame(tk.Frame):
             messagebox.showwarning('下注限制', f'下注已自动调整为 {self.format_money(allowed)}。',
                                    parent=self.winfo_toplevel())
         fee = allowed * fee_rate
+        fee_token = self._register_fee_visual(bet_type, fee) if fee > 0 else None
+        self._fee_collected = False
+        key = (bet_type, None)
+        self.pending_bet_visual_amounts[key] = (
+            self.pending_bet_visual_amounts.get(key, 0.0) + allowed)
         self.bet_state.add_bet(bet_type, allowed)
         self.balance -= allowed + fee
         if fee > 0:
@@ -2383,12 +2975,22 @@ class BubbleDragonTigerGame(tk.Frame):
         self.summary_mode = 'bet'
         self._refresh_treasure_pool_text()
         self.update_display()
+        source = self._chip_rack_source_position()
+        target = tuple(self.bet_spots[key]['chip_pos'])
+        def landed():
+            self._complete_pending_bet_visual(key, allowed)
+            if fee_token is not None:
+                self._start_fee_visual(fee_token)
+
+        self._animate_amount_chip(allowed, source, target, key=key, on_complete=landed)
         self.save_balance()
         return True
 
     def clear_single_bet(self, bet_type, _param=None):
         if not self.accept_bets or self.animation_running or self.settlement_running:
             return
+        self._cancel_chip_motion((bet_type, None))
+        self._cancel_fee_visuals(bet_type)
         refunded = self.bet_state.clear_area(bet_type)
         if refunded <= 0:
             return
@@ -2408,6 +3010,8 @@ class BubbleDragonTigerGame(tk.Frame):
             bet_type, _param, amount = self.undo_stack.pop()
             removed = self.bet_state.remove_amount(bet_type, amount)
             if removed > 0:
+                self._cancel_chip_motion((bet_type, None))
+                self._cancel_fee_visuals(bet_type)
                 fee_rate = self._treasure_fee_rate(bet_type)
                 fee = min(float(self.bet_fee_state.get(bet_type, 0.0)), removed * fee_rate)
                 if fee > 0:
@@ -2426,6 +3030,8 @@ class BubbleDragonTigerGame(tk.Frame):
     def clear_bets(self):
         if not self.accept_bets or self.animation_running or self.settlement_running:
             return
+        self._cancel_chip_motion()
+        self._cancel_fee_visuals()
         refunded = self.bet_state.clear_all()
         fee = sum(float(v) for v in self.bet_fee_state.values())
         if refunded <= 0 and fee <= 0:
@@ -2481,6 +3087,10 @@ class BubbleDragonTigerGame(tk.Frame):
 
     @staticmethod
     def _compact_amount(amount):
+        for threshold,unit in ((1_000_000_000,'B'),(1_000_000,'M')):
+            if amount>=threshold:
+                value=amount/threshold
+                return (f'{value:.0f}' if abs(value-round(value))<.01 else f'{value:.1f}')+unit
         if amount >= 1000:
             value = amount / 1000
             return f'{value:.0f}K' if abs(value - round(value)) < 0.01 else f'{value:.1f}K'
@@ -2503,6 +3113,10 @@ class BubbleDragonTigerGame(tk.Frame):
         self.canvas.delete('bet_chip_dynamic')
         for key, spot in self.bet_spots.items():
             amount = self.bet_state.current_area_bet(key[0])
+            # Merge a new wager into the static chip only after it lands.
+            pending_in = float(self.pending_bet_visual_amounts.get(key, 0.0))
+            if pending_in > 0 and not self.settlement_running:
+                amount = max(0.0, amount - pending_in)
             # Tie is a visual push for Dragon/Tiger during settlement: the
             # original wager chips stay on the felt until finish_settlement().
             # This is intentionally independent of whether a particular mode
@@ -2517,9 +3131,10 @@ class BubbleDragonTigerGame(tk.Frame):
             if amount <= 0:
                 continue
             x0, y0, x1, y1 = spot['bounds']
-            # Keep the wager chip in the geometric centre of its betting area.
-            x, y = (x0 + x1) / 2, (y0 + y1) / 2
-            radius = 20
+            # Use the same destination as the flying chip; tall XXX side panels
+            # reserve a clear pocket between the bilingual label and the odds.
+            x, y = spot['chip_pos']
+            radius = spot.get('chip_radius', self.WAGER_CHIP_RADIUS)
             x = max(x0 + radius + 1, min(x1 - radius - 1, x))
             y = max(y0 + radius + 1, min(y1 - radius - 1, y))
             chip_color = self.bet_chip_color(amount)
@@ -2531,8 +3146,10 @@ class BubbleDragonTigerGame(tk.Frame):
                                     x + radius - 3, y + radius - 3,
                                     fill=chip_color, outline='#e2ddd5', width=1,
                                     tags=('bet_chip_dynamic', spot['tag']))
-            self.canvas.create_text(x, y, text=self._compact_amount(amount),
-                                    font=('Arial', 9, 'bold'), fill=text_color,
+            caption = self._compact_amount(amount)
+            chip_font = ('Arial',9,'bold')
+            self.canvas.create_text(x, y, text=caption,
+                                    font=chip_font, fill=text_color,
                                     tags=('bet_chip_dynamic', spot['tag']))
 
     @classmethod
@@ -2546,6 +3163,168 @@ class BubbleDragonTigerGame(tk.Frame):
         return color
 
     # ------------------------------------------------------- Treasure Pot mode
+    def _draw_treasure_card_area(self, canvas, bounds, interactive=True, mode=None):
+        """XXX's centre card and fee panel spans the first two betting rows."""
+        mode = mode or self.game_mode
+        if mode != 'treasure':
+            if interactive:
+                self._treasure_board_geometry = None
+                self._treasure_round_positions = None
+            return
+        x0,y0,x1,y1 = bounds
+        sx,sy = (x1-x0)/738.0, (y1-y0)/234.0
+        scale = min(sx,sy)
+
+        def xy(x,y):
+            return x0+x*sx, y0+y*sy
+
+        def label(x,y,value,size=11,style='bold',tag=None):
+            return canvas.create_text(*xy(x,y), text=value, fill='#ffe69b',
+                font=('Arial',-max(7,round(size*scale)),style),
+                justify='center', tags=('board_dynamic',tag) if tag else 'board_dynamic')
+
+        canvas.create_rectangle(*xy(247,0),*xy(491,156), fill='#211811',
+                                outline='#856a32', tags=('board_dynamic','treasure_card_area'))
+        card_h = max(1,round(96*scale))
+        card_w = max(1,round(card_h*5/7))
+
+        def card_position(center):
+            px,py = xy(center,37)
+            return px-card_w/2,py
+
+        geometry = dict(positions=[card_position(305),card_position(389)],
+                        size=(card_w,card_h), scale=scale,
+                        fee=xy(463,94), fee_radius=self.WAGER_CHIP_RADIUS,
+                        cards_center=xy(347,85), single_position=card_position(347))
+        label(347,15,'黄金扑克',18,tag='treasure_title')
+        self._draw_treasure_placeholders(canvas,geometry)
+        self._draw_treasure_slot_labels(canvas,geometry)
+        label(347,149,'命中条件，倍率相乘',10)
+        fx,fy = geometry['fee']
+        canvas.create_oval(fx-25*sx,fy-33*sy,fx+25*sx,fy+42*sy,
+            fill='',outline='#a89465',width=1.5,dash=(4,3),
+            tags=('board_dynamic','treasure_fee_placeholder'))
+        label(463,36,'手续费',14,'bold italic')
+        label(463,124,'10%',12)
+        if interactive:
+            self._treasure_board_geometry = geometry
+            self._treasure_round_positions = None
+
+    def _draw_treasure_placeholders(self, canvas, geometry, positions=None):
+        width, height = geometry['size']
+        for index, (px, py) in enumerate(geometry['positions'] if positions is None else positions):
+            canvas.create_rectangle(px, py, px + width, py + height,
+                fill='', outline='#a78948', width=1, dash=(4, 3),
+                tags=('board_dynamic', 'treasure_card_placeholder',
+                      f'treasure_card_placeholder_{index}'))
+
+    def _draw_treasure_slot_labels(self, canvas, geometry, positions=None, kinds=None):
+        canvas.delete('treasure_slot_label')
+        positions = geometry['positions'] if positions is None else positions
+        kinds = ('SuitOnly', 'RankOnly') if kinds is None else kinds
+        for index, ((px, py), kind) in enumerate(zip(positions, kinds)):
+            canvas.create_text(px + geometry['size'][0]/2, py + geometry['size'][1]/2,
+                text='花色' if kind == 'SuitOnly' else '点数', fill='#ffe05a',
+                font=('Arial', -max(10, round(20*geometry['scale'])), 'bold'),
+                tags=('board_dynamic', 'treasure_slot_label', f'treasure_slot_label_{index}'))
+
+    def _treasure_card_size(self):
+        return tuple(max(1, round(v)) for v in self._treasure_board_geometry['size'])
+
+    def _treasure_panel_tags(self):
+        return ('treasure_panel', 'board_dynamic')
+
+    def _fee_chip_target_position(self):
+        return self._treasure_board_geometry['fee']
+
+    def _register_fee_visual(self, bet_type, amount):
+        self._fee_visual_serial += 1
+        token = self._fee_visual_serial
+        self.pending_fee_visuals[token] = dict(bet_type=bet_type, amount=float(amount),
+                                              motion_tag=None)
+        return token
+
+    def _start_fee_visual(self, token):
+        transfer = self.pending_fee_visuals.get(token)
+        if transfer is None or transfer['motion_tag'] is not None or self._closing:
+            return
+        spot = self.bet_spots.get((transfer['bet_type'], None))
+        if not spot or self.game_mode != 'treasure':
+            self._complete_fee_visual(token)
+            return
+        tag = self._animate_amount_chip(
+            transfer['amount'], spot['chip_pos'], self._fee_chip_target_position(),
+            on_complete=lambda: self._complete_fee_visual(token),
+            key=(transfer['bet_type'], None), role='fee')
+        if token in self.pending_fee_visuals:
+            transfer['motion_tag'] = tag
+
+    def _complete_fee_visual(self, token):
+        if self.pending_fee_visuals.pop(token, None) is not None and not self._closing:
+            self._refresh_treasure_pool_text()
+
+    def _cancel_fee_visuals(self, bet_type=None):
+        for token, transfer in list(self.pending_fee_visuals.items()):
+            if bet_type is None or transfer['bet_type'] == bet_type:
+                self._cancel_chip_motion((transfer['bet_type'], None), role='fee')
+                self.pending_fee_visuals.pop(token, None)
+
+    def _draw_amount_chip(self, amount, x, y, tags, radius=None):
+        radius = self.WAGER_CHIP_RADIUS if radius is None else radius
+        color = self.bet_chip_color(amount)
+        self.canvas.create_oval(x-radius, y-radius, x+radius, y+radius,
+                               fill='#292522', outline='#151311', width=1, tags=tags)
+        self.canvas.create_oval(x-radius+3, y-radius+3, x+radius-3, y+radius-3,
+                               fill=color, outline='#e2ddd5', width=1, tags=tags)
+        self.canvas.create_text(x, y, text=self._compact_amount(amount),
+                               font=('Arial', 9, 'bold'),
+                               fill=self.contrast_text_color(color), tags=tags)
+
+    def _draw_fee_chips(self):
+        self.canvas.delete('treasure_fee_chips')
+        if self.game_mode != 'treasure' or self._fee_collected:
+            return
+        pending = sum(v['amount'] for v in self.pending_fee_visuals.values())
+        amount = max(0.0, self.treasure_pot_amount - pending)
+        if amount > 0:
+            self._draw_amount_chip(amount, *self._fee_chip_target_position(),
+                                   ('board_dynamic', 'treasure_fee_chips'),
+                                   radius=self._treasure_board_geometry['fee_radius'])
+
+    def _animate_treasure_fee_light(self, on_complete, step=0):
+        """XXX's fee-chip light enters the card area before the cards appear."""
+        if self._closing or self.game_mode != 'treasure':
+            return
+        if step == 0 and self.pending_fee_visuals:
+            for token in tuple(self.pending_fee_visuals):
+                self._start_fee_visual(token)
+            self._queue_animation(20, self._animate_treasure_fee_light, on_complete, 0)
+            return
+        if step == 0:
+            self._fee_collected = True
+            self.canvas.delete('treasure_fee_chips')
+        self.canvas.delete('treasure_fee_light')
+        if self.treasure_pot_amount <= 0 or step > 22:
+            if callable(on_complete):
+                on_complete()
+            return
+        sx, sy = self._fee_chip_target_position()
+        positions = self._treasure_panel_positions()
+        card_w, card_h = self._treasure_card_size()
+        tx = sum(px + card_w/2 for px, _py in positions) / len(positions)
+        ty = sum(py + card_h/2 for _px, py in positions) / len(positions)
+        t = max(0, min(1, (step - 4) / 14))
+        x, y = sx + (tx-sx)*t, sy + (ty-sy)*t - 18*math.sin(math.pi*t)
+        tags = ('board_dynamic', 'treasure_fee_light')
+        if 0 < t < 1:
+            self.canvas.create_line(sx, sy, x, y, fill='#ad7516', width=5, tags=tags)
+            self.canvas.create_line(sx, sy, x, y, fill='#ffe68a', width=2, tags=tags)
+        radius = 16-step*1.5 if step < 5 else (7 if step < 18 else 7+(step-18)*3)
+        for r, color in ((radius+5, '#865b16'), (radius, '#f4c64a'),
+                         (max(2, radius-4), '#fff4bd')):
+            self.canvas.create_oval(x-r, y-r, x+r, y+r, fill=color, outline='', tags=tags)
+        self._queue_animation(25, self._animate_treasure_fee_light, on_complete, step+1)
+
     def _prepare_treasure_round(self, on_complete=None):
         """Choose this round's active golden condition(s), then reveal their cards.
 
@@ -2583,43 +3362,44 @@ class BubbleDragonTigerGame(tk.Frame):
             self.current_golden_cards.append((('RankOnly', rank), rank_mult))
 
         self.current_golden_map = {}
+        for suit in DragonTigerEngine.SUITS:
+            for rank in DragonTigerEngine.RANKS:
+                multiplier = 1
+                if self.current_treasure_suit and suit == self.current_treasure_suit[0]:
+                    multiplier *= self.current_treasure_suit[1]
+                if self.current_treasure_rank and rank == self.current_treasure_rank[0]:
+                    multiplier *= self.current_treasure_rank[1]
+                if multiplier > 1:
+                    self.current_golden_map[(suit, rank)] = multiplier
         self._show_treasure_panel_shell()
         self.update_golden_bet_visuals()
-        self._animate_treasure_card_fade(0, on_complete)
+        self._animate_treasure_fee_light(
+            lambda: self._animate_treasure_card_fade(0, on_complete))
 
     def _show_treasure_panel_shell(self):
+        """Show the original Dragon/Tiger conditions inside XXX's centre panel."""
         self.treasure_panel_active = True
-        self.canvas.delete('history_dynamic')
         self.canvas.delete('treasure_panel')
+        self.canvas.delete('treasure_card_placeholder')
         self.treasure_panel_images = []
         self.treasure_animation_refs = {}
         self.treasure_panel_card_items = []
         self.treasure_panel_multiplier_items = []
-        x0, y0, x1, y1 = self.HISTORY_X0, 4, self.HISTORY_X1, 620
-        c = self.canvas
-        c.create_rectangle(x0, y0, x1, y1, fill='#17120f', outline='#d0aa3f', width=3,
-                           tags='treasure_panel')
-        c.create_text((x0+x1)/2, 34, text='聚宝盆', font=('Arial', 22, 'bold'),
-                      fill='#ffd84a', tags='treasure_panel')
-        c.create_text((x0+x1)/2, 72, text='本局黄金条件', font=('Arial', 13, 'bold'),
-                      fill='#e8d8b4', tags='treasure_panel')
-        for (descriptor, _mult), (px, _py) in zip(
-                self.current_golden_cards, self._treasure_panel_positions()):
-            kind_tag, _value = descriptor
-            label = '花色' if kind_tag == 'SuitOnly' else '点数'
-            c.create_text(px + 50, 118, text=label, font=('Arial', 12, 'bold'),
-                          fill='white', tags='treasure_panel')
-        c.create_text((x0+x1)/2, 390,
-                      text='命中花色或点数会增加倍数',
-                      font=('Arial', 12, 'bold'), fill='#e8d8b4', justify='center',
-                      tags='treasure_panel')
-        c.tag_raise('treasure_panel')
+        geometry = self._treasure_board_geometry
+        if len(self.current_golden_cards) == 1:
+            positions = [geometry['single_position']]
+        else:
+            positions = list(geometry['positions'])
+        self._treasure_round_slots = list(range(len(positions)))
+        self._treasure_round_positions = positions
+        self._draw_treasure_placeholders(self.canvas, geometry, positions)
+        self._draw_treasure_slot_labels(self.canvas, geometry, positions,
+            [descriptor[0] for descriptor, _mult in self.current_golden_cards])
 
     def _treasure_panel_positions(self):
-        """Return centered panel positions for one or two active condition cards."""
-        if len(self.current_golden_cards) <= 1:
-            return [(908, 145)]
-        return [(837, 145), (1007, 145)]
+        positions = self._treasure_round_positions
+        return list(positions if positions is not None
+                    else self._treasure_board_geometry['positions'])
 
     def _make_treasure_condition_pil(self, kind, value):
         """Draw a formal-size Treasure condition card without corner indices.
@@ -2719,43 +3499,57 @@ class BubbleDragonTigerGame(tk.Frame):
         if self._closing or not self.treasure_panel_active:
             return
         if index >= len(self.current_golden_cards):
-            self._queue_animation(20, self._animate_treasure_multiplier_drop, on_complete)
+            self._finish_treasure_card_layout(on_complete)
             return
 
-        descriptor, _mult = self.current_golden_cards[index]
+        card, _mult = self.current_golden_cards[index]
         px, py = self._treasure_panel_positions()[index]
         c = self.canvas
-        base = self._treasure_condition_pil(descriptor)
-        steps = 20
+        base = self._treasure_condition_pil(card)
+        if base is not None:
+            base = base.resize(self._treasure_card_size(), Image.Resampling.LANCZOS)
+        card_w, card_h = self._treasure_card_size()
+        card_tags = self._treasure_panel_tags()+(f'treasure_selected_card_{index}',)
+        # Replace the centred condition caption as its original gold card fades in.
+        c.delete(f'treasure_slot_label_{index}')
+        steps = 20                 # 20 * 25ms = 0.50 seconds
         frame_ms = 25
 
+        def card_ready():
+            if self._closing or not self.treasure_panel_active:
+                return
+            if self.game_mode == 'treasure':
+                slots = getattr(self, '_treasure_round_slots', None)
+                slot = slots[index] if slots is not None else index
+                c.delete(f'treasure_card_placeholder_{slot}')
+            self._queue_animation(0, self._animate_treasure_card_fade, index + 1, on_complete)
+
         if base is None or ImageTk is None:
-            kind_tag, value = descriptor
-            rect = c.create_rectangle(px, py, px+100, py+140, fill='#d3a202',
-                                      outline='#3b302d', width=4,
-                                      stipple='gray75', tags='treasure_panel')
-            inner1 = c.create_rectangle(px+7, py+7, px+93, py+133, outline='#f7edd0', width=2,
-                                        tags='treasure_panel')
-            inner2 = c.create_rectangle(px+12, py+12, px+88, py+128, outline='#b89417', width=1,
-                                        tags='treasure_panel')
-            if kind_tag == 'SuitOnly':
-                text = {'Club':'♣', 'Diamond':'♦', 'Heart':'♥', 'Spade':'♠'}.get(value, value)
-                fg = '#c22631' if value in ('Diamond','Heart') else '#111111'
-                font = ('Arial', 42, 'bold')
-            else:
-                text, fg = value, '#111111'
-                font = ('Arial', 38, 'bold')
-            txt = c.create_text(px+50, py+70, text=text,
-                                font=font, fill=fg,
-                                tags='treasure_panel')
-            self.treasure_panel_card_items.extend((rect, inner1, inner2, txt))
-            self._queue_animation(500, self._animate_treasure_card_fade, index + 1, on_complete)
+            # Pillow-less fallback: approximate the 0.5s fade with a staged
+            # outline, while preserving the same sequencing duration.
+            rect = c.create_rectangle(px, py, px+card_w, py+card_h, fill='#f8efd1',
+                                      outline='#ffd84a', width=3,
+                                      stipple='gray75', tags=card_tags)
+            kind, value = card
+            caption = ({'Club':'♣', 'Diamond':'♦', 'Heart':'♥', 'Spade':'♠'}.get(value, value)
+                       if kind == 'SuitOnly' else value)
+            txt = c.create_text(px+card_w/2, py+card_h/2, text=caption,
+                                font=('Arial', -max(14, round(card_w*.55)), 'bold'), fill='#222',
+                                tags=card_tags)
+            self.treasure_panel_card_items.extend((rect, txt))
+            def ready():
+                c.itemconfigure(rect, stipple='')
+                card_ready()
+            self._queue_animation(500, ready)
             return
 
+        # Create one canvas image and replace its PhotoImage every frame.  The
+        # references dictionary prevents Tk from garbage-collecting the active
+        # frame during the animation.
         first = base.copy()
         first.putalpha(0)
         photo = ImageTk.PhotoImage(first, master=self)
-        item = c.create_image(px, py, image=photo, anchor='nw', tags='treasure_panel')
+        item = c.create_image(px, py, image=photo, anchor='nw', tags=card_tags)
         self.treasure_animation_refs[item] = photo
         self.treasure_panel_card_items.append(item)
 
@@ -2764,6 +3558,8 @@ class BubbleDragonTigerGame(tk.Frame):
                 return
             alpha = max(0, min(255, int(round(255 * step / steps))))
             frame = base.copy()
+            # Golden card artwork is opaque in normal use; applying a global
+            # alpha gives a clean true fade without changing its RGB colours.
             frame.putalpha(alpha)
             frame_photo = ImageTk.PhotoImage(frame, master=self)
             self.treasure_animation_refs[item] = frame_photo
@@ -2774,217 +3570,177 @@ class BubbleDragonTigerGame(tk.Frame):
             if step < steps:
                 self._queue_animation(frame_ms, fade_step, step + 1)
             else:
+                # Keep a stable final image reference and only then start the
+                # next card. No overlap between the per-card 0.5-second fades.
                 final_photo = ImageTk.PhotoImage(base, master=self)
                 self.treasure_animation_refs[item] = final_photo
                 c.itemconfigure(item, image=final_photo)
-                self._queue_animation(0, self._animate_treasure_card_fade, index + 1, on_complete)
+                card_ready()
+
         fade_step(0)
 
+
+    def _finish_treasure_card_layout(self, on_complete):
+        self.canvas.delete('treasure_card_placeholder')
+        self._queue_animation(20, self._animate_treasure_multiplier_drop, on_complete)
+
     def _animate_treasure_multiplier_drop(self, on_complete):
-        """Drop the two multiplier badges from above, matching the Baccarat animation."""
+        """Drop all current multiplier badges simultaneously over 0.5 seconds."""
         if self._closing or not self.treasure_panel_active:
             return
         c = self.canvas
         positions = self._treasure_panel_positions()
         self.treasure_panel_multiplier_items = []
-        start_y = 78
+        card_w, _card_h = self._treasure_card_size()
+        compact = True
+        radius = max(7, round(card_w * .23)) if compact else 14
+        font_size = max(6, round(card_w * .19)) if compact else 9
+        badge_inset = radius if compact else 8
         finals = []
-        for (_descriptor, mult), (px, py) in zip(self.current_golden_cards, positions):
-            cx = px + 77
-            final_y = py + 12
-            oval = c.create_oval(cx-18, start_y-18, cx+18, start_y+18,
+        for (_card, mult), (px, py) in zip(self.current_golden_cards, positions):
+            cx = px + card_w - badge_inset
+            final_y = py + (radius if compact else 7)
+            start_y = final_y - radius if compact else 72
+            oval = c.create_oval(cx-radius, start_y-radius, cx+radius, start_y+radius,
                                  fill='#ffffff', outline='#d6d6d6', width=2,
-                                 tags='treasure_panel')
-            text = c.create_text(cx, start_y, text=f'{mult}X', font=('Arial', 11, 'bold'),
-                                 fill='#000000', tags='treasure_panel')
+                                 tags=self._treasure_panel_tags())
+            text = c.create_text(cx, start_y, text=f'{int(mult)}X', font=('Arial',font_size,'bold'),
+                                 fill='#000000', tags=self._treasure_panel_tags())
             self.treasure_panel_multiplier_items.extend((oval, text))
-            finals.append((oval, text, cx, final_y))
+            finals.append((oval, text, cx, start_y, final_y))
         c.tag_raise('treasure_panel')
 
-        steps = 20
+        steps = 20                 # 20 * 25ms = 0.50 seconds
         frame_ms = 25
         def drop_step(step=0):
             if self._closing or not self.treasure_panel_active:
                 return
             ratio = min(1.0, step / float(steps))
+            # Ease-out cubic: fast initial fall, gentle landing.
             eased = 1.0 - (1.0 - ratio) ** 3
-            for oval, text, cx, final_y in finals:
+            for oval, text, cx, start_y, final_y in finals:
                 cy = start_y + (final_y - start_y) * eased
-                c.coords(oval, cx-18, cy-18, cx+18, cy+18)
+                c.coords(oval, cx-radius, cy-radius, cx+radius, cy+radius)
                 c.coords(text, cx, cy)
             if step < steps:
                 self._queue_animation(frame_ms, drop_step, step + 1)
             elif callable(on_complete):
+                # The very first Dragon card may only be dealt after all current
+                # multiplier badges have landed.
                 self._queue_animation(0, on_complete)
         drop_step(0)
 
     def _hide_treasure_panel(self):
         self.treasure_panel_active = False
         self.canvas.delete('treasure_panel')
+        self.canvas.delete('treasure_card_placeholder')
+        self.canvas.delete('treasure_fee_light')
         self.treasure_panel_images = []
         self.treasure_animation_refs = {}
         self.treasure_panel_card_items = []
         self.treasure_panel_multiplier_items = []
+        self._treasure_round_positions = None
         self.current_treasure_suit = None
         self.current_treasure_rank = None
         self.current_treasure_condition_mode = None
-        self._draw_history_content()
+        self._fee_collected = False
+        if self.game_mode == 'treasure':
+            self._draw_treasure_placeholders(self.canvas, self._treasure_board_geometry)
+            self._draw_treasure_slot_labels(self.canvas, self._treasure_board_geometry)
         self.update_history_table()
 
     def _gold_multiplier_for_revealed(self, bet_type):
-        """Return the currently visible Treasure multiplier without spoilers."""
+        """Show each applicable potential win price using only face-up cards."""
         if self.game_mode != 'treasure':
             return 1
-        ds = list(self.revealed_cards.get('Dragon', []))
-        ts = list(self.revealed_cards.get('Tiger', []))
-        dragon = ds[0] if ds else None
-        tiger = ts[0] if ts else None
-        suit_value = self.current_treasure_suit[0] if self.current_treasure_suit else None
+        ds = self.revealed_cards.get('Dragon') or []
+        ts = self.revealed_cards.get('Tiger') or []
+        dragon,tiger = (ds[0] if ds else None),(ts[0] if ts else None)
+        suit = self.current_treasure_suit[0] if self.current_treasure_suit else None
         suit_mult = int(self.current_treasure_suit[1]) if self.current_treasure_suit else 1
-        rank_value = self.current_treasure_rank[0] if self.current_treasure_rank else None
+        rank = self.current_treasure_rank[0] if self.current_treasure_rank else None
         rank_mult = int(self.current_treasure_rank[1]) if self.current_treasure_rank else 1
 
         def card_mult(card):
-            if not card:
+            if card is None:
                 return 1
-            m = 1
-            if card[0] == suit_value:
-                m *= suit_mult
-            if card[1] == rank_value:
-                m *= rank_mult
-            return m
+            return (suit_mult if card[0] == suit else 1)*(rank_mult if card[1] == rank else 1)
 
-        if bet_type in ('Dragon', 'Tiger'):
-            # Display is card-driven, not result-driven: if that side's dealt card
-            # is golden, keep showing the amplified *would-win* odds and gold frame
-            # even when that side ultimately loses the hand.  The only exception
-            # is a Tie, where Dragon/Tiger main bets are fixed half-losses and must
-            # never advertise a Treasure-amplified return.
+        if bet_type in ('Dragon','Tiger'):
             if dragon and tiger and dragon[1] == tiger[1]:
-                return 1
-            side_card = dragon if bet_type == 'Dragon' else tiger
-            return card_mult(side_card)
-
-        # These wagers depend on both dealt cards, so wait until both are visible.
-        if bet_type in ('Both Red', 'Red Black', 'Both Black'):
+                return 1  # These main bets have a fixed half-loss on a tie.
+            return card_mult(dragon if bet_type == 'Dragon' else tiger)
+        if bet_type in ('Both Red','Red Black','Both Black') or bet_type in DragonTigerEngine.GAP_RANGES:
+            # Outcome-independent ribbons, like Baccarat: a losing tile can still
+            # show the multiplier it would apply to a winning profit.
+            return max(1,card_mult(dragon)*card_mult(tiger))
+        if bet_type in ('Tie','Perfect Suited Tie'):
+            multiplier = 1
+            for card in (dragon,tiger):
+                if card and card[0] == suit:
+                    multiplier *= suit_mult
+            if dragon and tiger and dragon[1] == tiger[1] == rank:
+                multiplier *= rank_mult
+            return multiplier
+        if bet_type in ('Small','Big'):
             if not (dragon and tiger):
                 return 1
-            d_red = dragon[0] in DragonTigerEngine.RED_SUITS
-            t_red = tiger[0] in DragonTigerEngine.RED_SUITS
-            winning_color_bet = 'Both Red' if (d_red and t_red) else ('Red Black' if d_red != t_red else 'Both Black')
-            if bet_type != winning_color_bet:
-                return 1
-            return max(1, card_mult(dragon) * card_mult(tiger))
-
-        if bet_type == 'Tie':
-            m = 1
-            for card in (dragon, tiger):
-                if card and card[0] == suit_value:
-                    m *= suit_mult
-            if dragon and tiger and dragon[1] == tiger[1] == rank_value:
-                m *= rank_mult
-            return m
-
-        if bet_type == 'Perfect Suited Tie':
-            m = 1
-            for card in (dragon, tiger):
-                if card and card[0] == suit_value:
-                    m *= suit_mult
-            if dragon and tiger and dragon[1] == tiger[1] == rank_value:
-                m *= rank_mult
-            return m
-
-        if bet_type in ('Small', 'Big'):
-            # Both cards are required to know the winning/tied rank and winning side.
-            if not (dragon and tiger):
-                return 1
-            if isinstance(self.current_result, dict):
-                visible_result_rank = DragonTigerEngine.result_rank(self.current_result)
-                winner = self.current_result.get('winner')
-            else:
-                dv = DragonTigerEngine.rank_value(dragon)
-                tv = DragonTigerEngine.rank_value(tiger)
-                visible_result_rank = max(dv, tv)
-                winner = 'Dragon' if dv > tv else ('Tiger' if tv > dv else 'Tie')
-
-            if bet_type == 'Small' and not (1 <= visible_result_rank <= 9):
-                return 1
-            if bet_type == 'Big' and not (10 <= visible_result_rank <= 13):
-                return 1
-
-            cards = (dragon,) if winner == 'Dragon' else ((tiger,) if winner == 'Tiger' else (dragon, tiger))
-            m = 1
-            for card in cards:
-                m *= card_mult(card)
-            return max(1, m)
-
+            dv,tv = DragonTigerEngine.rank_value(dragon),DragonTigerEngine.rank_value(tiger)
+            if dv == tv:
+                return card_mult(dragon)*card_mult(tiger)
+            return card_mult(dragon if dv > tv else tiger)
         return 1
 
     def _base_profit_odds_for_treasure(self, bet_type):
-        return {'Dragon':1.0, 'Tiger':1.0, 'Tie':8.0,
-                'Both Red':2.0, 'Red Black':0.75, 'Both Black':2.0,
-                'Small':0.75, 'Perfect Suited Tie':30.0, 'Big':0.55}.get(bet_type)
+        if bet_type in DragonTigerEngine.GAP_RANGES:
+            return DragonTigerEngine.GAP_PROFIT_ODDS['treasure'][bet_type]
+        return {'Dragon':1.0,'Tiger':1.0,'Tie':8.0,
+                'Both Red':2.0,'Red Black':0.75,'Both Black':2.0,
+                'Small':0.75,'Perfect Suited Tie':30.0,'Big':0.55}.get(bet_type)
 
     def update_golden_bet_visuals(self):
-        """Restore Baccarat-style golden outlines and live profit-odds badges."""
+        """XXX's diagonal upper-left band and live odds for each boosted wager."""
         self.canvas.delete('golden_bet_dynamic')
-        for _key, spot in self.bet_spots.items():
-            rect = spot.get('rect_id')
-            if rect:
-                try:
-                    self.canvas.itemconfigure(rect,
-                                              outline=spot.get('normal_outline', '#d5cbbd'),
-                                              width=spot.get('normal_outline_width', 1))
-                except tk.TclError:
-                    pass
-            odds_item = spot.get('odds_item')
-            if odds_item:
-                try:
-                    self.canvas.itemconfigure(odds_item, state='normal')
-                    self.canvas.coords(odds_item, spot.get('odds_base_x'), spot.get('odds_y'))
-                except tk.TclError:
-                    pass
-
-        if self.game_mode != 'treasure' or not (self.current_treasure_suit or self.current_treasure_rank):
-            return
-
-        for bet_type in ('Both Red', 'Red Black', 'Both Black',
-                         'Small', 'Perfect Suited Tie', 'Big',
-                         'Dragon', 'Tie', 'Tiger'):
-            spot = self.bet_spots.get((bet_type, None))
-            if not spot:
-                continue
-            mult = self._gold_multiplier_for_revealed(bet_type)
-            if mult <= 1:
-                continue
-            rect = spot.get('rect_id')
-            if rect:
-                try:
-                    self.canvas.itemconfigure(rect, outline='#ffd42a', width=4)
-                except tk.TclError:
-                    pass
+        self.canvas.delete('treasure_ribbon')
+        active = (self.game_mode == 'treasure'
+                  and (self.current_treasure_suit or self.current_treasure_rank))
+        for (bet_type, _param), spot in self.bet_spots.items():
+            multiplier = self._gold_multiplier_for_revealed(bet_type) if active else 1
             base = self._base_profit_odds_for_treasure(bet_type)
-            if base is None:
-                continue
-            latest = base * mult
-            odds_item = spot.get('odds_item')
-            bx = spot.get('odds_base_x', (spot['bounds'][0] + spot['bounds'][2]) / 2)
-            by = spot.get('odds_y', spot['bounds'][3] - 13)
-            if odds_item:
-                try:
-                    self.canvas.itemconfigure(odds_item, state='hidden')
-                except tk.TclError:
-                    pass
-            x0, _y0, x1, _y1 = spot['bounds']
-            half_w = min(40.0, max(29.0, (x1-x0) * 0.17))
-            self.canvas.create_oval(bx-half_w, by-15, bx+half_w, by+15,
-                                    fill='#e3b51d', outline='#fff2a3', width=2,
-                                    tags=('golden_bet_dynamic', spot['tag']))
-            self.canvas.create_text(bx, by, text=f'{latest:g}:1',
-                                    font=('Arial', 12 if not spot.get('main') else 14, 'bold'),
-                                    fill='#201700', tags=('golden_bet_dynamic', spot['tag']))
-        self.canvas.tag_raise('golden_bet_dynamic')
+            boosted = multiplier > 1 and base is not None
+            price = f'{base*multiplier:.2f}'.rstrip('0').rstrip('.') if boosted else None
+            text = f'{price}:1' if boosted else spot['base_odds']
+            accent = '#ffd84a' if spot['normal_odds_color'] == '#f8ecd3' else '#7a4600'
+            self.canvas.itemconfigure(spot['odds_item'], state='normal', text=text,
+                fill=accent if boosted else spot['normal_odds_color'])
+            if bet_type in DragonTigerEngine.GAP_RANGES:
+                size = min(13, int((spot['bounds'][2]-spot['bounds'][0]-8)/(len(text)*.67)))
+                self.canvas.itemconfigure(spot['odds_item'],font=('Arial',-max(7,size),'bold'))
+            if boosted:
+                self._draw_multiplier_ribbon(spot, multiplier)
+        self.canvas.tag_raise('multiplier_ribbon')
         self.canvas.tag_raise('bet_chip_dynamic')
+
+    def _draw_multiplier_ribbon(self, spot, multiplier):
+        """Shared gold corner band for Golden Dice, Treasure and 1-pays-2."""
+        x0,y0,x1,y1 = spot['bounds']
+        outer = min(52., (y1-y0)-10., (x1-x0)*.4)
+        if not spot.get('main'):
+            outer = min(outer, 32.)
+        inner = outer*.47
+        x,y = x0+3,y0+3
+        mode_tag = 'treasure_ribbon'
+        tags = ('board_dynamic','multiplier_ribbon',mode_tag,spot['tag'])
+        self.canvas.create_polygon(x,y+inner, x+inner,y, x+outer,y, x,y+outer,
+            fill='#ffd13c', outline='#60430b', width=.8, tags=tags)
+        self.canvas.create_line(x+2,y+outer-4, x+outer-4,y+2,
+            fill='#fff0a0', width=1, tags=tags)
+        caption = f'{int(multiplier)}X'
+        # Keep exact multipliers readable even when they have several digits.
+        font_size = max(7,min(12,int((outer+inner)*.8/math.sqrt(2)/(len(caption)*.67))))
+        middle = (inner+outer)/4
+        self.canvas.create_text(x+middle,y+middle, text=caption, angle=45,
+            anchor='center', font=('Arial',-font_size,'bold'), fill='#171006', tags=tags)
 
     # ---------------------------------------------------------- shoe / cut / burn
     def _show_cut_dialog(self, second=False):
@@ -3393,6 +4149,8 @@ class BubbleDragonTigerGame(tk.Frame):
                                  parent=self.winfo_toplevel())
             return
 
+        self._cancel_chip_motion(role='wager')
+        self.update_bet_chips()
         self.accept_bets = False
         self.animation_running = True
         current_bets = self.snapshot_bets()
@@ -3410,9 +4168,8 @@ class BubbleDragonTigerGame(tk.Frame):
         self.update_control_states()
 
         if self.game_mode == 'treasure':
-            # The Treasure panel owns the screen first. One or two active condition
-            # cards fade in, then their multiplier badges fall together. Only after
-            # that animation completes may the real Dragon card be dealt.
+            # The fee light activates the inline cards; deal only after their
+            # fades and multiplier drops have completed, as in Baccarat XXX.
             self.canvas.itemconfigure(self.animation_phase_text, text='聚宝盆…')
             self._prepare_treasure_round(on_complete=self._begin_actual_round_deal)
         else:
@@ -3445,7 +4202,17 @@ class BubbleDragonTigerGame(tk.Frame):
         self._deal_initial_sequence_original()
 
     def _queue_animation(self, delay, callback, *args):
-        after_id = self.after(delay, callback, *args)
+        holder = {}
+
+        def run():
+            after_id = holder['id']
+            if after_id in self.animation_after_ids:
+                self.animation_after_ids.remove(after_id)
+            if not self._closing:
+                callback(*args)
+
+        after_id = self.after(delay, run)
+        holder['id'] = after_id
         self.animation_after_ids.append(after_id)
         return after_id
 
@@ -3459,9 +4226,17 @@ class BubbleDragonTigerGame(tk.Frame):
             image = self._rotated_back_image
         return image or self.external_back_image
 
-    def _face_photo(self, card, rotated=False):
+    def _face_pil(self, card, use_golden=True):
         card = tuple(card)
-        if self._is_current_golden(card):
+        if use_golden and self._is_current_golden(card):
+            image = self.golden_card_pil.get(card)
+            if image is not None:
+                return image
+        return self.external_card_pil.get(card)
+
+    def _face_photo(self, card, rotated=False, use_golden=True):
+        card = tuple(card)
+        if use_golden and self._is_current_golden(card):
             image = self.golden_card_images_rotated.get(card) if rotated else self.golden_card_images.get(card)
             if image is not None:
                 return image
@@ -3544,17 +4319,18 @@ class BubbleDragonTigerGame(tk.Frame):
         self._flip_card_original(self.initial_card_ids[3], self.current_result['tiger_hand'][1])
         self._queue_animation(160, self._process_extra_cards_original)
 
-    def _create_scaled_flip_image(self, card, width, height, use_back=False, rotated=False):
+    def _create_scaled_flip_image(self, card, width, height, use_back=False, rotated=False,
+                                  use_golden=True):
         if Image is None or ImageTk is None:
-            return self._back_photo(rotated) if use_back else self._face_photo(card, rotated)
+            return self._back_photo(rotated) if use_back else self._face_photo(card, rotated, use_golden)
         if use_back:
             base = self.external_back_pil
-        elif self._is_current_golden(card):
+        elif use_golden and self._is_current_golden(card):
             base = self.golden_card_pil.get(tuple(card)) or self.external_card_pil.get(tuple(card))
         else:
             base = self.external_card_pil.get(tuple(card))
         if base is None:
-            return self._back_photo(rotated) if use_back else self._face_photo(card, rotated)
+            return self._back_photo(rotated) if use_back else self._face_photo(card, rotated, use_golden)
         if rotated:
             base = base.rotate(90, expand=True)
         resample = getattr(Image, 'Resampling', Image).LANCZOS
@@ -3562,24 +4338,36 @@ class BubbleDragonTigerGame(tk.Frame):
         return ImageTk.PhotoImage(image, master=self)
 
     def _flip_card_original(self, card_info, real_card, step=0, on_complete=None):
+        if self._closing:
+            return
         hand_type, card_id, index = card_info
         rotated = False
         steps = 12
         orig_w, orig_h = (100, 140)
         if step > steps:
-            final_image = self._face_photo(real_card, rotated=False)
+            final_image = self._face_photo(real_card, rotated=False, use_golden=False)
             if final_image is not None:
                 self.canvas.itemconfigure(card_id, image=final_image)
-            self.revealed_cards.setdefault(hand_type, []).append(real_card)
-            target = self.dragon_score_text if hand_type == 'Dragon' else self.tiger_score_text
-            self.canvas.itemconfigure(target, text=real_card[1])
-            if self.game_mode == 'treasure':
-                self.update_golden_bet_visuals()
             target_x, target_y = self.card_position(hand_type, index)
             self.canvas.coords(card_id, target_x, target_y)
             self._temp_flip_images.pop(card_id, None)
-            if callable(on_complete):
-                on_complete()
+
+            def revealed():
+                self.revealed_cards.setdefault(hand_type, []).append(real_card)
+                target = self.dragon_score_text if hand_type == 'Dragon' else self.tiger_score_text
+                self.canvas.itemconfigure(target, text=real_card[1])
+                self.update_golden_bet_visuals()
+
+            if self._is_current_golden(real_card):
+                def inject():
+                    revealed()
+                    self._animate_dealt_golden_multiplier(hand_type, index, real_card,
+                        on_complete=on_complete, fade_card_id=card_id)
+                self._animate_treasure_light(hand_type, index, real_card, card_id, inject)
+            else:
+                revealed()
+                if callable(on_complete):
+                    on_complete()
             return
         half = steps // 2
         if step <= half:
@@ -3590,13 +4378,200 @@ class BubbleDragonTigerGame(tk.Frame):
             use_back = False
         width = max(1, int(orig_w * ratio))
         image = self._create_scaled_flip_image(real_card, width, orig_h,
-                                               use_back=use_back, rotated=rotated)
+                                               use_back=use_back, rotated=rotated,
+                                               use_golden=False)
         if image is not None:
             self._temp_flip_images[card_id] = image
             self.canvas.itemconfigure(card_id, image=image)
             target_x, target_y = self.card_position(hand_type, index)
             self.canvas.coords(card_id, target_x + (orig_w - width) / 2, target_y)
         self._queue_animation(20, self._flip_card_original, card_info, real_card, step + 1, on_complete)
+
+    def _animate_treasure_light(self, hand_type, index, card, card_id, on_complete):
+        """Gather at each matching condition card, then inject XXX's gold trail."""
+        matches = [i for i, (descriptor, _mult) in enumerate(self.current_golden_cards)
+                   if (descriptor[0] == 'SuitOnly' and descriptor[1] == card[0])
+                   or (descriptor[0] == 'RankOnly' and descriptor[1] == card[1])]
+        if not matches:
+            on_complete()
+            return
+        positions = self._treasure_panel_positions()
+        width, height = self._treasure_card_size()
+        tx, ty = self.card_position(hand_type, index)
+        target = (tx + 50, ty + 70)
+        tag = f'golden_light_{hand_type}_{index}'
+        tags = ('animation', 'golden_light', tag)
+        c = self.canvas
+        lights = []
+        for match in matches:
+            px, py = positions[match]
+            source = (px + width / 2, py + height / 2)
+            control = ((source[0] + target[0]) / 2, min(source[1], target[1]) - 55)
+            trail = c.create_line(*source, *source, fill='#e6ad27', width=4,
+                                  capstyle='round', tags=tags)
+            halo = c.create_oval(0, 0, 1, 1, fill='', outline='#ffd65b', width=3, tags=tags)
+            core = c.create_oval(0, 0, 1, 1, fill='#fff8d4', outline='#fff2a0', tags=tags)
+            lights.append((source, control, trail, halo, core))
+
+        def path(source, control, t):
+            return tuple((1-t)**2 * source[i] + 2*(1-t)*t*control[i] + t*t*target[i]
+                         for i in (0, 1))
+
+        def frame(step=0):
+            if self._closing or not c.type(card_id):
+                c.delete(tag)
+                return
+            for source, control, trail, halo, core in lights:
+                if step <= 6:
+                    cx, cy = source
+                    radius, core_radius = 17 - 11*step/6, 2 + 3*step/6
+                elif step <= 28:
+                    t = (step - 6) / 22.0
+                    eased = t*t*(3-2*t)
+                    cx, cy = path(source, control, eased)
+                    c.coords(trail, *path(source, control, max(0.0, eased-.14)), cx, cy)
+                    radius, core_radius = 8, 4
+                else:
+                    t = (step - 28) / 10.0
+                    cx, cy = target
+                    radius, core_radius = 20*(1-t), 6*(1-t)
+                    c.itemconfigure(trail, state='hidden')
+                c.coords(halo, cx-radius, cy-radius, cx+radius, cy+radius)
+                c.coords(core, cx-core_radius, cy-core_radius, cx+core_radius, cy+core_radius)
+            c.tag_raise(tag)
+            if step < 38:
+                self._queue_animation(20, frame, step+1)
+            else:
+                c.delete(tag)
+                on_complete()
+        frame()
+
+    def _animate_dealt_golden_multiplier(self, hand_type, index, card, on_complete=None,
+                                        fade_card_id=None):
+        """Drop the multiplier and fade the fully opened card on the same clock."""
+        multiplier = int(self.current_golden_map.get(tuple(card), 1))
+        if self.game_mode != 'treasure' or multiplier <= 1:
+            if callable(on_complete):
+                on_complete()
+            return
+
+        self.update_golden_bet_visuals()
+
+        x, y = self.card_position(hand_type, index)
+        rotated = index == 2
+        card_w = 140 if rotated else 100
+
+        # 相对 V1 版最终位置：
+        # 向右移动 20px，向上移动 20px。
+        base_end_x = x + card_w - 18
+        base_end_y = y + 18
+
+        end_x = base_end_x + 20
+        end_y = base_end_y - 20
+
+        # 第三张补牌是 90° 横向牌。
+        # 如果补牌命中黄金牌，倍数圆的最终跌落位置额外向下移动 100px。
+        if rotated:
+            end_y += 100
+
+        start_y = end_y - 48
+        radius = 18
+
+        card_tag = f'golden_card_{hand_type}_{index}'
+        oval = self.canvas.create_oval(
+            end_x - radius,
+            start_y - radius,
+            end_x + radius,
+            start_y + radius,
+            fill='white',
+            outline='black',
+            width=3,
+            tags=('dealt_golden_multiplier', 'animation', card_tag)
+        )
+
+        text = self.canvas.create_text(
+            end_x,
+            start_y,
+            text=f'{int(multiplier)}X',
+            font=('Arial', 12, 'bold'),
+            fill='black',
+            tags=('dealt_golden_multiplier', 'animation', card_tag)
+        )
+
+        self.canvas.tag_raise(oval)
+        self.canvas.tag_raise(text)
+
+        steps = 18
+        normal_face = golden_face = None
+        if fade_card_id is not None and Image is not None and ImageTk is not None:
+            normal_face = self._face_pil(card, use_golden=False)
+            golden_face = self._face_pil(card)
+            if normal_face is not None and golden_face is not None:
+                if rotated:
+                    normal_face = normal_face.rotate(90, expand=True)
+                    golden_face = golden_face.rotate(90, expand=True)
+                normal_face = normal_face.convert('RGBA')
+                golden_face = golden_face.convert('RGBA')
+                if golden_face.size != normal_face.size:
+                    resample = getattr(Image, 'Resampling', Image).LANCZOS
+                    golden_face = golden_face.resize(normal_face.size, resample)
+
+        # The fade and badge share elapsed time, so rendering cost cannot make
+        # their 1.5-second return animation drift apart or extend frame by frame.
+        started_at = time.monotonic() if fade_card_id is not None else None
+
+        def drop_step(step=0):
+            if self._closing:
+                return
+
+            if fade_card_id is not None:
+                elapsed_ms = (time.monotonic() - started_at) * 1000 if step else 0.0
+                ratio = min(1.0, elapsed_ms / self.GOLDEN_RETURN_DURATION_MS)
+            else:
+                ratio = min(1.0, step / float(steps))
+
+            if (fade_card_id is not None and normal_face is not None
+                    and golden_face is not None):
+                frame = Image.blend(normal_face, golden_face, ratio)
+                photo = ImageTk.PhotoImage(frame, master=self)
+                self._temp_flip_images[fade_card_id] = photo
+                self.canvas.itemconfigure(fade_card_id, image=photo)
+
+            # Ease-out：
+            # 开始跌落较快，接近最终位置时逐渐减速。
+            eased = 1.0 - (1.0 - ratio) ** 3
+            cy = start_y + (end_y - start_y) * eased
+
+            self.canvas.coords(
+                oval,
+                end_x - radius,
+                cy - radius,
+                end_x + radius,
+                cy + radius
+            )
+            self.canvas.coords(text, end_x, cy)
+
+            self.canvas.tag_raise(oval)
+            self.canvas.tag_raise(text)
+
+            if ratio < 1.0:
+                delay = 20
+                if fade_card_id is not None:
+                    delay = max(1, min(delay, math.ceil(
+                        self.GOLDEN_RETURN_DURATION_MS - elapsed_ms)))
+                self._queue_animation(delay, drop_step, step + 1)
+            else:
+                if fade_card_id is not None:
+                    final_image = self._face_photo(
+                        card, rotated=rotated)
+                    if final_image is not None:
+                        self.canvas.itemconfigure(fade_card_id, image=final_image)
+                    self._temp_flip_images.pop(fade_card_id, None)
+                if callable(on_complete):
+                    self._queue_animation(60, on_complete)
+
+        drop_step(0)
+
 
     def _process_extra_cards_original(self):
         if self.current_result and len(self.current_result['dragon_hand']) > 2:
@@ -3642,7 +4617,7 @@ class BubbleDragonTigerGame(tk.Frame):
 
 
         settle = DragonTigerEngine.resolve_bets(
-            self.pre_deal_bets, result, self.game_mode, self.jackpot_amount)
+            self.pre_deal_bets, result, self.game_mode)
         self.balance += settle['credit']
 
         self.last_win_amount = settle['credit']
@@ -3711,34 +4686,8 @@ class BubbleDragonTigerGame(tk.Frame):
         self.run_settlement_flash()
 
     def _sync_golden_badges_for_flash(self, light_phase):
-        """Make Treasure golden odds badges flash with their winning areas."""
-        if self.game_mode != 'treasure':
-            return
-        for key in self.flash_winning_keys:
-            spot = self.bet_spots.get(key)
-            if not spot:
-                continue
-            tag = spot.get('tag')
-            if not tag:
-                continue
-            for item_id in self.canvas.find_withtag(tag):
-                try:
-                    tags = self.canvas.gettags(item_id)
-                    if 'golden_bet_dynamic' not in tags:
-                        continue
-                    item_type = self.canvas.type(item_id)
-                    if item_type == 'oval':
-                        self.canvas.itemconfigure(
-                            item_id,
-                            fill='#fff8cf' if light_phase else '#e3b51d',
-                            outline='#111111' if light_phase else '#fff2a3',
-                            width=3 if light_phase else 2)
-                    elif item_type == 'text':
-                        self.canvas.itemconfigure(
-                            item_id, fill='#000000' if light_phase else '#201700')
-                    self.canvas.tag_raise(item_id)
-                except tk.TclError:
-                    pass
+        # XXX keeps its gold corner bands visible above the white win flash.
+        self.canvas.tag_raise('multiplier_ribbon')
 
     def run_settlement_flash(self):
         if self._closing or not self.settlement_running:
@@ -3764,10 +4713,17 @@ class BubbleDragonTigerGame(tk.Frame):
                 if not spot:
                     continue
                 x0, y0, x1, y1 = spot['bounds']
-                self.canvas.create_rectangle(x0, y0, x1, y1, fill='#ffffff',
-                                             outline='#111111', width=2,
-                                             tags=('win_flash_area', 'settlement_flash'))
+                shape = spot.get('classic_shape_coords')
+                if shape:
+                    self.canvas.create_polygon(*shape, smooth=True, fill='#ffffff',
+                                               outline='', width=0,
+                                               tags=('win_flash_area', 'settlement_flash'))
+                else:
+                    self.canvas.create_rectangle(x0, y0, x1, y1, fill='#ffffff',
+                                                 outline='#111111', width=2,
+                                                 tags=('win_flash_area', 'settlement_flash'))
                 self.raise_spot_content_above_flash(spot)
+            self.canvas.tag_raise('bet_board_frame')
             # Re-style + raise the golden badges after the white flash layer is
             # created, so the badge itself visibly participates in the flash.
             self._sync_golden_badges_for_flash(True)
@@ -4179,45 +5135,6 @@ class BubbleDragonTigerGame(tk.Frame):
             self.statistic_data['tie_win'] = int(self.statistic_data.get('tie_win', 0)) + 1
         self.save_statistic_data()
 
-    def get_jackpot_file(self):
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
-
-    def load_jackpot(self):
-        try:
-            with open(self.jackpot_file, 'r', encoding='utf-8') as handle:
-                data = json.load(handle)
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict) and item.get('Games') == 'BCT':
-                        return max(5_000_000.0, float(item.get('jackpot', 5_000_000)))
-            elif isinstance(data, dict) and data.get('Games') == 'BCT':
-                return max(5_000_000.0, float(data.get('jackpot', 5_000_000)))
-        except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError, ValueError):
-            pass
-        return 5_000_000.0
-
-    def save_jackpot(self):
-        try:
-            if os.path.exists(self.jackpot_file):
-                with open(self.jackpot_file, 'r', encoding='utf-8') as handle:
-                    data = json.load(handle)
-            else:
-                data = []
-            if not isinstance(data, list):
-                data = []
-            found = False
-            for item in data:
-                if isinstance(item, dict) and item.get('Games') == 'BCT':
-                    item['jackpot'] = float(self.jackpot_amount)
-                    found = True
-                    break
-            if not found:
-                data.append({'Games': 'BCT', 'jackpot': float(self.jackpot_amount)})
-            with open(self.jackpot_file, 'w', encoding='utf-8') as handle:
-                json.dump(data, handle, ensure_ascii=False, indent=4)
-        except (OSError, json.JSONDecodeError):
-            pass
-
     # ---------------------------------------------------------------- lifecycle
     def save_balance(self):
         if self.username:
@@ -4226,6 +5143,14 @@ class BubbleDragonTigerGame(tk.Frame):
             self.on_balance_change(float(self.balance))
 
     def cancel_pending_callbacks(self):
+        self._cancel_mode_transition()
+        self._cancel_fee_visuals()
+        self._cancel_chip_motion()
+        try:
+            self.canvas.delete('golden_light')
+            self.canvas.delete('treasure_fee_light')
+        except tk.TclError:
+            pass
         for after_id in list(self.animation_after_ids):
             try:
                 self.after_cancel(after_id)
@@ -4326,7 +5251,7 @@ def main(parent=None, balance=10000, user=None, on_back=None,
 
     root = tk.Tk()
     root.title('龙虎 Dragon Tiger')
-    root.geometry('1150x750+50+10')
+    root.geometry(f'{BubbleDragonTigerGame.WIDTH}x{BubbleDragonTigerGame.HEIGHT}+50+10')
     root.resizable(False, False)
 
     def close_standalone(final_balance):

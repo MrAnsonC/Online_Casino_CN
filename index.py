@@ -19,7 +19,7 @@ import subprocess
 import sys
 from datetime import datetime
 from typing import Callable, Optional
-
+from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Dependency bootstrap (Windows)
@@ -31,6 +31,48 @@ _REQUIRED_PIP_PACKAGES = {
 }
 _INSTALL_FLAG = "--install-dependencies-only"
 _BOOTSTRAP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+_APP_USER_MODEL_ID = "PokerGame.MyGame.Desktop"
+
+
+def _set_windows_app_id() -> None:
+    """Identify this application to the Windows taskbar before creating Tk."""
+    if os.name != "nt":
+        return
+    try:
+        set_app_id = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID
+        set_app_id.argtypes = [ctypes.c_wchar_p]
+        set_app_id.restype = ctypes.c_long
+        set_app_id(_APP_USER_MODEL_ID)
+    except (AttributeError, OSError):
+        # Window icons can still be set if this optional shell API is unavailable.
+        pass
+
+
+def _set_window_icon(window) -> None:
+    """Set the current Tk window icon and the default for its future dialogs."""
+    if os.name != "nt":
+        return
+    import tkinter as _icon_tk
+
+    bundle_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    icon_path = bundle_dir / "Picture" / "MyGame.ico"
+    try:
+        with icon_path.open("rb") as icon_file:
+            header = icon_file.read(6)
+        if (len(header) != 6 or header[:4] != b"\x00\x00\x01\x00"
+                or int.from_bytes(header[4:6], "little") == 0):
+            raise ValueError("MyGame.ico must be exported as a Windows ICO file.")
+        window.iconbitmap(bitmap=str(icon_path))
+        window.iconbitmap(default=str(icon_path))
+    except (OSError, ValueError, _icon_tk.TclError) as error:
+        _native_message(
+            "图标载入失败 / Icon could not be loaded",
+            f"无法载入图标 / Unable to load the icon:\n{icon_path}\n\n{error}\n\n"
+            "请确认 Picture/MyGame.ico 是实际导出的 ICO 文件，并已包含在打包资源中。\n"
+            "Ensure Picture/MyGame.ico is an exported ICO file included in the bundle.",
+        )
+
 
 
 def _native_message(title: str, message: str, ask: bool = False) -> bool:
@@ -562,11 +604,13 @@ def _show_dependency_setup_wizard(missing: list[str]) -> tuple[str, str]:
         },
     }
 
+    _set_windows_app_id()
     root = tk.Tk()
     root.title("Language / 语言 / 語言 / Reo / Lingvo")
     root.geometry("920x720")
     root.minsize(780, 620)
     root.configure(bg="#f4f4f4")
+    _set_window_icon(root)
 
     result = {"choice": "reject", "language": "en"}
     selected_language = {"value": None}
@@ -963,7 +1007,6 @@ _TRANSLATIONS = {'en': {'游戏中心': 'Game Center',
         '新密码': 'New password',
         '更新密码': 'Update password',
         '外观与语言': 'Appearance & language',
-        '这些选项只影响本次上传的五个界面文件。': 'These options affect only the five uploaded interface files.',
         '黑暗模式': 'Dark mode',
         '语言': 'Language',
         '选择语言': 'Choose language',
@@ -1041,7 +1084,6 @@ _TRANSLATIONS = {'en': {'游戏中心': 'Game Center',
            '新密码': '新密碼',
            '更新密码': '更新密碼',
            '外观与语言': '外觀與語言',
-           '这些选项只影响本次上传的五个界面文件。': '這些選項只影響本次上傳的五個介面檔案。',
            '黑暗模式': '黑暗模式',
            '语言': '語言',
            '选择语言': '選擇語言',
@@ -1119,7 +1161,6 @@ _TRANSLATIONS = {'en': {'游戏中心': 'Game Center',
         '新密码': 'Kupuhipa hou',
         '更新密码': 'Whakahōu kupuhipa',
         '外观与语言': 'Āhua me te reo',
-        '这些选项只影响本次上传的五个界面文件。': 'Ka pā ēnei kōwhiringa ki ngā kōnae atanga e rima kua tukuake anake.',
         '黑暗模式': 'Aratau pōuri',
         '语言': 'Reo',
         '选择语言': 'Kōwhiria te reo',
@@ -1197,7 +1238,6 @@ _TRANSLATIONS = {'en': {'游戏中心': 'Game Center',
         '新密码': 'Nova pasvorto',
         '更新密码': 'Ĝisdatigi pasvorton',
         '外观与语言': 'Aspekto kaj lingvo',
-        '这些选项只影响本次上传的五个界面文件。': 'Ĉi tiuj elektoj influas nur la kvin alŝutitajn interfacajn dosierojn.',
         '黑暗模式': 'Malhela reĝimo',
         '语言': 'Lingvo',
         '选择语言': 'Elekti lingvon',
@@ -1748,11 +1788,13 @@ class HomeDashboard(tk.Frame):
 
 class GameCenterApp(tk.Tk):
     def __init__(self):
+        _set_windows_app_id()
         super().__init__()
         self.title(f"游戏中心")
         self.geometry("1150x750+50+10")
         self.resizable(False, False)
         self.configure(bg=WINDOW_BG)
+        _set_window_icon(self)
         self.protocol("WM_DELETE_WINDOW", self.close_application)
 
         self.users = []
@@ -2498,7 +2540,7 @@ class GameCenterApp(tk.Tk):
     def show_settings(self):
         if not self._clear_account_action():
             return
-        self._account_title("外观与语言", "这些选项只影响本次上传的五个界面文件。")
+        self._account_title("外观与语言")
         form = tk.Frame(self.account_action_host, bg="#FFFFFF")
         form.pack(fill="x", anchor="n")
 

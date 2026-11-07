@@ -1,0 +1,936 @@
+{
+    "temp_finish_data": {
+        "records": [
+            {
+                "winner": "射中",
+                "diff": 5,
+                "first_card": [
+                    "Club",
+                    "9"
+                ],
+                "second_card": [
+                    "Heart",
+                    "4"
+                ],
+                "third_card": [
+                    "Spade",
+                    "6"
+                ],
+                "first_score": 9,
+                "second_score": 4,
+                "third_score": 6,
+                "time": "2026-10-07 05:39:48"
+            },
+            {
+                "winner": "射偏",
+                "diff": 2,
+                "first_card": [
+                    "Spade",
+                    "J"
+                ],
+                "second_card": [
+                    "Spade",
+                    "9"
+                ],
+                "third_card": [
+                    "Heart",
+                    "Q"
+                ],
+                "first_score": 11,
+                "second_score": 9,
+                "third_score": 12,
+                "time": "2026-10-07 05:40:05"
+            },
+            {
+                "winner": "射中",
+                "diff": 4,
+                "first_card": [
+                    "Diamond",
+                    "9"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "K"
+                ],
+                "third_card": [
+                    "Diamond",
+                    "Q"
+                ],
+                "first_score": 9,
+                "second_score": 13,
+                "third_score": 12,
+                "time": "2026-10-07 05:40:14"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 7,
+                "first_card": [
+                    "Spade",
+                    "9"
+                ],
+                "second_card": [
+                    "Heart",
+                    "2"
+                ],
+                "third_card": [
+                    "Heart",
+                    "9"
+                ],
+                "first_score": 9,
+                "second_score": 2,
+                "third_score": 9,
+                "time": "2026-10-07 06:00:53"
+            },
+            {
+                "winner": "射偏",
+                "diff": 2,
+                "first_card": [
+                    "Diamond",
+                    "Q"
+                ],
+                "second_card": [
+                    "Club",
+                    "10"
+                ],
+                "third_card": [
+                    "Spade",
+                    "K"
+                ],
+                "first_score": 12,
+                "second_score": 10,
+                "third_score": 13,
+                "time": "2026-10-07 06:10:11"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 11,
+                "first_card": [
+                    "Club",
+                    "Q"
+                ],
+                "second_card": [
+                    "Club",
+                    "A"
+                ],
+                "third_card": [
+                    "Club",
+                    "Q"
+                ],
+                "first_score": 12,
+                "second_score": 1,
+                "third_score": 12,
+                "time": "2026-10-07 06:10:29"
+            },
+            {
+                "winner": "射中",
+                "diff": 12,
+                "first_card": [
+                    "Club",
+                    "A"
+                ],
+                "second_card": [
+                    "Club",
+                    "K"
+                ],
+                "third_card": [
+                    "Club",
+                    "9"
+                ],
+                "first_score": 1,
+                "second_score": 13,
+                "third_score": 9,
+                "time": "2026-10-07 06:10:40"
+            },
+            {
+                "winner": "射偏",
+                "diff": 1,
+                "first_card": [
+                    "Spade",
+                    "J"
+                ],
+                "second_card": [
+                    "Heart",
+                    "Q"
+                ],
+                "third_card": [
+                    "Heart",
+                    "2"
+                ],
+                "first_score": 11,
+                "second_score": 12,
+                "third_score": 2,
+                "time": "2026-10-07 06:10:51"
+            },
+            {
+                "winner": "射偏",
+                "diff": 0,
+                "first_card": [
+                    "Heart",
+                    "8"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "8"
+                ],
+                "third_card": [
+                    "Heart",
+                    "10"
+                ],
+                "first_score": 8,
+                "second_score": 8,
+                "third_score": 10,
+                "time": "2026-10-07 06:11:03"
+            },
+            {
+                "winner": "射偏",
+                "diff": 0,
+                "first_card": [
+                    "Club",
+                    "2"
+                ],
+                "second_card": [
+                    "Heart",
+                    "2"
+                ],
+                "third_card": [
+                    "Heart",
+                    "K"
+                ],
+                "first_score": 2,
+                "second_score": 2,
+                "third_score": 13,
+                "time": "2026-10-07 06:11:14"
+            },
+            {
+                "winner": "射中",
+                "diff": 9,
+                "first_card": [
+                    "Spade",
+                    "K"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "4"
+                ],
+                "third_card": [
+                    "Heart",
+                    "8"
+                ],
+                "first_score": 13,
+                "second_score": 4,
+                "third_score": 8,
+                "time": "2026-10-07 06:11:28"
+            },
+            {
+                "winner": "射中",
+                "diff": 3,
+                "first_card": [
+                    "Diamond",
+                    "10"
+                ],
+                "second_card": [
+                    "Spade",
+                    "K"
+                ],
+                "third_card": [
+                    "Heart",
+                    "J"
+                ],
+                "first_score": 10,
+                "second_score": 13,
+                "third_score": 11,
+                "time": "2026-10-07 06:11:41"
+            },
+            {
+                "winner": "射偏",
+                "diff": 1,
+                "first_card": [
+                    "Diamond",
+                    "9"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "10"
+                ],
+                "third_card": [
+                    "Heart",
+                    "K"
+                ],
+                "first_score": 9,
+                "second_score": 10,
+                "third_score": 13,
+                "time": "2026-10-07 06:11:53"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 5,
+                "first_card": [
+                    "Club",
+                    "5"
+                ],
+                "second_card": [
+                    "Spade",
+                    "10"
+                ],
+                "third_card": [
+                    "Club",
+                    "10"
+                ],
+                "first_score": 5,
+                "second_score": 10,
+                "third_score": 10,
+                "time": "2026-10-07 06:12:04"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 4,
+                "first_card": [
+                    "Heart",
+                    "8"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "4"
+                ],
+                "third_card": [
+                    "Spade",
+                    "8"
+                ],
+                "first_score": 8,
+                "second_score": 4,
+                "third_score": 8,
+                "time": "2026-10-07 06:12:11"
+            },
+            {
+                "winner": "射偏",
+                "diff": 1,
+                "first_card": [
+                    "Club",
+                    "4"
+                ],
+                "second_card": [
+                    "Spade",
+                    "5"
+                ],
+                "third_card": [
+                    "Heart",
+                    "7"
+                ],
+                "first_score": 4,
+                "second_score": 5,
+                "third_score": 7,
+                "time": "2026-10-07 06:12:18"
+            },
+            {
+                "winner": "射偏",
+                "diff": 2,
+                "first_card": [
+                    "Heart",
+                    "Q"
+                ],
+                "second_card": [
+                    "Spade",
+                    "10"
+                ],
+                "third_card": [
+                    "Spade",
+                    "9"
+                ],
+                "first_score": 12,
+                "second_score": 10,
+                "third_score": 9,
+                "time": "2026-10-07 06:14:34"
+            },
+            {
+                "winner": "射中",
+                "diff": 3,
+                "first_card": [
+                    "Heart",
+                    "K"
+                ],
+                "second_card": [
+                    "Club",
+                    "10"
+                ],
+                "third_card": [
+                    "Heart",
+                    "J"
+                ],
+                "first_score": 13,
+                "second_score": 10,
+                "third_score": 11,
+                "time": "2026-10-08 12:13:47"
+            },
+            {
+                "winner": "射偏",
+                "diff": 4,
+                "first_card": [
+                    "Spade",
+                    "8"
+                ],
+                "second_card": [
+                    "Club",
+                    "4"
+                ],
+                "third_card": [
+                    "Spade",
+                    "3"
+                ],
+                "first_score": 8,
+                "second_score": 4,
+                "third_score": 3,
+                "time": "2026-10-08 12:13:56"
+            },
+            {
+                "winner": "射偏",
+                "diff": 1,
+                "first_card": [
+                    "Club",
+                    "4"
+                ],
+                "second_card": [
+                    "Heart",
+                    "5"
+                ],
+                "third_card": [
+                    "Club",
+                    "7"
+                ],
+                "first_score": 4,
+                "second_score": 5,
+                "third_score": 7,
+                "time": "2026-10-08 12:14:07"
+            },
+            {
+                "winner": "射偏",
+                "diff": 6,
+                "first_card": [
+                    "Diamond",
+                    "2"
+                ],
+                "second_card": [
+                    "Heart",
+                    "8"
+                ],
+                "third_card": [
+                    "Diamond",
+                    "9"
+                ],
+                "first_score": 2,
+                "second_score": 8,
+                "third_score": 9,
+                "time": "2026-10-08 12:16:22"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 11,
+                "first_card": [
+                    "Diamond",
+                    "A"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "Q"
+                ],
+                "third_card": [
+                    "Spade",
+                    "Q"
+                ],
+                "first_score": 1,
+                "second_score": 12,
+                "third_score": 12,
+                "time": "2026-10-08 12:16:31"
+            },
+            {
+                "winner": "射中",
+                "diff": 7,
+                "first_card": [
+                    "Spade",
+                    "6"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "K"
+                ],
+                "third_card": [
+                    "Diamond",
+                    "Q"
+                ],
+                "first_score": 6,
+                "second_score": 13,
+                "third_score": 12,
+                "time": "2026-10-08 12:16:39"
+            }
+        ]
+    },
+    "last_72_record": {
+        "records": [
+            {
+                "winner": "射中",
+                "diff": 5,
+                "first_card": [
+                    "Club",
+                    "9"
+                ],
+                "second_card": [
+                    "Heart",
+                    "4"
+                ],
+                "third_card": [
+                    "Spade",
+                    "6"
+                ],
+                "first_score": 9,
+                "second_score": 4,
+                "third_score": 6,
+                "time": "2026-10-07 05:39:48"
+            },
+            {
+                "winner": "射偏",
+                "diff": 2,
+                "first_card": [
+                    "Spade",
+                    "J"
+                ],
+                "second_card": [
+                    "Spade",
+                    "9"
+                ],
+                "third_card": [
+                    "Heart",
+                    "Q"
+                ],
+                "first_score": 11,
+                "second_score": 9,
+                "third_score": 12,
+                "time": "2026-10-07 05:40:05"
+            },
+            {
+                "winner": "射中",
+                "diff": 4,
+                "first_card": [
+                    "Diamond",
+                    "9"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "K"
+                ],
+                "third_card": [
+                    "Diamond",
+                    "Q"
+                ],
+                "first_score": 9,
+                "second_score": 13,
+                "third_score": 12,
+                "time": "2026-10-07 05:40:14"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 7,
+                "first_card": [
+                    "Spade",
+                    "9"
+                ],
+                "second_card": [
+                    "Heart",
+                    "2"
+                ],
+                "third_card": [
+                    "Heart",
+                    "9"
+                ],
+                "first_score": 9,
+                "second_score": 2,
+                "third_score": 9,
+                "time": "2026-10-07 06:00:53"
+            },
+            {
+                "winner": "射偏",
+                "diff": 2,
+                "first_card": [
+                    "Diamond",
+                    "Q"
+                ],
+                "second_card": [
+                    "Club",
+                    "10"
+                ],
+                "third_card": [
+                    "Spade",
+                    "K"
+                ],
+                "first_score": 12,
+                "second_score": 10,
+                "third_score": 13,
+                "time": "2026-10-07 06:10:11"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 11,
+                "first_card": [
+                    "Club",
+                    "Q"
+                ],
+                "second_card": [
+                    "Club",
+                    "A"
+                ],
+                "third_card": [
+                    "Club",
+                    "Q"
+                ],
+                "first_score": 12,
+                "second_score": 1,
+                "third_score": 12,
+                "time": "2026-10-07 06:10:29"
+            },
+            {
+                "winner": "射中",
+                "diff": 12,
+                "first_card": [
+                    "Club",
+                    "A"
+                ],
+                "second_card": [
+                    "Club",
+                    "K"
+                ],
+                "third_card": [
+                    "Club",
+                    "9"
+                ],
+                "first_score": 1,
+                "second_score": 13,
+                "third_score": 9,
+                "time": "2026-10-07 06:10:40"
+            },
+            {
+                "winner": "射偏",
+                "diff": 1,
+                "first_card": [
+                    "Spade",
+                    "J"
+                ],
+                "second_card": [
+                    "Heart",
+                    "Q"
+                ],
+                "third_card": [
+                    "Heart",
+                    "2"
+                ],
+                "first_score": 11,
+                "second_score": 12,
+                "third_score": 2,
+                "time": "2026-10-07 06:10:51"
+            },
+            {
+                "winner": "射偏",
+                "diff": 0,
+                "first_card": [
+                    "Heart",
+                    "8"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "8"
+                ],
+                "third_card": [
+                    "Heart",
+                    "10"
+                ],
+                "first_score": 8,
+                "second_score": 8,
+                "third_score": 10,
+                "time": "2026-10-07 06:11:03"
+            },
+            {
+                "winner": "射偏",
+                "diff": 0,
+                "first_card": [
+                    "Club",
+                    "2"
+                ],
+                "second_card": [
+                    "Heart",
+                    "2"
+                ],
+                "third_card": [
+                    "Heart",
+                    "K"
+                ],
+                "first_score": 2,
+                "second_score": 2,
+                "third_score": 13,
+                "time": "2026-10-07 06:11:14"
+            },
+            {
+                "winner": "射中",
+                "diff": 9,
+                "first_card": [
+                    "Spade",
+                    "K"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "4"
+                ],
+                "third_card": [
+                    "Heart",
+                    "8"
+                ],
+                "first_score": 13,
+                "second_score": 4,
+                "third_score": 8,
+                "time": "2026-10-07 06:11:28"
+            },
+            {
+                "winner": "射中",
+                "diff": 3,
+                "first_card": [
+                    "Diamond",
+                    "10"
+                ],
+                "second_card": [
+                    "Spade",
+                    "K"
+                ],
+                "third_card": [
+                    "Heart",
+                    "J"
+                ],
+                "first_score": 10,
+                "second_score": 13,
+                "third_score": 11,
+                "time": "2026-10-07 06:11:41"
+            },
+            {
+                "winner": "射偏",
+                "diff": 1,
+                "first_card": [
+                    "Diamond",
+                    "9"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "10"
+                ],
+                "third_card": [
+                    "Heart",
+                    "K"
+                ],
+                "first_score": 9,
+                "second_score": 10,
+                "third_score": 13,
+                "time": "2026-10-07 06:11:53"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 5,
+                "first_card": [
+                    "Club",
+                    "5"
+                ],
+                "second_card": [
+                    "Spade",
+                    "10"
+                ],
+                "third_card": [
+                    "Club",
+                    "10"
+                ],
+                "first_score": 5,
+                "second_score": 10,
+                "third_score": 10,
+                "time": "2026-10-07 06:12:04"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 4,
+                "first_card": [
+                    "Heart",
+                    "8"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "4"
+                ],
+                "third_card": [
+                    "Spade",
+                    "8"
+                ],
+                "first_score": 8,
+                "second_score": 4,
+                "third_score": 8,
+                "time": "2026-10-07 06:12:11"
+            },
+            {
+                "winner": "射偏",
+                "diff": 1,
+                "first_card": [
+                    "Club",
+                    "4"
+                ],
+                "second_card": [
+                    "Spade",
+                    "5"
+                ],
+                "third_card": [
+                    "Heart",
+                    "7"
+                ],
+                "first_score": 4,
+                "second_score": 5,
+                "third_score": 7,
+                "time": "2026-10-07 06:12:18"
+            },
+            {
+                "winner": "射偏",
+                "diff": 2,
+                "first_card": [
+                    "Heart",
+                    "Q"
+                ],
+                "second_card": [
+                    "Spade",
+                    "10"
+                ],
+                "third_card": [
+                    "Spade",
+                    "9"
+                ],
+                "first_score": 12,
+                "second_score": 10,
+                "third_score": 9,
+                "time": "2026-10-07 06:14:34"
+            },
+            {
+                "winner": "射中",
+                "diff": 3,
+                "first_card": [
+                    "Heart",
+                    "K"
+                ],
+                "second_card": [
+                    "Club",
+                    "10"
+                ],
+                "third_card": [
+                    "Heart",
+                    "J"
+                ],
+                "first_score": 13,
+                "second_score": 10,
+                "third_score": 11,
+                "time": "2026-10-08 12:13:47"
+            },
+            {
+                "winner": "射偏",
+                "diff": 4,
+                "first_card": [
+                    "Spade",
+                    "8"
+                ],
+                "second_card": [
+                    "Club",
+                    "4"
+                ],
+                "third_card": [
+                    "Spade",
+                    "3"
+                ],
+                "first_score": 8,
+                "second_score": 4,
+                "third_score": 3,
+                "time": "2026-10-08 12:13:56"
+            },
+            {
+                "winner": "射偏",
+                "diff": 1,
+                "first_card": [
+                    "Club",
+                    "4"
+                ],
+                "second_card": [
+                    "Heart",
+                    "5"
+                ],
+                "third_card": [
+                    "Club",
+                    "7"
+                ],
+                "first_score": 4,
+                "second_score": 5,
+                "third_score": 7,
+                "time": "2026-10-08 12:14:07"
+            },
+            {
+                "winner": "射偏",
+                "diff": 6,
+                "first_card": [
+                    "Diamond",
+                    "2"
+                ],
+                "second_card": [
+                    "Heart",
+                    "8"
+                ],
+                "third_card": [
+                    "Diamond",
+                    "9"
+                ],
+                "first_score": 2,
+                "second_score": 8,
+                "third_score": 9,
+                "time": "2026-10-08 12:16:22"
+            },
+            {
+                "winner": "撞柱",
+                "diff": 11,
+                "first_card": [
+                    "Diamond",
+                    "A"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "Q"
+                ],
+                "third_card": [
+                    "Spade",
+                    "Q"
+                ],
+                "first_score": 1,
+                "second_score": 12,
+                "third_score": 12,
+                "time": "2026-10-08 12:16:31"
+            },
+            {
+                "winner": "射中",
+                "diff": 7,
+                "first_card": [
+                    "Spade",
+                    "6"
+                ],
+                "second_card": [
+                    "Diamond",
+                    "K"
+                ],
+                "third_card": [
+                    "Diamond",
+                    "Q"
+                ],
+                "first_score": 6,
+                "second_score": 13,
+                "third_score": 12,
+                "time": "2026-10-08 12:16:39"
+            }
+        ]
+    },
+    "statistic_data": {
+        "total_game": 23,
+        "shoot_win": 7,
+        "miss_win": 11,
+        "pillar_win": 5
+    }
+}

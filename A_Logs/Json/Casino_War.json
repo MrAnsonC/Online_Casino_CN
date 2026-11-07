@@ -1,103 +1,1039 @@
 {
     "history_record": {
-        "player_win": 815,
-        "dealer_win": 806,
-        "war": 146,
-        "war_fail": 64,
-        "war_success": 69,
+        "player_win": 896,
+        "dealer_win": 884,
+        "war": 153,
+        "war_fail": 67,
+        "war_success": 73,
         "war_push": 13,
-        "surrender": 0,
-        "game": 1767
+        "surrender": 1,
+        "game": 1934
     },
     "history": [
         {
-            "game_id": 1718,
-            "timestamp": "2026-07-18 10:08:45",
-            "player_card": "3♥",
-            "dealer_card": "5♦",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1719,
-            "timestamp": "2026-07-18 10:08:54",
-            "player_card": "5♦",
-            "dealer_card": "6♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1720,
-            "timestamp": "2026-07-18 10:09:03",
-            "player_card": "10♠",
-            "dealer_card": "5♠",
+            "game_id": 1885,
+            "timestamp": "2026-10-04 22:31:55",
+            "player_card": "Q♣",
+            "dealer_card": "8♠",
             "war_cards": {
                 "player_war_card": null,
                 "dealer_war_card": null
             },
             "result": {
                 "winner": "player",
-                "surrender": false
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 600.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "Q♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "5♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "8♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "Q♣"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "5♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "8♠"
+                    ]
+                ]
             }
         },
         {
-            "game_id": 1721,
-            "timestamp": "2026-07-18 10:09:12",
-            "player_card": "2♠",
-            "dealer_card": "9♦",
+            "game_id": 1886,
+            "timestamp": "2026-10-04 22:32:02",
+            "player_card": "K♦",
+            "dealer_card": "8♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "K♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "Q♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "8♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "K♦"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "Q♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "8♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1887,
+            "timestamp": "2026-10-04 22:32:09",
+            "player_card": "4♦",
+            "dealer_card": "10♥",
             "war_cards": {
                 "player_war_card": null,
                 "dealer_war_card": null
             },
             "result": {
                 "winner": "dealer",
-                "surrender": false
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "4♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "4♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "10♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "4♦"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "4♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "10♥"
+                    ]
+                ]
             }
         },
         {
-            "game_id": 1722,
-            "timestamp": "2026-07-18 10:09:20",
-            "player_card": "7♦",
-            "dealer_card": "A♣",
+            "game_id": 1888,
+            "timestamp": "2026-10-04 22:32:15",
+            "player_card": "9♣",
+            "dealer_card": "10♠",
             "war_cards": {
                 "player_war_card": null,
                 "dealer_war_card": null
             },
             "result": {
                 "winner": "dealer",
-                "surrender": false
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "9♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "5♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "10♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "9♣"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "5♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "10♠"
+                    ]
+                ]
             }
         },
         {
-            "game_id": 1723,
-            "timestamp": "2026-07-18 10:09:29",
+            "game_id": 1889,
+            "timestamp": "2026-10-04 22:32:22",
+            "player_card": "Q♠",
+            "dealer_card": "9♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 600.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "Q♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "8♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "9♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "Q♠"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "8♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "9♠"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1890,
+            "timestamp": "2026-10-04 22:32:36",
+            "player_card": "5♥",
+            "dealer_card": "3♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "5♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "K♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "3♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "5♥"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "K♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "3♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1891,
+            "timestamp": "2026-10-04 22:32:43",
+            "player_card": "Q♠",
+            "dealer_card": "3♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "Q♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "A♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "3♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "Q♠"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "A♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "3♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1892,
+            "timestamp": "2026-10-04 22:32:50",
+            "player_card": "10♦",
+            "dealer_card": "K♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "10♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "2♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "K♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "10♦"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "2♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "K♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1893,
+            "timestamp": "2026-10-04 22:32:56",
+            "player_card": "A♣",
+            "dealer_card": "2♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "A♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "4♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "2♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "A♣"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "4♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "2♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1894,
+            "timestamp": "2026-10-04 22:33:04",
             "player_card": "A♥",
-            "dealer_card": "K♣",
+            "dealer_card": "8♥",
             "war_cards": {
                 "player_war_card": null,
                 "dealer_war_card": null
             },
             "result": {
                 "winner": "player",
-                "surrender": false
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "A♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "Q♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "8♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "A♥"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "Q♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "8♥"
+                    ]
+                ]
             }
         },
         {
-            "game_id": 1724,
-            "timestamp": "2026-07-18 10:09:38",
-            "player_card": "9♦",
+            "game_id": 1895,
+            "timestamp": "2026-10-04 22:33:12",
+            "player_card": "J♣",
             "dealer_card": "6♣",
             "war_cards": {
                 "player_war_card": null,
@@ -105,41 +1041,713 @@
             },
             "result": {
                 "winner": "player",
-                "surrender": false
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "J♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "7♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "6♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "J♣"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "7♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "6♣"
+                    ]
+                ]
             }
         },
         {
-            "game_id": 1725,
-            "timestamp": "2026-07-18 10:09:47",
-            "player_card": "K♣",
-            "dealer_card": "4♥",
+            "game_id": 1896,
+            "timestamp": "2026-10-04 22:33:19",
+            "player_card": "A♥",
+            "dealer_card": "5♠",
             "war_cards": {
                 "player_war_card": null,
                 "dealer_war_card": null
             },
             "result": {
                 "winner": "player",
-                "surrender": false
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "A♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "8♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "5♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "A♥"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "8♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "5♠"
+                    ]
+                ]
             }
         },
         {
-            "game_id": 1726,
-            "timestamp": "2026-07-18 10:10:03",
-            "player_card": "8♦",
-            "dealer_card": "8♣",
+            "game_id": 1897,
+            "timestamp": "2026-10-04 22:33:27",
+            "player_card": "Q♦",
+            "dealer_card": "6♠",
             "war_cards": {
-                "player_war_card": "8♣",
-                "dealer_war_card": "2♣"
+                "player_war_card": null,
+                "dealer_war_card": null
             },
             "result": {
                 "winner": "player",
-                "surrender": false
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "Q♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "9♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "6♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "Q♦"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "9♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "6♠"
+                    ]
+                ]
             }
         },
         {
-            "game_id": 1727,
-            "timestamp": "2026-07-18 10:10:10",
-            "player_card": "Q♦",
+            "game_id": 1898,
+            "timestamp": "2026-10-04 22:33:34",
+            "player_card": "3♦",
+            "dealer_card": "2♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "3♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "K♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "2♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "3♦"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "K♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "2♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1899,
+            "timestamp": "2026-10-04 22:33:41",
+            "player_card": "10♣",
+            "dealer_card": "2♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "10♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "K♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "2♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "10♣"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "K♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "2♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1900,
+            "timestamp": "2026-10-04 22:33:48",
+            "player_card": "2♠",
+            "dealer_card": "4♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 600.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "2♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "K♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "4♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "2♠"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "K♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "4♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1901,
+            "timestamp": "2026-10-04 22:33:56",
+            "player_card": "9♣",
+            "dealer_card": "8♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "9♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "10♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "8♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "9♣"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "10♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "8♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1902,
+            "timestamp": "2026-10-04 22:34:05",
+            "player_card": "J♠",
             "dealer_card": "7♣",
             "war_cards": {
                 "player_war_card": null,
@@ -147,12 +1755,2844 @@
             },
             "result": {
                 "winner": "player",
-                "surrender": false
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 1200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "J♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "Q♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "7♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "J♠"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "Q♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "7♣"
+                    ]
+                ]
             }
         },
         {
-            "game_id": 1728,
-            "timestamp": "2026-07-18 10:10:19",
+            "game_id": 1903,
+            "timestamp": "2026-10-04 22:34:13",
+            "player_card": "4♦",
+            "dealer_card": "Q♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "4♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "10♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "Q♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "4♦"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "10♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "Q♠"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1904,
+            "timestamp": "2026-10-04 22:34:19",
+            "player_card": "3♠",
+            "dealer_card": "7♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "3♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "5♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "7♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "3♠"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "5♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "7♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1905,
+            "timestamp": "2026-10-04 22:34:26",
+            "player_card": "10♦",
+            "dealer_card": "9♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 600.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 600.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 600.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 600.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 600.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "10♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "6♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "9♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "10♦"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "6♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "9♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1906,
+            "timestamp": "2026-10-04 22:34:35",
+            "player_card": "10♥",
+            "dealer_card": "K♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 675.0,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "10♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "10♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "K♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "10♥"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "10♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "K♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1907,
+            "timestamp": "2026-10-04 22:34:50",
+            "player_card": "10♠",
+            "dealer_card": "10♦",
+            "war_cards": {
+                "player_war_card": "2♥",
+                "dealer_war_card": "5♦"
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 1,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 385.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 385.0,
+                "surrendered": false,
+                "side_winner": "dealer",
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 1,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 385.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 385.0,
+                        "surrendered": false,
+                        "side_winner": "dealer"
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 300.0
+                    },
+                    "Player2": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 637.5,
+                "total_return": 385.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "10♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "10♦"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player1",
+                        "burned": true,
+                        "card": "10♣"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player1",
+                        "burned": true,
+                        "card": "8♥"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player1",
+                        "burned": true,
+                        "card": "3♣"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "2♥"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": true,
+                        "card": "6♦"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": true,
+                        "card": "4♣"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": true,
+                        "card": "2♠"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "5♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "10♠"
+                        ],
+                        [
+                            "10♣",
+                            "8♥",
+                            "3♣",
+                            "2♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "10♦"
+                    ],
+                    [
+                        "6♦",
+                        "4♣",
+                        "2♠",
+                        "5♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1908,
+            "timestamp": "2026-10-04 22:34:56",
+            "player_card": "4♥",
+            "dealer_card": "Q♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 337.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "4♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "Q♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "4♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "Q♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1909,
+            "timestamp": "2026-10-04 22:35:02",
+            "player_card": "10♦",
+            "dealer_card": "Q♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 300.0,
+                        "tie": 35.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 337.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "10♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "Q♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "10♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "Q♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1910,
+            "timestamp": "2026-10-08 11:58:20",
+            "player_card": "2♦",
+            "dealer_card": "7♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "2♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "7♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "2♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "7♠"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1911,
+            "timestamp": "2026-10-08 11:58:27",
+            "player_card": "8♥",
+            "dealer_card": "Q♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "8♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "Q♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "8♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "Q♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1912,
+            "timestamp": "2026-10-08 11:58:34",
+            "player_card": "8♠",
+            "dealer_card": "2♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 200.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 200.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 200.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 200.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "8♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "2♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "8♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "2♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1913,
+            "timestamp": "2026-10-08 11:58:47",
+            "player_card": "3♥",
+            "dealer_card": "3♣",
+            "war_cards": {
+                "player_war_card": "2♠",
+                "dealer_war_card": "A♥"
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 1,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 110.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 110.0,
+                "surrendered": false,
+                "side_winner": "dealer",
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 1,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 110.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 110.0,
+                        "surrendered": false,
+                        "side_winner": "dealer"
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 100.0
+                    }
+                },
+                "total_charged": 212.5,
+                "total_return": 110.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "3♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "3♣"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player2",
+                        "burned": true,
+                        "card": "Q♠"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player2",
+                        "burned": true,
+                        "card": "Q♥"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player2",
+                        "burned": true,
+                        "card": "4♣"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "2♠"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": true,
+                        "card": "3♠"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": true,
+                        "card": "6♦"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": true,
+                        "card": "8♣"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "A♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "3♥"
+                        ],
+                        [
+                            "Q♠",
+                            "Q♥",
+                            "4♣",
+                            "2♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "3♣"
+                    ],
+                    [
+                        "3♠",
+                        "6♦",
+                        "8♣",
+                        "A♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1914,
+            "timestamp": "2026-10-08 11:58:55",
+            "player_card": "J♣",
+            "dealer_card": "8♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 200.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 200.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 200.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 200.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "J♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "8♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "J♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "8♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1915,
+            "timestamp": "2026-10-08 11:59:01",
+            "player_card": "2♦",
+            "dealer_card": "Q♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "2♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "Q♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "2♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "Q♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1916,
+            "timestamp": "2026-10-08 11:59:08",
+            "player_card": "J♠",
+            "dealer_card": "8♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 200.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 200.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 200.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 200.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "J♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "8♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "J♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "8♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1917,
+            "timestamp": "2026-10-08 11:59:16",
+            "player_card": "10♣",
+            "dealer_card": "A♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "10♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "A♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "10♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "A♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1918,
+            "timestamp": "2026-10-08 11:59:22",
+            "player_card": "3♠",
+            "dealer_card": "K♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "3♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "K♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "3♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "K♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1919,
+            "timestamp": "2026-10-08 11:59:29",
+            "player_card": "A♣",
+            "dealer_card": "Q♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 200.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 200.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 200.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 200.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "A♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "Q♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "A♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "Q♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1920,
+            "timestamp": "2026-10-08 11:59:36",
+            "player_card": "5♣",
+            "dealer_card": "7♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "5♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "7♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "5♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "7♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1921,
+            "timestamp": "2026-10-08 11:59:42",
+            "player_card": "5♥",
+            "dealer_card": "K♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "5♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "K♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "5♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "K♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1922,
+            "timestamp": "2026-10-08 12:06:52",
+            "player_card": "Q♣",
+            "dealer_card": "9♣",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 200.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 200.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 200.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 200.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "Q♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "9♣"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "Q♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "9♣"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1923,
+            "timestamp": "2026-10-08 12:07:22",
+            "player_card": "4♥",
+            "dealer_card": "8♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "4♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "8♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "4♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "8♠"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1924,
+            "timestamp": "2026-10-08 12:07:35",
+            "player_card": "6♣",
+            "dealer_card": "Q♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "6♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "Q♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "6♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "Q♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1925,
+            "timestamp": "2026-10-08 12:07:45",
+            "player_card": "5♣",
+            "dealer_card": "10♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "5♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "10♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "5♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "10♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1926,
+            "timestamp": "2026-10-08 12:07:51",
+            "player_card": "6♣",
+            "dealer_card": "10♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "6♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "10♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "6♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "10♠"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1927,
+            "timestamp": "2026-10-08 12:08:06",
+            "player_card": "10♦",
+            "dealer_card": "10♣",
+            "war_cards": {
+                "player_war_card": "6♥",
+                "dealer_war_card": "3♥"
+            },
+            "result": {
+                "winner": "player",
+                "ties": 1,
+                "main": 300.0,
+                "reward": 0.0,
+                "tie": 110.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 410.0,
+                "surrendered": false,
+                "side_winner": "player",
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 1,
+                        "main": 300.0,
+                        "reward": 0.0,
+                        "tie": 110.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 410.0,
+                        "surrendered": false,
+                        "side_winner": "player"
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 100.0
+                    }
+                },
+                "total_charged": 212.5,
+                "total_return": 410.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "10♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "10♣"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player2",
+                        "burned": true,
+                        "card": "3♥"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player2",
+                        "burned": true,
+                        "card": "Q♠"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player2",
+                        "burned": true,
+                        "card": "Q♦"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "6♥"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": true,
+                        "card": "8♠"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": true,
+                        "card": "A♥"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": true,
+                        "card": "10♣"
+                    },
+                    {
+                        "round": 1,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "3♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "10♦"
+                        ],
+                        [
+                            "3♥",
+                            "Q♠",
+                            "Q♦",
+                            "6♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "10♣"
+                    ],
+                    [
+                        "8♠",
+                        "A♥",
+                        "10♣",
+                        "3♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1928,
+            "timestamp": "2026-10-08 12:08:15",
+            "player_card": "6♠",
+            "dealer_card": "3♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 200.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 200.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 200.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 200.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "6♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "3♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "6♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "3♠"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1929,
+            "timestamp": "2026-10-08 12:12:53",
+            "player_card": "10♣",
+            "dealer_card": "J♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "10♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "J♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "10♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "J♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1930,
+            "timestamp": "2026-10-08 12:13:09",
+            "player_card": "9♦",
+            "dealer_card": "K♥",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "9♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "K♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "9♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "K♥"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1931,
+            "timestamp": "2026-10-08 12:13:15",
+            "player_card": "A♠",
+            "dealer_card": "2♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 200.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 200.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 200.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 200.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "A♠"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "2♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "A♠"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "2♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1932,
+            "timestamp": "2026-10-08 12:13:24",
+            "player_card": "J♥",
+            "dealer_card": "4♦",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "player",
+                "ties": 0,
+                "main": 200.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 200.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 200.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 200.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 100.0,
+                        "tie": 10.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 112.5,
+                "total_return": 200.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "J♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "4♦"
+                    }
+                ],
+                "player_rounds": {
+                    "Player2": [
+                        [
+                            "J♥"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "4♦"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1933,
+            "timestamp": "2026-11-06 11:43:42",
+            "player_card": "4♣",
+            "dealer_card": "J♠",
+            "war_cards": {
+                "player_war_card": null,
+                "dealer_war_card": null
+            },
+            "result": {
+                "winner": "dealer",
+                "ties": 0,
+                "main": 0.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 0.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "dealer",
+                        "ties": 0,
+                        "main": 0.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 0.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 5000.0,
+                        "tie": 1000.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 5000.0,
+                        "tie": 1000.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 12005.0,
+                "total_return": 0.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "4♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "5♦"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "J♠"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "4♣"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "5♦"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "J♠"
+                    ]
+                ]
+            }
+        },
+        {
+            "game_id": 1934,
+            "timestamp": "2026-11-06 11:43:48",
             "player_card": "9♥",
             "dealer_card": "2♥",
             "war_cards": {
@@ -161,553 +4601,95 @@
             },
             "result": {
                 "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1729,
-            "timestamp": "2026-07-18 10:10:28",
-            "player_card": "Q♦",
-            "dealer_card": "A♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1730,
-            "timestamp": "2026-07-18 10:10:50",
-            "player_card": "6♠",
-            "dealer_card": "8♣",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1731,
-            "timestamp": "2026-07-18 10:10:59",
-            "player_card": "4♠",
-            "dealer_card": "8♦",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1732,
-            "timestamp": "2026-07-18 10:11:08",
-            "player_card": "A♠",
-            "dealer_card": "3♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1733,
-            "timestamp": "2026-07-18 10:11:17",
-            "player_card": "4♠",
-            "dealer_card": "K♣",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1734,
-            "timestamp": "2026-07-18 10:11:26",
-            "player_card": "8♣",
-            "dealer_card": "4♣",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1735,
-            "timestamp": "2026-07-18 10:11:35",
-            "player_card": "5♣",
-            "dealer_card": "8♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1736,
-            "timestamp": "2026-07-18 10:11:44",
-            "player_card": "10♣",
-            "dealer_card": "8♦",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1737,
-            "timestamp": "2026-07-18 10:11:53",
-            "player_card": "8♥",
-            "dealer_card": "7♦",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1738,
-            "timestamp": "2026-07-18 10:12:02",
-            "player_card": "6♥",
-            "dealer_card": "4♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1739,
-            "timestamp": "2026-07-18 10:12:11",
-            "player_card": "8♥",
-            "dealer_card": "7♣",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1740,
-            "timestamp": "2026-07-18 10:12:20",
-            "player_card": "7♥",
-            "dealer_card": "Q♦",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1741,
-            "timestamp": "2026-07-18 10:12:29",
-            "player_card": "Q♣",
-            "dealer_card": "3♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1742,
-            "timestamp": "2026-07-18 10:12:38",
-            "player_card": "Q♦",
-            "dealer_card": "A♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1743,
-            "timestamp": "2026-07-18 10:12:47",
-            "player_card": "K♣",
-            "dealer_card": "9♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1744,
-            "timestamp": "2026-07-18 10:12:56",
-            "player_card": "4♦",
-            "dealer_card": "J♣",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1745,
-            "timestamp": "2026-07-18 10:13:05",
-            "player_card": "7♣",
-            "dealer_card": "K♣",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1746,
-            "timestamp": "2026-07-18 10:13:14",
-            "player_card": "Q♣",
-            "dealer_card": "2♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1747,
-            "timestamp": "2026-07-18 10:13:23",
-            "player_card": "3♥",
-            "dealer_card": "7♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1748,
-            "timestamp": "2026-07-18 10:13:32",
-            "player_card": "10♠",
-            "dealer_card": "7♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1749,
-            "timestamp": "2026-07-18 10:13:53",
-            "player_card": "Q♦",
-            "dealer_card": "10♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1750,
-            "timestamp": "2026-07-18 10:14:10",
-            "player_card": "6♣",
-            "dealer_card": "5♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1751,
-            "timestamp": "2026-07-18 10:14:19",
-            "player_card": "4♠",
-            "dealer_card": "7♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1752,
-            "timestamp": "2026-07-18 10:14:28",
-            "player_card": "7♠",
-            "dealer_card": "Q♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1753,
-            "timestamp": "2026-07-18 10:14:43",
-            "player_card": "Q♥",
-            "dealer_card": "Q♣",
-            "war_cards": {
-                "player_war_card": "J♣",
-                "dealer_war_card": "7♣"
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1754,
-            "timestamp": "2026-07-18 10:14:51",
-            "player_card": "8♥",
-            "dealer_card": "Q♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1755,
-            "timestamp": "2026-07-18 10:15:01",
-            "player_card": "7♥",
-            "dealer_card": "5♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1756,
-            "timestamp": "2026-07-18 10:15:10",
-            "player_card": "10♦",
-            "dealer_card": "A♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1757,
-            "timestamp": "2026-07-30 14:33:41",
-            "player_card": "Q♥",
-            "dealer_card": "9♣",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1758,
-            "timestamp": "2026-07-30 14:33:48",
-            "player_card": "J♠",
-            "dealer_card": "4♦",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1759,
-            "timestamp": "2026-07-30 14:34:04",
-            "player_card": "7♦",
-            "dealer_card": "7♦",
-            "war_cards": {
-                "player_war_card": "10♥",
-                "dealer_war_card": "A♠"
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1760,
-            "timestamp": "2026-07-30 14:34:12",
-            "player_card": "3♥",
-            "dealer_card": "4♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1761,
-            "timestamp": "2026-08-29 09:21:08",
-            "player_card": "8♠",
-            "dealer_card": "7♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1762,
-            "timestamp": "2026-09-02 23:28:05",
-            "player_card": "6♣",
-            "dealer_card": "J♣",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1763,
-            "timestamp": "2026-09-02 23:28:19",
-            "player_card": "A♦",
-            "dealer_card": "A♠",
-            "war_cards": {
-                "player_war_card": "4♠",
-                "dealer_war_card": "3♦"
-            },
-            "result": {
-                "winner": "player",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1764,
-            "timestamp": "2026-09-02 23:28:26",
-            "player_card": "Q♣",
-            "dealer_card": "K♦",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1765,
-            "timestamp": "2026-09-02 23:29:04",
-            "player_card": "9♥",
-            "dealer_card": "10♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1766,
-            "timestamp": "2026-09-09 22:40:12",
-            "player_card": "4♠",
-            "dealer_card": "10♠",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
-            }
-        },
-        {
-            "game_id": 1767,
-            "timestamp": "2026-09-09 22:40:31",
-            "player_card": "5♦",
-            "dealer_card": "10♥",
-            "war_cards": {
-                "player_war_card": null,
-                "dealer_war_card": null
-            },
-            "result": {
-                "winner": "dealer",
-                "surrender": false
+                "ties": 0,
+                "main": 10000.0,
+                "reward": 0.0,
+                "tie": 0.0,
+                "jackpot": 0.0,
+                "jackpot_name": null,
+                "returned": 10000.0,
+                "surrendered": false,
+                "side_winner": null,
+                "surrender": false,
+                "hands": {
+                    "Player1": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 10000.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 10000.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    },
+                    "Player2": {
+                        "winner": "player",
+                        "ties": 0,
+                        "main": 10000.0,
+                        "reward": 0.0,
+                        "tie": 0.0,
+                        "jackpot": 0.0,
+                        "jackpot_name": null,
+                        "returned": 10000.0,
+                        "surrendered": false,
+                        "side_winner": null
+                    }
+                },
+                "bets": {
+                    "Player1": {
+                        "ante": 5000.0,
+                        "tie": 1000.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    },
+                    "Player2": {
+                        "ante": 5000.0,
+                        "tie": 1000.0,
+                        "jackpot": 2.5,
+                        "war": 0.0
+                    }
+                },
+                "total_charged": 12005.0,
+                "total_return": 20000.0,
+                "deal_sequence": [
+                    {
+                        "round": 0,
+                        "side": "Player1",
+                        "burned": false,
+                        "card": "9♥"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Player2",
+                        "burned": false,
+                        "card": "10♣"
+                    },
+                    {
+                        "round": 0,
+                        "side": "Dealer",
+                        "burned": false,
+                        "card": "2♥"
+                    }
+                ],
+                "player_rounds": {
+                    "Player1": [
+                        [
+                            "9♥"
+                        ]
+                    ],
+                    "Player2": [
+                        [
+                            "10♣"
+                        ]
+                    ]
+                },
+                "dealer_rounds": [
+                    [
+                        "2♥"
+                    ]
+                ]
             }
         }
     ]

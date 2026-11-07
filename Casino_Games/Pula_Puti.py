@@ -883,32 +883,324 @@ class RedPacketRainGame:
         self._start_key_bindings=[]
 
     def show_game_instructions(self):
-        window=tk.Toplevel(self.root)
-        window.title('红白落球 · 游戏规则')
-        window.geometry('650x510')
-        window.configure(bg='#173c32')
-        cv=tk.Canvas(window,bg='#173c32',highlightthickness=0)
-        cv.pack(fill='both',expand=True)
-        cv.create_text(325,35,text='红白落球  ·  游戏规则',fill='#f2e6c9',font=(Theme.FONT_CJK,21,'bold'))
-        for i,color in enumerate(('#d93c3c','#f7f5ef','#163d85')):
-            cv.create_oval(140+i*62,75,178+i*62,113,fill=color,outline='#d8b46a',width=2)
-        cv.create_text(455,95,text='三球落在 18 × 8 格子',fill='white',font=(Theme.FONT_CJK,14))
-        lines=[
-            '双红 / 双白  ≥2同色：2X       三红 / 三白  3同色：9X',
-            '任意蓝  ≥1蓝：6X             红白蓝  各1颗：12X',
-            '至少2颗蓝球进入红包游戏；2蓝有18封，3蓝有12封。',
-            '点选红包，收集同一档至目标张数即可领取该档倍率。',
-            '两蓝：18封，Mini 3 / Maxi 3 / Minor 3 / Major 4 / Grand 5。',
-            '三蓝：12封，Minor 3 / Major 4 / Grand 5。',
-            '每档倍率在当局随机翻出；双蓝下注按获奖倍率结算。',
-            '停球后有300秒选择；到时系统每5秒自动开启一封。',
-            '左键下注 / 右键清除；数字1–7选择下注区。',
-        ]
-        for i,line in enumerate(lines):
-            y=153+i*36
-            cv.create_rectangle(34,y-15,616,y+17,fill='#245344' if i%2==0 else '#21483d',outline='#537969')
-            cv.create_text(48,y,text=line,anchor='w',fill='#f6eedc',font=(Theme.FONT_CJK,12))
-        tk.Button(window,text='关闭',command=window.destroy,bg='#d8b46a',font=(Theme.FONT_CJK,12,'bold')).place(x=276,y=475,width=100,height=28)
+        """按原版卡片式布局显示本游戏的图解说明。"""
+        import tkinter as tk
+        import tkinter.font as tkfont
+        import math
+
+        owner = self if isinstance(self, tk.Misc) else self.root
+        parent = owner.winfo_toplevel()
+        current = getattr(self, '_game_instruction_dialog', None)
+        if current is not None:
+            try:
+                if current.winfo_exists():
+                    current.lift()
+                    current.focus_force()
+                    return
+            except tk.TclError:
+                pass
+        dialog = tk.Toplevel(parent)
+        self._game_instruction_dialog = dialog
+        dialog.title('红白落球 · 完整图解玩法')
+        dialog.configure(bg='#faf5e8')
+        dialog.resizable(False, False)
+        dialog.transient(parent)
+        width, height = 1000, 670
+        parent.update_idletasks()
+        px, py = parent.winfo_rootx(), parent.winfo_rooty()
+        pw, ph = max(1, parent.winfo_width()), max(1, parent.winfo_height())
+        dialog.geometry(f'{width}x{height}+{max(0, px + (pw-width)//2)}+{max(0, py + (ph-height)//2)}')
+
+        manual_pages = [('玩法',
+          '三颗球落入 18 × 8 个格子，按落点颜色结算。',
+          [('游戏目标', '', [('落球结果', '每局三颗球各进入不同格；格子为红、白或蓝。\n七个下注区可分别下注，命中条件可同时成立。')], []),
+           ('一局如何进行',
+            '',
+            [('① 下注', '选择筹码，左键点击下注区；可以押多个项目，或零下注试玩。\n右键点击下注区清除该项。'),
+             ('② 落球', '点击“开始游戏”，等待三颗球全部停下。'),
+             ('③ 红包与结算', '至少两颗蓝球触发红包；选择红包直至同一档集齐目标张数，之后按各下注区独立结算。')],
+            []),
+           ('红白蓝落点示意', '', [], [])]),
+         ('下注 & 限红',
+          '确认下注金额及余额后开始。',
+          [('七种下注',
+            '',
+            [],
+            [('条件与返还',
+              ['项目', '命中条件', '返还含本金'],
+              [['双红 / 双白', '至少 2 颗指定颜色', '下注 × 2'],
+               ['三红 / 三白', '3 颗指定颜色', '下注 × 9'],
+               ['任意蓝', '至少 1 颗蓝球', '下注 × 6'],
+               ['双蓝', '至少 2 颗蓝球', '红包获得的倍率'],
+               ['红白蓝', '三色各 1 颗', '下注 × 12']])]),
+           ('下注限额',
+            '',
+            [('限额规则', '每个已下注区域须达到单区最低；全部下注合计不得超过全台上限或余额。\n高额模式须通过界面验证。')],
+            [('当前两种模式',
+              ['模式', '单区最低', '单区最高', '全台最高'],
+              [['普通模式', '$10', '$10,000', '$50,000'], ['高额模式', '$100', '$50,000', '$250,000']])])]),
+         ('红包游戏',
+          '两蓝与三蓝的红包数量及档位不同。',
+          [('红包选择示意', '', [], []),
+           ('触发与计时',
+            '',
+            [('选择红包', '两蓝有 18 封；三蓝有 12 封。\n奖励倍率展示完毕后有 300 秒手动选择；超时后系统每 5 秒自动开启一封。')],
+            []),
+           ('完成条件',
+            '',
+            [],
+            [('红包档位',
+              ['档位', '需集齐张数', '可能倍率'],
+              [['Mini（两蓝）', '3', '15 / 20 / 25 / 30'],
+               ['Maxi（两蓝）', '3', '30 / 40 / 50 / 60'],
+               ['Minor', '3', '60 / 80 / 100 / 120'],
+               ['Major', '4', '150 / 200 / 250 / 300'],
+               ['Grand', '5', '300 / 500 / 750 / 1000']])]),
+           ('派奖口径', '', [('双蓝下注', '每档倍率在本局生成，先集齐的档位决定双蓝下注的含本金返还倍率。\n其他命中下注仍按各自规则结算。')], []),
+           ('开奖说明',
+            '',
+            [('完成一档即结算',
+              '两蓝包含 Mini、Maxi、Minor、Major、Grand 五档。\n'
+              '三蓝只包含 Minor、Major、Grand 三档。\n'
+              '各档集齐目标张数后结束选择，按完成档位的本局倍率派奖。\n'
+              '倍率已含本金，不再额外加回双蓝本金。')],
+            [])]),
+         ('操作 & 记录',
+          '了解重注、结果与统计。',
+          [('桌面操作',
+            '',
+            [('快捷方式', '数字 1–7 可选择对应下注区；右键清除单区；重置清除本局下注；“重复上局下注”恢复最近一次有下注的组合，但受余额及限额约束。')],
+            []),
+           ('金额与历史',
+            '',
+            [('返还与净值', '获胜返还包含本金。\n净盈亏＝全部返还－本局总下注；未命中的下注不返还。\n历史统计只显示过去结果，不参与下一局判奖。')],
+            [])]),
+         ('结算示例',
+          '返还包含本金；净盈亏须扣除全部下注。',
+          [('金额计算',
+            '',
+            [('三颗红球',
+              '双红下注 $10，三红下注 $10。\n'
+              '双红返还：$10 × 2＝$20。\n'
+              '三红返还：$10 × 9＝$90。\n'
+              '合计返还 $110；总下注 $20；本局净赢 $90。'),
+             ('两颗蓝球',
+              '任意蓝下注 $10，双蓝下注 $10。\n'
+              '若红包集齐 Mini，且本局 Mini 倍率为 20 倍：\n'
+              '任意蓝返还 $60；双蓝返还 $200。\n'
+              '合计返还 $260；总下注 $20；本局净赢 $240。')],
+            [])])]
+
+        illustration_cards = {'红白蓝落点示意': 'grid', '红包选择示意': 'packets'}
+
+        BG = '#faf5e8'
+        HEADER = '#f1e7cd'
+        SIDEBAR = '#f2e8d0'
+        PANEL = '#fffdf7'
+        PANEL_2 = '#f5ecd6'
+        BORDER = '#c9b88a'
+        GOLD = '#a8842c'
+        GOLD_BAR = '#e7d36c'
+        TEXT = '#3a2f1e'
+        MUTED = '#7a6a50'
+        font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
+        header = tk.Frame(dialog, bg=HEADER, height=76)
+        header.pack(fill=tk.X, side=tk.TOP)
+        header.pack_propagate(False)
+        tk.Label(header, text='红白落球 · 完整图解玩法', font=(font_name, 20, 'bold'),
+                 fg=GOLD, bg=HEADER, anchor='w', wraplength=795,
+                 justify=tk.LEFT).place(x=24, y=6, width=795, height=41)
+        tk.Label(header, text='玩法 · 下注 · 派奖 · 图解 · 结算示例',
+                 font=(font_name, 14), fg=MUTED, bg=HEADER, anchor='w').place(x=26, y=46)
+        def close_dialog():
+            try:
+                self._game_instruction_dialog = None
+            except Exception:
+                pass
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
+        tk.Button(header, text='关闭  ESC', command=close_dialog,
+                  font=(font_name, 14, 'bold'), bg='#e8dcc0', fg=TEXT,
+                  activebackground='#d9c895', relief=tk.FLAT, bd=0,
+                  cursor='hand2').place(x=850, y=17, width=120, height=42)
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X, side=tk.TOP)
+        body = tk.Frame(dialog, bg=BG)
+        body.pack(fill=tk.BOTH, expand=True)
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=205)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+        tk.Label(sidebar, text='说明目录', font=(font_name, 16, 'bold'),
+                 fg=GOLD, bg=SIDEBAR, anchor='w').pack(fill=tk.X, padx=18, pady=(17, 10))
+        scroll_host = tk.Frame(body, bg=BG)
+        scroll_host.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(scroll_host, bg=BG, highlightthickness=0, bd=0, yscrollincrement=36)
+        scrollbar = tk.Scrollbar(scroll_host, orient=tk.VERTICAL, command=canvas.yview,
+                                 bg='#ded3b7', troughcolor=BG, activebackground=GOLD_BAR,
+                                 relief=tk.FLAT, bd=0, width=13)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=10)
+        content = tk.Frame(canvas, bg=BG)
+        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
+        def sync_scrollregion(_event=None):
+            canvas.configure(scrollregion=canvas.bbox('all'))
+        def fit_content_width(event):
+            canvas.itemconfigure(content_window, width=event.width)
+        content.bind('<Configure>', sync_scrollregion)
+        canvas.bind('<Configure>', fit_content_width)
+        def add_rule(parent_frame, title, detail):
+            row = tk.Frame(parent_frame, bg=PANEL)
+            row.pack(fill=tk.X, padx=16, pady=5)
+            tk.Frame(row, bg=GOLD_BAR, width=5).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 11))
+            text_box = tk.Frame(row, bg=PANEL)
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(text_box, text=title, font=(font_name, 15, 'bold'),
+                     fg=TEXT, bg=PANEL, anchor='w', justify=tk.LEFT,
+                     wraplength=650).pack(fill=tk.X)
+            if detail:
+                tk.Label(text_box, text=detail, font=(font_name, 14),
+                         fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+                         wraplength=650).pack(fill=tk.X, pady=(3, 0))
+        def add_table(parent_frame, title, headers, rows):
+            block = tk.Frame(parent_frame, bg=PANEL_2,
+                             highlightbackground=BORDER, highlightthickness=1, bd=0)
+            block.pack(fill=tk.X, padx=16, pady=8)
+            tk.Label(block, text=title, font=(font_name, 14, 'bold'),
+                     fg=TEXT, bg=GOLD_BAR, anchor='w', justify=tk.LEFT,
+                     wraplength=675, padx=11, pady=7).pack(fill=tk.X)
+            grid = tk.Frame(block, bg=PANEL_2)
+            grid.pack(fill=tk.X)
+            count = max([len(headers)] + [len(row) for row in rows]) if rows else len(headers)
+            table_font = tkfont.Font(family=font_name, size=14)
+            matrix = ([headers] if headers else []) + rows
+            minimums = [62] * count
+            preferences = []
+            for col in range(count):
+                text_width = max((table_font.measure(line)
+                                  for row in matrix if col < len(row)
+                                  for line in str(row[col]).split('\n')), default=0)
+                preferences.append(max(50, min(text_width, 260)))
+            available = 700
+            remaining = max(0, available - sum(minimums))
+            total_preference = sum(preferences) or 1
+            column_widths = [minimums[col] + remaining * preferences[col] // total_preference
+                             for col in range(count)]
+            if column_widths:
+                column_widths[-1] += available - sum(column_widths)
+            for col, width in enumerate(column_widths):
+                grid.grid_columnconfigure(col, minsize=width)
+            for r, row in enumerate(matrix):
+                for c in range(count):
+                    value = row[c] if c < len(row) else ''
+                    head = bool(headers) and r == 0
+                    bg = GOLD_BAR if head else (PANEL if r % 2 else '#fbf6e9')
+                    fg = TEXT if head else MUTED
+                    tk.Message(grid, text=value, font=(font_name, 14, 'bold' if head else 'normal'),
+                               fg=fg, bg=bg, anchor='w', justify=tk.LEFT,
+                               width=max(42, column_widths[c] - 16),
+                               padx=7, pady=5, borderwidth=1,
+                               relief=tk.SOLID).grid(row=r, column=c, sticky='nsew')
+        def draw_illustration(parent_frame, kind):
+            c = tk.Canvas(parent_frame, width=700, height=340,
+                          bg=PANEL, highlightthickness=0)
+            c.pack(padx=16, pady=(5, 10))
+            if kind == 'grid':
+                blue_cells = {5, 34, 38, 67, 80, 91, 119, 130}
+                colors = {'red': '#d93c3c', 'white': '#fffdf7', 'blue': '#163d85'}
+                for row in range(8):
+                    for col in range(18):
+                        index = row * 18 + col
+                        color = 'blue' if index in blue_cells else ('red' if (row + col) % 2 == 0 else 'white')
+                        x, y = 22 + col * 23, 48 + row * 23
+                        c.create_rectangle(x, y, x + 23, y + 23,
+                                           fill=colors[color], outline=BORDER)
+                c.create_text(230, 23, text='18 × 8 落球格', fill=GOLD,
+                              font=(font_name, 15, 'bold'))
+                for index in (0, 1, 5):
+                    x, y = 33.5 + (index % 18) * 23, 59.5 + (index // 18) * 23
+                    c.create_oval(x-8, y-8, x+8, y+8, fill='#e7d36c', outline='#8a6b2a', width=2)
+                c.create_text(470, 60, text='三球分别进入不同格\n\n'
+                              '红色格：68 格\n白色格：68 格\n蓝色格：8 格\n\n'
+                              '球所在格子的颜色\n决定本局下注结果。',
+                              anchor='nw', fill=TEXT, font=(font_name, 14))
+                c.create_text(22, 262, text='示例：红、白、蓝各一颗\n'
+                              '“任意蓝”与“红白蓝”同时满足中奖条件。',
+                              anchor='nw', fill=MUTED, font=(font_name, 14))
+            else:
+                for x0, count, title in ((16, 18, '两蓝：18 封红包'), (366, 12, '三蓝：12 封红包')):
+                    c.create_text(x0+151, 20, text=title, fill=GOLD, font=(font_name, 15, 'bold'))
+                    for index in range(count):
+                        x, y = x0 + (index % 6) * 51, 48 + (index // 6) * 65
+                        c.create_rectangle(x, y, x+43, y+54, fill='#b72d2d', outline='#d7aa53', width=2)
+                        c.create_line(x, y, x+21.5, y+18, x+43, y, fill='#f2cf77', width=2)
+                        c.create_oval(x+12, y+22, x+31, y+41, fill='#e4bd60', outline='#f7de9b')
+                        c.create_text(x+21.5, y+31.5, text='福', fill='#8c2424', font=(font_name, 11, 'bold'))
+                c.create_text(16, 257, text='点击未开启的红包 → 累积同档张数 → 集齐目标档位 → 按该档倍率派奖',
+                              anchor='nw', fill=TEXT, font=(font_name, 13, 'bold'))
+                c.create_text(16, 294, text='示意图。实际红包内容与各档倍率以本局显示为准。',
+                              anchor='nw', fill=MUTED, font=(font_name, 12))
+
+        def render_page(index):
+            for child in content.winfo_children():
+                child.destroy()
+            for idx, button in enumerate(nav_buttons):
+                button.configure(bg='#e6d9b9' if idx == index else SIDEBAR,
+                                 fg=GOLD if idx == index else MUTED)
+            page_title, subtitle, cards = manual_pages[index]
+            top = tk.Frame(content, bg=BG)
+            top.pack(fill=tk.X, padx=14, pady=(7, 2))
+            tk.Label(top, text=page_title, font=(font_name, 20, 'bold'),
+                     fg=GOLD, bg=BG, anchor='w', justify=tk.LEFT,
+                     wraplength=690).pack(fill=tk.X)
+            if subtitle:
+                tk.Label(top, text=subtitle, font=(font_name, 14),
+                         fg=MUTED, bg=BG, anchor='w', justify=tk.LEFT,
+                         wraplength=690).pack(fill=tk.X, pady=(3, 0))
+            for card_title, card_subtitle, rules, tables in cards:
+                card = tk.Frame(content, bg=PANEL, highlightbackground=BORDER,
+                                highlightcolor=BORDER, highlightthickness=1, bd=0)
+                card.pack(fill=tk.X, padx=10, pady=7)
+                head = tk.Frame(card, bg=PANEL)
+                head.pack(fill=tk.X, padx=16, pady=(12, 5))
+                tk.Label(head, text=card_title, font=(font_name, 16, 'bold'),
+                         fg=GOLD, bg=PANEL, anchor='w', justify=tk.LEFT,
+                         wraplength=680).pack(fill=tk.X)
+                if card_subtitle:
+                    tk.Label(head, text=card_subtitle, font=(font_name, 14),
+                             fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+                             wraplength=680).pack(fill=tk.X)
+                if card_title in illustration_cards:
+                    draw_illustration(card, illustration_cards[card_title])
+                for rule_title, detail in rules:
+                    add_rule(card, rule_title, detail)
+                for table_title, table_headers, rows in tables:
+                    add_table(card, table_title, table_headers, rows)
+                tk.Frame(card, bg=PANEL, height=6).pack(fill=tk.X)
+            content.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox('all'))
+            canvas.yview_moveto(0)
+        nav_buttons = []
+        for index, (page_title, _subtitle, _cards) in enumerate(manual_pages):
+            button = tk.Button(sidebar, text=page_title, command=lambda i=index: render_page(i),
+                               font=(font_name, 14), fg=MUTED, bg=SIDEBAR,
+                               activebackground='#e8d49a', activeforeground=GOLD,
+                               relief=tk.FLAT, bd=0, anchor='w', padx=18, pady=10,
+                               cursor='hand2')
+            button.pack(fill=tk.X)
+            nav_buttons.append(button)
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-event.delta / 120), 'units')
+            return 'break'
+        dialog.bind('<MouseWheel>', on_mousewheel)
+        dialog.bind('<Button-4>', lambda _e: (canvas.yview_scroll(-1, 'units'), 'break')[1])
+        dialog.bind('<Button-5>', lambda _e: (canvas.yview_scroll(1, 'units'), 'break')[1])
+        dialog.bind('<Escape>', lambda _e: close_dialog())
+        dialog.protocol('WM_DELETE_WINDOW', close_dialog)
+        if nav_buttons:
+            render_page(0)
+        dialog.after(30, dialog.focus_force)
 
     def update_display(self):
         self._draw_latest_double()

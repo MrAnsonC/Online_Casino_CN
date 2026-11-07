@@ -1,43 +1,53 @@
-import sys as _account_sys
-from pathlib import Path as _AccountPath
-_account_root = next((p for p in (_AccountPath(__file__).resolve().parent, *_AccountPath(__file__).resolve().parents) if (p / "A_Tools" / "Account" / "secure_json.py").is_file()), None)
-if _account_root is None:
-    raise RuntimeError("Cannot locate encrypted account storage")
-if str(_account_root) not in _account_sys.path:
-    _account_sys.path.insert(0, str(_account_root))
-from A_Tools.Account import install_secure_json as _install_secure_json
-_install_secure_json()
-del _install_secure_json, _account_root, _AccountPath, _account_sys
+"""Wenzhou Pai Gow with the supplied Classic Pai Gow UI.
+
+Run: python Wenzhou_Pai_Gow.py
+Requires Python 3, Tkinter and Pillow. Guest mode works standalone;
+named accounts use the original encrypted A_Tools account storage.
+The main(...), build_pai_gow_page(...) and start_pai_gow_gui(...) APIs are retained.
+"""
+import sys
+from pathlib import Path
+_ACCOUNT_ROOT = next((p for p in (Path(__file__).resolve().parent,
+    *Path(__file__).resolve().parents)
+    if (p / 'A_Tools' / 'Account' / 'secure_json.py').is_file()), None)
+if _ACCOUNT_ROOT is not None:
+    if str(_ACCOUNT_ROOT) not in sys.path:
+        sys.path.insert(0, str(_ACCOUNT_ROOT))
+    from A_Tools.Account import install_secure_json
+    install_secure_json()
 
 import json
 import os
 import secrets
+import random
 import math
-import time
 import tkinter as tk
-from dataclasses import dataclass
 from tkinter import messagebox, simpledialog
-
+from dataclasses import dataclass
+import time
+from decimal import Decimal, ROUND_HALF_UP
 from PIL import Image, ImageDraw, ImageTk
 
-
-# ============================================================
-# 温州牌九 — 32张牌、两张制、四门制
-# ============================================================
-WINDOW_GEOMETRY = "1150x750+50+10"
-
-BG = "#17120f"
-FELT = "#0b4540"
-GOLD = "#e7d36c"
-GOLD_DARK = "#8d742d"
-TEXT = "#f7f1e4"
-MUTED = "#c8bda9"
+WINDOW_GEOMETRY = '1150x750+50+10'
+ROOT_BG = '#1B3D31'
+TEXT = '#ffffff'
+RED = '#ff2a23'
+BLACK = '#050505'
+DARK_BLUE = '#173f66'
+GOLD = '#D4AF37'
+GOLD_DARK = '#8d742d'
+PANEL_BG = '#F2E6C9'
+HEADER_BG = '#D8B46A'
+TITLE_FG = '#2A1B08'
 CLASSIC_TILE_ASPECT = 2.5
+CHIPS = [(10, '#ffa500'), (25, '#00ff00'), (100, BLACK),
+         (500, '#FF7DDA'), (1000, TEXT), (2500, RED)]
 
 
 def get_data_file_path():
-    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(parent_dir, "A_Tools/Account/saving_data.json")
+    if _ACCOUNT_ROOT is None:
+        raise RuntimeError('Named accounts require A_Tools/Account/secure_json.py')
+    return str(_ACCOUNT_ROOT / 'A_Tools' / 'Account' / 'saving_data.json')
 
 def load_user_data():
     try:
@@ -46,12 +56,14 @@ def load_user_data():
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return []
 
+
 def save_user_data(users):
     try:
         with open(get_data_file_path(), "w", encoding="utf-8") as f:
             json.dump(users, f, ensure_ascii=False, indent=4)
     except OSError:
         pass
+
 
 def update_balance_in_json(username, new_balance):
     if not username or username == "Guest":
@@ -62,6 +74,521 @@ def update_balance_in_json(username, new_balance):
             user["cash"] = f"{float(new_balance):.2f}"
             break
     save_user_data(users)
+
+
+GD_PIPS = {
+    1: ((0, 0),), 2: ((-1, -1), (1, 1)),
+    3: ((-1, -1), (0, 0), (1, 1)),
+    4: ((-1, -1), (1, -1), (-1, 1), (1, 1)),
+    5: ((-1, -1), (1, -1), (0, 0), (-1, 1), (1, 1)),
+    6: ((-1, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (1, 1)),
+}
+GD_DICE_COLORS = ((47, 127, 235), (224, 64, 59))  # Blue die, red die.
+
+# World-space rigid cubes; geometry is shared by collision, rendering and scoring.
+GD_SCENE_UNIT = 600.0
+GD_DICE_EDGE_PX = 22.0
+GD_BOWL_SCALE = 1.55
+GD_VIEW_DEPTH = .28 / math.hypot(.28, .70)
+GD_VIEW_UP = .70 / math.hypot(.28, .70)
+def _gd_view_projection():
+    return GD_VIEW_DEPTH, GD_VIEW_UP, 96., (0., GD_VIEW_UP, GD_VIEW_DEPTH)
+
+
+def _gd_dot(a, b):
+    return sum(x*y for x, y in zip(a, b))
+
+
+def _gd_cross(a, b):
+    return (a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0])
+
+
+def _gd_add(a, b):
+    return tuple(x+y for x, y in zip(a, b))
+
+
+def _gd_sub(a, b):
+    return tuple(x-y for x, y in zip(a, b))
+
+
+def _gd_scale(a, amount):
+    return tuple(x*amount for x in a)
+
+
+def _gd_length(a):
+    return math.sqrt(_gd_dot(a, a))
+
+
+def _gd_unit(a):
+    length = _gd_length(a)
+    return _gd_scale(a, 1/length) if length > 1e-12 else (0., 0., 0.)
+
+
+def _gd_rotate(q, omega, dt):
+    speed = _gd_length(omega)
+    if speed < 1e-12:
+        return q
+    a = speed*dt/2
+    dw = math.cos(a)
+    dx, dy, dz = _gd_scale(omega, math.sin(a)/speed)
+    w, x, y, z = q
+    r = (dw*w-dx*x-dy*y-dz*z, dw*x+dx*w+dy*z-dz*y,
+         dw*y-dx*z+dy*w+dz*x, dw*z+dx*y-dy*x+dz*w)
+    norm = math.sqrt(sum(v*v for v in r))
+    return tuple(v/norm for v in r)
+
+
+def _gd_qvector(q, v):
+    xyz = q[1:]
+    t = _gd_scale(_gd_cross(xyz, v), 2)
+    return _gd_add(v, _gd_add(_gd_scale(t, q[0]), _gd_cross(xyz, t)))
+
+
+# Standard six-sided dice: 1 opposite 6, 2 opposite 5, 3 opposite 4.
+# Fixed standard pip layouts rotate with the cube; the result is its upward face.
+GD_CUBE_FACES = (
+    (1, (0., 0., 1.), (1., 0., 0.), (0., 1., 0.)),
+    (6, (0., 0., -1.), (1., 0., 0.), (0., -1., 0.)),
+    (3, (1., 0., 0.), (0., 1., 0.), (0., 0., 1.)),
+    (4, (-1., 0., 0.), (0., -1., 0.), (0., 0., 1.)),
+    (2, (0., 1., 0.), (-1., 0., 0.), (0., 0., 1.)),
+    (5, (0., -1., 0.), (1., 0., 0.), (0., 0., 1.)),
+)
+
+
+class GoldenRigidDie:
+    EDGE = GD_DICE_EDGE_PX / GD_SCENE_UNIT
+    HALF = EDGE/2
+    INVERSE_INERTIA = 6/(EDGE*EDGE)  # unit mass, uniform solid cube
+    LANDING_ANGLE_DEGREES = 8.0
+    LANDING_ALIGNMENT = math.cos(math.radians(LANDING_ANGLE_DEGREES))
+    CONTACT_TOLERANCE = EDGE*math.sin(math.radians(LANDING_ANGLE_DEGREES))
+
+    def __init__(self, x, top=1):
+        self.p = (x, 0., self.HALF)
+        self.v = (0., 0., 0.)
+        self.omega = (0., 0., 0.)
+        self.q = (1., 0., 0., 0.)
+        # This initialization restores saved top faces only; rounds never assign faces.
+        normal = next(face[1] for face in GD_CUBE_FACES if face[0] == top)
+        axis = _gd_cross(normal, (0., 0., 1.))
+        if _gd_length(axis) > 1e-10:
+            self.q = _gd_rotate(self.q, _gd_unit(axis), math.acos(normal[2]))
+        elif normal[2] < 0:
+            self.q = _gd_rotate(self.q, (1., 0., 0.), math.pi)
+
+    def axes(self):
+        return tuple(_gd_qvector(self.q, axis) for axis in
+                     ((1., 0., 0.), (0., 1., 0.), (0., 0., 1.)))
+
+    def vertices(self):
+        axes = self.axes()
+        return [_gd_add(self.p, _gd_scale(_gd_add(_gd_scale(axes[0], x),
+                         _gd_add(_gd_scale(axes[1], y), _gd_scale(axes[2], z))), self.HALF))
+                for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)]
+
+    def support(self, normal):
+        point = self.p
+        for axis in self.axes():
+            projection = _gd_dot(axis, normal)
+            if abs(projection) > 1e-9:
+                point = _gd_add(point, _gd_scale(axis, math.copysign(self.HALF, projection)))
+        return point
+
+    def impulse(self, impulse, point):
+        self.v = _gd_add(self.v, impulse)
+        self.omega = _gd_add(self.omega, _gd_scale(_gd_cross(_gd_sub(point, self.p), impulse),
+                                            self.INVERSE_INERTIA))
+
+    def top_face(self):
+        candidates = [(number, _gd_qvector(self.q, normal)[2])
+                      for number, normal, _u, _v in GD_CUBE_FACES]
+        number, alignment = max(candidates, key=lambda item: item[1])
+        return number if alignment >= self.LANDING_ALIGNMENT-1e-12 else None
+
+    def settled(self):
+        floor = min(point[2] for point in self.vertices())
+        return (self.top_face() is not None and abs(floor) <= self.CONTACT_TOLERANCE
+                and _gd_length(self.v) < .005 and _gd_length(self.omega) < .12)
+
+    def stabilize_contact(self):
+        """Remove contact chatter only when a face is already almost flat."""
+        face = max(GD_CUBE_FACES, key=lambda f: _gd_qvector(self.q, f[1])[2])
+        normal = _gd_qvector(self.q, face[1])
+        if (normal[2] > .999 and self.p[2] < self.HALF+self.EDGE*.04
+                and _gd_length(self.v) < .08 and _gd_length(self.omega) < 12.):
+            axis = _gd_cross(normal, (0., 0., 1.))
+            if _gd_length(axis) > 1e-12:
+                self.q = _gd_rotate(self.q, _gd_unit(axis), math.acos(min(1., normal[2])))
+            self.p = (self.p[0], self.p[1], self.HALF)
+            self.v = self.omega = (0., 0., 0.)
+
+
+def _gd_overlap(a, b):
+    """Read-only OBB contact query shared by physics and final validation."""
+    aa, ba = a.axes(), b.axes()
+    axes = list(aa)+list(ba)+[_gd_cross(x, y) for x in aa for y in ba]
+    delta = _gd_sub(b.p, a.p)
+    normal, penetration = None, float('inf')
+    for axis in axes:
+        if _gd_length(axis) < 1e-8:
+            continue
+        axis = _gd_unit(axis)
+        ra = a.HALF*sum(abs(_gd_dot(axis, v)) for v in aa)
+        rb = b.HALF*sum(abs(_gd_dot(axis, v)) for v in ba)
+        overlap = ra+rb-abs(_gd_dot(delta, axis))
+        if overlap <= 0:
+            return None
+        if overlap < penetration:
+            penetration = overlap
+            normal = axis if _gd_dot(delta, axis) >= 0 else _gd_scale(axis, -1)
+    return normal, penetration
+
+
+def _gd_collide_dice(a, b):
+    """OBB contact, friction impulses and angular response from BacBo."""
+    contact_info = _gd_overlap(a, b)
+    if contact_info is None:
+        return False
+    normal, penetration = contact_info
+    contact = _gd_scale(_gd_add(a.support(normal), b.support(_gd_scale(normal, -1))), .5)
+    ra, rb = _gd_sub(contact, a.p), _gd_sub(contact, b.p)
+    av = _gd_add(a.v, _gd_cross(a.omega, ra))
+    bv = _gd_add(b.v, _gd_cross(b.omega, rb))
+    relative = _gd_sub(bv, av)
+    speed = _gd_dot(relative, normal)
+    if speed < 0:
+        effective = 2+a.INVERSE_INERTIA*(_gd_dot(_gd_cross(ra, normal), _gd_cross(ra, normal))
+                                       + _gd_dot(_gd_cross(rb, normal), _gd_cross(rb, normal)))
+        amount = -(1.4 if speed < -.08 else 1.)*speed/effective
+        impulse = _gd_scale(normal, amount)
+        a.impulse(_gd_scale(impulse, -1), contact)
+        b.impulse(impulse, contact)
+        tangent = _gd_sub(relative, _gd_scale(normal, speed))
+        if _gd_length(tangent) > 1e-9:
+            direction = _gd_unit(tangent)
+            effective = 2+a.INVERSE_INERTIA*(
+                _gd_length(_gd_cross(ra, direction))**2+_gd_length(_gd_cross(rb, direction))**2)
+            friction = min(.35*amount, _gd_length(tangent)/effective)
+            a.impulse(_gd_scale(direction, friction), contact)
+            b.impulse(_gd_scale(direction, -friction), contact)
+    correction = _gd_scale(normal, (penetration+.000002)*.5)
+    a.p = _gd_sub(a.p, correction)
+    b.p = _gd_add(b.p, correction)
+    return True
+
+
+class GoldenDiceBowl:
+    RADIUS = .085 * GD_BOWL_SCALE
+    HEIGHT = .128 * GD_BOWL_SCALE
+
+    def __init__(self, values=None, rng=None):
+        self.rng = rng or random.SystemRandom()
+        values = values or [self.rng.randint(1, 6) for _ in range(2)]
+        self.dice = [GoldenRigidDie(-GoldenRigidDie.EDGE*.7, values[0]),
+                     GoldenRigidDie(GoldenRigidDie.EDGE*.7, values[1])]
+        self.color = (239, 187, 57)
+        self.origin = self.velocity = (0., 0., 0.)
+        self.collision_count = 0
+        self.durations = []
+        self.randomize_positions()
+
+    def randomize_positions(self):
+        """Place both cubes flat with independent positions and headings."""
+        for _ in range(256):
+            for die in self.dice:
+                angle = self.rng.uniform(0, math.tau)
+                radius = math.sqrt(self.rng.random())*(self.RADIUS-die.EDGE)
+                die.p = (radius*math.cos(angle), radius*math.sin(angle), die.HALF)
+                die.q = _gd_rotate(die.q, (0., 0., 1.), self.rng.uniform(0, math.tau))
+                die.v = die.omega = (0., 0., 0.)
+            if self.landing_error() is None and _gd_overlap(*self.dice) is None:
+                return
+        # A bounded fallback still has random heading and preserves rolled faces.
+        heading = self.rng.uniform(0, math.tau)
+        for die, sign in zip(self.dice, (-1, 1)):
+            die.p = (sign*.032, 0., die.HALF)
+            die.q = _gd_rotate(die.q, (0., 0., 1.), heading)
+
+    def landing_error(self):
+        """Accept up to 8 degrees and the corresponding small contact errors.
+
+        Screen-space overlap is a camera effect, not a failed physical landing.
+        Keep genuine stacks and deep intersections distinct from tiny contacts.
+        """
+        for die in self.dice:
+            vertices = [self.local(p) for p in die.vertices()]
+            if die.top_face() is None or abs(min(p[2] for p in vertices)) > die.CONTACT_TOLERANCE:
+                return '骰子未平放'
+            if any((x*x+y*y)/self.RADIUS**2 + max(0.,z)**2/self.HEIGHT**2 > 1.0001
+                   for x,y,z in vertices):
+                return '骰子超出底盘'
+        a, b = self.dice
+        contact = _gd_overlap(a, b)
+        if contact is not None and contact[1] > min(a.CONTACT_TOLERANCE,b.CONTACT_TOLERANCE):
+            return '骰子重叠'
+        return None
+
+    def begin(self):
+        # Fast upright directional shakes. No bowl flips or inverted holds.
+        count = self.rng.randint(10, 14)
+        self.durations = [self.rng.uniform(.18, .25) for _ in range(count)]
+        self.strokes = []
+        for _ in range(count):
+            heading = self.rng.randrange(4)*math.pi/2+self.rng.uniform(-.45, .45)
+            strength = self.rng.uniform(1.2, 1.8)
+            self.strokes.append((strength*math.cos(heading), strength*math.sin(heading),
+                                 self.rng.choice((-1, 1))*self.rng.uniform(1.0, 1.8),
+                                 self.rng.uniform(-.012, .012), self.rng.uniform(.010, .020)))
+        self.duration = sum(self.durations)
+        self.collision_count = 0
+
+    def motion(self, t):
+        elapsed = 0.
+        for duration, stroke in zip(self.durations, self.strokes):
+            if t < elapsed+duration:
+                u = max(0., (t-elapsed)/duration)
+                first = math.sin(math.pi*u)**4
+                second = math.sin(math.tau*u)**4
+                vx, vy, snap, side, hop = stroke
+                along, lateral = .030*first+.010*snap*second, side*second*1.5
+                return vx*along-vy*lateral, vy*along+vx*lateral, hop*second
+            elapsed += duration
+        return (0., 0., 0.)
+
+    def world(self, local):
+        return _gd_add(self.origin, local)
+
+    def local(self, world):
+        return _gd_sub(world, self.origin)
+
+    def wall_contact(self, die, point, normal, penetration):
+        die.p = _gd_add(die.p, _gd_scale(normal, penetration+.0000005))
+        point = _gd_add(point, _gd_scale(normal, penetration))
+        radius = _gd_sub(point, die.p)
+        surface = self.velocity
+        relative = _gd_sub(_gd_add(die.v, _gd_cross(die.omega, radius)), surface)
+        speed = _gd_dot(relative, normal)
+        if speed >= 0:
+            return
+        rn = _gd_cross(radius, normal)
+        impulse = -(1.25 if speed < -.2 else 1.)*speed/(1+die.INVERSE_INERTIA*_gd_dot(rn, rn))
+        die.impulse(_gd_scale(normal, impulse), point)
+        relative = _gd_sub(_gd_add(die.v, _gd_cross(die.omega, radius)), surface)
+        tangent = _gd_sub(relative, _gd_scale(normal, _gd_dot(relative, normal)))
+        if _gd_length(tangent) > 1e-10:
+            direction = _gd_unit(tangent)
+            effective = 1+die.INVERSE_INERTIA*_gd_length(_gd_cross(radius, direction))**2
+            friction = min(.48*impulse, _gd_length(tangent)/effective)
+            die.impulse(_gd_scale(direction, -friction), point)
+
+    def contain(self, die):
+        touching = False
+        # Iterated vertex contacts give flat cubes a four-point floor manifold.
+        for _ in range(4):
+            vertices = die.vertices()
+            contacts = []
+            for point in vertices:
+                local = self.local(point)
+                if local[2] < 0:
+                    normal = (0., 0., 1.)
+                    contacts.append((-local[2], point, normal))
+                level = (local[0]**2+local[1]**2)/self.RADIUS**2+max(0., local[2])**2/self.HEIGHT**2
+                if level > 1:
+                    gradient = (local[0]/self.RADIUS**2, local[1]/self.RADIUS**2,
+                                max(0., local[2])/self.HEIGHT**2)
+                    depth = (level-1)/(2*_gd_length(gradient))
+                    normal = _gd_scale(_gd_unit(gradient), -1)
+                    contacts.append((depth, point, normal))
+            if not contacts:
+                break
+            depth, point, normal = max(contacts, key=lambda item: item[0])
+            self.wall_contact(die, point, normal, depth)
+            touching = True
+        return touching
+
+    def step(self, dt, t, shaking=True):
+        if dt <= 0:
+            return
+        target = self.motion(t) if shaking else (0., 0., 0.)
+        travel = _gd_length(_gd_sub(target, self.origin))
+        speed = max(_gd_length(die.v)+_gd_length(die.omega)*die.HALF for die in self.dice)
+        # Smaller contact steps when fast motion could cross a significant cube width.
+        steps = max(1, min(8, math.ceil((travel+speed*dt)/(GoldenRigidDie.EDGE*.22))))
+        h = dt/steps
+        for index in range(steps):
+            self._step_once(h, t-dt+(index+1)*h, shaking)
+
+    def _step_once(self, dt, t, shaking=True):
+        old_origin = self.origin
+        if shaking:
+            self.origin = self.motion(t)
+        else:
+            self.origin = (0., 0., 0.)
+        self.velocity = _gd_scale(_gd_sub(self.origin, old_origin), 1/dt)
+        for die in self.dice:
+            die.v = _gd_add(die.v, (0., 0., -9.81*dt))
+            die.p = _gd_add(die.p, _gd_scale(die.v, dt))
+            die.q = _gd_rotate(die.q, die.omega, dt)
+            touching = self.contain(die)
+            die.omega = _gd_scale(die.omega, math.exp(-(2.8 if touching else .1)*dt))
+            if touching and not shaking:
+                die.v = _gd_scale(die.v, math.exp(-4*dt))
+        for _ in range(2):
+            if not _gd_collide_dice(*self.dice):
+                break
+            self.collision_count += 1
+            for die in self.dice:
+                self.contain(die)
+        if not shaking:
+            for die in self.dice:
+                die.stabilize_contact()
+
+    def settled(self):
+        return all(die.settled() for die in self.dice)
+
+    def values(self):
+        if not self.settled() or self.landing_error():
+            raise ValueError('骰子尚未平稳朝上，不能读取结果')
+        return [die.top_face() for die in self.dice]
+
+    def snapshot(self):
+        return {'version': 1, 'dice': [{'p': list(d.p), 'q': list(d.q)} for d in self.dice]}
+
+    @classmethod
+    def restore(cls, state):
+        """Only restore a complete, flat, non-overlapping pair of saved bodies."""
+        try:
+            if state.get('version') != 1 or len(state['dice']) != 2:
+                return None
+            bowl = cls.__new__(cls)
+            bowl.rng, bowl.color = random.SystemRandom(), (239, 187, 57)
+            bowl.origin = bowl.velocity = (0.,0.,0.)
+            bowl.collision_count, bowl.durations = 0, []
+            bowl.dice = [GoldenRigidDie(0), GoldenRigidDie(0)]
+            for die, data in zip(bowl.dice, state['dice']):
+                die.p, die.q = tuple(map(float,data['p'])), tuple(map(float,data['q']))
+                if (len(die.p) != 3 or len(die.q) != 4
+                        or not all(math.isfinite(v) for v in die.p+die.q)
+                        or abs(sum(v*v for v in die.q)-1) > 1e-6):
+                    return None
+            return bowl if bowl.settled() and bowl.landing_error() is None else None
+        except (KeyError, ValueError, TypeError, AttributeError):
+            return None
+
+
+def _gd_bowl_mesh(bowl):
+    """Golden Dice dome and ceramic dish, with one blue die and one red die."""
+    solids, glass = [], []
+    _depth, _up, _center, camera = _gd_view_projection()
+    def face(points, color, line=None, width=.7, transparent=False, paint_depth=None):
+        if len(points) >= 3:
+            n = _gd_cross(_gd_sub(points[1], points[0]), _gd_sub(points[2], points[0]))
+            if not transparent and _gd_dot(n, camera) <= 0:
+                return
+        depth = (sum(_gd_dot(point, camera) for point in points)/len(points)
+                 if paint_depth is None else paint_depth)
+        (glass if transparent else solids).append((depth, points, color, line, width))
+        return depth
+    def ring(radius, z):
+        return [(radius*math.cos(k*math.tau/32), radius*math.sin(k*math.tau/32), z)
+                for k in range(32)]
+    def band(a, b, color):
+        for k in range(32):
+            j = (k+1)%32
+            shade = .86+.14*math.cos(k*math.tau/32-2.2)
+            rgb = tuple(round(v*shade) for v in color)+(255,)
+            face([bowl.world(p) for p in (a[k], b[k], b[j], a[j])], rgb)
+    profile = [(radius * GD_BOWL_SCALE, z * GD_BOWL_SCALE) for radius, z in
+               ((.083, 0.), (.088, .005), (.093, .002), (.094, -.007),
+                (.092, -.014), (.083, -.020))]
+    rings = [ring(radius, z) for radius, z in profile]
+    for k in range(32):
+        j = (k+1)%32
+        face([bowl.world(p) for p in ((0.,0.,0.), rings[0][k], rings[0][j])], (248,234,197,255))
+        face([bowl.world(p) for p in ((0.,0.,-.020*GD_BOWL_SCALE), rings[-1][j], rings[-1][k])], (142,111,70,255))
+    for a,b,color in zip(rings,rings[1:],((187,151,99),(255,231,176),(191,158,107),(243,215,156),(148,117,75))):
+        band(a,b,color)
+    # The dish is below the bodies. Sorting its large triangles against the
+    # small cube faces by average depth can paint the dish over a resting die.
+    # Keep the whole support surface behind the dice, with glass in front.
+    dish = sorted(solids,key=lambda f:f[0])
+    solids = []
+    for die, color in zip(bowl.dice, GD_DICE_COLORS):
+        for number, normal, u, v in GD_CUBE_FACES:
+            n = _gd_qvector(die.q, normal)
+            if _gd_dot(n, camera) <= 0:
+                continue
+            def cube_point(x, y, z=die.HALF):
+                return _gd_add(die.p, _gd_qvector(die.q, _gd_add(_gd_scale(normal,z),
+                             _gd_add(_gd_scale(u,x), _gd_scale(v,y)))))
+            corners = [cube_point(x*die.HALF,y*die.HALF) for x,y in ((-1,-1),(1,-1),(1,1),(-1,1))]
+            lighting = .72+.28*max(0., _gd_dot(n, _gd_unit((-.4,.5,1.))))
+            shade = lighting
+            rgb = tuple(round(channel*shade) for channel in color)+(255,)
+            rim = tuple(round(channel*.55) for channel in color)+(255,)
+            face_depth = face(corners, rgb, rim, .35)
+            for px, py in GD_PIPS[number]:
+                centerx, centery = px*die.EDGE*.27, py*die.EDGE*.27
+                dot = [cube_point(centerx+math.cos(k*math.tau/10)*die.EDGE*.085,
+                                  centery+math.sin(k*math.tau/10)*die.EDGE*.085,
+                                  die.HALF+.00008) for k in range(10)]
+                # Keep a face and all its pips in one stable paint group. Sorting
+                # each pip by its own centre lets the parent face cover far pips
+                # as the cube turns, incorrectly changing the apparent number.
+                face(dot, (250, 247, 238, 255), paint_depth=face_depth)
+    raised = 0.
+    levels = 12
+    rings = [ring(bowl.RADIUS*math.cos(j/levels*math.pi/2),
+                  bowl.HEIGHT*math.sin(j/levels*math.pi/2)+raised) for j in range(levels+1)]
+    for j in range(levels):
+        for k in range(32):
+            n = (k+1)%32
+            face([bowl.world(p) for p in (rings[j][k],rings[j][n],rings[j+1][n],rings[j+1][k])],
+                 (166,214,202,18), transparent=True)
+    for z,radius,color,width in ((raised,bowl.RADIUS,(225,248,237,220),1.2),
+                                (raised+.002*GD_BOWL_SCALE,.086*GD_BOWL_SCALE,(168,207,194,185),.6)):
+        rim = ring(radius,z)
+        for k in range(32):
+            face([bowl.world(rim[k]),bowl.world(rim[(k+1)%32])],None,color,width,True)
+    for azimuth,color,width in ((-2.4,(242,255,249,220),1.2),(.55,(219,246,235,160),.8)):
+        curve = []
+        for k in range(22):
+            a = .10+1.28*k/21
+            curve.append(bowl.world((bowl.RADIUS*math.cos(a)*math.cos(azimuth),
+                                     bowl.RADIUS*math.cos(a)*math.sin(azimuth),
+                                     bowl.HEIGHT*math.sin(a)+raised+.0005*GD_BOWL_SCALE)))
+        for k in range(len(curve)-1):
+            face(curve[k:k+2],None,color,width,True)
+    return dish + sorted(solids,key=lambda f:f[0]), sorted(glass,key=lambda f:f[0])
+
+
+def _gd_project(point, bowl):
+    # The real bowl translation drives physics. Its screen travel is reduced to
+    # fit the betting area, applied identically to glass, dish and dice.
+    point = _gd_sub(point, _gd_scale(bowl.origin, .78))
+    return (98*GD_BOWL_SCALE+point[0]*680,
+            96*GD_BOWL_SCALE+(point[1]*GD_VIEW_DEPTH-point[2]*GD_VIEW_UP)*680)
+
+
+def _gd_render_bowl(bowl):
+    """Antialiased image of the same geometry used by contact and scoring."""
+    size, aa = (round(196*GD_BOWL_SCALE), round(138*GD_BOWL_SCALE)), 3
+    picture = Image.new('RGBA', (size[0]*aa, size[1]*aa))
+    for meshes in _gd_bowl_mesh(bowl):
+        layer = Image.new('RGBA', picture.size)
+        draw = ImageDraw.Draw(layer)
+        for _depth, points, color, line, width in meshes:
+            projected = [(x*aa,y*aa) for x,y in (_gd_project(p,bowl) for p in points)]
+            if color:
+                draw.polygon(projected, fill=color)
+            if line:
+                draw.line(projected+([projected[0]] if len(points)>2 else []),
+                          fill=line,width=max(1,round(width*aa)))
+        picture.alpha_composite(layer)
+    return picture.resize(size, Image.Resampling.LANCZOS)
+
+
 
 class Dice:
     def __init__(self):
@@ -297,36 +824,8 @@ def compare_wenzhou_hands(player_hand, dealer_hand):
     return 0
 
 
-
-class WenzhouPaiGowGUI(tk.Frame):
-    ROOT_BG = "#1B3D31"
-    PANEL_BG = "#F2E6C9"
-    HEADER_BG = "#D8B46A"
-    TITLE_FG = "#2A1B08"
-    SELECT_BORDER = "#87CEFA"
-    HAND_WIN_BG = "#00ff00"
-    HAND_LOSE_BG = "#ff0000"
-    HAND_NEUTRAL_BG = "#173f3a"
-
-    DEALER_ZONE = (24, 128, 726, 303)
-    SHOE_ZONE = (24, 313, 726, 505)
-    DOOR_ZONES = {
-        1: (24, 515, 250, 719),
-        2: (262, 515, 488, 719),
-        3: (500, 515, 726, 719),
-    }
-    POSITION_NAMES = {0: '庄家', 1: '顺门', 2: '出门', 3: '到门'}
-    BET_SIDES = ('win', 'lose')
-    WIN_MULTIPLIER = 1.99
-    LOSE_MULTIPLIER = 1.93
-    HAND_W = 50
-    HAND_H = 125
-
-    NORMAL_MIN_BET = 10
-    NORMAL_MAX_BET = 25000
-    HIGH_MIN_BET = 100
-    HIGH_MAX_BET = 100000
-
+class WenzhouArtwork:
+    SELECT_BORDER = GOLD
 
     TILE_THEMES = {
         'black': {
@@ -348,6 +847,7 @@ class WenzhouPaiGowGUI(tk.Frame):
             'back_text': '#6f5421',
         },
     }
+
     TRADITIONAL_PIP_PATTERNS = {
         ('Gee Joon', (2, 4)): [
             (0.304, 0.122, 'base'), (0.697, 0.122, 'base'),
@@ -475,183 +975,6 @@ class WenzhouPaiGowGUI(tk.Frame):
         ],
     }
 
-    def __init__(self, parent, balance=10000, user='Guest', on_back=None, on_balance_change=None):
-        super().__init__(parent, bg=BG, width=1150, height=750)
-        self.pack_propagate(False)
-        self.username = user or 'Guest'
-        self.balance = float(balance)
-        self.on_back = on_back
-        self.on_balance_change = on_balance_change
-        self._closing = False
-
-        top = self.winfo_toplevel()
-        try:
-            top.geometry(WINDOW_GEOMETRY)
-            top.resizable(False, False)
-        except tk.TclError:
-            pass
-
-        self.canvas = tk.Canvas(self, width=1150, height=750, bg=BG, highlightthickness=0)
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-
-        self.tile_theme = 'white' if secrets.randbelow(2) == 0 else 'black'
-        self._render_tile_theme_override = None
-
-        self.dice_objects = [Dice(), Dice()]
-        self.dice_images_animation = []
-        self.dice_images_small = []
-        self.animation_dice_items = []
-        self.animation_dice_base_positions = []
-        self.animation_running = True
-        self.animation_frames_left = 0
-        self.animation_final_dice = None
-        self.animation_after_id = None
-
-        self.selected_chip = 10
-        self.high_bet_mode = False
-        self.stage = 'betting'
-        self.status = '新温州牌九牌靴正在进入…'
-        self.last_result = ''
-        self.last_return = 0.0
-        self.ante = 0.0
-
-        self.full_tiles = []
-        self.stacks = []
-        self.pair_stacks = []
-        self.position_hands = {}
-        self.deal_wall_visible = False
-        self.shoe_ready_for_next_round = False
-        self.deal_stack_markers = {}
-        self.deal_start_index = None
-        self.deal_order = []
-        self.dice_result = []
-        self.flip_anim = None
-
-        self.bets = {(door, side): 0.0 for door in (1, 2, 3) for side in self.BET_SIDES}
-        self.last_bets = dict(self.bets)
-        self.round_bets = dict(self.bets)
-        self.bet_result_values = {}
-        self.winning_cells = set()
-        self.door_hands = {0: [], 1: [], 2: [], 3: []}
-        self.door_dealt_visible = {0: False, 1: False, 2: False, 3: False}
-        self.door_face_up = {0: False, 1: False, 2: False, 3: False}
-        self.door_tile_face_up = {pos: [False, False] for pos in (0, 1, 2, 3)}
-        self.door_outcomes = {1: None, 2: None, 3: None}
-        self.door_result_text = {1: '', 2: '', 3: ''}
-        self.bet_cell_labels = {}
-        self.door_header_items = {}
-        self.door_result_items = {}
-        self.round_total_bet = 0.0
-        self.limit_card_widgets = []
-        self.chip_container = None
-        self.chip_canvases = {}
-
-        self.create_dice_images()
-        self.create_static_ui()
-        self.update_display()
-        self.after(90, self._animate_initial_shoe_left)
-
-
-    def create_dice_images(self):
-        self.dice_images_animation = []
-        self.dice_images_small = []
-
-        def make_die(size, number):
-            image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(image)
-            margin = max(1, size // 28)
-            radius = max(3, size // 6)
-            die_fill = "#f0f0e9"
-            die_outline = "#222"
-            pip_color = "#d21e2b" if number in (1, 4) else "#111"
-            draw.rounded_rectangle(
-                (margin, margin, size - margin - 1, size - margin - 1),
-                radius=radius,
-                fill=die_fill,
-                outline=die_outline,
-                width=max(1, size // 18),
-            )
-            quarter = size // 4
-            half = size // 2
-            three_quarter = size - quarter
-            positions = {
-                1: [(half, half)],
-                2: [(quarter, quarter), (three_quarter, three_quarter)],
-                3: [(quarter, quarter), (half, half), (three_quarter, three_quarter)],
-                4: [(quarter, quarter), (three_quarter, quarter),
-                    (quarter, three_quarter), (three_quarter, three_quarter)],
-                5: [(quarter, quarter), (three_quarter, quarter), (half, half),
-                    (quarter, three_quarter), (three_quarter, three_quarter)],
-                6: [(quarter, size // 5), (three_quarter, size // 5),
-                    (quarter, half), (three_quarter, half),
-                    (quarter, size - size // 5), (three_quarter, size - size // 5)],
-            }
-            pip = max(1, size // 11)
-            for x, y in positions[number]:
-                draw.ellipse((x - pip, y - pip, x + pip, y + pip), fill=pip_color)
-            return ImageTk.PhotoImage(image)
-
-        for number in range(1, 7):
-            self.dice_images_animation.append(make_die(62, number))
-            self.dice_images_small.append(make_die(24, number))
-
-    def secure_shuffle(self, seq):
-        seq = list(seq)
-        for i in range(len(seq) - 1, 0, -1):
-            j = secrets.randbelow(i + 1)
-            seq[i], seq[j] = seq[j], seq[i]
-        return seq
-
-    def _bet_cursor(self, widget):
-        try:
-            widget.config(cursor='hand2' if self.stage == 'betting' else 'no')
-        except tk.TclError:
-            widget.config(cursor='hand2' if self.stage == 'betting' else 'X_cursor')
-
-    def select_chip(self, value):
-        if self.stage != 'betting':
-            return
-        self.selected_chip = value
-        self._update_chip_ui()
-
-    def _update_chip_ui(self):
-        for value, (cv, oval) in getattr(self, 'chip_canvases', {}).items():
-            selected = self.stage == 'betting' and value == self.selected_chip
-            cv.itemconfigure(oval, outline='#2f00ff' if selected else 'black', width=3 if selected else 1)
-            try:
-                cv.config(cursor='hand2' if self.stage == 'betting' else 'no')
-            except tk.TclError:
-                cv.config(cursor='hand2' if self.stage == 'betting' else 'X_cursor')
-
-    @staticmethod
-    def _fmt(value):
-        value = float(value)
-        if abs(value - round(value)) < 1e-9:
-            return f"{value:,.0f}"
-        return f"{value:,.2f}"
-
-    def _persist_balance(self):
-        update_balance_in_json(self.username, self.balance)
-        if callable(self.on_balance_change):
-            self.on_balance_change(float(self.balance))
-
-    def on_close(self):
-        self._closing = True
-        if self.animation_after_id:
-            try:
-                self.after_cancel(self.animation_after_id)
-            except tk.TclError:
-                pass
-        self._persist_balance()
-        if callable(self.on_back):
-            self.on_back(float(self.balance))
-        else:
-            try:
-                self.winfo_toplevel().destroy()
-            except tk.TclError:
-                pass
-
-
     def _active_tile_theme(self):
         name = self._render_tile_theme_override or self.tile_theme
         return self.TILE_THEMES[name]
@@ -777,17 +1100,6 @@ class WenzhouPaiGowGUI(tk.Frame):
 
         self._draw_face_pips(c, tile, tr, w, h, tags, compact=compact)
 
-    def wall_tile_rect(self, tile_index):
-        x0, y0, w, h, gap_x, gap_y = self.wall_geometry()
-        col = tile_index // 2
-        row = tile_index % 2
-        return x0 + col * (w + gap_x), y0 + row * (h + gap_y), w, h
-
-    def _snapshot_wall_rect(self, tile_index, offset_x=0.0):
-        x, y, w, h = self.wall_tile_rect(tile_index)
-        return x + offset_x, y, w, h
-
-
     def _instruction_tile(
         self,
         canvas,
@@ -897,1329 +1209,2066 @@ class WenzhouPaiGowGUI(tk.Frame):
             f'group={group!r}, dots={dots!r}, shape={shape!r}'
         )
 
-    def create_static_ui(self):
-        c = self.canvas
-        c.create_rectangle(0, 0, 1150, 750, fill=BG, outline='', tags='static')
-        c.create_rectangle(10, 8, 740, 740, fill=FELT, outline=GOLD_DARK, width=3, tags='static')
-        c.create_text(375, 27, text='温州牌九', font=('Arial', 19, 'bold'), fill=GOLD, tags='static')
-
-        # Two-dice strip.
-        c.create_rectangle(24, 48, 726, 118, fill='#123c38', outline='#6e9185', width=1, tags='static')
-        c.create_text(38, 83, anchor='w', text='两骰', font=('Arial', 11, 'bold'),
-                      fill='#d9efe8', tags='static')
-        self.animation_dice_base_positions = [(142, 83), (218, 83)]
-        self.animation_dice_items = [
-            c.create_image(x, y, image=self.dice_images_animation[5], tags=('dice', 'static'))
-            for x, y in self.animation_dice_base_positions
-        ]
-        c.create_text(180, 83, text='+', font=('Arial', 17, 'bold'), fill=TEXT, tags='static')
-        self.dice_summary_item = c.create_text(
-            270, 83, anchor='w', text='= --点　｜　等待摇骰',
-            font=('Arial', 13, 'bold'), fill=TEXT, tags='static'
-        )
-
-        # Dealer zone.
-        x0, y0, x1, y1 = self.DEALER_ZONE
-        c.create_rectangle(x0, y0, x1, y1, fill='#103f39', outline='#5a887a', width=2, tags='static')
-        self.dealer_header_item = c.create_text(
-            x0 + 14, y0 + 18, anchor='w', text='庄家',
-            font=('Arial', 14, 'bold'), fill=TEXT, tags='static'
-        )
-        # Hidden compatibility item for inherited code paths that still expect it.
-        self.player_header_item = c.create_text(0, 0, text='', state='hidden', tags='static')
-
-        # Shoe base.  Live wall is redrawn on top.
-        sx0, sy0, sx1, sy1 = self.SHOE_ZONE
-        c.create_rectangle(sx0, sy0, sx1, sy1, fill='#0a3834', outline='#557b70', width=1, tags='static')
-
-        # Three player doors.
-        for pos in (1, 2, 3):
-            x0, y0, x1, y1 = self.DOOR_ZONES[pos]
-            c.create_rectangle(x0, y0, x1, y1, fill='#134942', outline='#5a887a', width=2, tags='static')
-            self.door_header_items[pos] = c.create_text(
-                x0 + 12, y0 + 18, anchor='w', text=self.POSITION_NAMES[pos],
-                font=('Arial', 13, 'bold'), fill=TEXT, tags='static'
-            )
-            self.door_result_items[pos] = c.create_text(
-                (x0 + x1) / 2, y1 - 15, text='', width=(x1 - x0 - 18),
-                font=('Arial', 9, 'bold'), fill=GOLD, state='hidden', tags='static'
-            )
-
-        self.result_item = c.create_text(375, 718, text='', state='hidden', tags='static')
-        self.create_right_panel_widgets()
-
-    def create_right_panel_widgets(self):
-        panel = tk.Frame(self, bg=self.ROOT_BG, width=400, height=734)
-        panel.place(x=750, y=8, width=400, height=734)
-        panel.pack_propagate(False)
-        self.right_panel = panel
-
-        def card(title, title_size=13):
-            outer = tk.Frame(panel, bg=self.PANEL_BG, bd=1, relief=tk.SOLID)
-            outer.pack(fill=tk.X, pady=3, padx=(0, 1))
-            header = tk.Frame(outer, bg=self.HEADER_BG)
-            header.pack(fill=tk.X)
-            title_label = tk.Label(header, text=title, font=('Arial', title_size, 'bold'),
-                                   bg=self.HEADER_BG, fg=self.TITLE_FG)
-            title_label.pack(pady=3)
-            return outer, header, title_label
-
-        info, _, _ = card('温州牌九', 14)
-        body = tk.Frame(info, bg=self.PANEL_BG)
-        body.pack(fill=tk.X, padx=11, pady=5)
-        self.balance_label = tk.Label(body, text='余额: $0.00', font=('Arial', 15, 'bold'),
-                                      bg=self.PANEL_BG, fg='black')
-        self.balance_label.pack(side=tk.LEFT)
-        self.stage_label = tk.Label(body, text='下注阶段', font=('Arial', 13, 'bold'),
-                                    bg=self.PANEL_BG, fg='#A88100')
-        self.stage_label.pack(side=tk.RIGHT)
-
-        # Clickable limit card, following the uploaded Three Card Poker interaction.
-        limit, limit_header, limit_title = card('下注上限', 12)
-        limit_body = tk.Frame(limit, bg=self.PANEL_BG)
-        limit_body.pack(fill=tk.X, padx=10, pady=6)
-        limit_grid = tk.Frame(limit_body, bg=self.PANEL_BG, bd=1, relief=tk.SOLID)
-        limit_grid.pack(fill=tk.X)
-        for col in range(2):
-            limit_grid.columnconfigure(col, weight=1)
-        limit_headers = []
-        for col, title in enumerate(('下注最低', '下注最高')):
-            lbl = tk.Label(limit_grid, text=title, font=('Arial', 10, 'bold'),
-                           bg=self.PANEL_BG, fg=self.TITLE_FG,
-                           borderwidth=1, relief=tk.SOLID, pady=3)
-            lbl.grid(row=0, column=col, sticky='nsew')
-            limit_headers.append(lbl)
-        self.min_bet_label = tk.Label(
-            limit_grid, text='$10', font=('Arial', 11, 'bold'),
-            bg=self.PANEL_BG, fg='#A88100', borderwidth=1, relief=tk.SOLID, pady=3
-        )
-        self.min_bet_label.grid(row=1, column=0, sticky='nsew')
-        self.max_bet_label = tk.Label(
-            limit_grid, text='$25,000', font=('Arial', 11, 'bold'),
-            bg=self.PANEL_BG, fg='#A88100', borderwidth=1, relief=tk.SOLID, pady=3
-        )
-        self.max_bet_label.grid(row=1, column=1, sticky='nsew')
-        self.limit_card_widgets = [limit, limit_header, limit_title, limit_body, limit_grid,
-                                   *limit_headers, self.min_bet_label, self.max_bet_label]
-        for w in self.limit_card_widgets:
-            w.bind('<Button-1>', self.toggle_high_bet_limits)
-            try:
-                w.config(cursor='hand2')
-            except tk.TclError:
-                pass
-
-        # Chips and the unchanged door-bet grid share one card.
-        combined, _, _ = card('筹码与下注', 12)
-        body = tk.Frame(combined, bg=self.PANEL_BG)
-        body.pack(fill=tk.X, padx=8, pady=5)
-
-        chip_row = tk.Frame(body, bg=self.PANEL_BG)
-        chip_row.pack(fill=tk.X, pady=(0, 7))
-        for i in range(6):
-            chip_row.columnconfigure(i, weight=1)
-        self.chip_container = chip_row
-        self.chip_canvases = {}
-        self._rebuild_chips()
-
-        grid = tk.Frame(body, bg=self.PANEL_BG)
-        # Fixed pixel geometry: payout text can grow, but the six betting cells never do.
-        # 64 + 158 + 158 = 380px, matching the previous visual footprint inside this card.
-        grid.pack(anchor='center')
-        grid.configure(width=380, height=160)
-        grid.grid_propagate(False)
-        grid.columnconfigure(0, weight=0, minsize=64)
-        grid.columnconfigure(1, weight=0, minsize=158)
-        grid.columnconfigure(2, weight=0, minsize=158)
-        grid.rowconfigure(0, weight=0, minsize=36)
-        for fixed_row in (1, 2, 3):
-            grid.rowconfigure(fixed_row, weight=0, minsize=39)
-        headers = ('', '获胜\n0.99 : 1', '惜败\n0.93 : 1')
-        for col, text in enumerate(headers):
-            tk.Label(grid, text=text, font=('Arial', 10, 'bold'), bg=self.PANEL_BG,
-                     fg=self.TITLE_FG, relief=tk.SOLID, bd=1, pady=3).grid(
-                row=0, column=col, sticky='nsew'
-            )
-
-        for row_no, pos in enumerate((1, 2, 3), start=1):
-            tk.Label(grid, text=self.POSITION_NAMES[pos], font=('Arial', 11, 'bold'),
-                     bg=self.PANEL_BG, fg=self.TITLE_FG, relief=tk.SOLID, bd=1,
-                     pady=8).grid(row=row_no, column=0, sticky='nsew')
-            for col, side in ((1, 'win'), (2, 'lose')):
-                # Width/height are fixed through the grid cell, so values such as
-                # $193000.00 cannot resize the betting table.  Cursor/bind behaviour
-                # below the limit card is intentionally left unchanged.
-                lbl = tk.Label(grid, text='$0', font=('Arial', 12, 'bold'),
-                               bg='white', fg='black', relief=tk.SUNKEN, bd=2,
-                               anchor='center', cursor='hand2', width=1, height=1)
-                lbl.grid(row=row_no, column=col, sticky='nsew', padx=1, pady=1)
-                lbl.bind('<Button-1>', lambda _e, p=pos, s=side: self.add_bet_cell(p, s))
-                lbl.bind('<Button-3>', lambda _e, p=pos, s=side: self.clear_bet_cell(p, s))
-                lbl.bind('<Enter>', lambda _e, p=pos, s=side, w=lbl: self._update_bet_cell_cursor(p, s, w))
-                lbl.bind('<Leave>', lambda _e, w=lbl: w.config(cursor=''))
-                self.bet_cell_labels[(pos, side)] = lbl
-
-        action = tk.Frame(panel, bg=self.PANEL_BG, bd=1, relief=tk.SOLID, height=133)
-        action.pack(fill=tk.X, pady=3, padx=(0, 1))
-        action.pack_propagate(False)
-        header = tk.Frame(action, bg=self.HEADER_BG, height=28)
-        header.pack(fill=tk.X)
-        header.pack_propagate(False)
-        tk.Label(header, text='操作', font=('Arial', 13, 'bold'),
-                 bg=self.HEADER_BG, fg=self.TITLE_FG).pack(expand=True)
-        body = tk.Frame(action, bg=self.PANEL_BG)
-        body.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
-        self.status_label = tk.Label(
-            body, text='选择门注后开始游戏', font=('Arial', 10, 'bold'),
-            bg=self.PANEL_BG, fg=self.TITLE_FG, wraplength=370,
-            justify=tk.CENTER, height=3,
-        )
-        self.status_label.pack(fill=tk.X)
-        self.action_frame = tk.Frame(body, bg=self.PANEL_BG, height=40)
-        self.action_frame.pack(fill=tk.X)
-        self.action_frame.pack_propagate(False)
-
-        summary = tk.Frame(panel, bg=self.PANEL_BG, bd=1, relief=tk.SOLID)
-        summary.pack(fill=tk.X, pady=3, padx=(0, 1))
-        body = tk.Frame(summary, bg=self.PANEL_BG)
-        body.pack(fill=tk.X, padx=10, pady=5)
-        self.current_bet_label = tk.Label(body, text='本局下注: $0', font=('Arial', 11, 'bold'),
-                                          bg=self.PANEL_BG, fg='black')
-        self.current_bet_label.pack(anchor='w')
-        row = tk.Frame(body, bg=self.PANEL_BG)
-        row.pack(fill=tk.X, pady=(2, 0))
-        self.last_win_label = tk.Label(row, text='上局返还: $0', font=('Arial', 11, 'bold'),
-                                       bg=self.PANEL_BG, fg='black')
-        self.last_win_label.pack(side=tk.LEFT)
-        tk.Button(row, text='ℹ️', command=self.show_detailed_rules,
-                  bg='#4B8BBE', fg='white', font=('Arial', 9, 'bold'),
-                  width=3, relief=tk.FLAT).pack(side=tk.RIGHT)
-
-        self._update_limits_display()
-
-    def _current_min_bet(self):
-        return self.HIGH_MIN_BET if self.high_bet_mode else self.NORMAL_MIN_BET
-
-    def _current_max_bet(self):
-        return self.HIGH_MAX_BET if self.high_bet_mode else self.NORMAL_MAX_BET
-
-    def _bets_fit_limits(self, source):
-        total = self._bet_total(source)
-        if total == 0:
-            return True
-        return self._current_min_bet() <= total <= self._current_max_bet()
-
-    def toggle_high_bet_limits(self, event=None):
-        if self.stage != 'betting' or self.animation_running:
-            return
-        if not self.high_bet_mode:
-            current_password = time.strftime('%H%M')
-            pwd = simpledialog.askstring('高额下注', '请输入密码：', parent=self.winfo_toplevel())
-            if pwd is None:
-                return
-            if pwd.strip() != current_password:
-                messagebox.showerror('错误', '密码错误', parent=self.winfo_toplevel())
-                return
-            self.high_bet_mode = True
-        else:
-            self.high_bet_mode = False
-
-        self.bets = {(door, side): 0.0 for door in (1, 2, 3) for side in self.BET_SIDES}
-        self.ante = 0.0
-        self.bet_result_values = {}
-        self.winning_cells = set()
-        self._update_limits_display()
-        self._rebuild_chips()
-        mode_name = '高额下注' if self.high_bet_mode else '正常下注'
-        self.status = f'已切换为{mode_name}模式。'
-        self.update_display()
-
-    def _update_limits_display(self):
-        if not hasattr(self, 'min_bet_label'):
-            return
-        self.min_bet_label.config(text=f'${self._current_min_bet():,}')
-        self.max_bet_label.config(text=f'${self._current_max_bet():,}')
-
-    def _rebuild_chips(self):
-        if self.chip_container is None:
-            return
-        for widget in self.chip_container.winfo_children():
-            widget.destroy()
-        self.chip_canvases = {}
-
-        if self.high_bet_mode:
-            chip_configs = [
-                (100, '$100', '#181818', 'white'),
-                (500, '$500', '#e66fb1', 'black'),
-                (1000, '$1K', '#f2f2e8', 'black'),
-                (5000, '$5K', '#e52929', 'white'),
-                (10000, '$10K', '#00fbff', 'black'),
-                (50000, '$50K', '#00ffae', 'black'),
-            ]
-            default = 100
-        else:
-            chip_configs = [
-                (10, '$10', '#f4a621', 'black'),
-                (25, '$25', '#22d84b', 'black'),
-                (100, '$100', '#181818', 'white'),
-                (500, '$500', '#e66fb1', 'black'),
-                (1000, '$1K', '#f2f2e8', 'black'),
-                (2500, '$2.5K', '#e52929', 'white'),
-            ]
-            default = 10
-
-        for col, (value, text, colour, fg) in enumerate(chip_configs):
-            cell = tk.Frame(self.chip_container, bg=self.PANEL_BG)
-            cell.grid(row=0, column=col, sticky='nsew', padx=2)
-            cv = tk.Canvas(cell, width=48, height=48, bg=self.PANEL_BG, highlightthickness=0)
-            cv.pack(anchor='center')
-            oval = cv.create_oval(2, 2, 46, 46, fill=colour, outline='black', width=1)
-            cv.create_text(24, 24, text=text, fill=fg, font=('Arial', 9, 'bold'))
-            cv.bind('<Button-1>', lambda _e, v=value: self.select_chip(v))
-            cv.bind('<Enter>', lambda _e, w=cv: self._bet_cursor(w))
-            cv.bind('<Leave>', lambda _e, w=cv: w.config(cursor=''))
-            self.chip_canvases[value] = (cv, oval)
-
-        self.selected_chip = default
-        self._update_chip_ui()
-
-    def _bet_total(self, source=None):
-        source = self.bets if source is None else source
-        return float(sum(source.values()))
-
-    @staticmethod
-    def _opposite_bet_side(side):
-        return 'lose' if side == 'win' else 'win'
-
-    def _bet_side_blocked(self, door, side):
-        opposite = self._opposite_bet_side(side)
-        return float(self.bets.get((door, opposite), 0.0)) > 0.0
-
-    def _update_bet_cell_cursor(self, door, side, widget=None):
-        widget = widget or self.bet_cell_labels.get((door, side))
-        if widget is None:
-            return
-        if self.stage != 'betting' or self.animation_running:
-            cursor = 'arrow'
-        elif self._bet_side_blocked(door, side):
-            cursor = 'no'
-        else:
-            cursor = 'hand2'
-        try:
-            widget.config(cursor=cursor)
-        except tk.TclError:
-            widget.config(cursor='X_cursor' if cursor == 'no' else cursor)
-
-    def reset_bets(self):
-        """Clear all six CURRENT-round bet cells without changing last-round bets."""
-        if self.stage != 'betting' or self.animation_running:
-            return
-        self.bets = {(door, side): 0.0 for door in (1, 2, 3) for side in self.BET_SIDES}
-        self.ante = 0.0
-        self.bet_result_values = {}
-        self.winning_cells = set()
-        self.status = '已重设本局下注金额。'
-        self.update_display()
-
-    def add_bet_cell(self, door, side):
-        if self.stage != 'betting' or self.animation_running:
-            return
-        # A single door may be backed on only one side.  If the opposite side
-        # already has money, this click is intentionally ignored.
-        if self._bet_side_blocked(door, side):
-            return
-        key = (door, side)
-        chip = float(self.selected_chip)
-        maximum = self._current_max_bet()
-        if self._bet_total() + chip > maximum:
-            messagebox.showerror('超过上限', f'本局下注最高 ${maximum:,}', parent=self.winfo_toplevel())
-            return
-        if self._bet_total() + chip > self.balance:
-            messagebox.showerror('余额不足', '余额不足以增加该笔门注', parent=self.winfo_toplevel())
-            return
-        self.bets[key] += chip
-        self.ante = self._bet_total()
-        self.update_display()
-
-    def clear_bet_cell(self, door, side):
-        if self.stage != 'betting' or self.animation_running:
-            return
-        self.bets[(door, side)] = 0.0
-        self.ante = self._bet_total()
-        self.update_display()
-
-    def repeat_bet(self):
-        if self.stage != 'betting' or self.animation_running:
-            return
-        for door in (1, 2, 3):
-            if float(self.last_bets.get((door, 'win'), 0.0)) > 0 and float(self.last_bets.get((door, 'lose'), 0.0)) > 0:
-                messagebox.showerror('下注限制', f'{self.POSITION_NAMES[door]}不能同时下注获胜与惜败', parent=self.winfo_toplevel())
-                return
-        total = self._bet_total(self.last_bets)
-        if not self._bets_fit_limits(self.last_bets):
-            messagebox.showerror(
-                '下注限制',
-                f'上局下注合计不符合当前 ${self._current_min_bet():,}–${self._current_max_bet():,} 限额',
-                parent=self.winfo_toplevel(),
-            )
-            return
-        if total > self.balance:
-            messagebox.showerror('余额不足', '余额不足以重复上局全部门注', parent=self.winfo_toplevel())
-            return
-        self.bets = dict(self.last_bets)
-        self.ante = total
-        self.status = f'已重复上局门注，总计 ${self._fmt(total)}。'
-        self.update_display()
-
-    def _refresh_bet_cells(self):
-        for key, lbl in self.bet_cell_labels.items():
-            if self.stage == 'settled':
-                value = self.bet_result_values.get(key, 0.0)
-                lbl.config(
-                    text=f'${self._fmt(value)}',
-                    bg='#D8B46A' if key in self.winning_cells else 'white',
-                    fg='black',
-                )
-                try:
-                    lbl.config(cursor='arrow')
-                except tk.TclError:
-                    pass
-            else:
-                value = self.bets.get(key, 0.0)
-                lbl.config(text=f'${self._fmt(value)}', bg='white', fg='black')
-                self._update_bet_cell_cursor(key[0], key[1], lbl)
-
-    def roll_dice(self):
-        if self.animation_running:
-            return
-        self.animation_running = True
-        self.animation_final_dice = [die.roll() for die in self.dice_objects]
-        self.animation_frames_left = secrets.randbelow(15) + 27
-        self.animate_dice()
-
-    def animate_dice(self):
-        if self._closing:
-            return
-        if self.animation_frames_left > 0:
-            current = [secrets.randbelow(6) + 1 for _ in range(2)]
-            for index, (item, value) in enumerate(zip(self.animation_dice_items, current)):
-                base_x, base_y = self.animation_dice_base_positions[index]
-                shake_x = secrets.randbelow(31) - 15
-                shake_y = secrets.randbelow(31) - 15
-                self.canvas.coords(item, base_x + shake_x, base_y + shake_y)
-                self.canvas.itemconfigure(item, image=self.dice_images_animation[value - 1])
-            self.animation_frames_left -= 1
-            delay = 45 if self.animation_frames_left > 10 else 70
-            self.animation_after_id = self.after(delay, self.animate_dice)
-            return
-
-        for index, (item, value) in enumerate(zip(self.animation_dice_items, self.animation_final_dice)):
-            base_x, base_y = self.animation_dice_base_positions[index]
-            self.canvas.coords(item, base_x, base_y)
-            self.canvas.itemconfigure(item, image=self.dice_images_animation[value - 1])
-        self.animation_after_id = self.after(300, self.prepare_deal)
-
-    def start_round(self):
-        if self.stage != 'betting' or self.animation_running:
-            return
-        total_bet = self._bet_total()
-        if not self._bets_fit_limits(self.bets):
-            messagebox.showerror(
-                '下注限制',
-                f'本局下注合计必须在 ${self._current_min_bet():,}–${self._current_max_bet():,} 之间，或为 $0',
-                parent=self.winfo_toplevel(),
-            )
-            return
-        if total_bet > self.balance:
-            messagebox.showerror('余额不足', '余额不足以支付本局全部门注', parent=self.winfo_toplevel())
-            return
-        if not self.full_tiles or len(self.full_tiles) != 32 or not self.deal_wall_visible:
-            messagebox.showerror('牌靴未就绪', '新牌靴尚未准备完成', parent=self.winfo_toplevel())
-            return
-
-        self.round_bets = dict(self.bets)
-        self.last_bets = dict(self.bets)
-        self.round_total_bet = total_bet
-        self.ante = total_bet
-        self.last_ante = total_bet
-        self.balance -= total_bet
-        self._persist_balance()
-
-        self.stage = 'rolling'
-        self.status = '停止下注。正在摇两颗骰子决定第一门。'
-        self.last_result = ''
-        self.last_return = 0.0
-        self.bet_result_values = {}
-        self.winning_cells = set()
-        self.door_result_text = {1: '', 2: '', 3: ''}
-        self.door_hands = {0: [], 1: [], 2: [], 3: []}
-        self.door_dealt_visible = {0: False, 1: False, 2: False, 3: False}
-        self.door_face_up = {0: False, 1: False, 2: False, 3: False}
-        self.door_tile_face_up = {pos: [False, False] for pos in (0, 1, 2, 3)}
-        self.door_outcomes = {1: None, 2: None, 3: None}
-        self.flip_anim = None
-        self.deal_stack_markers = {}
-        self.deal_order = []
-        self.position_hands = {}
-        self.shoe_ready_for_next_round = False
-        self.update_display()
-        self.roll_dice()
-
-    def prepare_deal(self):
-        self.animation_running = False
-        self.dice_result = list(self.animation_final_dice)
-        total = sum(self.dice_result)
-        remainder = total % 4
-        start_pos = {1: 0, 2: 1, 3: 2, 0: 3}[remainder]
-        self.deal_start_index = start_pos
-        self.deal_order = [(start_pos + i) % 4 for i in range(4)]
-
-        # One physical column (top+bottom) is one two-tile pair.  Deal the four
-        # leftmost pairs in order, assigning them according to the dice rotation.
-        self.pair_stacks = [self.full_tiles[i * 2:(i + 1) * 2] for i in range(16)]
-        self.position_hands = {}
-        for pair_no, pos in enumerate(self.deal_order):
-            hand = ordered_wenzhou_hand(self.pair_stacks[pair_no])
-            self.position_hands[pos] = hand
-            self.door_hands[pos] = hand
-
-        self.stage = 'dealing'
-        first_name = self.POSITION_NAMES[start_pos]
-        self.status = f'骰子共{total}点，余{4 if remainder == 0 else remainder}：{first_name}先派。'
-        self.update_display()
-        self.after(260, lambda: self.animate_deal_pair(0))
-
-    def wall_geometry(self):
-        w = 24
-        h = int(w * CLASSIC_TILE_ASPECT)
-        gap_x, gap_y = 7, 10
-        total_w = 16 * w + 15 * gap_x
-        x0 = (self.SHOE_ZONE[0] + self.SHOE_ZONE[2] - total_w) / 2
-        y0 = self.SHOE_ZONE[1] + 42
-        return x0, y0, w, h, gap_x, gap_y
-
-    def draw_deal_wall(self):
-        self.canvas.delete('deal_wall')
-        if not self.deal_wall_visible or not self.full_tiles:
-            return
-        sx0, sy0, sx1, sy1 = self.SHOE_ZONE
-        self.canvas.create_rectangle(sx0, sy0, sx1, sy1, fill='#0a3834',
-                                     outline='#557b70', width=1, tags='deal_wall')
-        self.canvas.create_text(sx0 + 14, sy0 + 18, anchor='w', text='牌九牌靴',
-                                font=('Arial', 12, 'bold'), fill='#d9efe8', tags='deal_wall')
-        self.canvas.create_text(sx1 - 14, sy0 + 18, anchor='e', text='32张 · 16副 × 2张',
-                                font=('Arial', 9, 'bold'), fill=MUTED, tags='deal_wall')
-
-        for idx, tile_obj in enumerate(self.full_tiles):
-            pair_no = idx // 2
-            if pair_no in self.deal_stack_markers:
-                continue
-            x, y, w, h = self.wall_tile_rect(idx)
-            self.draw_tile(x, y, w, h, tile_obj, face_up=False,
-                           tag=f'wall_{idx}', extra_tag='deal_wall',
-                           show_name=False, compact=True)
-
-        x0, y0, w, h, gap_x, gap_y = self.wall_geometry()
-        for pair_no in range(16):
-            x = x0 + pair_no * (w + gap_x)
-            self.canvas.create_rectangle(x - 2, y0 - 3, x + w + 2,
-                                         y0 + 2 * h + gap_y + 3,
-                                         outline='#6f8f85', width=1, tags='deal_wall')
-
-    def _draw_shoe_snapshot(self, tiles, offset_x=0.0, tag='shoe_snapshot', hide_uids=None,
-                            theme=None):
-        hide_uids = set(hide_uids or ())
-        previous = self._render_tile_theme_override
-        if theme is not None:
-            self._render_tile_theme_override = theme
-        try:
-            sx0, sy0, sx1, sy1 = self.SHOE_ZONE
-            self.canvas.create_rectangle(sx0 + offset_x, sy0, sx1 + offset_x, sy1,
-                                         fill='#0a3834', outline='#557b70', width=1, tags=tag)
-            self.canvas.create_text(sx0 + 14 + offset_x, sy0 + 18, anchor='w', text='牌九牌靴',
-                                    font=('Arial', 12, 'bold'), fill='#d9efe8', tags=tag)
-            self.canvas.create_text(sx1 - 14 + offset_x, sy0 + 18, anchor='e',
-                                    text='32张 · 16副 × 2张', font=('Arial', 9, 'bold'),
-                                    fill=MUTED, tags=tag)
-            x0, y0, w, h, gap_x, gap_y = self.wall_geometry()
-            for idx, tile_obj in enumerate(tiles):
-                if tile_obj.uid in hide_uids:
-                    continue
-                col = idx // 2
-                row = idx % 2
-                x = x0 + col * (w + gap_x) + offset_x
-                y = y0 + row * (h + gap_y)
-                self.draw_tile(x, y, w, h, tile_obj, face_up=False,
-                               tag=f'{tag}_{idx}', extra_tag=tag,
-                               show_name=False, compact=True)
-            for pair_no in range(16):
-                x = x0 + pair_no * (w + gap_x) + offset_x
-                self.canvas.create_rectangle(x - 2, y0 - 3, x + w + 2,
-                                             y0 + 2 * h + gap_y + 3,
-                                             outline='#6f8f85', width=1, tags=tag)
-        finally:
-            self._render_tile_theme_override = previous
-
-    def hand_positions(self, pos):
-        if pos == 0:
-            x0, y0, x1, y1 = self.DEALER_ZONE
-        else:
-            x0, y0, x1, y1 = self.DOOR_ZONES[pos]
-        gap = 18 if pos == 0 else 12
-        total_w = 2 * self.HAND_W + gap
-        cx = (x0 + x1) / 2
-        start_x = cx - total_w / 2
-        # Nudge all dealt hands 6px downward relative to the previous layout.
-        if pos == 0:
-            top = y0 + 24
-        else:
-            top = y0 + 43
-        return [
-            (start_x, top, self.HAND_W, self.HAND_H),
-            (start_x + self.HAND_W + gap, top, self.HAND_W, self.HAND_H),
-        ]
-
-    def deal_destination(self, pos):
-        rects = self.hand_positions(pos)
-        cx = sum(x + w / 2 for x, y, w, h in rects) / 2
-        cy = sum(y + h / 2 for x, y, w, h in rects) / 2
-        return cx, cy
-
-    def animate_deal_pair(self, pair_no):
-        if self._closing:
-            return
-        if pair_no >= 4:
-            self.after(350, self.settle_wenzhou_round)
-            return
-
-        pos = self.deal_order[pair_no]
-        tiles = self.pair_stacks[pair_no]
-        source_rects = [self.wall_tile_rect(pair_no * 2), self.wall_tile_rect(pair_no * 2 + 1)]
-        target_rects = self.hand_positions(pos)
-        frames = 13
-        self.deal_stack_markers[pair_no] = pos
-        self.draw_deal_wall()
-
-        def frame(step):
-            if self._closing:
-                return
-            self.canvas.delete('moving_stack')
-            t = step / frames
-            smooth = t * t * (3 - 2 * t)
-            for tile_obj, src, dst in zip(tiles, source_rects, target_rects):
-                sx, sy, sw, sh = src
-                tx, ty, tw, th = dst
-                x = sx + (tx - sx) * smooth
-                y = sy + (ty - sy) * smooth
-                w = sw + (tw - sw) * smooth
-                h = sh + (th - sh) * smooth
-                self.draw_tile(x, y, w, h, tile_obj, face_up=False,
-                               tag='moving_stack', extra_tag='moving_stack', compact=True)
-            if step < frames:
-                self.after(34, lambda: frame(step + 1))
-                return
-
-            self.canvas.delete('moving_stack')
-            self.door_dealt_visible[pos] = True
-            self.door_face_up[pos] = False
-            self.status = f'派牌2张中，到位后立即开牌。'
-            self.redraw_tiles()
-            self.update_display(redraw=False)
-            self.after(120, lambda: self.reveal_position(pos, pair_no))
-
-        frame(0)
-
-    def reveal_position(self, pos, pair_no):
-        """逐张翻开刚派到该门的两张牌。"""
-        if self._closing:
-            return
-        self.update_display(redraw=False)
-        self.after(40, lambda: self.animate_flip_position(pos, 0, lambda: self.finish_position_reveal(pos, pair_no)))
-
-    def animate_flip_position(self, pos, index, done_callback):
-        """牌九 flip: shrink horizontally, switch face, expand, then next tile."""
-        if self._closing:
-            return
-        hand = self.door_hands.get(pos, [])
-        states = self.door_tile_face_up.setdefault(pos, [False, False])
-        if index >= len(hand):
-            self.door_face_up[pos] = True
-            done_callback()
-            return
-
-        frames = 10
-        self.flip_anim = {'pos': pos, 'index': index, 'scale': 1.0}
-
-        def frame(step):
-            if self._closing:
-                return
-            if step <= frames // 2:
-                scale = max(0.08, 1.0 - (step / (frames / 2)) * 0.92)
-            else:
-                if not states[index]:
-                    states[index] = True
-                scale = 0.08 + ((step - frames / 2) / (frames / 2)) * 0.92
-            self.flip_anim['scale'] = scale
-            self.redraw_tiles()
-            if step < frames:
-                self.after(35, lambda: frame(step + 1))
-            else:
-                states[index] = True
-                self.flip_anim = None
-                self.redraw_tiles()
-                self.after(85, lambda: self.animate_flip_position(pos, index + 1, done_callback))
-
-        frame(0)
-
-    def finish_position_reveal(self, pos, pair_no):
-        if self._closing:
-            return
-        self.door_face_up[pos] = True
-        self.door_tile_face_up[pos] = [True, True]
-        value = evaluate_wenzhou_hand(self.door_hands[pos])
-        self.redraw_tiles()
-        self.update_display(redraw=False)
-        self.after(420, lambda: self.animate_deal_pair(pair_no + 1))
-
-    def redraw_tiles(self):
-        self.canvas.delete('tile_dynamic')
-        self.draw_deal_wall()
-
-        # Match 牌九 result presentation: the corresponding PLAYER door
-        # receives a pure green/red hand background after comparison with the dealer.
-        if self.stage == 'settled':
-            for pos in (1, 2, 3):
-                outcome = self.door_outcomes.get(pos)
-                if outcome not in ('win', 'lose'):
-                    continue
-                rects = self.hand_positions(pos)
-                min_x = min(r[0] for r in rects) - 14
-                min_y = min(r[1] for r in rects) - 8
-                max_x = max(r[0] + r[2] for r in rects) + 14
-                max_y = max(r[1] + r[3] for r in rects) + 8
-                fill = self.HAND_WIN_BG if outcome == 'win' else self.HAND_LOSE_BG
-                self.canvas.create_rectangle(
-                    min_x, min_y, max_x, max_y,
-                    fill=fill, outline='#7d9187', width=1, tags='tile_dynamic'
-                )
-
-        for pos in (0, 1, 2, 3):
-            if not self.door_dealt_visible.get(pos):
-                continue
-            hand = self.door_hands.get(pos, [])
-            if len(hand) != 2:
-                continue
-            rects = self.hand_positions(pos)
-            face_states = self.door_tile_face_up.setdefault(pos, [False, False])
-            for index, (tile_obj, rect) in enumerate(zip(hand, rects)):
-                x, y, w, h = rect
-                scale = 1.0
-                if self.flip_anim and self.flip_anim.get('pos') == pos and self.flip_anim.get('index') == index:
-                    scale = self.flip_anim.get('scale', 1.0)
-                draw_w = max(6, w * scale)
-                draw_x = x + (w - draw_w) / 2
-                self.draw_tile(
-                    draw_x, y, draw_w, h, tile_obj,
-                    face_up=bool(face_states[index]),
-                    tag=f'pos_{pos}_{tile_obj.uid}', extra_tag='tile_dynamic'
-                )
-
-        dealer_text = '庄家'
-        if self.door_face_up.get(0) and len(self.door_hands.get(0, [])) == 2:
-            dealer_text = f"庄家 - {evaluate_wenzhou_hand(self.door_hands[0]).name}"
-        self.canvas.itemconfigure(self.dealer_header_item, text=dealer_text)
-
-        for pos in (1, 2, 3):
-            title = self.POSITION_NAMES[pos]
-            if self.door_face_up.get(pos) and len(self.door_hands.get(pos, [])) == 2:
-                title += f" - {evaluate_wenzhou_hand(self.door_hands[pos]).name}"
-            self.canvas.itemconfigure(self.door_header_items[pos], text=title)
-            self.canvas.itemconfigure(self.door_result_items[pos], text=self.door_result_text.get(pos, ''))
-
-    def settle_wenzhou_round(self):
-        dealer = self.door_hands.get(0, [])
-        if len(dealer) != 2 or any(len(self.door_hands.get(pos, [])) != 2 for pos in (1, 2, 3)):
-            return
-
-        returned = 0.0
-        self.winning_cells = set()
-        self.bet_result_values = {(door, side): 0.0 for door in (1, 2, 3) for side in self.BET_SIDES}
-        for pos in (1, 2, 3):
-            hand = self.door_hands[pos]
-            cmp_value = compare_wenzhou_hands(hand, dealer)
-            # Ties, including identical hand type + identical strongest-tile level,
-            # belong to 惜败.  Ordinary 0 vs 0 therefore also goes to 惜败.
-            winner_side = 'win' if cmp_value > 0 else 'lose'
-            loser_side = 'lose' if winner_side == 'win' else 'win'
-            # Door-hand background is green only for a strict player win; any
-            # smaller/equal result (惜败, including ordinary 0 vs 0) is red.
-            self.door_outcomes[pos] = 'win' if cmp_value > 0 else 'lose'
-            self.winning_cells.add((pos, winner_side))
-
-            multiplier = self.WIN_MULTIPLIER if winner_side == 'win' else self.LOSE_MULTIPLIER
-            stake = float(self.round_bets.get((pos, winner_side), 0.0))
-            payout = stake * multiplier
-            self.bet_result_values[(pos, winner_side)] = payout
-            self.bet_result_values[(pos, loser_side)] = 0.0
-            returned += payout
-
-            # No per-door sentence below the cards; the green/red hand background
-            # already communicates 获胜 / 惜败.
-            self.door_result_text[pos] = ''
-
-        self.balance += returned
-        self.last_return = returned
-        net = returned - self.round_total_bet
-        self.last_result = f'游戏结束'
-        self.status = self.last_result
-        self.stage = 'settled'
-        self.animation_running = False
-        self._persist_balance()
-        self.update_display()
-
-    def render_action_buttons(self):
-        if not hasattr(self, 'action_frame'):
-            return
-        for widget in self.action_frame.winfo_children():
-            widget.destroy()
-        for i in range(3):
-            self.action_frame.columnconfigure(i, weight=1)
-
-        def btn(text, command, bg, enabled=True, fg='white'):
-            return tk.Button(
-                self.action_frame, text=text, command=command,
-                font=('Arial', 11, 'bold'), bg=bg, fg=fg,
-                activebackground=bg, relief=tk.RAISED,
-                state=tk.NORMAL if enabled else tk.DISABLED,
-            )
-
-        if self.stage == 'betting':
-            repeat_ok = (self._bet_total(self.last_bets) > 0 and self._bet_total(self.last_bets) <= self.balance and self._bets_fit_limits(self.last_bets))
-            start_ok = not self.animation_running and self._bet_total() <= self.balance
-            btn('重设金额', self.reset_bets, '#F44336', True, 'white').grid(
-                row=0, column=0, sticky='nsew', padx=(0, 3), pady=1
-            )
-            btn('重复上局下注', self.repeat_bet, '#FFC107', repeat_ok, 'black').grid(
-                row=0, column=1, sticky='nsew', padx=3, pady=1
-            )
-            btn('开始游戏', self.start_round, '#4CAF50', start_ok).grid(
-                row=0, column=2, sticky='nsew', padx=(3, 0), pady=1
-            )
-        elif self.stage == 'settled':
-            btn('再来一局', self.new_round, '#FFC107', True, 'black').grid(
-                row=0, column=0, columnspan=3, sticky='nsew', padx=105, pady=1
-            )
-        else:
-            tk.Label(self.action_frame, text='动画进行中…', font=('Arial', 11, 'bold'),
-                     bg=self.PANEL_BG, fg='#6B6251').grid(
-                row=0, column=0, columnspan=3, sticky='nsew'
-            )
-
-    def update_dice_and_order_text(self):
-        if not self.dice_result:
-            self.canvas.itemconfigure(self.dice_summary_item, text='= --点　｜　等待摇骰')
-            return
-        total = sum(self.dice_result)
-        rem = total % 4
-        display_rem = 4 if rem == 0 else rem
-        start_pos = {1: 0, 2: 1, 3: 2, 0: 3}[rem]
-        self.canvas.itemconfigure(
-            self.dice_summary_item,
-            text=f'= {total}点　｜　余{display_rem} · {self.POSITION_NAMES[start_pos]}先派',
-        )
-
-    def update_display(self, redraw=True):
-        if not hasattr(self, 'balance_label'):
-            return
-        stage_map = {
-            'betting': '下注阶段', 'rolling': '摇骰中', 'dealing': '派牌中',
-            'settled': '结算完成', 'shoe_exchange': '换牌靴',
-        }
-        self.balance_label.config(text=f'余额: ${self.balance:,.2f}')
-        self.stage_label.config(text=stage_map.get(self.stage, self.stage))
-        self.current_bet_label.config(text=f'本局下注: ${self._fmt(self._bet_total())}')
-        self.last_win_label.config(text=f'上局返还: ${self._fmt(self.last_return)}')
-        self.status_label.config(text=str(self.status).split('\n', 1)[0])
-        self._update_chip_ui()
-        self._refresh_bet_cells()
-        self.update_dice_and_order_text()
-        self.render_action_buttons()
-        if redraw:
-            self.redraw_tiles()
-
-    def _animate_initial_shoe_left(self):
-        if self._closing:
-            return
-        new_tiles = self.secure_shuffle(build_pai_gow_set())
-        frames = 24
-        travel = (self.SHOE_ZONE[2] - self.SHOE_ZONE[0]) + 45
-        initial_theme = self.tile_theme
-
-        def frame(step):
-            if self._closing:
-                return
-            self.canvas.delete('initial_shoe_slide')
-            t = step / frames
-            smooth = t * t * (3 - 2 * t)
-            offset = -travel * (1 - smooth)
-            self._draw_shoe_snapshot(new_tiles, offset, 'initial_shoe_slide', theme=initial_theme)
-            if step < frames:
-                self.after(28, lambda: frame(step + 1))
-                return
-            self.canvas.delete('initial_shoe_slide')
-            self.full_tiles = list(new_tiles)
-            self.pair_stacks = [self.full_tiles[i * 2:(i + 1) * 2] for i in range(16)]
-            self.stacks = list(self.pair_stacks)
-            self.deal_wall_visible = True
-            self.shoe_ready_for_next_round = True
-            self.animation_running = False
-            self.status = f'{self._tile_colour_name(initial_theme)}温州牌九牌靴已就位。'
-            self.update_display()
-
-        frame(0)
-
-    def _returning_start_states(self):
-        """Return all eight live Wenzhou tiles from their door positions to the shoe."""
-        states = {}
-        for pos in (0, 1, 2, 3):
-            hand = self.door_hands.get(pos, [])
-            rects = self.hand_positions(pos)
-            for tile_obj, rect in zip(hand, rects):
-                x, y, w, h = rect
-                states[tile_obj.uid] = (x + w / 2, y + h / 2, w, h, 0.0, tile_obj)
-        return states
-
-    def new_round(self):
-        if self.stage != 'settled' or self.animation_running:
-            return
-
-        start_states = self._returning_start_states()
-        if len(self.full_tiles) != 32 or len(start_states) != 8:
-            self._finish_new_shoe_immediately()
-            return
-
-        self.stage = 'shoe_exchange'
-        self.animation_running = True
-        self.status = '庄家、顺门、出门、到门牌九正在回到原来的牌靴位置…'
-        self.render_action_buttons()
-
-        old_tiles = list(self.full_tiles)
-        return_uids = set(start_states)
-        # Same rule as Classic final UI: every live tile goes back to the exact slot
-        # it occupied in this round's original 32-tile shoe.
-        target_index = {tile.uid: idx for idx, tile in enumerate(old_tiles)}
-
-        self.canvas.delete('tile_dynamic')
-        self.canvas.delete('deal_wall')
-        self.canvas.itemconfigure(self.dealer_header_item, text='庄家')
-        for pos in (1, 2, 3):
-            self.canvas.itemconfigure(self.door_header_items[pos], text=self.POSITION_NAMES[pos])
-            self.canvas.itemconfigure(self.door_result_items[pos], text='')
-        self._draw_shoe_snapshot(old_tiles, tag='shoe_return_base', hide_uids=return_uids, theme=self.tile_theme)
-
-        frames = 22
-
-        def frame(step):
-            if self._closing:
-                return
-            self.canvas.delete('returning_tiles')
-            t = step / frames
-            smooth = t * t * (3 - 2 * t)
-            for uid, (scx, scy, sbw, sbh, sangle, tile_obj) in start_states.items():
-                idx = target_index[uid]
-                tx, ty, tw, th = self._snapshot_wall_rect(idx)
-                tcx, tcy = tx + tw / 2, ty + th / 2
-                cx = scx + (tcx - scx) * smooth
-                cy = scy + (tcy - scy) * smooth
-                bw = sbw + (tw - sbw) * smooth
-                bh = sbh + (th - sbh) * smooth
-                angle = sangle * (1 - smooth)
-                self._draw_rotated_face_tile(
-                    cx, cy, bw, bh, angle, tile_obj,
-                    tag=f'return_{uid}', extra_tag='returning_tiles', compact=True,
-                )
-            if step < frames:
-                self.after(32, lambda: frame(step + 1))
-                return
-
-            self.canvas.delete('returning_tiles')
-            self.canvas.delete('shoe_return_base')
-            self.deal_stack_markers = {}
-            self._animate_shoe_swap(old_tiles)
-
-        frame(0)
-
-    def _animate_shoe_swap(self, old_tiles):
-        old_theme = self.tile_theme
-        new_theme = self._opposite_tile_theme(old_theme)
-        new_tiles = self.secure_shuffle(build_pai_gow_set())
-        frames = 24
-        travel = (self.SHOE_ZONE[2] - self.SHOE_ZONE[0]) + 45
-
-        def frame(step):
-            if self._closing:
-                return
-            self.canvas.delete('deal_wall')
-            self.canvas.delete('shoe_swap_old')
-            self.canvas.delete('shoe_swap_new')
-            t = step / frames
-            smooth = t * t * (3 - 2 * t)
-            self._draw_shoe_snapshot(old_tiles, travel * smooth, 'shoe_swap_old', theme=old_theme)
-            self._draw_shoe_snapshot(new_tiles, -travel * (1 - smooth), 'shoe_swap_new', theme=new_theme)
-            if step < frames:
-                self.after(28, lambda: frame(step + 1))
-                return
-
-            self.canvas.delete('shoe_swap_old')
-            self.canvas.delete('shoe_swap_new')
-            self.tile_theme = new_theme
-            self.full_tiles = list(new_tiles)
-            self.pair_stacks = [self.full_tiles[i * 2:(i + 1) * 2] for i in range(16)]
-            self.stacks = list(self.pair_stacks)
-            self.deal_wall_visible = True
-            self.shoe_ready_for_next_round = True
-            self._reset_after_shoe_exchange()
-
-        frame(0)
-
-    def _finish_new_shoe_immediately(self):
-        self.tile_theme = self._opposite_tile_theme(self.tile_theme)
-        self.full_tiles = self.secure_shuffle(build_pai_gow_set())
-        self.pair_stacks = [self.full_tiles[i * 2:(i + 1) * 2] for i in range(16)]
-        self.stacks = list(self.pair_stacks)
-        self.deal_wall_visible = True
-        self.shoe_ready_for_next_round = True
-        self._reset_after_shoe_exchange()
-
-    def _reset_after_shoe_exchange(self):
-        self.animation_running = False
-        self.stage = 'betting'
-        self.bets = {(door, side): 0.0 for door in (1, 2, 3) for side in self.BET_SIDES}
-        self.round_bets = dict(self.bets)
-        self.ante = 0.0
-        self.status = f'新{self._tile_colour_name()}温州牌九牌靴已就位。'
-        self.last_result = ''
-        self.bet_result_values = {}
-        self.winning_cells = set()
-        self.door_hands = {0: [], 1: [], 2: [], 3: []}
-        self.door_dealt_visible = {0: False, 1: False, 2: False, 3: False}
-        self.door_face_up = {0: False, 1: False, 2: False, 3: False}
-        self.door_tile_face_up = {pos: [False, False] for pos in (0, 1, 2, 3)}
-        self.door_outcomes = {1: None, 2: None, 3: None}
-        self.flip_anim = None
-        self.door_result_text = {1: '', 2: '', 3: ''}
-        self.dice_result = []
-        self.deal_start_index = None
-        self.deal_order = []
-        self.position_hands = {}
-        self.deal_stack_markers = {}
-        self.canvas.delete('tile_dynamic')
-        self.canvas.delete('moving_stack')
-        for item in self.animation_dice_items:
-            self.canvas.itemconfigure(item, image=self.dice_images_animation[5])
-        self.update_display()
-
     def show_detailed_rules(self):
-        """温州牌九图解玩法说明。"""
-        win = tk.Toplevel(self)
-        win.title('温州牌九 · 完整图解玩法与32张骨牌')
-        win.geometry('1040x720+55+20')
-        win.resizable(False, False)
-        win.configure(bg='#efe7d4')
+        """温州牌九图解玩法说明（奶油白配色，固定 1000×650）。"""
+        parent = self.winfo_toplevel()
 
-        shell = tk.Frame(win, bg='#efe7d4')
-        shell.pack(fill='both', expand=True, padx=8, pady=8)
-        scroller = tk.Canvas(shell, bg='#efe7d4', highlightthickness=0)
-        scrollbar = tk.Scrollbar(shell, orient='vertical', command=scroller.yview)
-        scroller.configure(yscrollcommand=scrollbar.set)
-        scrollbar.pack(side='right', fill='y')
-        scroller.pack(side='left', fill='both', expand=True)
-        content = tk.Frame(scroller, bg='#efe7d4')
-        window_id = scroller.create_window((0, 0), window=content, anchor='nw')
-
-        def resize_inner(_event=None):
+        existing = getattr(self, '_wenzhou_instruction_window', None)
+        if existing is not None:
             try:
-                scroller.itemconfigure(window_id, width=scroller.winfo_width())
-                scroller.configure(scrollregion=scroller.bbox('all'))
+                if existing.winfo_exists():
+                    existing.lift()
+                    existing.focus_force()
+                    return
             except tk.TclError:
                 pass
 
-        content.bind('<Configure>', resize_inner)
-        scroller.bind('<Configure>', resize_inner)
+        dialog = tk.Toplevel(parent)
+        self._wenzhou_instruction_window = dialog
+        dialog.title('温州牌九 · 完整图解玩法与32张骨牌')
+        dialog.configure(bg='#faf5e8')
+        dialog.resizable(False, False)
+        dialog.transient(parent)
 
-        def mousewheel(event):
-            scroller.yview_scroll((-1 if event.delta > 0 else 1) * 3, 'units')
+        # ================================================================
+        # 固定窗口尺寸
+        # ================================================================
+        win_w = 1000
+        win_h = 650
 
-        win.bind('<MouseWheel>', mousewheel)
+        parent.update_idletasks()
+        pw = max(1, parent.winfo_width())
+        ph = max(1, parent.winfo_height())
+        px = parent.winfo_rootx()
+        py = parent.winfo_rooty()
+        pos_x = px + (pw - win_w) // 2
+        pos_y = py + (ph - win_h) // 2
 
-        PANEL = '#fffaf0'
-        GOLD_BAR = '#d8b46a'
-        INK = '#2a1b08'
-        MUTED_INK = '#705f49'
+        dialog.geometry(f'{win_w}x{win_h}+{pos_x}+{pos_y}')
+        dialog.minsize(win_w, win_h)
+        dialog.maxsize(win_w, win_h)
+
+        font_name = 'Microsoft YaHei UI'
+
+        # ================================================================
+        # 配色：奶油白体系
+        # ================================================================
+        BG = '#faf5e8'          # 主背景（奶油白）
+        HEADER = '#f1e7cd'      # 顶栏（深一档奶油）
+        SIDEBAR = '#f2e8d0'     # 左侧栏
+        PANEL = '#fffdf7'       # 卡片底（近白）
+        PANEL_2 = '#f5ecd6'     # 卡片内嵌
+        ROW_ALT = '#faf3e3'     # 表格隔行
+        BORDER = '#c9b88a'      # 柔和金线
+
+        GOLD_BAR = '#e7d36c'    # 表头亮金
+        GOLD = '#a8842c'        # 深金（浅底可见）
+        TEXT = '#3a2f1e'        # 主文字（深棕）
+        MUTED = '#7a6a50'       # 次要文字
+
+        GREEN = '#2f7d3a'
+        RED = '#b83a3a'
         BLUE = '#2c6e9f'
-        BROWN = '#8a5318'
-        GREEN = '#0b6b45'
-        RED_INK = '#b51f1f'
-        section_font = ('Microsoft YaHei', 13, 'bold')
-        body_font = ('Microsoft YaHei', 10)
-        small_font = ('Microsoft YaHei', 9)
-        mini_font = ('Microsoft YaHei', 8)
+
+        FONT_SMALL = 11
+        FONT_NORMAL = 12
+        FONT_MEDIUM = 13
+        FONT_LARGE = 15
+        FONT_TITLE = 17
+
+        # ================================================================
+        # 顶部标题栏
+        # ================================================================
+        header = tk.Frame(dialog, bg=HEADER, height=76)
+        header.pack(fill=tk.X, side=tk.TOP)
+        header.pack_propagate(False)
 
         tk.Label(
-            content, text='温州牌九 · 完整图解说明',
-            font=('Microsoft YaHei', 20, 'bold'), bg='#efe7d4', fg=INK,
-        ).pack(fill='x', pady=(5, 3))
+            header, text='温州牌九 · 完整图解说明',
+            font=(font_name, FONT_TITLE, 'bold'), fg=GOLD, bg=HEADER,
+        ).place(x=22, y=8)
         tk.Label(
-            content,
-            text='先认32张牌 → 看两骰四门 → 学两张牌型 → 最后看下注、比较与换牌靴',
-            font=('Microsoft YaHei', 10, 'bold'), bg='#efe7d4', fg=MUTED_INK,
-        ).pack(fill='x', pady=(0, 10))
+            header, text='32张骨牌 · 两骰四门 · 牌型大小 · 鸡牌固定 · 下注赔率',
+            font=(font_name, FONT_SMALL), fg=MUTED, bg=HEADER,
+        ).place(x=23, y=44)
 
-        def section(title, body='', height=210):
-            outer = tk.Frame(content, bg=PANEL, bd=1, relief=tk.SOLID)
-            outer.pack(fill='x', padx=8, pady=6)
+        close_btn = tk.Button(
+            header, text='关闭  ESC',
+            font=(font_name, FONT_SMALL, 'bold'),
+            bg='#e5d9b8', fg=TEXT,
+            activebackground='#d4c090', activeforeground='#3a2f1e',
+            relief=tk.FLAT, bd=0, cursor='hand2',
+        )
+        close_btn.place(x=860, y=17, width=118, height=42)
+
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X, side=tk.TOP)
+
+        # ================================================================
+        # 主体：左 sidebar + 右 content
+        # ================================================================
+        body = tk.Frame(dialog, bg=BG)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        sidebar_w = 200
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=sidebar_w)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+
+        tk.Frame(body, bg=BORDER, width=1).pack(side=tk.LEFT, fill=tk.Y)
+
+        tk.Label(
+            sidebar, text='主题',
+            font=(font_name, FONT_SMALL, 'bold'),
+            fg=GOLD, bg=SIDEBAR, anchor='w',
+        ).pack(fill=tk.X, padx=16, pady=(16, 8))
+
+        right_wrap = tk.Frame(body, bg=BG)
+        right_wrap.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        right_wrap.grid_rowconfigure(0, weight=1)
+        right_wrap.grid_columnconfigure(0, weight=1)
+        right_wrap.grid_columnconfigure(1, weight=0)
+
+        content_canvas = tk.Canvas(
+            right_wrap, bg=BG, highlightthickness=0, bd=0, yscrollincrement=40,
+        )
+        content_scrollbar = tk.Scrollbar(
+            right_wrap, orient=tk.VERTICAL,
+            command=content_canvas.yview,
+            bg='#e5d9b8', troughcolor='#f0e6cc',
+            activebackground=GOLD_BAR, relief=tk.FLAT, bd=0, width=11,
+        )
+        content_canvas.configure(yscrollcommand=content_scrollbar.set)
+        content_canvas.grid(row=0, column=0, sticky='nsew', padx=(0, 4), pady=(6, 6))
+        content_scrollbar.grid(row=0, column=1, sticky='ns', padx=(0, 8), pady=(6, 6))
+
+        content = tk.Frame(content_canvas, bg=BG)
+        content_window = content_canvas.create_window((0, 0), window=content, anchor='nw')
+
+        def _sync_scrollregion(_event=None):
+            content_canvas.configure(scrollregion=content_canvas.bbox('all'))
+
+        def _fit_content_width(event):
+            content_canvas.itemconfigure(content_window, width=event.width)
+
+        content.bind('<Configure>', _sync_scrollregion)
+        content_canvas.bind('<Configure>', _fit_content_width)
+
+        def _scroll_units(event):
+            try:
+                return int(-1 * (event.delta / 120))
+            except Exception:
+                return 0
+
+        def _on_mousewheel(event):
+            units = _scroll_units(event)
+            if units:
+                content_canvas.yview_scroll(units, 'units')
+            return 'break'
+
+        dialog.bind('<MouseWheel>', _on_mousewheel)
+        dialog.bind('<Button-4>', lambda _e: content_canvas.yview_scroll(-1, 'units'))
+        dialog.bind('<Button-5>', lambda _e: content_canvas.yview_scroll(1, 'units'))
+
+        # ================================================================
+        # 排版辅助
+        # ================================================================
+        def clear_content():
+            for child in content.winfo_children():
+                child.destroy()
+
+        def reset_scroll():
+            try:
+                content_canvas.yview_moveto(0.0)
+            except tk.TclError:
+                pass
+
+        def section_title(text, subtitle=None):
+            block = tk.Frame(content, bg=BG)
+            block.pack(fill=tk.X, padx=16, pady=(12, 0))
             tk.Label(
-                outer, text=title, font=section_font, bg=GOLD_BAR, fg=INK,
-                anchor='w', padx=10, pady=5,
-            ).pack(fill='x')
-            if body:
+                block, text=text,
+                font=(font_name, FONT_LARGE, 'bold'),
+                fg=GOLD, bg=BG, anchor='w',
+            ).pack(side=tk.LEFT)
+            if subtitle:
                 tk.Label(
-                    outer, text=body, font=body_font, bg=PANEL, fg=INK,
-                    justify='left', anchor='w', padx=12, pady=7, wraplength=965,
-                ).pack(fill='x')
-            viz = tk.Canvas(outer, width=975, height=height, bg=PANEL, highlightthickness=0)
-            viz.pack(padx=8, pady=(0, 8))
-            return viz
+                    block, text=subtitle,
+                    font=(font_name, FONT_SMALL),
+                    fg=MUTED, bg=BG, anchor='e',
+                ).pack(side=tk.RIGHT)
+            tk.Frame(content, bg=BORDER, height=1).pack(fill=tk.X, padx=16, pady=(8, 12))
 
-        def draw_die(c, cx, cy, value, size=54):
+        def make_card(title=None, subtitle=None, pady=(0, 14)):
+            card = tk.Frame(
+                content, bg=PANEL,
+                highlightbackground=BORDER, highlightcolor=BORDER,
+                highlightthickness=1, bd=0,
+            )
+            card.pack(fill=tk.X, padx=16, pady=pady)
+            if title:
+                head = tk.Frame(card, bg=PANEL)
+                head.pack(fill=tk.X, padx=16, pady=(12, 8))
+                tk.Label(
+                    head, text=title,
+                    font=(font_name, FONT_MEDIUM, 'bold'),
+                    fg=GOLD, bg=PANEL, anchor='w',
+                ).pack(side=tk.LEFT)
+                if subtitle:
+                    tk.Label(
+                        head, text=subtitle,
+                        font=(font_name, FONT_SMALL),
+                        fg=MUTED, bg=PANEL, anchor='e',
+                    ).pack(side=tk.RIGHT)
+            return card
+
+        def add_rule(parent_frame, title, body, accent=GOLD):
+            row_wrap = tk.Frame(parent_frame, bg=PANEL)
+            row_wrap.pack(fill=tk.X, padx=16, pady=(0, 12))
+            row = tk.Frame(row_wrap, bg=PANEL)
+            row.pack(fill=tk.X)
+            tk.Frame(row, bg=accent, width=4).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 14))
+            text_box = tk.Frame(row, bg=PANEL)
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(
+                text_box, text=title,
+                font=(font_name, FONT_MEDIUM, 'bold'),
+                fg=TEXT, bg=PANEL, anchor='w', justify=tk.LEFT,
+            ).pack(fill=tk.X)
+            tk.Label(
+                text_box, text=body,
+                font=(font_name, FONT_SMALL),
+                fg=MUTED, bg=PANEL, anchor='w',
+                justify=tk.LEFT, pady=5,
+            ).pack(fill=tk.X)
+
+        def table_block(parent_frame, title, rows):
+            block = tk.Frame(
+                parent_frame, bg=PANEL_2,
+                highlightbackground=BORDER, highlightthickness=1, bd=0,
+            )
+            tk.Label(
+                block, text=title,
+                font=(font_name, FONT_SMALL, 'bold'),
+                fg=TEXT, bg=GOLD_BAR, anchor='w', padx=14, pady=7,
+            ).pack(fill=tk.X)
+
+            grid = tk.Frame(block, bg=PANEL_2)
+            grid.pack(fill=tk.BOTH, expand=True)
+            grid.grid_columnconfigure(0, weight=1)
+            grid.grid_columnconfigure(1, minsize=150)
+
+            for i, (cond, val) in enumerate(rows):
+                bg_row = ROW_ALT if i % 2 == 0 else PANEL_2
+                tk.Label(
+                    grid, text=cond,
+                    font=(font_name, FONT_SMALL),
+                    fg=TEXT, bg=bg_row,
+                    anchor='w', justify=tk.LEFT, padx=16, pady=8,
+                ).grid(row=i, column=0, sticky='nsew', padx=(0, 1), pady=(0, 1))
+                tk.Label(
+                    grid, text=val,
+                    font=(font_name, FONT_SMALL, 'bold'),
+                    fg=GOLD, bg=bg_row,
+                    anchor='center', padx=8, pady=8,
+                ).grid(row=i, column=1, sticky='nsew', pady=(0, 1))
+            return block
+
+        def preview_canvas(parent_frame, width, height):
+            cv = tk.Canvas(
+                parent_frame, width=width, height=height,
+                bg=PANEL, highlightthickness=0,
+            )
+            cv.pack(padx=12, pady=(4, 12))
+            return cv
+
+        # 奶油白底上用黑色牌面更醒目
+        def draw_tile_on(canvas, tile, cx, cy, scale=0.62):
+            old = self._render_tile_theme_override
+            self._render_tile_theme_override = 'black'
+            try:
+                self._instruction_tile(canvas, tile, cx, cy, scale=scale)
+            finally:
+                self._render_tile_theme_override = old
+
+        # ================================================================
+        # 数据准备
+        # ================================================================
+        tiles = build_pai_gow_set()
+        by_group = {}
+        for _t in tiles:
+            by_group.setdefault(_t.group, []).append(_t)
+
+        def find_pair(group):
+            return by_group[group][:2]
+
+        def find_named(name):
+            for i, a in enumerate(tiles):
+                for b in tiles[i + 1:]:
+                    if evaluate_wenzhou_hand([a, b]).name == name:
+                        return [a, b]
+            raise LookupError(name)
+
+        def find_ordinary(points, avoid=()):
+            for i, a in enumerate(tiles):
+                for b in tiles[i + 1:]:
+                    if a.group in avoid or b.group in avoid:
+                        continue
+                    v = evaluate_wenzhou_hand([a, b])
+                    if v.named_rank is None and v.points == points:
+                        return [a, b]
+            raise LookupError(points)
+
+        def draw_die(cv, cx, cy, value, size=52):
             r = size / 2
-            x0, y0, x1, y1 = cx-r, cy-r, cx+r, cy+r
-            c.create_rectangle(x0, y0, x1, y1, fill='#f0f0e9', outline='#222', width=2)
+            x0, y0, x1, y1 = cx - r, cy - r, cx + r, cy + r
+            cv.create_rectangle(x0, y0, x1, y1, fill='#faf8f0', outline='#4a3c20', width=2)
             positions = {
                 1: [(0.50, 0.50)],
                 2: [(0.28, 0.28), (0.72, 0.72)],
                 3: [(0.28, 0.28), (0.50, 0.50), (0.72, 0.72)],
                 4: [(0.28, 0.28), (0.72, 0.28), (0.28, 0.72), (0.72, 0.72)],
-                5: [(0.28, 0.28), (0.72, 0.28), (0.50, 0.50), (0.28, 0.72), (0.72, 0.72)],
-                6: [(0.28, 0.20), (0.72, 0.20), (0.28, 0.50), (0.72, 0.50), (0.28, 0.80), (0.72, 0.80)],
+                5: [(0.28, 0.28), (0.72, 0.28), (0.50, 0.50),
+                    (0.28, 0.72), (0.72, 0.72)],
+                6: [(0.28, 0.20), (0.72, 0.20), (0.28, 0.50),
+                    (0.72, 0.50), (0.28, 0.80), (0.72, 0.80)],
             }
             pip_r = max(3, int(size / 11))
-            pip_color = '#d21e2b' if value in (1, 4) else '#111'
+            pip_color = '#c0392b' if value in (1, 4) else '#2a2218'
             for ux, uy in positions[value]:
-                px, py = x0 + ux * size, y0 + uy * size
-                c.create_oval(px-pip_r, py-pip_r, px+pip_r, py+pip_r, fill=pip_color, outline='')
+                ppx, ppy = x0 + ux * size, y0 + uy * size
+                cv.create_oval(ppx - pip_r, ppy - pip_r, ppx + pip_r, ppy + pip_r,
+                            fill=pip_color, outline='')
 
+        CANVAS_W = 680
+
+        # ================================================================
+        # 各主题页面
+        # ================================================================
+        def page_rules():
+            section_title('玩法与流程', '两骰 · 四门 · 每门2张')
+
+            card = make_card(title='基本流程')
+            add_rule(
+                card, '1. 下注',
+                '顺门、出门、到门各有两个下注格：获胜 / 惜败。\n'
+                '同一门只能选一边下注，不能同时下两边。'
+            )
+            add_rule(
+                card, '2. 摇骰定门',
+                '按下「开牌」或 Enter 后摇两颗骰子，取总点数除以 4 的余数：\n'
+                '余1 → 庄家先派；余2 → 顺门先派；余3 → 出门先派；\n'
+                '整除（余0，等同余4）→ 到门先派。'
+            )
+            add_rule(
+                card, '3. 派牌顺序',
+                '从起始门开始按「庄家 → 顺门 → 出门 → 到门」循环。\n'
+                '每次从牌靴最左侧取 2 张作为一个门的手牌。\n'
+                '一门派完立即逐张翻牌，再派下一门。'
+            )
+            add_rule(
+                card, '4. 结算',
+                '顺门、出门、到门分别与庄家比较大小。\n'
+                '严格大于庄家 → 该门手牌背景变绿（获胜）；\n'
+                '小于或等于庄家 → 背景变红（惜败，庄家占优）。\n'
+                '对应下注格按赔率派彩：获胜 0.99:1，惜败 0.93:1。'
+            )
+            add_rule(
+                card, '5. 换牌靴',
+                '点击「再来一局」后，返还筹码先回到底栏，余额入账，再将本局牌向右收走；\n'
+                '旧牌靴向右退出，同时一副全新 32 张牌从左进入，\n'
+                '牌面颜色在黑色 / 白色之间交替。'
+            )
+
+        def page_dice():
+            section_title('两骰定门', '总点数 ÷ 4 取余')
+
+            card = make_card(title='两骰余数决定先派哪一门')
+            # 上下结构：上部两骰 + 结果，下部四门
+            cv = preview_canvas(card, CANVAS_W, 330)
+
+            # ---- 上半区：两骰 + 计算 ----
+            draw_die(cv, 300, 55, 3)
+            draw_die(cv, 380, 55, 4)
+            cv.create_text(340, 118, text='3 + 4 = 7',
+                        font=(font_name, FONT_LARGE, 'bold'), fill=TEXT)
+            cv.create_text(340, 148,
+                        text='7 ÷ 4 余 3 → 出门先派',
+                        font=(font_name, FONT_MEDIUM, 'bold'), fill=BLUE)
+
+            # 分隔线
+            cv.create_line(80, 172, 600, 172, fill=BORDER, width=1)
+
+            # ---- 下半区：四门 ----
+            doors = [('庄家', '余 1'), ('顺门', '余 2'),
+                    ('出门', '余 3'), ('到门', '余 0 / 余 4')]
+            cell_w = 92
+            gap = 15
+            total_w = len(doors) * cell_w + (len(doors) - 1) * gap
+            start_x = (CANVAS_W - total_w) / 2
+            row_y0 = 195
+            row_y1 = 255
+
+            for i, (name, cond) in enumerate(doors):
+                x0 = start_x + i * (cell_w + gap)
+                highlight = (i == 2)
+                fill = '#f6e2a8' if highlight else '#faf3e0'
+                edge = '#a8842c' if highlight else '#8b7658'
+                cv.create_rectangle(x0, row_y0, x0 + cell_w, row_y1,
+                                    fill=fill, outline=edge, width=2)
+                cv.create_text(x0 + cell_w / 2, row_y0 + 18, text=name,
+                            font=(font_name, FONT_SMALL, 'bold'), fill='#3a2f1e')
+                cv.create_text(x0 + cell_w / 2, row_y0 + 42, text=cond,
+                            font=(font_name, 9), fill='#7a6a50')
+                if i < 3:
+                    cv.create_text(x0 + cell_w + gap / 2, (row_y0 + row_y1) / 2,
+                                text='→', font=('Arial', 14, 'bold'), fill=GOLD)
+
+            # ---- 底部提示 ----
+            cv.create_text(CANVAS_W / 2, 282,
+                        text='示例起手顺序：出门 → 到门 → 庄家 → 顺门',
+                        font=(font_name, FONT_NORMAL, 'bold'), fill=GREEN)
+            cv.create_text(CANVAS_W / 2, 308,
+                        text='每派完一门：牌背缩窄 → 翻成牌面 → 展开 → 再派下一门',
+                        font=(font_name, FONT_SMALL), fill=MUTED)
+
+        def page_tiles():
+            section_title('一副温州牌九 · 32张骨牌', '16组 × 每组2张')
+
+            card = make_card()
+            groups = sorted(
+                by_group,
+                key=lambda g: (WENZHOU_PAIR_RANK[g][0], WENZHOU_PAIR_RANK[g][1], g),
+            )
+            cols = 3
+            cell_w = 222
+            cell_h = 140
+            rows = (len(groups) + cols - 1) // cols
+            cv = preview_canvas(card, cols * cell_w + 10, rows * cell_h + 10)
+
+            for idx, group in enumerate(groups):
+                row, col = divmod(idx, cols)
+                x0 = 5 + col * cell_w
+                y0 = 5 + row * cell_h
+
+                pair = find_pair(group)
+                rank, name = WENZHOU_PAIR_RANK[group]
+
+                cv.create_rectangle(x0, y0, x0 + cell_w - 10, y0 + cell_h - 10,
+                                    fill=PANEL_2, outline=BORDER)
+
+                draw_tile_on(cv, pair[0], x0 + 42, y0 + 74, scale=0.58)
+                draw_tile_on(cv, pair[1], x0 + 82, y0 + 74, scale=0.58)
+
+                cv.create_text(x0 + 112, y0 + 28, anchor='w', text=name,
+                            font=(font_name, FONT_SMALL, 'bold'), fill=GOLD)
+                cv.create_text(x0 + 112, y0 + 52, anchor='w',
+                            text=f'牌型级别 {rank}',
+                            font=(font_name, 9), fill=MUTED)
+                cv.create_text(x0 + 112, y0 + 76, anchor='w',
+                            text=' + '.join(f'{t.a}-{t.b}' for t in pair),
+                            font=(font_name, 9), fill=MUTED)
+                cv.create_text(x0 + 112, y0 + 100, anchor='w',
+                            text='共2张实体牌',
+                            font=(font_name, 9), fill=GREEN)
+
+            note = make_card(title='牌面构成')
+            add_rule(
+                note, '21 种牌面 · 32 张实体牌',
+                '11 种牌面各出现 2 次（文牌对）；\n'
+                '10 种牌面各出现 1 次（武牌对，含至尊的两张不同形状）。'
+            )
+
+        def page_ranks():
+            section_title('经典牌型大小', '完整 21 级 · 由高到低')
+
+            # ================================================================
+            # 完整牌型表（21 级）
+            # group=None 时按命名组合查找，否则用该组的两个实体牌
+            # ================================================================
+            row_data = [
+                # (级别, group,  牌型名,   说明)
+                (1,  'Teen',       '双天',     '两张天牌，最高牌型'),
+                (2,  'Day',        '双地',     '两张地牌'),
+                (3,  'Gee Joon',   '至尊',     '大鸡六 + 小鸡'),
+                (4,  'Yun',        '双人',     '两张人牌'),
+                (5,  'Gor',        '双鹅',     '两张鹅牌'),
+                (6,  'Mooy',       '双梅',     '两张梅牌'),
+                (6,  'Chong',      '双长三',   '两张长三'),
+                (6,  'Bon',        '双板凳',   '两张板凳'),
+                (7,  'Foo',        '双斧头',   '两张斧头'),
+                (7,  'Ping',       '双红头十', '两张红头十'),
+                (7,  'Tit',        '双高脚七', '两张高脚七'),
+                (7,  'Look',       '双零霖六', '两张零霖六'),
+                (8,  'Chop Gow',   '双杂九',   '3-6 与 4-5 各一张'),
+                (8,  'Chop Bot',   '双杂八',   '3-5 与 2-6 各一张'),
+                (8,  'Chop Chit',  '双杂七',   '3-4 与 2-5 各一张'),
+                (8,  'Chop Ng',    '双杂五',   '1-4 与 3-2 各一张'),
+                (9,  None,         '天九王',   '天牌 + 任意 9 点'),
+                (10, None,         '天杠',     '天牌 + 任意 8 点'),
+                (11, None,         '地杠',     '地牌 + 任意 8 点'),
+                (12, None,         '天九',     '天牌 + 任意 7 点'),
+                (13, None,         '地九',     '地牌 + 任意 7 点'),
+            ]
+
+            card = make_card(title='完整牌型表（按大小排序）')
+
+            # ================================================================
+            # 表格几何
+            # ================================================================
+            row_h = 36
+            header_h = 36
+            table_w = 640
+            table_x = (CANVAS_W - table_w) / 2
+            table_y0 = 10
+
+            canvas_h = table_y0 + header_h + len(row_data) * row_h + 16
+            cv = preview_canvas(card, CANVAS_W, canvas_h)
+
+            # 列宽：级别 / 牌型 / 示例 / 组成 / 说明
+            col_w = [46, 92, 138, 132, 232]
+            col_x = [table_x]
+            for w in col_w[:-1]:
+                col_x.append(col_x[-1] + w)
+
+            # ================================================================
+            # 表头
+            # ================================================================
+            headers = ['级别', '牌型', '示例', '组成', '说明']
+            for i, h in enumerate(headers):
+                x0 = col_x[i]
+                x1 = x0 + col_w[i]
+                cv.create_rectangle(x0, table_y0, x1, table_y0 + header_h,
+                                    fill=GOLD_BAR, outline=BORDER)
+                cv.create_text((x0 + x1) / 2, table_y0 + header_h / 2,
+                            text=h, font=(font_name, FONT_SMALL, 'bold'), fill=TEXT)
+
+            # ================================================================
+            # 数据行
+            # ================================================================
+            old_theme = self._render_tile_theme_override
+            self._render_tile_theme_override = 'black'
+            try:
+                for idx, (rank, group, name, note) in enumerate(row_data):
+                    y0 = table_y0 + header_h + idx * row_h
+                    y1 = y0 + row_h
+                    cy = (y0 + y1) / 2
+                    bg = ROW_ALT if idx % 2 == 0 else PANEL
+
+                    # 单元格背景
+                    for i, w in enumerate(col_w):
+                        cv.create_rectangle(col_x[i], y0, col_x[i] + w, y1,
+                                            fill=bg, outline=BORDER)
+
+                    # 级别
+                    cv.create_text(col_x[0] + col_w[0] / 2, cy, text=str(rank),
+                                font=(font_name, FONT_SMALL, 'bold'), fill=GOLD)
+
+                    # 牌型名
+                    cv.create_text(col_x[1] + col_w[1] / 2, cy, text=name,
+                                font=(font_name, FONT_SMALL, 'bold'), fill=TEXT)
+
+                    # 取该行的两张实体牌
+                    if group is not None:
+                        hand = by_group[group][:2]
+                    else:
+                        hand = find_named(name)
+
+                    # 示例：两张水平迷你骨牌
+                    sample_cx = col_x[2] + col_w[2] / 2
+                    gap = 72
+                    self._instruction_tile(cv, hand[0], sample_cx - gap / 2, cy,
+                                        horizontal=True, scale=0.14)
+                    self._instruction_tile(cv, hand[1], sample_cx + gap / 2, cy,
+                                        horizontal=True, scale=0.14)
+
+                    # 组成
+                    comp_text = ' + '.join(f'{t.a}-{t.b}' for t in hand)
+                    cv.create_text(col_x[3] + col_w[3] / 2, cy, text=comp_text,
+                                font=(font_name, FONT_SMALL), fill=MUTED)
+
+                    # 说明
+                    cv.create_text(col_x[4] + 8, cy, anchor='w', text=note,
+                                font=(font_name, FONT_SMALL), fill=MUTED)
+            finally:
+                self._render_tile_theme_override = old_theme
+
+            # ================================================================
+            # 底部提示
+            # ================================================================
+            note_card = make_card(title='牌型说明')
+            add_rule(
+                note_card, '固定牌型 vs 普通点数',
+                '固定牌型（双天 ~ 地九）一定大于普通 0～9 点。\n'
+                '玩家必须先按牌型级别比较，再考虑普通点数。'
+            )
+            add_rule(
+                note_card, '同级别比较',
+                '同名级别内（例如 双梅 / 双长三 / 双板凳 同为 6 级），\n'
+                '两张牌的点数分布相同，视为同级；如需再分，则看最大单张级别。'
+            )
+            add_rule(
+                note_card, '天九王没有地王',
+                '温州牌九只有 天九王，没有单独设立的 地王 级别。\n'
+                '地牌与 9 点组合归入普通点数，按 9 点比较。'
+            )
+
+        def page_chicken():
+            section_title('鸡牌固定点数', '大鸡六 = 6；小鸡 = 3')
+
+            card = make_card(title='温州牌九的鸡牌不使用百搭')
+            big = self._instruction_find_tile(tiles, group='Gee Joon', shape=(2, 4))
+            small = self._instruction_find_tile(tiles, group='Gee Joon', shape=(1, 2))
+
+            cv = preview_canvas(card, CANVAS_W, 210)
+            draw_tile_on(cv, big, 150, 92, scale=0.82)
+            draw_tile_on(cv, small, 330, 92, scale=0.82)
+
+            cv.create_text(150, 178, text='大鸡六 = 固定 6 点',
+                        font=(font_name, FONT_NORMAL, 'bold'), fill=GREEN)
+            cv.create_text(330, 178, text='小鸡 = 固定 3 点',
+                        font=(font_name, FONT_NORMAL, 'bold'), fill=GREEN)
+            cv.create_text(535, 68,
+                        text='例：小鸡 3 + 高脚七 7 = 10 → 普通 0 点',
+                        font=(font_name, FONT_SMALL, 'bold'), fill=TEXT)
+            cv.create_text(535, 105,
+                        text='不会把小鸡从 3 改成 6\n去制造别的点数',
+                        font=(font_name, FONT_SMALL), fill=MUTED)
+
+            note = make_card()
+            add_rule(
+                note, '固定点数',
+                '至尊拆开后，大鸡六永远按 6 点计，小鸡永远按 3 点计。\n'
+                '这里不使用赌场大牌九中「3 / 6 半百搭」的规则。'
+            )
+            add_rule(
+                note, '统一算法',
+                '牌桌与图解采用相同的温州牌型和比牌顺序。'
+            )
+
+        def page_points():
+            section_title('普通点数与同点比较', '固定牌型 > 普通点数')
+
+            samples = [
+                (find_ordinary(9), '普通 9 点'),
+                (find_ordinary(7), '普通 7 点'),
+                (find_ordinary(0), '普通 0 点'),
+            ]
+
+            card = make_card(title='普通 0～9 点')
+            cv = preview_canvas(card, CANVAS_W, 220)
+
+            for i, (hand, label) in enumerate(samples):
+                cx = 115 + i * 225
+                draw_tile_on(cv, hand[0], cx - 25, 84, scale=0.62)
+                draw_tile_on(cv, hand[1], cx + 25, 84, scale=0.62)
+                cv.create_text(cx, 158, text=label,
+                            font=(font_name, FONT_NORMAL, 'bold'), fill=GOLD)
+                cv.create_text(cx, 182,
+                            text=evaluate_wenzhou_hand(hand).name,
+                            font=(font_name, FONT_SMALL), fill=MUTED)
+
+            note = make_card(title='比较顺序')
+            add_rule(
+                note, '第一步：看牌型',
+                '先看是否形成固定牌型（双天、双地、至尊、天九王、天杠、\n'
+                '地杠、天九、地九等）。固定牌型一定大于普通 0～9 点。'
+            )
+            add_rule(
+                note, '第二步：比点数',
+                '无固定牌型时，两张牌点数相加保留个位，先比点数大小。'
+            )
+            add_rule(
+                note, '第三步：比最大单张',
+                '点数相同时，比较两张牌中级别最高的那一张（1 = 最强）。\n'
+                '单张级别：天 > 地 > 人 > 鹅 > 梅 / 长三 / 板凳 >\n'
+                '斧头 / 红头十 / 高脚七 / 零霖六 >\n'
+                '杂九 / 杂八 / 杂七 / 杂五 / 至尊。'
+            )
+            add_rule(
+                note, '庄家占优',
+                '若牌型相同、点数相同、最大单张级别也相同，视为庄家占优，\n'
+                '玩家归「惜败」。普通 0 点对普通 0 点不再比单张，直接判惜败。',
+                accent=RED,
+            )
+
+        def page_betting():
+            section_title('下注区与赔率', '每门两格：获胜 / 惜败')
+
+            card = make_card(title='下注区示意')
+            cv = preview_canvas(card, CANVAS_W, 260)
+
+            for column, door in enumerate((1, 2, 3)):
+                x0 = 12 + column * 224
+                cv.create_rectangle(x0, 15, x0 + 208, 240,
+                                    fill=PANEL_2, outline=BORDER)
+                cv.create_text(x0 + 104, 40, text=self.POSITION_NAMES[door],
+                               font=(font_name, FONT_MEDIUM, 'bold'), fill=GOLD)
+                for center, title, odds in ((x0 + 54, '获胜', '0.99 : 1'),
+                                             (x0 + 154, '惜败', '0.93 : 1')):
+                    cv.create_text(center, 109, text=title + '\n' + odds,
+                                   font=(font_name, FONT_SMALL, 'bold'), fill=TEXT)
+                    cv.create_oval(center - 30, 142, center + 30, 202,
+                                   fill=PANEL, outline=GOLD, width=2)
+                    cv.create_oval(center - 26, 146, center + 26, 198,
+                                   outline=BORDER)
+                    cv.create_text(center, 172, text=title,
+                                   font=(font_name, FONT_SMALL, 'bold'), fill=TEXT)
+
+            note = make_card(title='赔率与限额')
+            add_rule(
+                note, '返还倍数',
+                f'获胜格总返还 = 本金 × {self.WIN_MULTIPLIER:.2f}（净盈利 0.99）\n'
+                f'惜败格总返还 = 本金 × {self.LOSE_MULTIPLIER:.2f}（净盈利 0.93）'
+            )
+            add_rule(
+                note, '限红',
+                f'正常模式：${self.NORMAL_MIN_BET:,} – ${self.NORMAL_MAX_BET:,}\n'
+                f'高额模式：${self.HIGH_MIN_BET:,} – ${self.HIGH_MAX_BET:,}\n'
+                '$0 空注仍可开局。'
+            )
+            add_rule(
+                note, '操作',
+                '左键点击下注圆圈或上方赔率文字 → 投入当前选中筹码\n'
+                '右键点击下注圆圈或上方赔率文字 → 清除该侧下注\n'
+                '「清除」 → 清空本局所有下注\n'
+                '「重复下注」 → 按上局金额重新下注'
+            )
+
+        def page_settle():
+            section_title('结算颜色与换牌靴', '绿 = 获胜；红 = 惜败')
+
+            card = make_card(title='手牌颜色说明')
+            add_rule(
+                card, '绿色手牌背景',
+                '该门手牌严格大于庄家 → 手牌背景变绿（获胜）。',
+                accent='#33cc33',
+            )
+            add_rule(
+                card, '红色手牌背景',
+                '该门手牌小于或等于庄家 → 手牌背景变红（惜败，庄家占优）。',
+                accent='#e74c3c',
+            )
+            add_rule(
+                card, '颜色与下注无关',
+                '手牌颜色只表示该门与庄家的牌面比较结果，与有没有下注无关。'
+            )
+
+            flow = make_card(title='「再来一局」换牌靴流程')
+            add_rule(
+                flow, '步骤 1',
+                '返还的本金与盈利筹码先回到底栏，并计入余额；\n'
+                '随后本局 8 张活牌向右收走。'
+            )
+            add_rule(
+                flow, '步骤 2',
+                '旧牌靴向右退出屏幕，同时下一副完整 32 张牌从左进入。'
+            )
+            add_rule(
+                flow, '步骤 3',
+                '新牌靴就位后重新开放下注；牌面颜色在黑色 / 白色之间交替。'
+            )
+
+            op = make_card(title='一局操作顺序')
+            add_rule(
+                op, '完整流程',
+                '下注 → 开牌（Enter）→ 摇两骰 → 四门依序派牌 / 开牌 →\n'
+                '与庄家比较 → 派彩结算 → 再来一局换新牌靴。'
+            )
+
+        # ================================================================
+        # 左侧主题按钮
+        # ================================================================
+        themes = [
+            ('玩法与流程',     page_rules),
+            ('两骰定门',       page_dice),
+            ('32张骨牌图鉴',   page_tiles),
+            ('牌型大小',       page_ranks),
+            ('鸡牌固定点数',   page_chicken),
+            ('普通点数与比牌', page_points),
+            ('下注与赔率',     page_betting),
+            ('结算与换牌靴',   page_settle),
+        ]
+
+        theme_buttons = {}
+        current_theme = {'name': None}
+
+        def select_theme(name):
+            if current_theme['name'] == name:
+                return
+            current_theme['name'] = name
+
+            for theme_name, btn in theme_buttons.items():
+                active = theme_name == name
+                btn.configure(
+                    bg='#f0e0b8' if active else SIDEBAR,
+                    fg=GOLD if active else MUTED,
+                    activebackground='#e8d49a',
+                    activeforeground=GOLD,
+                )
+
+            clear_content()
+            for theme_name, builder in themes:
+                if theme_name == name:
+                    builder()
+                    break
+
+            content_canvas.update_idletasks()
+            reset_scroll()
+
+        for name, _builder in themes:
+            btn = tk.Button(
+                sidebar,
+                text=name,
+                command=lambda n=name: select_theme(n),
+                font=(font_name, FONT_SMALL),
+                fg=MUTED, bg=SIDEBAR,
+                activebackground='#e8d49a',
+                activeforeground=GOLD,
+                relief=tk.FLAT,
+                bd=0,
+                anchor='w',
+                padx=18,
+                pady=10,
+                cursor='hand2',
+            )
+            btn.pack(fill=tk.X)
+            theme_buttons[name] = btn
+
+        select_theme(themes[0][0])
+
+        # ================================================================
+        # 关闭事件
+        # ================================================================
+        def _close_instruction():
+            try:
+                self._wenzhou_instruction_window = None
+            except Exception:
+                pass
+            try:
+                    dialog.destroy()
+            except tk.TclError:
+                pass
+
+        close_btn.configure(command=_close_instruction)
+        dialog.protocol('WM_DELETE_WINDOW', _close_instruction)
+        dialog.bind('<Escape>', lambda _e: _close_instruction())
+
+        dialog.after(30, dialog.focus_force)
+
+
+def money(value):
+    """Use the Classic table's cent rounding for bets and returns."""
+    return float(Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+
+
+POSITION_NAMES = {0: '庄家', 1: '顺门', 2: '出门', 3: '到门'}
+BET_SIDES = ('win', 'lose')
+NORMAL_MIN_BET, NORMAL_MAX_BET = 10, 25000
+HIGH_MIN_BET, HIGH_MAX_BET = 100, 100000
+WIN_MULTIPLIER, LOSE_MULTIPLIER = 1.99, 1.93
+HIGH_CHIPS = [(100, BLACK), (500, '#FF7DDA'), (1000, TEXT),
+              (5000, RED), (10000, '#00fbff'), (50000, '#00ffae')]
+
+
+def settle_wenzhou_hand(hand, dealer_hand, win_stake=0, lose_stake=0):
+    """A tie belongs to 惜败; the winning side receives stake plus profit."""
+    comparison = compare_wenzhou_hands(hand, dealer_hand)
+    side = 'win' if comparison > 0 else 'lose'
+    multiplier = WIN_MULTIPLIER if side == 'win' else LOSE_MULTIPLIER
+    winning_stake = win_stake if side == 'win' else lose_stake
+    returned = money(Decimal(str(winning_stake)) * Decimal(str(multiplier)))
+    return dict(comparison=comparison, side=side, returned=returned,
+                net=money(returned - win_stake - lose_stake))
+
+
+class WenzhouTableGame:
+    """Original Wenzhou rules, kept separate from the Classic table artwork."""
+    SEATS = (1, 2, 3)
+    POSITIONS = (0, 1, 2, 3)
+    BET_KEYS = tuple((door, side) for door in (1, 2, 3) for side in BET_SIDES)
+
+    def __init__(self):
+        self.stage = 'betting'
+        self.high_bet_mode = False
+        self.bets = self.empty_bets()
+        self.last_bets = None
+        self.last_return = 0.0
+        self.reset_hands()
+        self.new_shoe()
+
+    @classmethod
+    def empty_bets(cls):
+        return {key: 0.0 for key in cls.BET_KEYS}
+
+    @staticmethod
+    def shuffled_tiles():
         tiles = build_pai_gow_set()
-        by_group = {}
-        for tile in tiles:
-            by_group.setdefault(tile.group, []).append(tile)
+        for i in range(len(tiles) - 1, 0, -1):
+            j = secrets.randbelow(i + 1)
+            tiles[i], tiles[j] = tiles[j], tiles[i]
+        return tiles
 
-        def find_hand(name):
-            for i, a in enumerate(tiles):
-                for b in tiles[i+1:]:
-                    if evaluate_wenzhou_hand([a, b]).name == name:
-                        return [a, b]
-            raise LookupError(name)
+    @property
+    def min_bet(self):
+        return HIGH_MIN_BET if self.high_bet_mode else NORMAL_MIN_BET
 
-        def find_ordinary(points, avoid_groups=()):
-            for i, a in enumerate(tiles):
-                for b in tiles[i+1:]:
-                    if a.group in avoid_groups or b.group in avoid_groups:
-                        continue
-                    value = evaluate_wenzhou_hand([a, b])
-                    if value.named_rank is None and value.points == points:
-                        return [a, b]
-            raise LookupError(points)
+    @property
+    def max_bet(self):
+        return HIGH_MAX_BET if self.high_bet_mode else NORMAL_MAX_BET
 
-        def draw_hand(c, hand, cx, cy, label='', scale=.70, label_y=82):
-            gap = 48 * scale + 15
-            self._instruction_tile(c, hand[0], cx-gap/2, cy, scale=scale)
-            self._instruction_tile(c, hand[1], cx+gap/2, cy, scale=scale)
-            if label:
-                c.create_text(cx, cy+label_y, text=label, font=small_font, fill=INK)
+    @property
+    def total_bet(self):
+        return money(sum(self.bets.values()))
 
-        # 1. Dice and four-door dealing
-        c = section(
-            '1. 两颗骰子与四门派牌',
-            '两骰总点数除以4：余1庄家、余2顺门、余3出门、整除（界面显示余4）到门。确定第一门后，按“庄 → 顺 → 出 → 到”循环。每次从牌靴最左侧拿2张；一门派完立即逐张翻牌，再派下一门。',
-            height=245,
-        )
-        draw_die(c, 90, 72, 3)
-        draw_die(c, 165, 72, 4)
-        c.create_text(128, 126, text='3 + 4 = 7；7 ÷ 4 余3 → 出门先派', font=('Microsoft YaHei', 10, 'bold'), fill=BLUE)
-        doors = [('庄家', 0), ('顺门', 1), ('出门', 2), ('到门', 3)]
-        start_x = 310
-        for i, (name, pos) in enumerate(doors):
-            x0 = start_x + i * 155
-            fill = '#f5e7b8' if pos == 2 else '#f8f1df'
-            c.create_rectangle(x0, 48, x0+125, 105, fill=fill, outline='#8b7658', width=2)
-            c.create_text(x0+62, 66, text=name, font=('Microsoft YaHei', 11, 'bold'), fill=INK)
-            c.create_text(x0+62, 89, text='每门2张', font=small_font, fill=MUTED_INK)
-            if i < 3:
-                c.create_text(x0+140, 77, text='→', font=('Arial', 20, 'bold'), fill=BROWN)
-        c.create_text(486, 155, text='示例起手顺序：出门 → 到门 → 庄家 → 顺门', font=('Microsoft YaHei', 11, 'bold'), fill=GREEN)
-        c.create_text(486, 190, text='每派完一门：牌背缩窄 → 翻成牌面 → 展开 → 再派下一门', font=body_font, fill=INK)
+    def reset_hands(self):
+        self.hands, self.results = {}, {}
+        self.dice, self.deal_order = [], []
+        self.round_bets = self.empty_bets()
+        self.bet_returns = self.empty_bets()
+        self.winning_cells = set()
+        self.credited = self.resolved = False
 
-        # 2. Full 32-tile set
-        c = section(
-            '2. 一副温州牌九：32张 = 16组 × 每组2张',
-            '游戏使用传统32张牌九骨牌。下图由程序直接绘制实际牌面，因此说明页和牌桌显示一致。',
-            height=565,
-        )
-        groups = sorted(by_group, key=lambda g: (WENZHOU_PAIR_RANK[g][0], WENZHOU_PAIR_RANK[g][1], g))
-        cell_w, cell_h = 236, 132
-        for idx, group in enumerate(groups):
-            row, col = divmod(idx, 4)
-            x0, y0 = 10 + col*cell_w, 10 + row*cell_h
-            pair = by_group[group][:2]
-            rank, name = WENZHOU_PAIR_RANK[group]
-            c.create_rectangle(x0, y0, x0+224, y0+120, fill='#fbf6e9', outline='#d8c69a')
-            self._instruction_tile(c, pair[0], x0+42, y0+55, scale=.58)
-            self._instruction_tile(c, pair[1], x0+83, y0+55, scale=.58)
-            c.create_text(x0+120, y0+25, anchor='w', text=f'{name}', font=('Microsoft YaHei', 9, 'bold'), fill=INK)
-            c.create_text(x0+120, y0+49, anchor='w', text=f'牌型级别 {rank}', font=mini_font, fill=BROWN)
-            c.create_text(x0+120, y0+72, anchor='w', text=' + '.join(f'{t.a}-{t.b}' for t in pair), font=mini_font, fill=MUTED_INK)
-            c.create_text(x0+120, y0+94, anchor='w', text='共2张实体牌', font=mini_font, fill=GREEN)
+    def new_shoe(self):
+        self.tiles = self.shuffled_tiles()
+        self.stacks = [self.tiles[i * 2:i * 2 + 2] for i in range(16)]
 
-        # 3. Main ranking and special combinations
-        c = section(
-            '3. 经典温州牌型大小：先看牌型，再看普通点数',
-            '最高三档固定是“双天 > 双地 > 至尊”。随后是其余成对牌，再到天九王、天杠、地杠、天九、地九；普通0～9点位于这些固定牌型之后。这里用真实骨牌画出代表牌型。',
-            height=500,
-        )
-        examples = [
-            ('双天', find_hand('双天')), ('双地', find_hand('双地')), ('至尊', find_hand('至尊')),
-            ('天九王', find_hand('天九王')), ('天杠', find_hand('天杠')), ('地杠', find_hand('地杠')),
-            ('天九', find_hand('天九')), ('地九', find_hand('地九')),
-        ]
-        for idx, (label, hand) in enumerate(examples):
-            row, col = divmod(idx, 4)
-            cx = 125 + col*240
-            cy = 80 + row*210
-            c.create_rectangle(cx-108, cy-64, cx+108, cy+104, fill='#fbf6e9', outline='#d8c69a')
-            draw_hand(c, hand, cx, cy-8, label=f'{label} · {evaluate_wenzhou_hand(hand).name}', scale=.66, label_y=88)
-        c.create_text(487, 455, text='固定牌型不能只用“表面总点数”判断；必须先按牌型级别比较。', font=('Microsoft YaHei', 10, 'bold'), fill=RED_INK)
+    def side_blocked(self, door, side):
+        opposite = 'lose' if side == 'win' else 'win'
+        return self.bets.get((door, opposite), 0) > 0
 
-        # 4. Chicken fixed values
-        c = section(
-            '4. 鸡牌固定：大鸡六=6点，小鸡=3点，不变点',
-            '温州牌九里，至尊拆开后不使用赌场大牌九的3/6半百搭规则。大鸡六永远按6，小鸡永远按3。',
-            height=250,
-        )
-        big_chicken = self._instruction_find_tile(tiles, group='Gee Joon', shape=(2, 4))
-        small_chicken = self._instruction_find_tile(tiles, group='Gee Joon', shape=(1, 2))
-        self._instruction_tile(c, big_chicken, 185, 95, scale=.82)
-        self._instruction_tile(c, small_chicken, 385, 95, scale=.82)
-        c.create_text(185, 190, text='大鸡六 = 固定6点', font=('Microsoft YaHei', 11, 'bold'), fill=GREEN)
-        c.create_text(385, 190, text='小鸡 = 固定3点', font=('Microsoft YaHei', 11, 'bold'), fill=GREEN)
-        c.create_text(665, 82, text='例：小鸡3 + 高脚七7 = 10 → 普通0点', font=('Microsoft YaHei', 10, 'bold'), fill=INK)
-        c.create_text(665, 122, text='不会把小鸡从3改成6去制造别的点数。', font=body_font, fill=RED_INK)
-        c.create_text(665, 160, text='牌桌比较和说明页都调用同一个 evaluate_wenzhou_hand()。', font=small_font, fill=MUTED_INK)
+    def validate_bets(self, layout, balance, *, require_min=False):
+        if set(layout) != set(self.BET_KEYS):
+            raise ValueError('下注须包含顺门、出门、到门的获胜／惜败六格。')
+        if any(not math.isfinite(float(value)) or value < 0 for value in layout.values()):
+            raise ValueError('下注金额必须为有效的非负数。')
+        for door in self.SEATS:
+            if layout[(door, 'win')] > 0 and layout[(door, 'lose')] > 0:
+                raise ValueError(f'{POSITION_NAMES[door]}不能同时下注获胜与惜败。')
+        total = money(sum(layout.values()))
+        if total > self.max_bet:
+            raise ValueError(f'本局下注合计最高 ${self.max_bet:,}。')
+        if require_min and total and total < self.min_bet:
+            raise ValueError(f'本局下注合计须在 ${self.min_bet:,} 至 ${self.max_bet:,} 之间，或为 $0。')
+        if total > balance:
+            raise ValueError('余额不足以支付本局全部门注。')
+        return {key: money(layout[key]) for key in self.BET_KEYS}
 
-        # 5. Ordinary points and tie break
-        c = section(
-            '5. 普通0～9点与同点比较',
-            '没有形成固定牌型时，两张牌点数相加只保留个位。点数先比大小；点数相同再比两张牌中级别最高的那一张。若牌型相同且最大单张级别也相同，庄家占优，玩家归“惜败”。普通0点对普通0点直接归庄家。',
-            height=340,
-        )
-        hand9 = find_ordinary(9)
-        hand7 = find_ordinary(7)
-        hand0 = find_ordinary(0)
-        draw_hand(c, hand9, 165, 95, label='普通9点', scale=.72, label_y=92)
-        draw_hand(c, hand7, 485, 95, label='普通7点', scale=.72, label_y=92)
-        draw_hand(c, hand0, 805, 95, label='普通0点', scale=.72, label_y=92)
-        c.create_text(487, 225, text='比较顺序：固定牌型 > 普通点数；普通点数相同 → 最大单张级别；仍相同 → 庄家占优', font=('Microsoft YaHei', 10, 'bold'), fill=BLUE)
-        c.create_rectangle(300, 258, 675, 318, fill='#fff0f0', outline='#c77')
-        c.create_text(487, 278, text='0点 vs 0点', font=('Microsoft YaHei', 11, 'bold'), fill=RED_INK)
-        c.create_text(487, 302, text='不再比较单张；玩家直接判惜败', font=small_font, fill=INK)
+    def add_bet(self, door, side, amount, balance):
+        if self.stage != 'betting' or (door, side) not in self.bets:
+            return False
+        if self.side_blocked(door, side):
+            return False
+        if not math.isfinite(float(amount)) or amount <= 0:
+            raise ValueError('筹码金额必须大于零。')
+        layout = dict(self.bets)
+        layout[(door, side)] = money(layout[(door, side)] + amount)
+        self.bets = self.validate_bets(layout, balance)
+        return True
 
-        # 6. Betting table
-        c = section(
-            '6. 三门 × 两格：获胜 / 惜败',
-            f'顺门、出门、到门各有两个独立下注格。获胜格总返还=本金×{self.WIN_MULTIPLIER:.2f}；惜败格总返还=本金×{self.LOSE_MULTIPLIER:.2f}。六个格子的尺寸固定，结算数字再长也不会拉宽格子。$0空注仍可开局，真正中奖的格子仍会变金色。',
-            height=270,
-        )
-        x0, y0, left_w, cell_w, row_h = 225, 28, 110, 205, 52
-        headers = ['', '获胜 0.99 : 1', '惜败 0.93 : 1']
-        widths = [left_w, cell_w, cell_w]
-        xx=x0
-        for text_, w in zip(headers, widths):
-            c.create_rectangle(xx, y0, xx+w, y0+row_h, fill='#ead7a6', outline='#806d58')
-            c.create_text(xx+w/2, y0+row_h/2, text=text_, font=('Microsoft YaHei', 10, 'bold'), fill=INK)
-            xx += w
-        for r, pos in enumerate((1,2,3), start=1):
-            yy=y0+r*row_h
-            c.create_rectangle(x0, yy, x0+left_w, yy+row_h, fill='#f4ead3', outline='#806d58')
-            c.create_text(x0+left_w/2, yy+row_h/2, text=self.POSITION_NAMES[pos], font=('Microsoft YaHei', 10, 'bold'), fill=INK)
-            for cc in range(2):
-                bx=x0+left_w+cc*cell_w
-                c.create_rectangle(bx, yy, bx+cell_w, yy+row_h, fill='white', outline='#806d58', width=2)
-                c.create_text(bx+cell_w/2, yy+row_h/2, text='$0', font=('Arial', 11, 'bold'), fill='black')
-        c.create_text(487, 245, text=f'正常：${self.NORMAL_MIN_BET:,}–${self.NORMAL_MAX_BET:,}　｜　高额：${self.HIGH_MIN_BET:,}–${self.HIGH_MAX_BET:,}　｜　$0可空注', font=('Microsoft YaHei', 10, 'bold'), fill=BROWN)
+    def start(self, balance):
+        if self.stage != 'betting':
+            raise ValueError('请先完成本局。')
+        self.bets = self.validate_bets(self.bets, balance, require_min=True)
+        self.reset_hands()
+        self.round_bets = dict(self.bets)
+        self.last_bets = dict(self.bets)
+        self.last_return = 0.0
+        self.stage = 'rolling'
+        return money(balance - self.total_bet)
 
-        # 7. Comparison colours
-        c = section(
-            '7. 手牌与庄家比较后的颜色',
-            '除庄家外，顺门／出门／到门各自与庄家比较。严格大于庄家：该门手牌背景变绿色；小于或等于庄家（惜败）：背景变红色。这个颜色与有没有下注无关。',
-            height=330,
-        )
-        dealer_sample = find_ordinary(7)
-        win_sample = find_ordinary(9)
-        lose_sample = find_ordinary(5)
-        c.create_rectangle(65, 40, 285, 270, fill='#173f3a', outline='#7d9187')
-        c.create_text(175, 60, text='庄家', font=('Microsoft YaHei', 11, 'bold'), fill='white')
-        draw_hand(c, dealer_sample, 175, 135, label=evaluate_wenzhou_hand(dealer_sample).name, scale=.68, label_y=88)
-        c.create_rectangle(370, 40, 590, 270, fill=self.HAND_WIN_BG, outline='#7d9187')
-        c.create_text(480, 60, text='顺门 · 获胜', font=('Microsoft YaHei', 11, 'bold'), fill='black')
-        draw_hand(c, win_sample, 480, 135, label=evaluate_wenzhou_hand(win_sample).name, scale=.68, label_y=88)
-        c.create_rectangle(675, 40, 895, 270, fill=self.HAND_LOSE_BG, outline='#7d9187')
-        c.create_text(785, 60, text='出门 · 惜败', font=('Microsoft YaHei', 11, 'bold'), fill='white')
-        draw_hand(c, lose_sample, 785, 135, label=evaluate_wenzhou_hand(lose_sample).name, scale=.68, label_y=88)
-        c.create_text(487, 305, text='绿色 / 红色只表示该门与庄家的牌面比较结果。', font=small_font, fill=MUTED_INK)
+    def deal(self, dice):
+        if self.stage != 'rolling':
+            raise ValueError('请先开局摇骰。')
+        if len(dice) != 2 or any(type(n) is not int or n not in range(1, 7) for n in dice):
+            raise ValueError('温州牌九需要两颗有效骰子。')
+        self.dice = list(dice)
+        start = (sum(dice) - 1) % 4
+        self.deal_order = [(start + i) % 4 for i in range(4)]
+        self.hands = {door: ordered_wenzhou_hand(self.stacks[i])
+                      for i, door in enumerate(self.deal_order)}
+        self.stage = 'dealing'
 
-        # 8. Round-end return animation
-        c = section(
-            '8. 结算后【再来一局】：先归靴，再换整副新牌',
-            '桌上的8张活牌先沿平滑轨迹回到本局原来32张牌靴的位置；旧牌靴向右退出，同时下一副完整32张牌从左进入。新牌靴就位后重新开放下注。',
-            height=230,
-        )
-        boxes = [
-            (55, '结算完成', '#f6e7bd'),
-            (280, '8张牌回原位', '#e8f0f6'),
-            (505, '旧牌靴 → 右侧', '#f6dddd'),
-            (730, '新牌靴 ← 左侧', '#dff3e8'),
-        ]
-        for idx,(x,text_,fill) in enumerate(boxes):
-            c.create_rectangle(x, 65, x+170, 135, fill=fill, outline='#806d58', width=2)
-            c.create_text(x+85, 100, text=text_, font=('Microsoft YaHei', 10, 'bold'), fill=INK)
-            if idx < len(boxes)-1:
-                c.create_text(x+197, 100, text='→', font=('Arial', 20, 'bold'), fill=BROWN)
-        c.create_text(487, 175, text='每局结算后更换下一副完整牌靴。', font=('Microsoft YaHei', 10, 'bold'), fill=BLUE)
-        c.create_text(487, 205, text='操作：下注 → 开始游戏 → 两骰 → 四门依序派/开 → 结算 → 再来一局', font=small_font, fill=INK)
+    def settle(self):
+        if self.resolved:
+            return self.last_return
+        if self.stage != 'dealing' or any(len(self.hands.get(pos, [])) != 2 for pos in self.POSITIONS):
+            raise ValueError('庄家与三门都须派齐两张牌。')
+        self.bet_returns = self.empty_bets()
+        self.winning_cells = set()
+        self.results = {}
+        for door in self.SEATS:
+            result = settle_wenzhou_hand(self.hands[door], self.hands[0],
+                                        self.round_bets[(door, 'win')],
+                                        self.round_bets[(door, 'lose')])
+            self.results[door] = result
+            key = (door, result['side'])
+            self.winning_cells.add(key)
+            self.bet_returns[key] = result['returned']
+        self.last_return = money(sum(self.bet_returns.values()))
+        self.resolved = True
+        self.stage = 'settling'
+        return self.last_return
 
-        resize_inner()
-        win.bind('<Escape>', lambda _event: win.destroy())
+    def next_round(self):
+        if self.stage != 'sweeping' or not self.credited:
+            return False
+        self.reset_hands()
+        self.bets = self.empty_bets()
+        self.new_shoe()
+        self.stage = 'betting'
+        return True
+
+
+class WenzhouPaiGowGUI(tk.Frame, WenzhouArtwork):
+    """Classic Pai Gow table layout with the original two-tile Wenzhou game."""
+    WIDTH, HEIGHT = 1150, 750
+    ROOT_BG, PANEL_BG, HEADER_BG, TITLE_FG = ROOT_BG, PANEL_BG, HEADER_BG, TITLE_FG
+    ZONE_COLORS = ('#2A5541', '#204536')
+    POSITION_NAMES, BET_SIDES = POSITION_NAMES, BET_SIDES
+    WIN_MULTIPLIER, LOSE_MULTIPLIER = WIN_MULTIPLIER, LOSE_MULTIPLIER
+    NORMAL_MIN_BET, NORMAL_MAX_BET = NORMAL_MIN_BET, NORMAL_MAX_BET
+    HIGH_MIN_BET, HIGH_MAX_BET = HIGH_MIN_BET, HIGH_MAX_BET
+    SEAT_LEFT, SEAT_PITCH, SEAT_WIDTH = 22, 377, 352
+    BET_CHIP_SCALE = 0.8
+
+    def __init__(self, parent, balance=10000, user='Guest', on_back=None, on_balance_change=None):
+        tk.Frame.__init__(self, parent, bg=ROOT_BG, width=self.WIDTH, height=self.HEIGHT)
+        self.pack_propagate(False)
+        self.username, self.balance = user or 'Guest', money(balance)
+        if self.username != 'Guest' and _ACCOUNT_ROOT is None:
+            raise RuntimeError('请把此文件放回原项目内：正式账户需要 A_Tools/Account/secure_json.py。')
+        self.on_back, self.on_balance_change = on_back, on_balance_change
+        self.game = WenzhouTableGame()
+        self.tile_theme = 'white' if secrets.randbelow(2) == 0 else 'black'
+        self._render_tile_theme_override = None
+        self.selected_chip = 10
+        self._closing, self._jobs = False, set()
+        self._dealt, self._wall_removed, self._face_up = set(), set(), set()
+        self._moving, self._motion_count, self._chip_serial = False, 0, 0
+        self._flip_state = None
+        self.visual_chips, self.control_buttons = {}, {}
+        self._restart_job, self._restart_seconds = None, 30
+        self._round_credited = self._return_persisted = False
+        self.golden_dice_bowl = None
+        self._golden_dice_cup_photo = self._golden_dice_cup_item = None
+        self._golden_dice_phase = 'idle'
+        self._golden_dice_time = self._golden_dice_stable_time = 0.
+        self._golden_dice_rest_anchor = None
+        self.status = '选择筹码，点击获胜／惜败下注；Enter 开牌。'
+        self.canvas = tk.Canvas(self, width=self.WIDTH, height=self.HEIGHT,
+                                bg=ROOT_BG, highlightthickness=0)
+        self.canvas.place(x=0, y=0, width=self.WIDTH, height=self.HEIGHT)
+        self._create_widgets()
+        self._refresh()
+        self.bind('<Configure>', self._center_table, add='+')
+        self.bind('<Destroy>', self._on_destroy, add='+')
+        self._enter_binding = self.winfo_toplevel().bind('<Return>', self._enter_action, add='+')
+
+    @property
+    def stage(self):
+        return self.game.stage
+
+    @property
+    def bets(self):
+        return self.game.bets
+
+    @property
+    def high_bet_mode(self):
+        return self.game.high_bet_mode
+
+    @property
+    def game_in_progress(self):
+        return self.game.stage != 'betting' or not self._idle()
+
+    def _idle(self):
+        return not self._moving and self._motion_count == 0
+
+    def on_close(self):
+        if self._closing:
+            return
+        self._cancel_restart()
+        self._cancel_jobs()
+        g = self.game
+        # Closing during dice/deal animation must not discard a paid round.
         try:
-            win.transient(self.winfo_toplevel())
-            win.lift()
-            win.focus_force()
-        except tk.TclError:
+            if g.stage not in ('betting', 'shoe_exchange'):
+                if not g.resolved:
+                    if not g.hands:
+                        g.deal([secrets.randbelow(6) + 1 for _ in range(2)])
+                    g.settle()
+                self._credit_round_return()
+            else:
+                self._persist_balance()
+        except Exception as exc:
+            self.status = '余额保存失败，请重试关闭。'
+            messagebox.showerror('余额保存失败', str(exc), parent=self)
+            return
+        self._closing = True
+        dialog = getattr(self, '_wenzhou_instruction_window', None)
+        if dialog is not None:
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
+        try:
+            self.winfo_toplevel().unbind('<Return>', self._enter_binding)
+        except (tk.TclError, AttributeError):
             pass
+        if callable(self.on_back):
+            self.on_back(float(self.balance))
+        else:
+            self.winfo_toplevel().destroy()
 
+    def _create_widgets(self):
+        c = self.canvas
+        self._text(187, 44, '温州牌九', 16, GOLD)
+        self._text(957, 44, 'Wenzhou Pai Gow', 14, GOLD)
+        limit_tag = 'bet_limits'
+        c.create_rectangle(22, 69, 349, 178, fill=ROOT_BG, outline=GOLD, width=2, tags=limit_tag)
+        self.limit_title = self._text(185, 84, '下注上限', 12, PANEL_BG, tags=limit_tag)
+        self.limit_values = []
+        for i, title in enumerate(('合计最低', '合计最高', '每门张数')):
+            x = 22 + i * 109
+            c.create_rectangle(x, 101, x + 109, 137, outline='#77906B', tags=limit_tag)
+            c.create_rectangle(x, 137, x + 109, 178, outline='#77906B', tags=limit_tag)
+            self._text(x + 54.5, 119, title, 11, PANEL_BG, tags=limit_tag)
+            self.limit_values.append(self._text(x + 54.5, 158, '', 12, GOLD, tags=limit_tag))
+        c.tag_bind(limit_tag, '<Button-1>', self.toggle_high_bet_limits)
+        c.tag_bind(limit_tag, '<Enter>', lambda _e: self._limit_hover())
+        c.tag_bind(limit_tag, '<Leave>', lambda _e: self._bet_leave())
+        c.create_rectangle(797, 69, 1128, 178, fill=ROOT_BG, outline=GOLD, width=2)
+        self._text(962, 86, '门注赔率', 13, PANEL_BG)
+        for y, title, odds in ((113, '获胜', '0.99 : 1'), (138, '惜败', '0.93 : 1')):
+            self._text(816, y, title, 11, PANEL_BG, anchor='w')
+            self._text(1108, y, odds, 12, GOLD, anchor='e')
+        self._text(962, 163, '同牌庄家胜 · 每门仅可押一侧', 10, '#CDD5BF')
+        c.create_rectangle(384, 10, 764, 181, fill='#4b1e22', outline='#6B4544')
+        self.dealer_title = self._text(574, 28, '庄家', 16, PANEL_BG)
+        self._create_shoe_panel()
+
+        self.player_panels, self.player_titles, self.bet_labels, self.bet_headings = {}, {}, {}, {}
+        for door in self.game.SEATS:
+            x, cx = self.seat_x(door), self.seat_x(door) + self.SEAT_WIDTH / 2
+            fill = self.ZONE_COLORS[(door - 1) % 2]
+            self.player_panels[door] = c.create_rectangle(x, 317, x + self.SEAT_WIDTH, 614, fill=fill, outline='')
+            self.player_titles[door] = self._text(cx, 335, self.POSITION_NAMES[door], 18, PANEL_BG)
+            for side in self.BET_SIDES:
+                key, tag = (door, side), f'bet_{door}_{side}'
+                bx, by = self._bet_center(key)
+                heading = '获胜  0.99 : 1' if side == 'win' else '惜败  0.93 : 1'
+                self.bet_headings[key] = self._text(bx, by - 45, heading, 11, PANEL_BG, tags=tag)
+                c.create_oval(bx - 32, by - 32, bx + 32, by + 32, fill=fill, outline=GOLD, width=2, tags=tag)
+                c.create_oval(bx - 28, by - 28, bx + 28, by + 28, outline='#77906B', tags=tag)
+                self.bet_labels[key] = self._text(bx, by, '获胜' if side == 'win' else '惜败', 11, PANEL_BG, tags=tag)
+                c.tag_bind(tag, '<Button-1>', lambda _e, d=door, s=side: self.add_bet_cell(d, s))
+                c.tag_bind(tag, '<Button-3>', lambda _e, d=door, s=side: self.clear_bet_cell(d, s))
+                c.tag_bind(tag, '<Enter>', lambda _e, k=key: self._bet_hover(k))
+                c.tag_bind(tag, '<Leave>', lambda _e: self._bet_leave())
+
+        # Same bottom bar, chip rack, bevelled buttons and Enter shortcut as Classic.
+        c.create_rectangle(0, 625, 1150, 749, fill=ROOT_BG, outline='#6C7850', width=2)
+        self.balance_item = self._text(10, 665, '', 18, TEXT, anchor='w')
+        self.total_item = self._text(10, 710, '', 18, TEXT, anchor='w')
+        self.clear_button = self.create_control_button(278, 650, 344, 704, '清除',
+            self.reset_bets, '#9B403A', font_size=11, draw_shadow=False)
+        self.info_button = self.create_control_button(810, 650, 855, 695, '?',
+            self.show_detailed_rules, DARK_BLUE, font_size=17, draw_shadow=False)
+        self.repeat_button = self.create_control_button(862, 638, 1000, 708, '重复下注',
+            self.repeat_bet, '#536A43', font_size=11, draw_shadow=False)
+        self.start_button = self.create_control_button(1012, 628, 1138, 720, '开牌',
+            self.primary_action, HEADER_BG, fg=TITLE_FG, font_size=14,
+            subtext='Enter', subtext_font_size=14, draw_shadow=False)
+        self.restart_button = self.create_control_button(862, 638, 1138, 708, '再来一局(30)',
+            self._return_all_chips, HEADER_BG, fg=TITLE_FG, font_size=17, draw_shadow=False)
+        c.itemconfigure(self.restart_button, state='hidden')
+        self._update_limits_display()
+        self._draw_chips()
+
+    def seat_x(self, door):
+        return self.SEAT_LEFT + (door - 1) * self.SEAT_PITCH
+
+    def _chip_configs(self):
+        return HIGH_CHIPS if self.high_bet_mode else CHIPS
+
+    def _draw_chips(self):
+        self.canvas.delete('rack')
+        for i, (amount, _) in enumerate(self._chip_configs()):
+            tag = f'rack_{i}'
+            self._draw_chip(tag, amount, 415 + i * 64, 674, ('rack',), amount == self.selected_chip)
+            self.canvas.tag_bind(tag, '<Button-1>', lambda _e, a=amount: self.select_chip(a))
+
+    def select_chip(self, amount):
+        if self.game.stage == 'betting' and self._idle() and amount in dict(self._chip_configs()):
+            self.selected_chip = amount
+            self._draw_chips()
+
+    def _bet_center(self, key):
+        door, side = key
+        return self.seat_x(door) + self.SEAT_WIDTH / 2 + (-90 if side == 'win' else 90), 542
+
+    @staticmethod
+    def _bet_tag(key):
+        return f'bet_{key[0]}_{key[1]}'
+
+    def _bet_hover(self, key):
+        cursor = ''
+        if self.stage == 'betting' and self._idle():
+            cursor = 'X_cursor' if self.game.side_blocked(*key) else 'hand2'
+        self.canvas.configure(cursor=cursor)
+
+    def _bet_leave(self):
+        self.canvas.configure(cursor='')
+
+    def _limit_hover(self):
+        self.canvas.configure(cursor='hand2' if self.stage == 'betting' and self._idle() else '')
+
+    def _render_bet_chips(self):
+        self.canvas.delete('bet_chips')
+        for (key, role), chip in sorted(self.visual_chips.items(), key=lambda item: item[0][1] != 'stake'):
+            self._draw_chip(f'chip_{key[0]}_{key[1]}_{role}', chip['amount'], *chip['xy'],
+                            ('bet_chips', self._bet_tag(key)), scale=self.BET_CHIP_SCALE)
+
+    def add_bet_cell(self, door, side):
+        if not self._idle() or self.stage != 'betting':
+            return
+        previous = dict(self.game.bets)
+        try:
+            changed = self.game.add_bet(door, side, self.selected_chip, self.balance)
+        except ValueError as exc:
+            messagebox.showwarning('下注', str(exc), parent=self)
+            return
+        if not changed:
+            return
+        layout = dict(self.game.bets)
+        self.game.bets = previous
+        self._apply_bet_layout(layout)
+
+    def clear_bet_cell(self, door, side):
+        if self.stage == 'betting' and self._idle() and (door, side) in self.game.bets:
+            layout = dict(self.game.bets)
+            layout[(door, side)] = 0.0
+            self._apply_bet_layout(layout)
+
+    def reset_bets(self):
+        if self.stage == 'betting' and self._idle():
+            self._apply_bet_layout(self.game.empty_bets())
+
+    def repeat_bet(self):
+        if not self._idle() or self.stage != 'betting' or not self.game.last_bets:
+            return
+        try:
+            layout = self.game.validate_bets(self.game.last_bets, self.balance, require_min=True)
+        except ValueError as exc:
+            messagebox.showwarning('重复下注', str(exc), parent=self)
+            return
+        self._apply_bet_layout(layout)
+
+    def secondary_action(self):
+        self.repeat_bet()
+
+    def _apply_bet_layout(self, new_bets):
+        previous = dict(self.game.bets)
+        self.game.bets = dict(new_bets)
+        transfers = []
+        for key in self.game.BET_KEYS:
+            delta = money(new_bets[key] - previous[key])
+            if delta > 0:
+                transfers.append(dict(amount=delta, start=self._rack_position(), target=self._bet_center(key),
+                    arrive=lambda k=key, a=new_bets[key]: self._set_visual(k, 'stake', a)))
+            elif delta < 0:
+                self._set_visual(key, 'stake', new_bets[key])
+                transfers.append(dict(amount=-delta, start=self._bet_center(key), target=self._rack_position(), duration=440))
+        self._run_chip_batch(transfers, self._refresh)
+        self._refresh()
+
+    def _current_min_bet(self):
+        return self.game.min_bet
+
+    def _current_max_bet(self):
+        return self.game.max_bet
+
+    def toggle_high_bet_limits(self, event=None):
+        if self.stage != 'betting' or not self._idle():
+            return
+        if not self.high_bet_mode:
+            current_password = time.strftime('%H%M')
+            password = simpledialog.askstring('高额下注', '请输入密码：', parent=self.winfo_toplevel())
+            if password is None:
+                return
+            if password.strip() != current_password:
+                messagebox.showerror('错误', '密码错误', parent=self.winfo_toplevel())
+                return
+        self.game.high_bet_mode = not self.game.high_bet_mode
+        self.selected_chip = 100 if self.high_bet_mode else 10
+        self._draw_chips()
+        self._update_limits_display()
+        self.status = '已切换为高额下注模式。' if self.high_bet_mode else '已切换为正常下注模式。'
+        self._apply_bet_layout(self.game.empty_bets())
+
+    def _update_limits_display(self):
+        self.canvas.itemconfigure(self.limit_title, text='下注上限 · 高额' if self.high_bet_mode else '下注上限')
+        for item, text in zip(self.limit_values, (f'${self.game.min_bet:,}', f'${self.game.max_bet:,}', '2 张')):
+            self.canvas.itemconfigure(item, text=text)
+
+    def primary_action(self):
+        if not self._idle():
+            return
+        if self.stage == 'betting':
+            self.start_round()
+        elif self.stage in ('await_restart', 'credit_pending'):
+            self._return_all_chips()
+
+    def _refresh(self):
+        c, g = self.canvas, self.game
+        c.itemconfigure(self.balance_item, text=f'余额: ${self.balance:,.2f}')
+        c.itemconfigure(self.total_item, text=f'本局下注: ${g.total_bet:,.2f}' if g.total_bet else f'上局返还: ${g.last_return:,.2f}')
+        betting = g.stage == 'betting' and self._idle()
+        restarting = g.stage in ('settling', 'await_restart', 'returning', 'credit_pending', 'sweeping')
+        self.set_control_button_state(self.clear_button, betting)
+        self.set_control_button_state(self.repeat_button, betting and bool(g.last_bets and sum(g.last_bets.values())))
+        self.set_control_button_state(self.start_button, betting)
+        self.set_control_button_state(self.restart_button, g.stage in ('await_restart', 'credit_pending') and self._idle())
+        c.itemconfigure(self.repeat_button, state='hidden' if restarting else 'normal')
+        c.itemconfigure(self.start_button, state='hidden' if restarting else 'normal')
+        c.itemconfigure(self.restart_button, state='normal' if restarting else 'hidden')
+        self._render_bet_headings()
+        self._render_bet_chips()
+        self._draw_hands()
+        self._draw_wall()
+        self._draw_dice(g.dice or [1, 1])
+
+    def _render_bet_headings(self):
+        c, g = self.canvas, self.game
+        for key, heading in self.bet_headings.items():
+            c.itemconfigure(heading, fill=GOLD if g.resolved and key in g.winning_cells else PANEL_BG)
+
+    def _hand_positions(self, door):
+        if door == 0:
+            return [(527, 48, 38, 95), (583, 48, 38, 95)]
+        center = self.seat_x(door) + self.SEAT_WIDTH / 2
+        return [(center - 44, 354, 36, 90), (center + 8, 354, 36, 90)]
+
+    def _draw_hands(self):
+        c, g = self.canvas, self.game
+        c.delete('table_tiles')
+        for door in g.POSITIONS:
+            positions = self._hand_positions(door)
+            if door not in self._dealt:
+                for x, y, w, h in positions:
+                    c.create_rectangle(x, y, x + w, y + h, outline='#7B9374', dash=(3, 3), tags='table_tiles')
+            else:
+                result = g.results.get(door)
+                if result:
+                    shade = '#54A96B' if result['side'] == 'win' else '#AE4945'
+                    for x, y, w, h in positions:
+                        c.create_rectangle(x - 3, y - 3, x + w + 4, y + h + 4,
+                                           fill=shade, outline=shade, tags='table_tiles')
+                for index, (tile, (x, y, w, h)) in enumerate(zip(g.hands[door], positions)):
+                    if self._flip_state == (door, index):
+                        continue
+                    self.draw_tile(x, y, w, h, tile, face_up=(door, index) in self._face_up,
+                                   tag=f'table_tile_{door}_{index}', extra_tag='table_tiles',
+                                   show_name=False, compact=True)
+            revealed = door in self._dealt and all((door, i) in self._face_up for i in range(2))
+            label = evaluate_wenzhou_hand(g.hands[door]).name if revealed else ''
+            if door == 0:
+                c.itemconfigure(self.dealer_title, text='庄家' + (f' · {label}' if label else ''),
+                                fill=GOLD if label else PANEL_BG)
+            else:
+                title = self.POSITION_NAMES[door] + (f' · {label}' if label else '')
+                color = PANEL_BG
+                if door in g.results:
+                    won = g.results[door]['side'] == 'win'
+                    color = '#FFE18A' if won else TEXT
+                c.itemconfigure(self.player_titles[door], text=title, fill=color)
+
+    def _wall_origin(self, index):
+        column, local = divmod(index, 2)
+        layer = 1 - local
+        return 108 + column * 38 + layer * 2, 246 - layer * 12
+
+    def _wall_snapshot(self, tiles, tag='wall', offset=0, theme=None, removed=None, clip_bounds=None):
+        removed = removed or set()
+        # Each physical column is a two-tile Wenzhou hand, bottom then top.
+        for local in (1, 0):
+            for column in reversed(range(len(tiles) // 2)):
+                index = column * 2 + local
+                if index not in removed:
+                    x, y = self._wall_origin(index)
+                    self._prism_tile(x + offset, y, tag=tag, theme=theme, clip_bounds=clip_bounds)
+
+    def _draw_wall(self):
+        self.canvas.delete('wall')
+        if self._moving or self.stage in ('sweeping', 'shoe_exchange'):
+            return
+        self._wall_snapshot(self.game.tiles, removed=self._wall_removed)
+        self.canvas.itemconfigure(self.shoe_label, text=f'{32 - len(self._wall_removed)} / 32')
+
+    def _create_shoe_panel(self):
+        c = self.canvas
+        c.delete('shoe_panel')
+        c.create_rectangle(22, 190, 1128, 309, fill=ROOT_BG, outline='#65784B', tags='shoe_panel')
+        c.create_line(25, 191, 1125, 191, fill='#E0C879', width=2, tags='shoe_panel')
+        c.create_line(25, 308, 1125, 308, fill='#0C241B', width=2, tags='shoe_panel')
+        self._text(52, 209, '牌靴', 13, GOLD, anchor='w', tags='shoe_panel')
+        self.shoe_label = self._text(790, 209, '32 / 32', 12, PANEL_BG, anchor='e', tags='shoe_panel')
+        self.dice_label = self._text(1073, 272, '', 10, PANEL_BG, tags='shoe_panel')
+        self._dice_equation_items = [
+            self._text(x, 244, text, 12, color, tags='shoe_panel')
+            for x, text, color in (
+                (1028, '1', '#%02x%02x%02x' % GD_DICE_COLORS[0]),
+                (1046, '+', PANEL_BG),
+                (1064, '1', '#%02x%02x%02x' % GD_DICE_COLORS[1]),
+                (1082, '=', PANEL_BG),
+                (1107, '2', GOLD))]
+
+    def _draw_dice(self, values=None):
+        c = self.canvas
+        if self.golden_dice_bowl is None:
+            self.golden_dice_bowl = GoldenDiceBowl(values or [1, 1])
+        # Enlarge the bowl while keeping the cube edge and pixel scale unchanged.
+        picture = _gd_render_bowl(self.golden_dice_bowl)
+        size = (round(124*GD_BOWL_SCALE), round(87*GD_BOWL_SCALE))
+        picture = picture.resize(size, Image.Resampling.LANCZOS)
+        photo = ImageTk.PhotoImage(picture, master=c)
+        if self._golden_dice_cup_item is not None and c.find_withtag('dice'):
+            c.itemconfigure(self._golden_dice_cup_item, image=photo)
+        else:
+            self._golden_dice_cup_item = c.create_image(953, 180, anchor='n', image=photo, tags='dice')
+        self._golden_dice_cup_photo = photo
+        self._update_dice_equation()
+
+    def _update_dice_equation(self):
+        if self.stage == 'rolling':
+            terms = ('…', '+', '…', '=', '…')
+        else:
+            blue, red = self.golden_dice_bowl.values()
+            terms = (str(blue), '+', str(red), '=', str(blue + red))
+        for item, text in zip(self._dice_equation_items, terms):
+            self.canvas.itemconfigure(item, text=text)
+
+    def start_round(self):
+        if not self._idle() or self.stage != 'betting':
+            return
+        try:
+            self.balance = self.game.start(self.balance)
+        except ValueError as exc:
+            messagebox.showwarning('开牌', str(exc), parent=self)
+            return
+        self._persist_balance()
+        self._dealt.clear()
+        self._wall_removed.clear()
+        self._face_up.clear()
+        self._round_credited = self._return_persisted = False
+        self.status = '停止下注，正在摇两颗骰子。'
+        self._refresh()
+        self._start_golden_dice_roll()
+
+    def _start_golden_dice_roll(self):
+        if self._closing or self.stage != 'rolling':
+            return
+        self.golden_dice_bowl.begin()
+        self._golden_dice_phase = 'shake'
+        self._golden_dice_time = 0.
+        self._golden_dice_stable_time = 0.
+        self._golden_dice_rest_anchor = None
+        self._roll_frame()
+
+    def _reroll_golden_dice(self, reason):
+        self._golden_dice_phase = 'reroll'
+        self.status = f'重骰 · {reason}'
+        self._schedule(600, self._start_golden_dice_roll)
+
+    def _golden_dice_is_motionless(self, dt):
+        """Require an unchanged rigid pose for 0.65 s, including invalid landings.
+
+        A slow frame or a momentary zero velocity is not a stop. Compare every
+        vertex with the start of the observation window so creeping motion
+        cannot accumulate unnoticed. The tolerance is under 0.04 screen pixels.
+        """
+        pose = tuple(point for die in self.golden_dice_bowl.dice for point in die.vertices())
+        anchor = self._golden_dice_rest_anchor
+        if anchor is None or any(_gd_length(_gd_sub(p,q)) > .00005 for p,q in zip(pose,anchor)):
+            self._golden_dice_rest_anchor = pose
+            self._golden_dice_stable_time = 0.
+            return False
+        self._golden_dice_stable_time += dt
+        return self._golden_dice_stable_time >= .65
+
+    def _roll_frame(self):
+        if self._closing or self.stage != 'rolling':
+            return
+        started = time.monotonic()
+        bowl = self.golden_dice_bowl
+        valid_result = False
+        # Use the same 480 Hz physics and 30 Hz drawing as Golden Dice.
+        dt = 1/480
+        for _ in range(16):
+            if self._golden_dice_phase == 'shake':
+                self._golden_dice_time += dt
+                bowl.step(dt, self._golden_dice_time, self._golden_dice_time < bowl.duration)
+                if self._golden_dice_time >= bowl.duration:
+                    self._golden_dice_phase = 'settle'
+            else:
+                bowl.step(dt, 0., False)
+                if self._golden_dice_is_motionless(dt):
+                    for die in bowl.dice:
+                        die.v = die.omega = (0.,0.,0.)
+                    error = bowl.landing_error()
+                    if error:
+                        self._draw_dice()
+                        self._reroll_golden_dice(error)
+                        return
+                    valid_result = True
+                    break
+        self._draw_dice()
+        if not valid_result:
+            delay = max(1, 33-round((time.monotonic()-started)*1000))
+            self._schedule(delay, self._roll_frame)
+            return
+
+        dice = bowl.values()
+        self._golden_dice_phase = 'idle'
+        self.game.deal(dice)
+        start, total = self.game.deal_order[0], sum(dice)
+        self.canvas.itemconfigure(self.dice_label, text=f'{total} 点 · {self.POSITION_NAMES[start]}先派')
+        self.status = f'骰子共{total}点，{self.POSITION_NAMES[start]}先派。'
+        self._refresh()
+        self._schedule(220, self._deal_stack, 0)
+
+    def _deal_stack(self, stack_index):
+        if stack_index == 4:
+            self._schedule(350, self._settle_round)
+            return
+        door = self.game.deal_order[stack_index]
+        self._wall_removed.update(range(stack_index * 2, stack_index * 2 + 2))
+        self._draw_wall()
+        targets = self._hand_positions(door)
+        source_indices = {tile.uid: stack_index * 2 + i for i, tile in enumerate(self.game.stacks[stack_index])}
+        starts = [self._wall_origin(source_indices[tile.uid]) for tile in self.game.hands[door]]
+        self.status = f'正在派牌：{self.POSITION_NAMES[door]}。'
+        self._refresh()
+
+        def frame(step):
+            self.canvas.delete('flight')
+            t = step / 15
+            smooth = t * t * (3 - 2 * t)
+            for index, ((sx, sy), (tx, ty, tw, th)) in enumerate(zip(starts, targets)):
+                x, y = sx + (tx - sx) * smooth, sy + (ty - sy) * smooth - 30 * math.sin(math.pi * t)
+                if step < 5:
+                    self._prism_tile(x, y, tag='flight')
+                else:
+                    w, h = 27 + (tw - 27) * smooth, 44 + (th - 44) * smooth
+                    self.draw_tile(x, y, w, h, self.game.hands[door][index], face_up=False,
+                                   tag='flight', extra_tag=None, compact=True)
+            if step < 15:
+                self._schedule(16, frame, step + 1)
+            else:
+                self.canvas.delete('flight')
+                self._dealt.add(door)
+                self._draw_hands()
+                self._schedule(120, self._flip_next, [(door, 0), (door, 1)], 0,
+                               lambda: self._schedule(200, self._deal_stack, stack_index + 1))
+        frame(0)
+
+    def _flip_next(self, sequence, offset, complete):
+        if offset == len(sequence):
+            self._flip_state = None
+            self.canvas.delete('flip_tile')
+            complete()
+            return
+        door, index = sequence[offset]
+        x, y, w, h = self._hand_positions(door)[index]
+        tile = self.game.hands[door][index]
+        self._flip_state = (door, index)
+        self._draw_hands()
+
+        def frame(step):
+            self.canvas.delete('flip_tile')
+            width = max(1, w * abs(1 - step / 5))
+            self.draw_tile(x + (w - width) / 2, y, width, h, tile, face_up=step >= 5,
+                           tag='flip_tile', extra_tag=None, show_name=False, compact=True)
+            if step < 10:
+                self._schedule(32, frame, step + 1)
+            else:
+                self._face_up.add((door, index))
+                self._flip_state = None
+                self.canvas.delete('flip_tile')
+                self._draw_hands()
+                self._flip_next(sequence, offset + 1, complete)
+        frame(0)
+
+    def _settle_round(self):
+        if self.game.resolved:
+            return
+        self.game.settle()
+        self.status = f'结算完成 · 本局返还 ${self.game.last_return:,.2f}。'
+        transfers = []
+        for key in self.game.BET_KEYS:
+            stake = self.game.round_bets[key]
+            if not stake:
+                continue
+            returned = self.game.bet_returns[key]
+            if returned <= 0:
+                chip = self.visual_chips.pop((key, 'stake'), None)
+                if chip:
+                    transfers.append(dict(amount=chip['amount'], start=chip['xy'], target=(575, 43), duration=280))
+            else:
+                profit = money(returned - stake)
+                center = self._bet_center(key)
+                target = (center[0] - 54, center[1])
+                transfers.append(dict(amount=profit, start=(575, 43), target=target, duration=440,
+                    arrive=lambda k=key, a=profit, p=target: self._set_visual(k, 'profit', a, p)))
+        self._refresh()
+        self._run_chip_batch(transfers, self._await_next_round)
+
+    def settle_wenzhou_round(self):
+        self._settle_round()
+
+    def _complete_chip_return(self):
+        if self.stage not in ('returning', 'credit_pending'):
+            return
+        self.game.stage = 'credit_pending'
+        try:
+            self._credit_round_return()
+        except Exception as exc:
+            messagebox.showerror('余额保存失败', str(exc), parent=self)
+            self._refresh()
+            return
+        self.canvas.delete('returned_chips')
+        self.game.stage = 'sweeping'
+        self._moving = True
+        self.status = '正在收牌并更换牌靴。'
+        self._refresh()
+
+        def frame(step):
+            self.canvas.move('table_tiles', 1250 / 13, 0)
+            if step < 13:
+                self._schedule(16, frame, step + 1)
+            else:
+                self._dealt.clear()
+                self._face_up.clear()
+                self.canvas.delete('table_tiles')
+                self._swap_shoe()
+        frame(1)
+
+    def _swap_shoe(self):
+        old_tiles, old_theme = self.game.tiles[:], self.tile_theme
+        old_removed = set(self._wall_removed)
+        if not self.game.next_round():
+            return
+        self._dealt.clear()
+        self._face_up.clear()
+        self._flip_state = None
+        self.game.stage = 'shoe_exchange'
+        self.tile_theme = self._opposite_tile_theme(self.tile_theme)
+        self._wall_removed.clear()
+        self._moving = True
+        self._refresh()
+        shoe_bounds = (22, self.canvas.coords(self.shoe_label)[0])
+
+        def frame(step):
+            self.canvas.delete('shoe_swap')
+            t = step / 24
+            t = t * t * (3 - 2 * t)
+            self._wall_snapshot(old_tiles, tag='shoe_swap', offset=1200 * t,
+                                theme=old_theme, removed=old_removed, clip_bounds=shoe_bounds)
+            self._wall_snapshot(self.game.tiles, tag='shoe_swap', offset=-1200 * (1 - t),
+                                clip_bounds=shoe_bounds)
+            if step < 24:
+                self._schedule(20, frame, step + 1)
+            else:
+                self.canvas.delete('shoe_swap')
+                self.game.stage = 'betting'
+                self._round_credited = self._return_persisted = False
+                self._moving = False
+                self.canvas.itemconfigure(self.dice_label, text='')
+                self.status = '选择筹码，点击获胜／惜败下注；Enter 开牌。'
+                self._refresh()
+        frame(0)
+
+    def new_round(self):
+        self._return_all_chips()
+
+    def _center_table(self, event=None):
+        self.canvas.place(x=max(0, (self.winfo_width()-self.WIDTH)//2),
+                          y=max(0, (self.winfo_height()-self.HEIGHT)//2),
+                          width=self.WIDTH, height=self.HEIGHT)
+
+    def _text(self, x, y, text, size=12, color=TEXT, **kw):
+        return self.canvas.create_text(x, y, text=text, fill=color,
+                                       font=('Arial', size, 'bold'), **kw)
+
+    def _schedule(self, delay, callback, *args):
+        def run():
+            self._jobs.discard(job)
+            if not self._closing:
+                callback(*args)
+        job = self.after(delay, run)
+        self._jobs.add(job)
+        return job
+
+    def _cancel_jobs(self):
+        for job in tuple(self._jobs):
+            try:
+                self.after_cancel(job)
+            except tk.TclError:
+                pass
+        self._jobs.clear()
+
+    def _on_destroy(self, event):
+        if event.widget is self:
+            self._closing = True
+            self._cancel_jobs()
+            try:
+                self.winfo_toplevel().unbind('<Return>', self._enter_binding)
+            except (tk.TclError, AttributeError):
+                pass
+
+    def _persist_balance(self):
+        update_balance_in_json(self.username, self.balance)
+        if callable(self.on_balance_change):
+            self.on_balance_change(float(self.balance))
+
+    def _enter_action(self, event=None):
+        if event is not None and event.widget.winfo_toplevel() is not self.winfo_toplevel():
+            return
+        self.primary_action()
+        return 'break'
+
+    def _prism_tile(self, x, y, scale=1.0, tag='wall', theme=None, clip_bounds=None):
+        c = self.canvas
+        def polygon(*coords, **kw):
+            if clip_bounds is None:
+                return c.create_polygon(*coords, **kw)
+            points = list(zip(coords[::2], coords[1::2]))
+            for edge, direction in ((clip_bounds[0], 1), (clip_bounds[1], -1)):
+                if not points:
+                    return
+                clipped = []
+                previous = points[-1]
+                previous_inside = (previous[0] - edge) * direction >= 0
+                for point in points:
+                    inside = (point[0] - edge) * direction >= 0
+                    if inside != previous_inside:
+                        fraction = (edge - previous[0]) / (point[0] - previous[0])
+                        clipped.append((edge, previous[1] + fraction * (point[1] - previous[1])))
+                    if inside:
+                        clipped.append(point)
+                    previous, previous_inside = point, inside
+                points = clipped
+            if len(points) >= 3:
+                return c.create_polygon(*(value for point in points for value in point), **kw)
+
+        def line(x0, y0, x1, y1, **kw):
+            if clip_bounds is not None:
+                dx, dy = x1 - x0, y1 - y0
+                if abs(dx) < 1e-12:
+                    if not clip_bounds[0] <= x0 <= clip_bounds[1]:
+                        return
+                else:
+                    limits = sorted((edge - x0) / dx for edge in clip_bounds)
+                    start, end = max(0., limits[0]), min(1., limits[1])
+                    if start > end:
+                        return
+                    x0, y0, x1, y1 = (x0 + start * dx, y0 + start * dy,
+                                      x0 + end * dx, y0 + end * dy)
+            return c.create_line(x0, y0, x1, y1, **kw)
+
+        theme = theme or self.tile_theme
+        white = theme == 'white'
+        top, side, front = (('#ECE3CF', '#B2A38D', '#CFC1AA') if white else
+                            ('#293832', '#101B16', '#182820'))
+        def p(u, v): return (x+u*scale, y+v*scale)
+        a, b, d = p(0, 0), p(27, 0), p(-12, 36)
+        e = p(15, 36)
+        thick = 8*scale
+        # Cast shadow, right side, front edge, then upper face.
+        polygon(*p(-10, 42), *p(19, 43), *p(34, 5), *p(29, 0),
+                         fill='#0D281D', outline='', tags=tag)
+        polygon(*b, *e, e[0], e[1]+thick, b[0], b[1]+thick,
+                         fill=side, outline='#746B56' if white else '#415246', tags=tag)
+        polygon(*d, *e, e[0], e[1]+thick, d[0], d[1]+thick,
+                         fill=front, outline='#8B806B' if white else '#415246', tags=tag)
+        polygon(*a, *b, *e, *d, fill=top,
+                         outline='#F7F0DD' if white else '#7B8976', width=1, tags=tag)
+        polygon(*p(3, 5), *p(21, 5), *p(12, 30), *p(-5, 30),
+                         fill=top, outline='#AB9160' if white else '#8F804D', tags=tag)
+        line(*p(4, 16), *p(14, 16), fill='#A58D59', tags=tag)
+        line(*p(2, 21), *p(12, 21), fill='#A58D59', tags=tag)
+
+    @staticmethod
+    def _compact(amount):
+        """K/M筹码取两位有效数字并截断；有省略才加+，不改动真实金额。"""
+        from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
+        value=Decimal(str(amount)).quantize(Decimal('.01'),rounding=ROUND_HALF_UP)
+        if value==Decimal('2.50'):return '2.50'
+        if abs(value)>=1000000:
+            divisor,suffix=Decimal(1000000),'M'
+        elif abs(value)>=1000:
+            divisor,suffix=Decimal(1000),'K'
+        else:
+            label=format(value,'f')
+            return label.rstrip('0').rstrip('.') if '.' in label else label
+        scaled=value/divisor
+        precision=Decimal(1).scaleb(abs(scaled).adjusted()-1)
+        shown=scaled.quantize(precision,rounding=ROUND_DOWN)
+        label=format(shown,'f')
+        if '.' in label:label=label.rstrip('0').rstrip('.')
+        return label+suffix+('+' if shown!=scaled else '')
+
+    def _rounded_rectangle(self, x0, y0, x1, y1, radius, **options):
+        return self.canvas.create_polygon(
+            x0+radius, y0, x1-radius, y0, x1, y0, x1, y0+radius,
+            x1, y1-radius, x1, y1, x1-radius, y1, x0+radius, y1,
+            x0, y1, x0, y1-radius, x0, y0+radius, x0, y0,
+            smooth=True, splinesteps=24, **options)
+
+    @staticmethod
+    def shade_color(color, factor):
+        color = color.lstrip('#')
+        if len(color) != 6:
+            return '#555555'
+        values = [int(color[i:i + 2], 16) for i in (0, 2, 4)]
+        values = [max(0, min(255, int(value * factor))) for value in values]
+        return '#' + ''.join(f'{value:02x}' for value in values)
+
+    def create_control_button(self, x0, y0, x1, y1, text, command, fill,
+                              fg='white', font_size=11, subtext=None,
+                              subtext_font_size=10, draw_shadow=True):
+        tag = f'control_button_{len(self.control_buttons)}'
+        shadow = self.canvas.create_rectangle(x0 + 5, y0 + 6, x1 + 5, y1 + 6,
+                                              fill='#070605', outline='#070605',
+                                              width=1, tags=(tag, 'controls')) if draw_shadow else None
+        rim = self.canvas.create_rectangle(x0, y0, x1, y1,
+                                           fill=self.shade_color(fill, 0.55),
+                                           outline='#b7a58d', width=2,
+                                           tags=(tag, 'controls'))
+        face = self.canvas.create_rectangle(x0 + 4, y0 + 4, x1 - 4, y1 - 4,
+                                            fill=fill,
+                                            outline=self.shade_color(fill, 1.25),
+                                            width=2, tags=(tag, 'controls'))
+        highlight = self.canvas.create_line(x0 + 8, y0 + 8, x1 - 8, y0 + 8,
+                                            fill=self.shade_color(fill, 1.45), width=2,
+                                            tags=(tag, 'controls'))
+        center_y = (y0 + y1) / 2 - 1
+        text_y = center_y - 12 if subtext else center_y
+        text_id = self.canvas.create_text((x0 + x1) / 2, text_y, text=text,
+                                          font=('Arial', font_size, 'bold'), fill=fg,
+                                          tags=(tag, 'controls'))
+        subtext_id = None
+        subtext_center_y = None
+        if subtext:
+            subtext_center_y = center_y + 16
+            subtext_id = self.canvas.create_text((x0 + x1) / 2, subtext_center_y,
+                                                 text=subtext,
+                                                 font=('Arial', subtext_font_size, 'bold'),
+                                                 fill=fg, tags=(tag, 'controls'))
+        self.control_buttons[tag] = {
+            'shadow': shadow, 'rim': rim, 'face': face, 'highlight': highlight,
+            'text': text_id, 'subtext': subtext_id, 'command': command,
+            'fill': fill, 'fg': fg, 'enabled': True, 'pressed': False,
+            'center_y': text_y, 'subtext_center_y': subtext_center_y,
+        }
+
+        def enter(_event=None):
+            button = self.control_buttons.get(tag)
+            if button and button['enabled'] and not button['pressed']:
+                self.canvas.itemconfigure(button['face'], fill=self.shade_color(button['fill'], 1.12))
+
+        def leave(_event=None):
+            button = self.control_buttons.get(tag)
+            if button and button['enabled'] and not button['pressed']:
+                self.canvas.itemconfigure(button['face'], fill=button['fill'])
+
+        def press(_event=None):
+            button = self.control_buttons.get(tag)
+            if not button or not button['enabled']:
+                return
+            button['pressed'] = True
+            self.canvas.itemconfigure(button['face'], fill=self.shade_color(button['fill'], 0.72))
+            self.canvas.itemconfigure(button['highlight'], fill=self.shade_color(button['fill'], 0.8))
+            x, _y = self.canvas.coords(button['text'])
+            self.canvas.coords(button['text'], x, button['center_y'] + 2)
+            if button.get('subtext'):
+                sx, _sy = self.canvas.coords(button['subtext'])
+                self.canvas.coords(button['subtext'], sx, button['subtext_center_y'] + 2)
+
+        def release(_event=None):
+            button = self.control_buttons.get(tag)
+            if not button or not button['enabled'] or not button['pressed']:
+                return
+            button['pressed'] = False
+            self.canvas.itemconfigure(button['face'], fill=button['fill'])
+            self.canvas.itemconfigure(button['highlight'], fill=self.shade_color(button['fill'], 1.45))
+            x, _y = self.canvas.coords(button['text'])
+            self.canvas.coords(button['text'], x, button['center_y'])
+            if button.get('subtext'):
+                sx, _sy = self.canvas.coords(button['subtext'])
+                self.canvas.coords(button['subtext'], sx, button['subtext_center_y'])
+            button['command']()
+
+        self.canvas.tag_bind(tag, '<Enter>', enter)
+        self.canvas.tag_bind(tag, '<Leave>', leave)
+        self.canvas.tag_bind(tag, '<ButtonPress-1>', press)
+        self.canvas.tag_bind(tag, '<ButtonRelease-1>', release)
+        return tag
+
+    def set_control_button_state(self, tag, enabled):
+        button = self.control_buttons.get(tag)
+        if not button:
+            return
+        button['enabled'] = bool(enabled)
+        button['pressed'] = False
+        x, _y = self.canvas.coords(button['text'])
+        self.canvas.coords(button['text'], x, button['center_y'])
+        if button.get('subtext'):
+            sx, _sy = self.canvas.coords(button['subtext'])
+            self.canvas.coords(button['subtext'], sx, button['subtext_center_y'])
+        if enabled:
+            self.canvas.itemconfigure(button['face'], fill=button['fill'])
+            self.canvas.itemconfigure(button['rim'], fill=self.shade_color(button['fill'], 0.55))
+            self.canvas.itemconfigure(button['highlight'], fill=self.shade_color(button['fill'], 1.45))
+            self.canvas.itemconfigure(button['text'], fill=button['fg'])
+            if button.get('subtext'):
+                self.canvas.itemconfigure(button['subtext'], fill=button['fg'])
+        else:
+            self.canvas.itemconfigure(button['face'], fill='#4a4743')
+            self.canvas.itemconfigure(button['rim'], fill='#262422')
+            self.canvas.itemconfigure(button['highlight'], fill='#66615b')
+            self.canvas.itemconfigure(button['text'], fill='#9b9690')
+            if button.get('subtext'):
+                self.canvas.itemconfigure(button['subtext'], fill='#9b9690')
+
+    def _draw_chip(self, tag, amount, x, y, extra_tags=(), selected=False, scale=1.0):
+        # Rack remains 56px; betting/profit chips use 80% size, including rims and text.
+        c, tags = self.canvas, (tag, *extra_tags)
+        color = next((col for value, col in reversed(self._chip_configs()) if amount >= value), HEADER_BG)
+        outer, inner = 28*scale, 23*scale
+        c.create_oval(x-outer, y-outer, x+outer, y+outer, fill='#182F25',
+                      outline=GOLD if selected else '#6C7850', width=3*scale, tags=tags)
+        c.create_oval(x-inner, y-inner, x+inner, y+inner, fill=color, outline=PANEL_BG, width=2*scale, tags=tags)
+        self._text(x, y, self._compact(amount), max(8, round(10*scale)),
+                   TEXT if color in (BLACK, RED) else BLACK, tags=tags)
+
+    def _rack_position(self, index=None, total=1):
+        if index is not None:
+            return 575+(index-(total-1)/2)*min(28, 140/max(1, total-1)), 674
+        index = next((i for i, (value, _) in enumerate(self._chip_configs()) if value == self.selected_chip), 0)
+        return 415+index*64, 674
+
+    def _set_visual(self, seat, role, amount, xy=None):
+        key = (seat, role)
+        if amount:
+            self.visual_chips[key] = dict(amount=float(amount), xy=xy or self._bet_center(seat))
+        else:
+            self.visual_chips.pop(key, None)
+
+    def _animate_chip(self, amount, start, target, complete=None, duration=220):
+        if not amount:
+            if complete: complete()
+            return
+        self._motion_count += 1
+        self._chip_serial += 1
+        tag = f'moving_chip_{self._chip_serial}'
+        start_scale = 1.0 if start[1] == 674 else self.BET_CHIP_SCALE
+        end_scale = 1.0 if target[1] == 674 else self.BET_CHIP_SCALE
+        steps = max(1, round(duration/16))
+        self._refresh()
+        def frame(index):
+            self.canvas.delete(tag)
+            t = index/steps
+            t = t*t*(3-2*t)
+            self._draw_chip(tag, amount, start[0]+(target[0]-start[0])*t,
+                            start[1]+(target[1]-start[1])*t, ('moving_chips',),
+                            scale=start_scale+(end_scale-start_scale)*t)
+            if index < steps:
+                self._schedule(round(duration/steps), frame, index+1)
+            else:
+                self.canvas.delete(tag)
+                self._motion_count -= 1
+                if complete: complete()
+                self._refresh()
+        frame(0)
+
+    def _run_chip_batch(self, transfers, complete):
+        if not transfers:
+            complete()
+            return
+        pending = [len(transfers)]
+        def arrived(transfer):
+            if transfer.get('arrive'): transfer['arrive']()
+            pending[0] -= 1
+            if not pending[0]: complete()
+        for transfer in transfers:
+            self._animate_chip(transfer['amount'], transfer['start'], transfer['target'],
+                               lambda t=transfer: arrived(t), transfer.get('duration', 220))
+
+    def _await_next_round(self):
+        self.game.stage = 'await_restart'
+        self._restart_seconds = 30
+        self._refresh()
+        self._restart_tick()
+
+    def _restart_tick(self):
+        self._restart_job = None
+        if self.game.stage != 'await_restart': return
+        self.canvas.itemconfigure(self.control_buttons[self.restart_button]['text'],
+                                  text=f'再来一局({self._restart_seconds})')
+        if self._restart_seconds <= 0:
+            self._return_all_chips()
+        else:
+            self._restart_seconds -= 1
+            self._restart_job = self._schedule(1000,self._restart_tick)
+
+    def _cancel_restart(self):
+        if self._restart_job is not None:
+            try: self.after_cancel(self._restart_job)
+            except tk.TclError: pass
+            self._jobs.discard(self._restart_job)
+            self._restart_job = None
+
+    def _return_all_chips(self):
+        if not self._idle(): return
+        if self.game.stage == 'credit_pending':
+            self._complete_chip_return()
+            return
+        if self.game.stage != 'await_restart': return
+        self._cancel_restart()
+        self.game.stage = 'returning'
+        chips = list(self.visual_chips.values())
+        self.visual_chips.clear()
+        transfers = []
+        for index,chip in enumerate(chips):
+            target = self._rack_position(index,len(chips))
+            transfers.append(dict(amount=chip['amount'],start=chip['xy'],target=target,duration=600,
+                arrive=lambda a=chip['amount'],p=target,n=index:self._draw_chip(f'returned_{n}',a,*p,('returned_chips',))))
+        self._refresh()
+        self._run_chip_batch(transfers,self._complete_chip_return)
+
+    def _credit_round_return(self):
+        if not self._round_credited:
+            self.balance = money(self.balance+self.game.last_return)
+            self._round_credited = True
+        if not self._return_persisted:
+            self._persist_balance()
+            self._return_persisted = True
+        self.game.credited = True
 
 
 def build_pai_gow_page(parent, balance=10000, user='Guest', on_back=None, on_balance_change=None):
-    return WenzhouPaiGowGUI(
-        parent, balance=balance, user=user,
-        on_back=on_back, on_balance_change=on_balance_change,
-    )
+    return WenzhouPaiGowGUI(parent, balance=balance, user=user,
+                           on_back=on_back, on_balance_change=on_balance_change)
 
 
-def start_pai_gow_gui(balance=10000, user='Guest'):
+def start_pai_gow_gui(balance=10000, user='Guest', on_back=None, on_balance_change=None):
     root = tk.Tk()
     root.title('温州牌九')
     root.geometry(WINDOW_GEOMETRY)
     root.resizable(False, False)
-    page = WenzhouPaiGowGUI(root, balance=balance, user=user)
+    page = build_pai_gow_page(root, balance=balance, user=user,
+                             on_back=on_back, on_balance_change=on_balance_change)
     page.pack(fill='both', expand=True)
     root.protocol('WM_DELETE_WINDOW', page.on_close)
     root.mainloop()
@@ -2231,11 +3280,10 @@ def main(initial_balance=10000, username='Guest', *, parent=None, balance=None, 
     actual_balance = float(initial_balance if balance is None else balance)
     actual_user = username if user is None else user
     if parent is not None:
-        return build_pai_gow_page(
-            parent, balance=actual_balance, user=actual_user,
-            on_back=on_back, on_balance_change=on_balance_change,
-        )
-    return start_pai_gow_gui(balance=actual_balance, user=actual_user)
+        return build_pai_gow_page(parent, balance=actual_balance, user=actual_user,
+                                 on_back=on_back, on_balance_change=on_balance_change)
+    return start_pai_gow_gui(balance=actual_balance, user=actual_user,
+                            on_back=on_back, on_balance_change=on_balance_change)
 
 
 if __name__ == '__main__':

@@ -220,6 +220,7 @@ class BlackjackEngine:
 # UI
 # -----------------------------------------------------------------------------
 class BubbleBlackjackGame(tk.Frame):
+    CASHOUT_FACTOR = 0.90
     WIDTH = 1150
     HEIGHT = 750
     GAME_X0 = 12
@@ -243,6 +244,7 @@ class BubbleBlackjackGame(tk.Frame):
     MAX_SIDE_BET = 100_000.0
     MAX_SPLIT_ACTIONS = 3       # up to 4 player hands (3 split actions)
     MAX_HANDS = 4
+    CARD_WIDTH, CARD_HEIGHT = 100, 140
     BLACKJACK_PROFIT = 1.5      # 3:2
     INSURANCE_PROFIT = 2.0      # 2:1
     SPLIT_ACES_ONE_CARD_ONLY = True
@@ -279,7 +281,7 @@ class BubbleBlackjackGame(tk.Frame):
         (1000, '#ab0058', '1K'),
         (5000, '#ba3438', '5K'),
         (10000, '#70439a', '10K'),
-        (50000, '#2e7542', '50K'),
+        (50000, '#FFD166', '50K'),
         (250000, '#ffffff', '250K'),
     ]
 
@@ -418,9 +420,11 @@ class BubbleBlackjackGame(tk.Frame):
             self._previous_escape_binding = ''
         self._host_bindings_restored = False
 
+        self._host_bindings_restored = False
+
         try:
-            top.geometry('1150x750+50+10')
-            top.resizable(False, False)
+            top.bind('<Return>', self.handle_enter)
+            top.bind('<Escape>', lambda _e: self.exit_game())
         except tk.TclError:
             pass
         try:
@@ -437,9 +441,9 @@ class BubbleBlackjackGame(tk.Frame):
     def find_original_card_asset_dir(self):
         current = os.path.dirname(os.path.abspath(__file__))
         candidates = [
-            os.path.join(current, 'A_Tools', 'Card', 'Poker1'),
-            os.path.join(os.path.dirname(current), 'A_Tools', 'Card', 'Poker1'),
-            os.path.join(os.path.dirname(os.path.dirname(current)), 'A_Tools', 'Card', 'Poker1'),
+            os.path.join(current, 'A_Tools', 'Card', 'Poker2'),
+            os.path.join(os.path.dirname(current), 'A_Tools', 'Card', 'Poker2'),
+            os.path.join(os.path.dirname(os.path.dirname(current)), 'A_Tools', 'Card', 'Poker2'),
         ]
         for directory in candidates:
             if os.path.isdir(directory) and os.path.exists(os.path.join(directory, 'Background.png')):
@@ -458,12 +462,14 @@ class BubbleBlackjackGame(tk.Frame):
                         path = os.path.join(directory, f'{suit}{rank}.png')
                         if not os.path.exists(path):
                             continue
-                        base = Image.open(path).convert('RGBA').resize((100, 140), resample)
+                        base = Image.open(path).convert('RGBA').resize(
+                            (self.CARD_WIDTH, self.CARD_HEIGHT), resample)
                         self.external_card_pil[(suit, rank)] = base
                         self.external_card_images[(suit, rank)] = ImageTk.PhotoImage(base, master=self)
                 back_path = os.path.join(directory, 'Background.png')
                 if os.path.exists(back_path):
-                    back = Image.open(back_path).convert('RGBA').resize((100, 140), resample)
+                    back = Image.open(back_path).convert('RGBA').resize(
+                        (self.CARD_WIDTH, self.CARD_HEIGHT), resample)
                     self.external_back_pil = back
                     self.external_back_image = ImageTk.PhotoImage(back, master=self)
                 if self.external_card_images and self.external_back_image is not None:
@@ -500,7 +506,8 @@ class BubbleBlackjackGame(tk.Frame):
             draw.rectangle((12, 12, 87, 127), outline='#e4d490', width=2)
             draw.line((16, 16, 83, 123), fill='#e4d490', width=2)
             draw.line((83, 16, 16, 123), fill='#e4d490', width=2)
-            return image
+            return image.resize((self.CARD_WIDTH, self.CARD_HEIGHT),
+                                getattr(Image, 'Resampling', Image).LANCZOS)
         suit, rank = card
         suit_map = {'Club': '♣', 'Diamond': '♦', 'Heart': '♥', 'Spade': '♠'}
         color = '#c22631' if suit in ('Diamond', 'Heart') else '#111111'
@@ -512,7 +519,8 @@ class BubbleBlackjackGame(tk.Frame):
             font_suit = None
         draw.text((8, 6), str(rank), fill=color, font=font_big)
         draw.text((9, 42), suit_map.get(suit, suit[:1]), fill=color, font=font_suit)
-        return image
+        return image.resize((self.CARD_WIDTH, self.CARD_HEIGHT),
+                            getattr(Image, 'Resampling', Image).LANCZOS)
 
     # --------------------------------------------------------------------- UI
     def create_ui(self):
@@ -677,7 +685,7 @@ class BubbleBlackjackGame(tk.Frame):
         self.balance_text = c.create_text(10, 665, anchor='w', text='余额: $0',
                                           font=(self.cn_font, 18, 'bold'), fill='white',
                                           tags=('dynamic', 'controls'))
-        self.total_bet_text = c.create_text(10, 710, anchor='w', text='本局下注: $0.00',
+        self.total_bet_text = c.create_text(10, 710, anchor='w', text='本局下注: $0',
                                             font=(self.cn_font, 15, 'bold'), fill='white',
                                             tags=('dynamic', 'controls'))
         self.clear_button = self._create_canvas_button(
@@ -1866,7 +1874,8 @@ class BubbleBlackjackGame(tk.Frame):
             card_id = self.canvas.create_image(start_x, start_y, image=back, anchor='nw',
                                                tags=(tag, 'animation_card'))
         else:
-            card_id = self.canvas.create_rectangle(start_x, start_y, start_x+100, start_y+140,
+            card_id = self.canvas.create_rectangle(start_x, start_y,
+                                                   start_x+self.CARD_WIDTH, start_y+self.CARD_HEIGHT,
                                                    fill='#253e66', outline='#d7c46a', width=2,
                                                    tags=(tag, 'animation_card'))
         self._round_anim_item = card_id
@@ -1880,7 +1889,7 @@ class BubbleBlackjackGame(tk.Frame):
             if self.canvas.type(card_id) == 'image':
                 self.canvas.coords(card_id, x, y)
             else:
-                self.canvas.coords(card_id, x, y, x+100, y+140)
+                self.canvas.coords(card_id, x, y, x+self.CARD_WIDTH, y+self.CARD_HEIGHT)
             if step < 24:
                 self._queue(12, move_step, step + 1)
             elif flip:
@@ -1906,13 +1915,14 @@ class BubbleBlackjackGame(tk.Frame):
                 ratio = 1 - step / float(half); use_back = True
             else:
                 ratio = (step - half) / float(half); use_back = False
-            width = max(1, int(100 * ratio))
+            width = max(1, int(self.CARD_WIDTH * ratio))
             if self.canvas.type(card_id) == 'image':
-                image = self._create_scaled_flip_image(card, width, 140, use_back=use_back)
+                image = self._create_scaled_flip_image(
+                    card, width, self.CARD_HEIGHT, use_back=use_back)
                 if image is not None:
                     self._temp_flip_images[card_id] = image
                     self.canvas.itemconfigure(card_id, image=image)
-                    self.canvas.coords(card_id, target_x + (100-width)/2, target_y)
+                    self.canvas.coords(card_id, target_x + (self.CARD_WIDTH-width)/2, target_y)
             self._queue(20, flip_step, step + 1)
         move_step(0)
 
@@ -1922,13 +1932,15 @@ class BubbleBlackjackGame(tk.Frame):
             item = self.canvas.create_image(sx, sy, image=self.external_back_image,
                                             anchor='nw', tags=('burn_card','animation_card'))
         else:
-            item = self.canvas.create_rectangle(sx,sy,sx+100,sy+140,fill='#253e66',outline='#d7c46a',
+            item = self.canvas.create_rectangle(
+                sx, sy, sx+self.CARD_WIDTH, sy+self.CARD_HEIGHT,
+                fill='#253e66', outline='#d7c46a',
                                                 tags=('burn_card','animation_card'))
         def step(i=0):
             t=min(1.0,i/20.0); e=1-(1-t)**3
             x=sx+(target_x-sx)*e; y=sy+(target_y-sy)*e
             if self.canvas.type(item)=='image': self.canvas.coords(item,x,y)
-            else: self.canvas.coords(item,x,y,x+100,y+140)
+            else: self.canvas.coords(item,x,y,x+self.CARD_WIDTH,y+self.CARD_HEIGHT)
             if i<20: self._queue(12,step,i+1)
             elif callable(on_complete): on_complete()
         step(0)
@@ -2006,14 +2018,15 @@ class BubbleBlackjackGame(tk.Frame):
             self.card_items.append(item)
             return item
         fill = '#f4efe4' if face_up else '#253e66'
-        rect = self.canvas.create_rectangle(x, y, x + 100, y + 140, fill=fill,
+        rect = self.canvas.create_rectangle(x, y, x + self.CARD_WIDTH, y + self.CARD_HEIGHT, fill=fill,
                                             outline='#d7cbb9', width=2,
                                             tags=(tag, 'temp_card'))
         if face_up and card is not None:
             suit, rank = card
             symbol = {'Club': '♣', 'Diamond': '♦', 'Heart': '♥', 'Spade': '♠'}.get(suit, suit[:1])
             fg = '#c22631' if suit in ('Diamond', 'Heart') else '#111111'
-            tid = self.canvas.create_text(x + 50, y + 70, text=f'{rank}\n{symbol}',
+            tid = self.canvas.create_text(x + self.CARD_WIDTH/2, y + self.CARD_HEIGHT/2,
+                                          text=f'{rank}\n{symbol}',
                                           font=('Arial', 22, 'bold'), fill=fg,
                                           justify='center', tags=(tag, 'temp_card'))
             self.card_items.extend((rect, tid))
@@ -2385,10 +2398,11 @@ class BubbleBlackjackGame(tk.Frame):
         suit, rank = card
         fg = '#c22631' if suit in ('Diamond', 'Heart') else '#111111'
         symbol = {'Club': '♣', 'Diamond': '♦', 'Heart': '♥', 'Spade': '♠'}.get(suit, suit[:1])
-        self.canvas.create_rectangle(x, y, x + 100, y + 140,
+        self.canvas.create_rectangle(x, y, x + self.CARD_WIDTH, y + self.CARD_HEIGHT,
                                      fill='#f4efe4', outline='#d7cbb9', width=2,
                                      tags=tags)
-        self.canvas.create_text(x + 50, y + 70, text=f'{rank}\n{symbol}',
+        self.canvas.create_text(x + self.CARD_WIDTH/2, y + self.CARD_HEIGHT/2,
+                                text=f'{rank}\n{symbol}',
                                 font=('Arial', 22, 'bold'), fill=fg,
                                 justify='center', tags=tags)
 
@@ -2972,17 +2986,13 @@ class BubbleBlackjackGame(tk.Frame):
         return max(0.0,min(1.0,stand_win)), 0.0
 
     def surrender_offer(self, hand):
-        """Return the live cash-out offer using an infinite-deck Hit/Stand model.
-
-        No real shoe composition or remaining-card count is consulted.  V16
-        doubles the previous offer: 2 × outright win probability × current-hand stake.
-        """
+        """Return 90% of the current valuation, rounded to cents."""
         if not self.can_surrender(hand) or not self.dealer_cards:
             return 0.0,0.0,1.0,0.0
         ptotal,psoft=BlackjackEngine.hand_value(hand['cards'])
         dtotal,dsoft=self._upcard_state(self.dealer_cards[0])
         win,bust=self._infinite_optimal_hit_stand(ptotal,psoft,dtotal,dsoft)
-        credit=self.hand_stake(hand)*win*2.0
+        credit = round((self.hand_stake(hand)*win*2.0) * self.CASHOUT_FACTOR, 2)
         return credit,win,bust,0.0
 
     def instant_surrender(self):
@@ -3647,12 +3657,12 @@ class BubbleBlackjackGame(tk.Frame):
                        + self.insurance_bet + sum(self.round_side_bets.values()))
             self.canvas.itemconfigure(
                 self.total_bet_text,
-                text=f'本局下注: {self.format_money(round_bet)}')
+                text=f'本局下注: ${float(round_bet):,.0f}')
         else:
             pending=self.current_bet+sum(self.current_side_bets.values())
             self.canvas.itemconfigure(
                 self.total_bet_text,
-                text=f'本局下注: {self.format_money(pending)}')
+                text=f'本局下注: ${float(pending):,.0f}')
         self.update_bet_chips(); self._render_insurance_chip()
         self._draw_side_bet_progress_badges()
 
@@ -3688,506 +3698,6 @@ class BubbleBlackjackGame(tk.Frame):
         for _key,spot in self.bet_spots.items():
             self.canvas.itemconfigure(spot['rect'],fill=spot['normal_fill'])
 
-    def show_game_instructions(self):
-        parent = self.winfo_toplevel()
-
-        # 防止重复打开多个说明窗口。
-        existing = getattr(self, '_instruction_window', None)
-        if existing is not None:
-            try:
-                if existing.winfo_exists():
-                    existing.lift()
-                    existing.focus_force()
-                    return
-            except tk.TclError:
-                pass
-
-        dialog = tk.Toplevel(parent)
-        self._instruction_window = dialog
-        dialog.title('经典黑杰克 · 游戏说明')
-        dialog.configure(bg='#0f1311')
-        dialog.resizable(False, False)
-        dialog.transient(parent)
-
-        # 1000 x 650，正中当前游戏窗口。
-        win_w, win_h = 1000, 650
-        parent.update_idletasks()
-        pw = max(1, parent.winfo_width())
-        ph = max(1, parent.winfo_height())
-        px = parent.winfo_rootx()
-        py = parent.winfo_rooty()
-        pos_x = px + (pw - win_w) // 2
-        pos_y = py + (ph - win_h) // 2
-        dialog.geometry(f'{win_w}x{win_h}+{pos_x}+{pos_y}')
-        dialog.minsize(win_w, win_h)
-        dialog.maxsize(win_w, win_h)
-
-        font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
-
-        BG = '#0f1311'
-        HEADER = '#151b18'
-        PANEL = '#18201c'
-        PANEL_2 = '#202923'
-        BORDER = '#43534a'
-        GOLD = '#e7d36c'
-        TEXT = '#f4f4ee'
-        MUTED = '#c1cbc6'
-        GREEN = '#0b5f4c'
-        GREEN_2 = '#164f47'
-        RED = '#8c3f43'
-        BLUE = '#315b72'
-        ORANGE = '#a56d2c'
-        PURPLE = '#70439a'
-        CASH = '#7c3b40'
-        BLACK = '#111111'
-        WHITE = '#ffffff'
-
-        FONT_SMALL = 14
-        FONT_NORMAL = 15
-        FONT_MEDIUM = 16
-        FONT_LARGE = 18
-        FONT_TITLE = 20
-
-        # ================================================================
-        # 顶部标题栏
-        # ================================================================
-        header = tk.Frame(dialog, bg=HEADER, height=82)
-        header.pack(fill=tk.X, side=tk.TOP)
-        header.pack_propagate(False)
-
-        tk.Label(
-            header, text='经典黑杰克  CLASSIC BLACKJACK',
-            font=(font_name, FONT_TITLE, 'bold'), fg=GOLD, bg=HEADER
-        ).place(x=24, y=10)
-        tk.Label(
-            header, text='玩法 · 连续洗牌 · 决策按钮 · 下注区域 · 赔付表',
-            font=(font_name, FONT_SMALL), fg=MUTED, bg=HEADER
-        ).place(x=25, y=48)
-
-        close_btn = tk.Button(
-            header, text='关闭  ESC', command=dialog.destroy,
-            font=(font_name, FONT_SMALL, 'bold'),
-            bg='#2a332e', fg=TEXT,
-            activebackground='#3a463f', activeforeground=WHITE,
-            relief=tk.FLAT, bd=0, cursor='hand2')
-        close_btn.place(x=850, y=20, width=120, height=42)
-        tk.Frame(dialog, bg=GOLD, height=3).pack(fill=tk.X, side=tk.TOP)
-
-        # ================================================================
-        # Scroll Canvas
-        # ================================================================
-        scroll_host = tk.Frame(dialog, bg=BG)
-        scroll_host.pack(fill=tk.BOTH, expand=True)
-        canvas = tk.Canvas(
-            scroll_host, bg=BG, highlightthickness=0, bd=0,
-            yscrollincrement=40)
-        scrollbar = tk.Scrollbar(
-            scroll_host, orient=tk.VERTICAL, command=canvas.yview,
-            bg='#263029', troughcolor='#111512', activebackground=GOLD,
-            relief=tk.FLAT, bd=0, width=14)
-        canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True,
-                    padx=(12, 0), pady=(10, 10))
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y,
-                       padx=(0, 9), pady=(10, 10))
-
-        content = tk.Frame(canvas, bg=BG)
-        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
-
-        def _sync_scrollregion(_event=None):
-            canvas.configure(scrollregion=canvas.bbox('all'))
-
-        def _fit_content_width(event):
-            canvas.itemconfigure(content_window, width=event.width)
-
-        content.bind('<Configure>', _sync_scrollregion)
-        canvas.bind('<Configure>', _fit_content_width)
-
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), 'units')
-            return 'break'
-
-        dialog.bind('<MouseWheel>', _on_mousewheel)
-        dialog.bind('<Button-4>', lambda _e: (canvas.yview_scroll(-1, 'units'), 'break')[1])
-        dialog.bind('<Button-5>', lambda _e: (canvas.yview_scroll(1, 'units'), 'break')[1])
-
-        # ================================================================
-        # Helpers
-        # ================================================================
-        def make_card(title, subtitle=None, pady=(8, 8)):
-            card = tk.Frame(
-                content, bg=PANEL,
-                highlightbackground=BORDER, highlightcolor=BORDER,
-                highlightthickness=1, bd=0)
-            card.pack(fill=tk.X, padx=10, pady=pady)
-            head = tk.Frame(card, bg=PANEL)
-            head.pack(fill=tk.X, padx=18, pady=(15, 10))
-            tk.Label(
-                head, text=title, font=(font_name, FONT_LARGE, 'bold'),
-                fg=GOLD, bg=PANEL, anchor='w').pack(side=tk.LEFT)
-            if subtitle:
-                tk.Label(
-                    head, text=subtitle, font=(font_name, FONT_SMALL),
-                    fg=MUTED, bg=PANEL, anchor='e').pack(side=tk.RIGHT)
-            return card
-
-        def add_rule(parent_frame, title, body, accent=GOLD):
-            row = tk.Frame(parent_frame, bg=PANEL)
-            row.pack(fill=tk.X, padx=18, pady=6)
-            tk.Frame(row, bg=accent, width=5).pack(
-                side=tk.LEFT, fill=tk.Y, padx=(0, 12))
-            text_box = tk.Frame(row, bg=PANEL)
-            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            tk.Label(
-                text_box, text=title,
-                font=(font_name, FONT_MEDIUM, 'bold'),
-                fg=TEXT, bg=PANEL, anchor='w').pack(fill=tk.X)
-            tk.Label(
-                text_box, text=body,
-                font=(font_name, FONT_SMALL), fg=MUTED, bg=PANEL,
-                anchor='w', justify=tk.LEFT, wraplength=850
-            ).pack(fill=tk.X, pady=(4, 0))
-
-        def table_block(parent_frame, title, rows):
-            block = tk.Frame(
-                parent_frame, bg=PANEL_2,
-                highlightbackground='#354139', highlightthickness=1, bd=0)
-            tk.Label(
-                block, text=title,
-                font=(font_name, FONT_MEDIUM, 'bold'),
-                fg=BLACK, bg=GOLD, anchor='w', padx=12, pady=8
-            ).pack(fill=tk.X)
-            grid = tk.Frame(block, bg=PANEL_2)
-            grid.pack(fill=tk.BOTH, expand=True)
-            grid.grid_columnconfigure(0, weight=1)
-            grid.grid_columnconfigure(1, minsize=120)
-            for i, (condition, payout) in enumerate(rows):
-                row_bg = '#1b241f' if i % 2 == 0 else '#202923'
-                tk.Label(
-                    grid, text=condition, font=(font_name, FONT_SMALL),
-                    fg=TEXT, bg=row_bg, anchor='w', padx=12, pady=7
-                ).grid(row=i, column=0, sticky='nsew', padx=(0, 1), pady=(0, 1))
-                tk.Label(
-                    grid, text=payout, font=(font_name, FONT_SMALL, 'bold'),
-                    fg=GOLD, bg=row_bg, anchor='center', padx=8, pady=7
-                ).grid(row=i, column=1, sticky='nsew', pady=(0, 1))
-            return block
-
-        # ================================================================
-        # 01 游戏玩法 / 切牌
-        # ================================================================
-        rules_card = make_card(
-            '01  游戏玩法与连续洗牌说明',
-            '8副完整牌 · ENHC / OBO · S17')
-        columns = tk.Frame(rules_card, bg=PANEL)
-        columns.pack(fill=tk.X, padx=6, pady=(0, 14))
-        left_rules = tk.Frame(columns, bg=PANEL)
-        right_rules = tk.Frame(columns, bg=PANEL)
-        left_rules.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 7))
-        right_rules.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(7, 0))
-
-        add_rule(
-            left_rules, '基本目标',
-            '尽量让手牌接近21点而不爆牌，并击败庄家。庄家硬17、软17均停牌（S17）。'
-            '普通获胜1:1；未分牌的两张天然黑杰克按3:2支付。')
-        add_rule(
-            left_rules, '欧洲无底牌 ENHC + OBO',
-            '庄家起手只拿一张明牌，庄家回合才拿第二张。若庄家最终为Blackjack，'
-            '额外分牌/加倍本金按OBO退回，只有Original Bet承担庄家Blackjack的损失。')
-        add_rule(
-            left_rules, '分牌 / 加倍',
-            '同点数价值的两张牌可分牌，最多分牌3次（共4手）；允许分牌后加倍（DAS）。'
-            '加倍需追加与当前手原注相同金额，只再拿一张牌后自动停牌。')
-        add_rule(
-            left_rules, '分A规则',
-            'A-A可分牌。分A后当前手只补一张；若补到A并且仍未达到最多4手限制，可继续分A；'
-            '否则该手自动停牌。')
-        add_rule(
-            left_rules, '庄家A与保险',
-            '庄家明牌A时可购买保险，保险金额为Original Bet的一半，中奖利润2:1。'
-            '玩家天然Blackjack遇庄家A时，可选择“立刻获胜”按1:1锁定，或选择“赌！”。')
-
-        add_rule(
-            right_rules, '① 连续洗牌机',
-            '使用8副完整52张牌，共416张；所有牌局均由CSM_Shuffler连续洗牌机发牌。',
-            accent='#7cc8aa')
-        add_rule(
-            right_rules, '② 连续发牌',
-            '牌张跨局保留在连续洗牌系统中，不建立或切换独立牌靴。',
-            accent='#7cc8aa')
-        add_rule(
-            right_rules, '③ 牌张回收',
-            '每局结束后，已发出的牌进入弃牌区，由连续洗牌机按规则重新混入牌仓。',
-            accent='#7cc8aa')
-        add_rule(
-            right_rules, '④ 无需换靴',
-            '不使用剩余牌阈值、切牌或烧牌流程；下一局直接由连续洗牌机供牌。',
-            accent='#7cc8aa')
-        add_rule(
-            right_rules, '⑤ 即时兑现',
-            '即时兑现不读取真实牌靴；使用无限牌组模型，仅比较Hit/Stand路线。'
-            '显示金额 = 2 × 当前估算获胜概率 × 当前手本金。',
-            accent='#7cc8aa')
-
-        # ================================================================
-        # 02 玩家决策按钮
-        # ================================================================
-        button_card = make_card(
-            '02  玩家决策按钮',
-            '所有示意图均由Canvas即时绘制')
-        button_cv = tk.Canvas(
-            button_card, width=930, height=380,
-            bg=PANEL, highlightthickness=0)
-        button_cv.pack(fill=tk.X, padx=16, pady=(0, 16))
-
-        def draw_small_card(cv, x, y, rank='A', suit='♠', red=False):
-            cv.create_rectangle(
-                x, y, x + 40, y + 55, fill='#f5f0e5',
-                outline='#d7cbb9', width=2)
-            cv.create_text(
-                x + 11, y + 13, text=rank,
-                font=('Arial', FONT_SMALL, 'bold'),
-                fill='#b92f3b' if red else BLACK)
-            cv.create_text(
-                x + 20, y + 36, text=suit,
-                font=('Arial', FONT_SMALL, 'bold'),
-                fill='#b92f3b' if red else BLACK)
-
-        def action_icon(cv, kind, x, y, color):
-            if kind == 'hit':
-                draw_small_card(cv, x, y + 5, '7', '♣')
-                draw_small_card(cv, x + 18, y, '4', '♥', True)
-                cv.create_oval(x + 50, y + 29, x + 76, y + 55, fill=GOLD, outline='')
-                cv.create_text(x + 63, y + 42, text='+',
-                               font=('Arial', FONT_LARGE, 'bold'), fill=BLACK)
-            elif kind == 'stand':
-                cv.create_rectangle(x + 10, y + 5, x + 69, y + 56,
-                                    fill='#f1ede4', outline='#d6cab7', width=2)
-                cv.create_text(x + 39, y + 31, text='STOP',
-                               font=('Arial', FONT_SMALL, 'bold'), fill=RED)
-            elif kind == 'double':
-                cv.create_oval(x + 5, y + 15, x + 50, y + 60,
-                               fill=color, outline='#f3df9a', width=2)
-                cv.create_oval(x + 34, y + 3, x + 79, y + 48,
-                               fill=color, outline='#f3df9a', width=2)
-                cv.create_text(x + 42, y + 32, text='2×',
-                               font=('Arial', FONT_SMALL, 'bold'), fill=WHITE)
-            elif kind == 'split':
-                draw_small_card(cv, x + 2, y + 3, '8', '♠')
-                draw_small_card(cv, x + 44, y + 3, '8', '♦', True)
-            elif kind == 'cashout':
-                cv.create_oval(x + 10, y + 8, x + 65, y + 63,
-                               fill='#d4b64a', outline='#fff0a0', width=2)
-                cv.create_text(x + 37, y + 35, text='$',
-                               font=('Arial', FONT_TITLE, 'bold'), fill=BLACK)
-            elif kind == 'ace':
-                draw_small_card(cv, x + 2, y + 5, 'A', '♠')
-                cv.create_rectangle(x + 50, y + 6, x + 88, y + 29,
-                                    fill=ORANGE, outline='')
-                cv.create_rectangle(x + 50, y + 38, x + 88, y + 61,
-                                    fill=BLUE, outline='')
-                cv.create_text(x + 69, y + 17, text='YES',
-                               font=('Arial', FONT_SMALL, 'bold'), fill=WHITE)
-                cv.create_text(x + 69, y + 49, text='NO',
-                               font=('Arial', FONT_SMALL, 'bold'), fill=WHITE)
-
-        def draw_action_tile(x, y, title, detail, color, kind):
-            w, h = 440, 108
-            button_cv.create_rectangle(
-                x + 3, y + 4, x + w + 3, y + h + 4,
-                fill='#090c0a', outline='')
-            button_cv.create_rectangle(
-                x, y, x + w, y + h,
-                fill=PANEL_2, outline='#46554d', width=1)
-            button_cv.create_rectangle(
-                x + 12, y + 13, x + 112, y + 94,
-                fill=color, outline='#d8d0bd', width=1)
-            action_icon(button_cv, kind, x + 20, y + 21, color)
-            button_cv.create_text(
-                x + 130, y + 27, text=title, anchor='w',
-                font=(font_name, FONT_MEDIUM, 'bold'), fill=TEXT)
-            button_cv.create_text(
-                x + 130, y + 61, text=detail, anchor='w', width=290,
-                font=(font_name, FONT_SMALL), fill=MUTED)
-
-        draw_action_tile(10, 10, '要牌  HIT',
-                         '再要一张牌；爆牌后当前手立即结束。', BLUE, 'hit')
-        draw_action_tile(470, 10, '停牌  STAND',
-                         '结束当前手并进入下一手或庄家回合。', '#5b4938', 'stand')
-        draw_action_tile(10, 128, '加倍  DOUBLE',
-                         '追加同额下注，只拿一张牌后自动停牌。', ORANGE, 'double')
-        draw_action_tile(470, 128, '分牌  SPLIT',
-                         '同点值两张牌可分牌；最多分牌3次（共4手），允许DAS。', PURPLE, 'split')
-        draw_action_tile(10, 246, '兑现金额  CASH OUT',
-                         '符合条件时按当前胜率模型显示即时兑现金额。', CASH, 'cashout')
-        draw_action_tile(470, 246, '庄家明牌A的决策',
-                         '正常询问：购买保险 / 不购买\n玩家黑杰克：立刻获胜 / 赌！', '#4e4030', 'ace')
-
-        # ================================================================
-        # 03 下注区域 / 限红
-        # ================================================================
-        bet_card = make_card(
-            '03  下注区域与限红',
-            '主注 MAX $500K · 每个边注 MAX $100K')
-        bet_cv = tk.Canvas(
-            bet_card, width=930, height=310,
-            bg=PANEL, highlightthickness=0)
-        bet_cv.pack(fill=tk.X, padx=16, pady=(0, 15))
-        bet_cv.create_rectangle(
-            8, 8, 922, 302, fill='#103f36', outline='#4f6f64', width=2)
-        bet_cv.create_text(
-            30, 30, anchor='w', text='可下注区域示意',
-            font=(font_name, FONT_MEDIUM, 'bold'), fill=TEXT)
-        bet_cv.create_text(
-            900, 30, anchor='e', text='主注最低 $100',
-            font=(font_name, FONT_SMALL), fill='#bcd2c8')
-        bet_cv.create_oval(
-            335, 70, 595, 240, fill=GREEN, outline='#9de46f', width=4)
-        bet_cv.create_text(
-            465, 125, text='主注\nBLACKJACK',
-            font=(font_name, FONT_LARGE, 'bold'), fill=WHITE, justify=tk.CENTER)
-        bet_cv.create_text(
-            465, 195, text='MAX $500K',
-            font=(font_name, FONT_MEDIUM, 'bold'), fill=GOLD)
-
-        side_spots = [
-            (40, 74, 225, 140, '完美对子'),
-            (40, 172, 225, 238, '21+3'),
-            (240, 224, 405, 288, '明牌运气'),
-            (525, 224, 690, 288, '疯狂7'),
-            (705, 172, 890, 238, '热辣21'),
-            (705, 74, 890, 140, '爆牌!'),
-        ]
-        for x0, y0, x1, y1, label in side_spots:
-            bet_cv.create_oval(
-                x0, y0, x1, y1, fill=GREEN_2,
-                outline='#9de46f', width=3)
-            bet_cv.create_text(
-                (x0 + x1) / 2, (y0 + y1) / 2 - 10,
-                text=label, font=(font_name, FONT_SMALL, 'bold'), fill=WHITE)
-            bet_cv.create_text(
-                (x0 + x1) / 2, (y0 + y1) / 2 + 15,
-                text='MAX $100K', font=(font_name, FONT_SMALL), fill=GOLD)
-
-        tk.Label(
-            bet_card,
-            text='主注最低 $100、最高 $500,000；六个边注各自最高 $100,000。右键可清除对应下注。',
-            font=(font_name, FONT_SMALL), fg=MUTED, bg=PANEL,
-            anchor='w', justify=tk.LEFT, wraplength=920
-        ).pack(fill=tk.X, padx=20, pady=(0, 16))
-
-        # ================================================================
-        # 04 主注赔付
-        # ================================================================
-        payout_card = make_card(
-            '04  主注与保险赔付',
-            '赔率表示利润赔率；正常中奖同时返还下注本金')
-        main_table = table_block(
-            payout_card, '主注 / 保险', [
-                ('普通主注获胜', '1:1'),
-                ('玩家天然Blackjack（未分牌两张21）', '3:2'),
-                ('分牌后两张牌组成21点', '1:1'),
-                ('玩家Blackjack + 庄家A选择“立刻获胜”', '1:1'),
-                ('保险中奖（庄家Blackjack）', '2:1'),
-                ('庄家Blackjack：Original Bet', '输'),
-                ('庄家Blackjack：额外分牌/加倍本金', 'OBO退回'),
-                ('同点数 / 双方普通同分', 'Push退回'),
-            ])
-        main_table.pack(fill=tk.X, padx=18, pady=(0, 16))
-
-        # ================================================================
-        # 05 边注赔付
-        # ================================================================
-        side_card = make_card('05  边注赔付表', '六个边注 · 按利润赔率结算')
-        side_grid = tk.Frame(side_card, bg=PANEL)
-        side_grid.pack(fill=tk.X, padx=18, pady=(0, 16))
-        side_grid.grid_columnconfigure(0, weight=1, uniform='payout')
-        side_grid.grid_columnconfigure(1, weight=1, uniform='payout')
-
-        tables = [
-            ('完美对子', [
-                ('同花色同点对子', '25:1'),
-                ('同颜色同点对子', '12:1'),
-                ('杂色同点对子', '6:1'),
-            ]),
-            ('21+3', [
-                ('三张同花同点', '100:1'),
-                ('同花顺', '40:1'),
-                ('三条', '30:1'),
-                ('顺子', '10:1'),
-                ('同花', '5:1'),
-            ]),
-            ('明牌运气', [
-                ('庄2–7 + 玩家黑桃J/黑桃A', '80:1'),
-                ('庄2–7 + 玩家Blackjack', '8:1'),
-                ('庄2–7 + 玩家9–11点', '4:1'),
-                ('庄2–7 + 玩家18–20点', '3:1'),
-            ]),
-            ('疯狂7', [
-                ('目标三张同花7', '2000:1'),
-                ('目标三张7', '500:1'),
-                ('前两目标同花7', '150:1'),
-                ('前两目标7', '25:1'),
-                ('第一目标7（第0张）', '5:1'),
-            ]),
-            ('热辣21', [
-                ('三张7同花', '500:1'),
-                ('三张7', '100:1'),
-                ('三张牌同花且等于21', '20:1'),
-                ('三张牌等于21', '4:1'),
-                ('三张牌等于20', '2:1'),
-                ('三张牌等于19', '1:1'),
-            ]),
-            ('爆牌!', [
-                ('庄家8张或以上爆牌', '250:1'),
-                ('庄家7张爆牌', '100:1'),
-                ('庄家6张爆牌', '50:1'),
-                ('庄家5张爆牌', '9:1'),
-                ('庄家4张爆牌', '2:1'),
-                ('庄家3张爆牌', '1:1'),
-            ]),
-        ]
-        for idx, (title, rows) in enumerate(tables):
-            block = table_block(side_grid, title, rows)
-            row_index = idx // 2
-            column_index = idx % 2
-            block.grid(
-                row=row_index, column=column_index, sticky='nsew',
-                padx=(0, 7) if column_index == 0 else (7, 0), pady=7)
-
-        # ================================================================
-        # 06 重要提示
-        # ================================================================
-        notes_card = make_card('06  重要提示', pady=(8, 18))
-        add_rule(
-            notes_card, '21+3顺子',
-            'A可作低牌或高牌；A-2-3、J-Q-K、Q-K-A均可按连续牌序判断。')
-        add_rule(
-            notes_card, '疯狂7取牌位置',
-            '疯狂7按本局实际发牌序列的指定目标牌逐步锁定赔率：第一目标为7先保证5:1；'
-            '后续目标7可升级到25/150，再升级到500/2000。')
-        add_rule(
-            notes_card, '分牌行动顺序',
-            '分牌后先给当前第一手补一张并完成该手全部行动；只有第一手结束后，'
-            '才激活下一手并补该手的第一张分牌牌。')
-        add_rule(
-            notes_card, '即时兑现模型',
-            '兑现金额为模型估值，不会偷看或消耗真实牌靴中的下一张牌；实际牌局牌序保持不变。')
-
-        def _close_instruction():
-            try:
-                self._instruction_window = None
-            except Exception:
-                pass
-            try:
-                dialog.destroy()
-            except tk.TclError:
-                pass
-
-        close_btn.configure(command=_close_instruction)
-        dialog.protocol('WM_DELETE_WINDOW', _close_instruction)
-        dialog.bind('<Escape>', lambda _e: _close_instruction())
-        dialog.after(30, dialog.focus_force)
 
     def _queue(self, delay_ms, func, *args):
         holder = {'id': None}
@@ -4329,12 +3839,30 @@ class BubbleBlackjackGame(tk.Frame):
 # Blackjack Easy — Classic UI/animation shell with Easy betting rules only
 # =============================================================================
 class EasyBlackjackGame(BubbleBlackjackGame):
-    """Blackjack Classic presentation/animation with dealer-only Easy wagers.
+    """Classic's green/gold presentation with a table of eleven Easy wagers."""
 
-    Everything visual/animated is inherited from BubbleBlackjackGame.  The only
-    game-level difference is the Easy betting model: eleven dealer-result wagers,
-    no player hand/action layer, and dealer draws to any 17.
-    """
+    BG = '#1B3D31'
+    PANEL = '#183B30'
+    PANEL_LINE = '#6C7850'
+    GOLD = '#D4AF37'
+    BET_FILL = '#35634B'
+    BET_TEXT = '#F2E6C9'
+    BET_LINE = '#667D57'
+    BET_HOVER_FILL = '#417558'
+    NUMBER_BET_KEYS = ('MAIN', '17', '18', '19', '20')
+    SIZE_BET_KEYS = ('small', 'big')
+    PAYOUT_ORIGIN = (575.0, 43.0)
+    RULES_TEXT = '庄家任何17点停牌   ·   每局最低下注 $100'
+    CARD_WIDTH, CARD_HEIGHT = 80, 112
+    CHIP_SPECS = [
+        (100, '#202020', '100'),
+        (500, '#FF7DDA', '500'),
+        (1000, '#ab0058', '1K'),
+        (5000, '#ba3438', '5K'),
+        (10000, '#70439a', '10K'),
+        (50000, '#FFD166', '50K'),
+        (250000, '#ffffff', '250K'),
+    ]
 
     # Internal MAIN is the Easy "16" spot so Classic's MAIN-chip animation,
     # repeat/clear plumbing and settlement flash can be reused unchanged.
@@ -4368,8 +3896,10 @@ class EasyBlackjackGame(BubbleBlackjackGame):
     PHASE_PLAYING = '简单黑杰克 · 游戏中'
     PHASE_SETTLING = '简单黑杰克 · 结算中'
     MIN_BET = 100.0
-    MAX_MAIN_BET = 10_000_000_000.0
-    MAX_SIDE_BET = 10_000_000_000.0
+    MAX_MAIN_BET = 500_000.0
+    MAX_NUMBER_BET = 500_000.0
+    MAX_SIZE_BET = 300_000.0
+    MAX_SIDE_BET = 100_000.0
 
     # Easy 16-20 点赔率；独立于 Classic 主注赔率。
     EASY_ODDS = {
@@ -4388,6 +3918,9 @@ class EasyBlackjackGame(BubbleBlackjackGame):
         self.main_result_state = None
         self.easy_result_states = {}
         self.flash_push_side_bets = set()
+        self.settlement_visual_stage = None
+        self.pending_profit_chips = set()
+        self.hovered_bet_key = None
         super().__init__(
             parent=parent,
             balance=balance,
@@ -4403,30 +3936,70 @@ class EasyBlackjackGame(BubbleBlackjackGame):
 
     # ------------------------------------------------------------------ UI shell
     def draw_animation_panel(self):
-        # Exact Classic dealer panel, card origin, rule strip and phase placement.
-        super().draw_animation_panel()
-        # Easy has no player hand/card layer.  Keep Classic geometry intact so the
-        # dealer card coordinates and betting-table animation remain identical.
-        self.canvas.itemconfigure(self.player_zone_rect, state='hidden')
-        self.canvas.itemconfigure(self.player_zone_title, state='hidden')
-        self.canvas.itemconfigure(
-            self.rule_strip_text,
-            text='庄家任何17点停牌', state='normal')
-        self.canvas.itemconfigure(self.rule_strip_rect, state='normal')
-        self.canvas.itemconfigure(self.rule_strip_left_text, state='hidden')
-        self.canvas.itemconfigure(self.rule_strip_right_text, state='hidden')
-        self.canvas.tag_raise('round_rule_strip')
+        c = self.canvas
+        self.animation_panel = (22, 44, 1128, 617)
+        c.create_text(575, 18, text='简单黑杰克  EASY BLACKJACK',
+                      font=(self.cn_font, 16, 'bold'), fill=self.GOLD, tags='static')
+        self.dealer_zone_rect = c.create_rectangle(
+            355, 44, 795, 197, fill='#4b1e22', outline='', tags='static')
+        c.create_text(575, 57, text='庄家', font=(self.cn_font, 16, 'bold'),
+                      fill=self.BET_TEXT, tags='static')
+        self.dealer_total_text = c.create_text(575, 193, text='', state='hidden')
+        self.phase_text = c.create_text(
+            966, 89, text=self.PHASE_BETTING, font=(self.cn_font, 12, 'bold'),
+            fill=self.GOLD, tags=('dynamic', 'cards'))
+
+        # Match Classic's limit-table geometry, colours and typography.
+        c.create_rectangle(30, 75, 349, 181, fill=self.PANEL,
+                           outline=self.GOLD, tags='static')
+        c.create_rectangle(30, 75, 349, 104, fill='#40634B',
+                           outline=self.GOLD, tags='static')
+        c.create_text(189.5, 89, text='下注上限', font=(self.cn_font, 13, 'bold'),
+                      fill=self.BET_TEXT, tags='static')
+        limits = (('点数注', self.MAX_NUMBER_BET), ('大小注', self.MAX_SIZE_BET),
+                  ('其他注', self.MAX_SIDE_BET))
+        for column, (label, amount) in enumerate(limits):
+            left, right = 30+column*319/3, 30+(column+1)*319/3
+            c.create_rectangle(left, 104, right, 141, outline='#77906B', tags='static')
+            c.create_rectangle(left, 141, right, 181, outline='#77906B', tags='static')
+            c.create_text((left+right)/2, 122, text=label,
+                          font=(self.cn_font, 11, 'bold'), fill=self.BET_TEXT, tags='static')
+            amount_text = f'${amount:,.0f}'
+            c.create_text((left+right)/2, 161, text=amount_text,
+                          font=(self.cn_font, 12, 'bold'), fill=self.GOLD, tags='static')
+
+        self.rule_strip_bounds = (22.0, 200.0, 1128.0, 248.0)
+        self.rule_strip_rect = c.create_rectangle(
+            *self.rule_strip_bounds, fill='#173C2E', outline='#65784B',
+            tags='round_rule_strip')
+        c.create_line(25, 201, 1125, 201, fill='#E0C879', width=2, tags='round_rule_strip')
+        c.create_line(25, 247, 1125, 247, fill='#0C241B', width=2, tags='round_rule_strip')
+        self.rule_strip_text = c.create_text(
+            575, 224, text=self.RULES_TEXT, font=(self.cn_font, 13, 'bold'),
+            fill=self.GOLD, tags=('round_rule_strip', 'rule_strip_text'))
+        self.rule_strip_left_text = c.create_text(545, 224, text='', state='hidden')
+        self.rule_strip_right_text = c.create_text(605, 224, text='', state='hidden')
+        self.rule_strip_chip_pos = (575, 224)
+        self.shoe_origin = (575, 52)
 
     def draw_board(self):
-        """Classic Canvas betting spots, expanded vertically into the removed PLAYER area."""
+        """Two proportioned table rows with quiet borders and centred labels/chips."""
         c = self.canvas
-        board_x0, board_y0, board_x1, board_y1 = self.GAME_X0, 218, self.GAME_X1, 620
-        felt = '#075443'
+        board_x0, board_y0, board_x1, board_y1 = 22.0, 260.0, 1128.0, 617.0
         self.betting_board_home_bounds = (board_x0, board_y0, board_x1, board_y1)
-        # Easy never lowers the betting station after 开牌.
         self.betting_board_round_bounds = self.betting_board_home_bounds
         self.betting_board_rect = c.create_rectangle(
-            *self.betting_board_home_bounds, fill=felt, outline=self.LINE, width=2, tags='static')
+            *self.betting_board_home_bounds, fill=self.PANEL,
+            outline='', tags='static')
+
+        c.create_text(32, 279, anchor='w', text='点数下注',
+                      font=(self.cn_font, 13, 'bold'), fill=self.BET_TEXT, tags='static')
+        c.create_text(1118, 279, anchor='e', text='每格最高 500K',
+                      font=(self.cn_font, 11), fill='#B7C4A1', tags='static')
+        c.create_text(32, 444, anchor='w', text='组合与大小',
+                      font=(self.cn_font, 13, 'bold'), fill=self.BET_TEXT, tags='static')
+        c.create_text(1118, 444, anchor='e', text='大小 300K   ·   其他 100K',
+                      font=(self.cn_font, 11), fill='#B7C4A1', tags='static')
 
         labels = {
             'MAIN': f"16点\n{self.EASY_ODDS['MAIN']:g}:1",
@@ -4442,54 +4015,44 @@ class EasyBlackjackGame(BubbleBlackjackGame):
             'big': f"大\n{self.SIDE_BET_ODDS_TEXT['big']}",
         }
 
-        # 5 top spots + 5 bottom spots.  “小” is moved into the vertical gap
-        # between 20点 and 大; the old 小 location becomes the new 爆牌 side bet.
-        centers = (120.0, 347.5, 575.0, 802.5, 1030.0)
-        half_w = 94.0
-        top_y0, top_y1 = 232.0, 356.0
-        bottom_y0, bottom_y1 = 486.0, 610.0
-        small_y0, small_y1 = 359.0, 483.0
-
-        home = {
-            'MAIN': ((centers[0]-half_w, top_y0, centers[0]+half_w, top_y1), (centers[0], top_y0+36.0), (centers[0], top_y0+82.0)),
-            '17': ((centers[1]-half_w, top_y0, centers[1]+half_w, top_y1), (centers[1], top_y0+36.0), (centers[1], top_y0+82.0)),
-            '18': ((centers[2]-half_w, top_y0, centers[2]+half_w, top_y1), (centers[2], top_y0+36.0), (centers[2], top_y0+82.0)),
-            '19': ((centers[3]-half_w, top_y0, centers[3]+half_w, top_y1), (centers[3], top_y0+36.0), (centers[3], top_y0+82.0)),
-            '20': ((centers[4]-half_w, top_y0, centers[4]+half_w, top_y1), (centers[4], top_y0+36.0), (centers[4], top_y0+82.0)),
-            'bust': ((centers[0]-half_w, bottom_y0, centers[0]+half_w, bottom_y1), (centers[0], bottom_y0+36.0), (centers[0], bottom_y0+82.0)),
-            'pair': ((centers[1]-half_w, bottom_y0, centers[1]+half_w, bottom_y1), (centers[1], bottom_y0+36.0), (centers[1], bottom_y0+82.0)),
-            'bj': ((centers[2]-half_w, bottom_y0, centers[2]+half_w, bottom_y1), (centers[2], bottom_y0+36.0), (centers[2], bottom_y0+82.0)),
-            '21': ((centers[3]-half_w, bottom_y0, centers[3]+half_w, bottom_y1), (centers[3], bottom_y0+36.0), (centers[3], bottom_y0+82.0)),
-            'big': ((centers[4]-half_w, bottom_y0, centers[4]+half_w, bottom_y1), (centers[4], bottom_y0+36.0), (centers[4], bottom_y0+82.0)),
-            'small': ((centers[4]-half_w, small_y0, centers[4]+half_w, small_y1), (centers[4], small_y0+36.0), (centers[4], small_y0+82.0)),
-        }
-        # Same coordinates in-round: no station drop animation, while preserving
-        # Classic's animation pipeline and callback timing.
-        round_layout = {key: value for key, value in home.items()}
-
+        self.bet_row_bounds = ((30.0, 304.0, 1120.0, 422.0),
+                               (30.0, 465.0, 1120.0, 605.0))
+        row_keys = (self.NUMBER_BET_KEYS, ('bust', 'pair', 'bj', '21', 'small', 'big'))
+        cell_bounds = {}
+        for bounds, keys in zip(self.bet_row_bounds, row_keys):
+            left, top, right, bottom = bounds
+            column_width = (right-left)/len(keys)
+            for column, key in enumerate(keys):
+                cell_bounds[key] = (left+column*column_width, top,
+                                    left+(column+1)*column_width, bottom)
+        home = {}
+        for key, bounds in cell_bounds.items():
+            x0, y0, x1, y1 = bounds
+            centre = ((x0+x1)/2.0, (y0+y1)/2.0)
+            # Keep the full label centred; the chip overlays it without padding.
+            home[key] = (bounds, centre, centre)
         self.bet_layout_home = home
-        self.bet_layout_round = round_layout
+        self.bet_layout_round = dict(home)
         self.bet_layout_mode = 'home'
 
-        draw_order = ('MAIN', '17', '18', '19', '20', 'bust', 'pair', 'bj', '21', 'big', 'small')
         self.bet_spots = {}
         self.side_bet_spots = {}
-        for index, key in enumerate(draw_order):
-            bounds, label_pos, chip_pos = home[key]
+        for key, (bounds, label_pos, chip_pos) in home.items():
             tag = 'main_bet_spot' if key == 'MAIN' else f'easy_bet_{key}'
-            fill = '#164f47'
-            width = 4 if key == 'MAIN' else 3
-            shape = c.create_oval(
-                *bounds, fill=fill, outline='#9de46f', width=width,
+            fill = '#315E47' if key in self.NUMBER_BET_KEYS else '#284E3C'
+            shape = c.create_rectangle(
+                *bounds, fill=fill, outline=self.BET_LINE, width=1,
                 tags=(tag, 'betting_spot'))
             label = c.create_text(
-                *label_pos, text=labels[key], font=(self.cn_font, 13, 'bold'),
-                fill='white', justify='center', tags=(tag, 'betting_spot_label'))
+                *label_pos, text=labels[key],
+                font=(self.cn_font, 18 if key in self.NUMBER_BET_KEYS else 14, 'bold'),
+                fill=self.BET_TEXT, anchor='center', justify='center',
+                tags=(tag, 'betting_spot_label'))
             spot = {
                 'key': key, 'bounds': tuple(bounds), 'label_pos': tuple(label_pos),
-                'chip_pos': tuple(chip_pos), 'rect': shape, 'shape': 'oval',
+                'chip_pos': tuple(chip_pos), 'rect': shape, 'shape': 'rectangle',
                 'label': label, 'tag': tag, 'normal_fill': fill,
-                'normal_outline': '#9de46f', 'normal_width': width,
+                'normal_outline': self.BET_LINE, 'normal_width': 1,
             }
             self.bet_spots[key] = spot
             if key == 'MAIN':
@@ -4502,15 +4065,162 @@ class EasyBlackjackGame(BubbleBlackjackGame):
                 self.side_bet_spots[key] = spot
                 c.tag_bind(tag, '<Button-1>', lambda _e, k=key: self.place_easy_bet(k))
                 c.tag_bind(tag, '<Button-3>', lambda _e, k=key: self.clear_easy_bet(k))
-            c.tag_bind(tag, '<Enter>', lambda _e: c.configure(cursor='hand2'))
-            c.tag_bind(tag, '<Leave>', lambda _e: c.configure(cursor=''))
+            c.tag_bind(tag, '<Enter>', lambda _e, k=key: self._set_bet_hover(k, True))
+            c.tag_bind(tag, '<Leave>', lambda _e, k=key: self._set_bet_hover(k, False))
         self.update_bet_chips()
+
+    def _set_bet_hover(self, key, inside):
+        if inside:
+            self.hovered_bet_key = key
+        elif self.hovered_bet_key == key:
+            self.hovered_bet_key = None
+        self.canvas.configure(cursor='hand2' if inside and self.accept_bets else '')
+        self._refresh_bet_spot_styles()
+
+    def _refresh_bet_spot_styles(self):
+        can_bet = (self.accept_bets and not self.round_active
+                   and not self.animation_running and not self.settlement_running)
+        for key, spot in self.bet_spots.items():
+            hovered = can_bet and key == self.hovered_bet_key
+            self.canvas.itemconfigure(
+                spot['rect'], fill=self.BET_HOVER_FILL if hovered else spot['normal_fill'],
+                outline=self.GOLD if hovered else spot['normal_outline'],
+                width=2 if hovered else spot['normal_width'])
+
+    def draw_bottom_controls(self):
+        """Classic's chip rack and betting buttons, sized for Easy's balance range."""
+        c = self.canvas
+        c.create_rectangle(0, 625, 1150, 748, fill=self.BG,
+                           outline=self.PANEL_LINE, width=2, tags='controls')
+        self.balance_text = c.create_text(
+            10, 665, anchor='w', text='', font=(self.cn_font, 18, 'bold'),
+            fill='white', tags=('dynamic', 'controls'))
+        self.total_bet_text = c.create_text(
+            10, 710, anchor='w', text='', font=(self.cn_font, 18, 'bold'),
+            fill='white', tags=('dynamic', 'controls'))
+        self.clear_button = self._create_canvas_button(
+            278, 650, 344, 704, '清除', self.clear_bets, '#9B403A',
+            tag='control_clear', font_size=11)
+        diameter, gap = 56, 8
+        total_width = len(self.CHIP_SPECS)*diameter+(len(self.CHIP_SPECS)-1)*gap
+        chip_x = (self.WIDTH-total_width)/2
+        self.chip_selector_centers = {}
+        for value, colour, label in self.CHIP_SPECS:
+            tag = f'chip_select_{value}'
+            outer = c.create_oval(
+                chip_x, 646, chip_x+56, 702, fill='#182F25',
+                outline=self.PANEL_LINE, width=3, tags=(tag, 'chip_selector'))
+            inner = c.create_oval(
+                chip_x+5, 651, chip_x+51, 697, fill=colour,
+                outline=self.BET_TEXT, width=2, tags=(tag, 'chip_selector'))
+            text = c.create_text(
+                chip_x+28, 674, text=label, font=(self.cn_font, 10, 'bold'),
+                fill=self.contrast_text_color(colour), tags=(tag, 'chip_selector'))
+            self.chip_selector_items[value] = (outer, inner, text)
+            self.chip_selector_centers[float(value)] = (chip_x+28, 674)
+            c.tag_bind(tag, '<Button-1>', lambda _e, v=value: self.select_chip(v))
+            chip_x += diameter+gap
+        self.info_button = self._create_canvas_button(
+            810, 650, 855, 695, '?', self.show_game_instructions, '#173f66',
+            tag='control_info', font_size=17)
+        self.repeat_button = self._create_canvas_button(
+            862, 638, 1000, 708, '重复下注', self.repeat_last_bet, '#536A43',
+            tag='control_repeat', font_size=11)
+        self.deal_button = self._create_canvas_button(
+            1012, 628, 1138, 720, '开牌\nENTER', self.deal_cards, '#D8B46A',
+            fg='#2A1B08', tag='control_deal', font_size=14)
+        self._set_round_control_visibility(False)
+
+    def select_chip(self, value):
+        self.selected_chip = float(value)
+        for chip_value, (outer, _inner, _text) in self.chip_selector_items.items():
+            selected = float(chip_value) == self.selected_chip
+            self.canvas.itemconfigure(
+                outer, outline='#f4d65b' if selected else self.PANEL_LINE,
+                width=5 if selected else 3)
+
+    def _animate_betting_station(self, to_round, on_complete=None):
+        """The table stays fixed, as in the current Classic interface."""
+        self.bet_layout_mode = 'round' if to_round else 'home'
+        self._set_rules_strip_visible(True)
+        self._raise_betting_layers()
+        if callable(on_complete):
+            on_complete()
+
+    def _raise_betting_layers(self):
+        """Labels remain whole and centred underneath every stationary/flying chip."""
+        for tag in ('betting_spot_label', 'side_bet_win_odds', 'bet_chip_dynamic',
+                    'bet_chip_fly', 'settlement_profit_fly',
+                    'settlement_loss_fly', 'settlement_return_fly'):
+            self.canvas.tag_raise(tag)
+
+    def _draw_baccarat_chip(self, cx, cy, amount, tags, radius=20, force_color=None):
+        # A table refresh must keep every moving payout above labels and chips.
+        if any(tag.startswith('settlement_profit_fly_') for tag in tags):
+            tags = (*tags, 'settlement_profit_fly')
+        return super()._draw_baccarat_chip(
+            cx, cy, amount, tags, radius=radius, force_color=force_color)
+
+    def update_bet_chips(self):
+        self.canvas.delete('bet_chip_dynamic')
+        if self.settlement_visual_stage == 'returning':
+            return
+        if self.round_active and self.settlement_running:
+            # Flash only the cell: principal and net profit stay at fixed amounts.
+            for row in self._settlement_chip_rows():
+                if row['key'] in self.pending_profit_chips:
+                    continue
+                self._draw_baccarat_chip(
+                    *row['pos'], row['amount'], tags=row['tags'], radius=row['radius'])
+        else:
+            for key, spot in self.bet_spots.items():
+                amount = self._bet_amount_for_spot(key)
+                if amount > 0:
+                    self._draw_baccarat_chip(
+                        *spot['chip_pos'], amount,
+                        tags=('bet_chip_dynamic', spot['tag'], 'principal_chip'), radius=20)
+        self._raise_betting_layers()
+
+    def _restore_betting_spot_label_colors(self):
+        for spot in self.bet_spots.values():
+            self.canvas.itemconfigure(spot['label'], fill=self.BET_TEXT)
+        self._set_rule_strip_text_color(self.GOLD)
+        self._raise_betting_layers()
+
+    def _dealer_card_target(self, card_index):
+        count = max(1, len(self.dealer_cards))
+        step = min(42.0, (292-self.CARD_WIDTH)/max(1, count-1))
+        width = self.CARD_WIDTH+(count-1)*step
+        return 575-width/2+card_index*step, 74.0
+
+    def _draw_dealer_total_badge(self):
+        if not self.dealer_cards:
+            return
+        card_x, card_y = self._dealer_card_target(len(self.dealer_cards)-1)
+        tip_x = card_x+self.CARD_WIDTH+6
+        centre_y = card_y+self.CARD_HEIGHT/2
+        box_left, box_right = tip_x+10, tip_x+62
+        total, soft = BlackjackEngine.hand_value(self.dealer_cards)
+        natural = BlackjackEngine.is_blackjack(self.dealer_cards)
+        fill = '#000000' if natural else (
+            '#e34848' if total > 21 else ('#f2b0b0' if self.dealer_phase_active else '#ffffff'))
+        self.canvas.create_polygon(
+            tip_x, centre_y, box_left, centre_y-18, box_right, centre_y-18,
+            box_right, centre_y+18, box_left, centre_y+18,
+            fill=fill, outline='', tags=('hand_label', 'dealer_total_badge'))
+        self.canvas.create_text(
+            (box_left+box_right)/2, centre_y,
+            text=self._hand_total_badge_text(
+                self.dealer_cards, blackjack=natural,
+                soft_stand=soft and len(self.dealer_cards)>=2 and 17<=total<=21),
+            font=(self.cn_font, 12, 'bold'), fill='#FFFFFF' if natural else '#111111',
+            tags=('hand_label', 'dealer_total_badge'))
 
     def _set_rules_strip_visible(self, visible):
         """Easy rule strip is permanent; Classic may request hide, but Easy ignores it."""
         self.canvas.itemconfigure(self.rule_strip_rect, state='normal')
-        self.canvas.itemconfigure(self.rule_strip_text, text='庄家任何17点停牌',
-                                  state='normal', fill='white')
+        self.canvas.itemconfigure(self.rule_strip_text, text=self.RULES_TEXT,
+                                  state='normal', fill=self.GOLD)
         self.canvas.itemconfigure(self.rule_strip_left_text, state='hidden')
         self.canvas.itemconfigure(self.rule_strip_right_text, state='hidden')
         self.canvas.delete('insurance_chip')
@@ -4544,11 +4254,20 @@ class EasyBlackjackGame(BubbleBlackjackGame):
                 self.canvas.tag_raise(item)
 
     # ------------------------------------------------------------- bet handling
+    def _bet_limit(self, key):
+        if key in self.NUMBER_BET_KEYS:
+            return self.MAX_NUMBER_BET
+        if key in self.SIZE_BET_KEYS:
+            return self.MAX_SIZE_BET
+        return self.MAX_SIDE_BET
+
     def place_easy_bet(self, key):
         if (key not in self.bet_spots or not self.accept_bets or self.round_active
                 or self.animation_running or self.settlement_running):
             return
-        amount = float(self.selected_chip)
+        current = self.current_bet if key == 'MAIN' else self.current_side_bets.get(key, 0.0)
+        remaining = max(0.0, self._bet_limit(key)-float(current))
+        amount = min(float(self.selected_chip), remaining)
         if amount <= 0.0:
             return
         if self.balance + 1e-9 < amount:
@@ -4596,6 +4315,39 @@ class EasyBlackjackGame(BubbleBlackjackGame):
     def clear_side_bet(self, key):
         self.clear_easy_bet(key)
 
+    def repeat_last_bet(self):
+        if (not self.accept_bets or self.round_active or self.animation_running
+                or self.settlement_running or self.bet_chip_animation_count > 0):
+            return
+        targets = {'MAIN': self.last_bet, **self.last_side_bets}
+        currents = {'MAIN': self.current_bet, **self.current_side_bets}
+        additions = {
+            key: max(0.0, min(float(target), self._bet_limit(key))-float(currents.get(key, 0.0)))
+            for key, target in targets.items()
+        }
+        needed = sum(additions.values())
+        if needed <= 0.0:
+            return
+        if self.balance + 1e-9 < needed:
+            messagebox.showwarning('无法重复下注', '余额不足。', parent=self.winfo_toplevel())
+            return
+        self.show_last_win = False
+        for key, amount in additions.items():
+            if amount <= 0.0:
+                continue
+            self.balance -= amount
+            if key == 'MAIN':
+                self.current_bet += amount
+            else:
+                self.current_side_bets[key] += amount
+            self.pending_bet_animation[key] += amount
+            self.bet_chip_animation_count += 1
+        self.update_display()
+        for key, amount in additions.items():
+            if amount > 0.0:
+                self._animate_amount_chip_to_spot(
+                    key, amount, lambda k=key, a=amount: self._finish_bet_chip_animation(k, a))
+
     # -------------------------------------------------------------- card dealing
     def _maybe_settle_crazy7(self):
         # Easy does not have Classic's Crazy 7 side bet.  Kept as a no-op because
@@ -4636,7 +4388,7 @@ class EasyBlackjackGame(BubbleBlackjackGame):
         self._raise_visible_bottom_controls(True)
 
         def after_old_cards():
-            # Exact Classic 0.20 s betting-station transition.
+            # Keep the table fixed when entering the dealer round.
             self._animate_betting_station(True, on_complete=self._begin_easy_round_after_layout)
         if self.canvas.find_withtag('dealt_card'):
             # Exact Classic previous-round 0.20 s upper-left exit.
@@ -4677,8 +4429,8 @@ class EasyBlackjackGame(BubbleBlackjackGame):
         self.render_cards()
         self.update_display()
 
-        # Easy starts with two dealer cards, but each card uses Classic's exact
-        # shoe-origin flight + flip + dealer target positioning.
+        # Easy starts with two dealer cards, using Classic's shoe origin,
+        # card size and centred overlapping dealer row.
         def deal_second():
             self._deal_dealer_card_animated(
                 on_complete=lambda: self._queue(120, self._begin_easy_dealer_run))
@@ -4878,9 +4630,9 @@ class EasyBlackjackGame(BubbleBlackjackGame):
                 if self.settlement_running:
                     if self.main_return_amount <= 0.0:
                         return 0.0
-                    if self.flash_mode == 'win':
-                        return float(self.main_return_amount)
-                amount = stake
+                    amount = min(stake, float(self.main_return_amount))
+                else:
+                    amount = stake
             else:
                 amount = float(self.current_bet)
         else:
@@ -4890,9 +4642,9 @@ class EasyBlackjackGame(BubbleBlackjackGame):
                     returned = float(self.side_bet_return_amounts.get(spot_key, 0.0))
                     if returned <= 0.0:
                         return 0.0
-                    if self.flash_mode == 'win':
-                        return returned
-                amount = stake
+                    amount = min(stake, returned)
+                else:
+                    amount = stake
             else:
                 amount = float(self.current_side_bets.get(spot_key, 0.0))
         if not self.round_active:
@@ -4916,52 +4668,58 @@ class EasyBlackjackGame(BubbleBlackjackGame):
                 sources.append((x, y, stake, 20))
         return sources
 
+    def _settlement_chip_rows(self):
+        """Display returned principal centrally and net profit to its left."""
+        if not self.round_active:
+            return []
+        rows = []
+        for key, spot in self.bet_spots.items():
+            stake = float(self.round_original_bet if key == 'MAIN'
+                          else self.round_side_bets.get(key, 0.0))
+            returned = max(0.0, float(self.main_return_amount if key == 'MAIN'
+                                     else self.side_bet_return_amounts.get(key, 0.0)))
+            if stake <= 0.0 or returned <= 0.0:
+                continue
+            x, y = spot['chip_pos']
+            tags = ('bet_chip_dynamic', spot['tag'])
+            rows.append(dict(key=(key, 'principal'), role='principal',
+                             amount=min(stake, returned), pos=(x, y), radius=20,
+                             tags=(*tags, 'principal_chip')))
+            profit = max(0.0, round(returned-stake, 2))
+            if profit > 0.0:
+                # Classic uses two 40px chips with a 2px gap at the same height.
+                rows.append(dict(key=(key, 'profit'), role='profit', amount=profit,
+                                 pos=(x-42, y), radius=20,
+                                 tags=(*tags, 'profit_chip')))
+        return rows
+
     def _settlement_return_chip_sources(self):
-        sources = []
-        if self.main_return_amount > 0.0:
-            spot = self.bet_spots.get('MAIN')
-            if spot:
-                x, y = spot['chip_pos']
-                sources.append((x, y, float(self.main_return_amount), 20))
-        for key in self.SIDE_BET_KEYS:
-            returned = float(self.side_bet_return_amounts.get(key, 0.0))
-            spot = self.bet_spots.get(key)
-            if returned > 0.0 and spot:
-                x, y = spot['chip_pos']
-                sources.append((x, y, returned, 20))
-        return sources
+        # Return exactly the separate chips that were shown during the flash.
+        return [(*row['pos'], row['amount'], row['radius'])
+                for row in self._settlement_chip_rows()]
+
+    def _finish_flash_with_chip_return(self):
+        if (self._closing or not self.settlement_running
+                or self.settlement_visual_stage != 'display'
+                or self.settlement_flash_step < 6):
+            return
+        # Suppress redraws while the travelling clones return to the chip rack.
+        self.settlement_visual_stage = 'returning'
+        super()._finish_flash_with_chip_return()
+
+    def _reset_after_round(self):
+        self.settlement_visual_stage = None
+        self.pending_profit_chips.clear()
+        super()._reset_after_round()
 
     def _draw_side_bet_win_odds_badges(self):
+        """Match Classic: no pointed payout-odds badges."""
         self.canvas.delete('side_bet_win_odds')
-        if not self.settlement_running:
-            return
-        for key in ('pair', 'bj', '21', 'bust'):
-            if self.easy_result_states.get(key) != 'win':
-                continue
-            spot = self.bet_spots.get(key)
-            odds = self.side_bet_hit_odds.get(key)
-            if not spot or odds is None:
-                continue
-            x0, y0, x1, _y1 = spot['bounds']
-            cx = (x0 + x1) / 2.0
-            box_w, box_h, nose_h = 66.0, 34.0, 13.0
-            top = max(350.0, y0 - box_h - nose_h - 5.0)
-            bx0, bx1 = cx - box_w / 2.0, cx + box_w / 2.0
-            by0, by1 = top, top + box_h
-            self.canvas.create_rectangle(
-                bx0, by0, bx1, by1, fill='#ffffff', outline='',
-                tags=('side_bet_win_odds', 'settlement_flash'))
-            self.canvas.create_polygon(
-                cx - 30.0, by1, cx + 30.0, by1, cx, by1 + nose_h,
-                fill='#ffffff', outline='', tags=('side_bet_win_odds', 'settlement_flash'))
-            self.canvas.create_text(
-                cx, (by0 + by1) / 2.0, text=f'{float(odds):g}:1',
-                font=(self.cn_font, 17, 'bold'), fill='#000000',
-                tags=('side_bet_win_odds', 'settlement_flash'))
 
     def run_settlement_flash(self):
-        """Classic three-cycle settlement flash, with Classic-blue Push for every Easy tie."""
-        if self._closing or not self.settlement_running:
+        """Flash winning/tied cells while principal and profit chips remain steady."""
+        if (self._closing or not self.settlement_running
+                or self.settlement_visual_stage != 'display'):
             return
         if self.settlement_flash_step >= 6:
             self._finish_flash_with_chip_return()
@@ -4980,8 +4738,8 @@ class EasyBlackjackGame(BubbleBlackjackGame):
                 if not spot:
                     continue
                 x0, y0, x1, y1 = spot['bounds']
-                self.canvas.create_oval(
-                    x0, y0, x1, y1, fill='#ffffff', outline='#111111', width=2,
+                self.canvas.create_rectangle(
+                    x0, y0, x1, y1, fill='#F4F1DE', outline=self.GOLD, width=1,
                     tags=('win_flash_area', 'settlement_flash'))
                 self.canvas.itemconfigure(spot['label'], fill='#111111')
                 self.canvas.tag_raise(spot['label'])
@@ -4992,8 +4750,8 @@ class EasyBlackjackGame(BubbleBlackjackGame):
                 if not spot:
                     continue
                 x0, y0, x1, y1 = spot['bounds']
-                self.canvas.create_oval(
-                    x0, y0, x1, y1, fill='#9fdcff', outline='#111111', width=2,
+                self.canvas.create_rectangle(
+                    x0, y0, x1, y1, fill='#B9D8E8', outline=self.GOLD, width=1,
                     tags=('win_flash_area', 'settlement_flash'))
                 self.canvas.itemconfigure(spot['label'], fill='#111111')
                 self.canvas.tag_raise(spot['label'])
@@ -5004,23 +4762,22 @@ class EasyBlackjackGame(BubbleBlackjackGame):
                 spot = self.bet_spots.get('MAIN')
                 if spot:
                     x0, y0, x1, y1 = spot['bounds']
-                    self.canvas.create_oval(
-                        x0, y0, x1, y1, fill='#9fdcff', outline='#111111', width=3,
+                    self.canvas.create_rectangle(
+                        x0, y0, x1, y1, fill='#B9D8E8', outline=self.GOLD, width=1,
                         tags=('win_flash_area', 'settlement_flash'))
                     self.canvas.itemconfigure(spot['label'], fill='#111111')
                     self.canvas.tag_raise(spot['label'])
 
         self.update_bet_chips()
-        self._draw_side_bet_win_odds_badges()  # pushes intentionally have no odds badge
         self.canvas.tag_raise('win_flash_area')
-        self.canvas.tag_raise('side_bet_win_odds')
         for tag in ('betting_spot_label', 'bet_chip_dynamic', 'dealt_card',
-                    'side_bet_win_odds', 'settlement_loss_fly'):
+                    'settlement_profit_fly', 'settlement_loss_fly'):
             try:
                 self.canvas.tag_raise(tag)
             except tk.TclError:
                 pass
         self._raise_visible_bottom_controls(self.round_active)
+        self._raise_betting_layers()
         self.settlement_flash_step += 1
         self._queue(300, self.run_settlement_flash)
 
@@ -5028,6 +4785,14 @@ class EasyBlackjackGame(BubbleBlackjackGame):
         return (max(0.0, float(self.main_return_amount))
                 + sum(max(0.0, float(self.side_bet_return_amounts.get(k, 0.0)))
                       for k in self.SIDE_BET_KEYS))
+
+    def _set_amount_readout(self, item, text):
+        # Large Easy balances must fit before the Clear button and chip rack.
+        for size in range(18, 9, -1):
+            self.canvas.itemconfigure(item, text=text, font=(self.cn_font, size, 'bold'))
+            bounds = self.canvas.bbox(item)
+            if not bounds or bounds[2] <= 268:
+                break
 
     def _finish_easy_round(self):
         self.animation_running = False
@@ -5050,35 +4815,50 @@ class EasyBlackjackGame(BubbleBlackjackGame):
         self.flash_main_push_only = self.main_result_state == 'tie'
         self.flash_insurance_rule = False
         self.settlement_running = True
+        self.settlement_visual_stage = 'paying'
         self.settlement_flash_step = 0
         self.flash_mode = 'original'
+        profits = [row for row in self._settlement_chip_rows() if row['role'] == 'profit']
+        self.pending_profit_chips = {row['key'] for row in profits}
         self.render_cards()
         self.update_display()
 
         def start_flash():
-            # Exact Classic 0.30 s losing-chip collection + three flash cycles.
-            self._animate_losing_chips_out()
+            if (self._closing or not self.settlement_running
+                    or self.settlement_visual_stage != 'paying'):
+                return
+            self.settlement_visual_stage = 'display'
             self.run_settlement_flash()
-        self._queue(80, start_flash)
+
+        def arrived(row):
+            self.pending_profit_chips.discard(row['key'])
+            self.update_bet_chips()
+            if not self.pending_profit_chips:
+                start_flash()
+
+        # Use Classic's loss destination, 440ms payout flight from (575, 43),
+        # and the existing return to (575, 674) after all flash cycles finish.
+        self._animate_losing_chips_out()
+        if not profits:
+            self._queue(300, start_flash)
+        for index, row in enumerate(profits):
+            self._animate_settlement_chips(
+                [(*self.PAYOUT_ORIGIN, row['amount'], row['radius'])], row['pos'], 440,
+                f'settlement_profit_fly_{index}', lambda r=row: arrived(r))
 
     def update_display(self):
         if self._closing:
             return
-        self.canvas.itemconfigure(self.balance_text, text=f'余额: ${int(self.balance):,}')
+        self._set_amount_readout(self.balance_text, f'余额: ${int(self.balance):,}')
         if self.show_last_win:
-            self.canvas.itemconfigure(
-                self.total_bet_text,
-                text=f'上局获胜: {self.format_money(self.last_win_amount)}')
+            bet_text = f'上局获胜: {self.format_money(self.last_win_amount)}'
         elif self.round_active:
             round_bet = self.round_original_bet + sum(self.round_side_bets.values())
-            self.canvas.itemconfigure(
-                self.total_bet_text,
-                text=f'本局下注: {self.format_money(round_bet)}')
+            bet_text = f'本局下注: ${float(round_bet):,.0f}'
         else:
             pending = self.current_bet + sum(self.current_side_bets.values())
-            self.canvas.itemconfigure(
-                self.total_bet_text,
-                text=f'本局下注: {self.format_money(pending)}')
+            bet_text = f'本局下注: ${float(pending):,.0f}'
+        self._set_amount_readout(self.total_bet_text, bet_text)
 
         self.update_bet_chips()
         can_bet = (self.accept_bets and not self.round_active
@@ -5093,290 +4873,781 @@ class EasyBlackjackGame(BubbleBlackjackGame):
             can_bet and no_chip_flying
             and (self.current_bet + sum(self.current_side_bets.values()) >= self.MIN_BET))
         self._set_round_control_visibility(self.round_active)
-        for _key, spot in self.bet_spots.items():
-            self.canvas.itemconfigure(spot['rect'], fill=spot['normal_fill'])
+        self._refresh_bet_spot_styles()
 
     def show_game_instructions(self):
-        """Use the same large custom instruction UI as Classic, but with Easy rules."""
+
+        """Show the game manual in the shared card-based rules window."""
+
+        import os
+
+        import tkinter.font as tkfont
+
+        from PIL import Image, ImageTk
+
+
+
         parent = self.winfo_toplevel()
 
-        existing = getattr(self, '_instruction_window', None)
-        if existing is not None:
+        current = getattr(self, '_game_instruction_dialog', None)
+
+        if current is not None:
+
             try:
-                if existing.winfo_exists():
-                    existing.lift()
-                    existing.focus_force()
+
+                if current.winfo_exists():
+
+                    current.lift()
+
+                    current.focus_force()
+
                     return
+
             except tk.TclError:
+
                 pass
 
+
+
         dialog = tk.Toplevel(parent)
-        self._instruction_window = dialog
+
+        self._game_instruction_dialog = dialog
+
         dialog.title('简单黑杰克 · 游戏说明')
-        dialog.configure(bg='#0f1311')
+
+        dialog.configure(bg='#faf5e8')
+
         dialog.resizable(False, False)
+
         dialog.transient(parent)
 
-        win_w, win_h = 1000, 650
+
+
+        width, height = 1000, 670
+
         parent.update_idletasks()
-        pw = max(1, parent.winfo_width())
-        ph = max(1, parent.winfo_height())
-        px = parent.winfo_rootx()
-        py = parent.winfo_rooty()
-        pos_x = px + (pw - win_w) // 2
-        pos_y = py + (ph - win_h) // 2
-        dialog.geometry(f'{win_w}x{win_h}+{pos_x}+{pos_y}')
-        dialog.minsize(win_w, win_h)
-        dialog.maxsize(win_w, win_h)
+
+        px, py = parent.winfo_rootx(), parent.winfo_rooty()
+
+        pw, ph = max(1, parent.winfo_width()), max(1, parent.winfo_height())
+
+        dialog.geometry(f'{width}x{height}+{px + (pw-width)//2}+{py + (ph-height)//2}')
+
+
+
+        manual_pages = [
+            (
+                '玩法',
+                '了解游戏目标，以及一局从下注到结算的完整顺序。',
+                [
+                    [
+                        '游戏目标',
+                        '',
+                        [
+                            ('下注庄家结果', '本游戏没有玩家手牌操作，玩家只下注庄家的最终结果。\n庄家16点及以下补牌，任何17点或以上停牌。'),
+                            ('独立下注项目', '16–20点、大、小、庄家对子、庄家黑杰克、庄家21点与爆牌均独立判定。'),
+                        ],
+                        [],
+                    ],
+                    [
+                        '一局如何进行',
+                        '',
+                        [
+                            ('玩家下注', '在16–20点及各项庄家结果下注位下注；\n本局合计至少$100后开始发牌。'),
+                            ('玩家决策', '本游戏没有要牌、停牌、加倍或分牌操作；\n下注后等待庄家完成牌局。'),
+                            ('庄家开牌', '庄家按规则从明牌开始补牌，达到17点或以上停牌。'),
+                            ('结算', '主注及每个边注独立判定；\n点数相同的16–20下注退回本金。'),
+                        ],
+                        [],
+                    ],
+                ],
+            ),
+            (
+                '下注 & 限红',
+                '各项目限红如下。\n每局全部下注合计至少$100。',
+                [
+                    [
+                        '下注项目',
+                        '',
+                        [],
+                        [
+                            (
+                                '下注项目与限红',
+                                ['项目', '限红'],
+                                [
+                                    ['16、17、18、19、20点', '每项最高$500,000', '庄家最终点数'],
+                                    ['小', '每项最高$300,000', '庄家正好两张牌停牌'],
+                                    ['大', '每项最高$300,000', '庄家至少四张牌停牌'],
+                                    ['对子', '每项最高$100,000', '庄家前两张牌点数相同'],
+                                    ['庄家黑杰克', '每项最高$100,000', '庄家前两张牌合计21点'],
+                                    ['庄家21点', '每项最高$100,000', '庄家最终手牌合计21点'],
+                                    ['爆牌', '每项最高$100,000', '庄家最终总点数超过21点'],
+                                ],
+                            ),
+                        ],
+                    ],
+                ],
+            ),
+            (
+                '获胜条件 & 赔率',
+                '按下列表格核对各项判定条件、胜负结果及赔率。',
+                [
+                    [
+                        '判定规则',
+                        '',
+                        [],
+                        [
+                            (
+                                '庄家结果判定',
+                                ['下注项目', '获胜、平局或命中条件'],
+                                [
+                                    ['16–20点', '庄家爆牌或最终点数低于所选点数：获胜；\n相同点数：平局；\n高于所选点数：输。'],
+                                    ['小 / 大', '小：庄家正好两张牌且未爆牌；\n大：庄家至少四张牌停牌且未爆牌。'],
+                                    ['对子', '庄家前两张牌点数相同；\n花色组合对应不同奖励等级。'],
+                                    ['庄家黑杰克', '庄家前两张牌合计21点；\n花色组合对应不同奖励等级。'],
+                                    ['庄家21点', '庄家最终手牌合计21点；\n不限牌张数，花色组合对应不同奖励等级。'],
+                                    ['爆牌', '庄家最终总点数超过21点；\n奖金档位按爆牌时的牌张数决定。'],
+                                ],
+                            ),
+                        ],
+                    ],
+                    [
+                        '主注赔率',
+                        '',
+                        [],
+                        [
+                            (
+                                '点数与张数下注',
+                                ['下注结果', '净赔率或返还'],
+                                [
+                                    ['16点', '2.45:1'],
+                                    ['17点', '1.93:1'],
+                                    ['18点', '0.95:1'],
+                                    ['19点', '0.48:1'],
+                                    ['20点', '0.13:1'],
+                                    ['小（两张牌停牌）', '1.75:1'],
+                                    ['大（四张或以上停牌）', '3.5:1'],
+                                    ['点数注平局', '退回本金'],
+                                ],
+                            ),
+                        ],
+                    ],
+                    [
+                        '对子赔率',
+                        '',
+                        [],
+                        [
+                            (
+                                '庄家前两张对子',
+                                ['牌面组合', '净赔率'],
+                                [
+                                    ['AA同花', '60:1'],
+                                    ['其他同花对子', '30:1'],
+                                    ['同色对子', '15:1'],
+                                    ['杂色对子', '7:1'],
+                                ],
+                            ),
+                        ],
+                    ],
+                    [
+                        '庄家黑杰克赔率',
+                        '',
+                        [],
+                        [
+                            (
+                                '前两张组成21点',
+                                ['花色组合', '净赔率'],
+                                [
+                                    ['同花', '50:1'],
+                                    ['同色', '25:1'],
+                                    ['杂色', '11:1'],
+                                ],
+                            ),
+                        ],
+                    ],
+                    [
+                        '庄家21点赔率',
+                        '',
+                        [],
+                        [
+                            (
+                                '最终手牌为21点',
+                                ['花色组合', '净赔率'],
+                                [
+                                    ['同花', '50:1'],
+                                    ['同色', '20:1'],
+                                    ['杂色', '8:1'],
+                                ],
+                            ),
+                        ],
+                    ],
+                    [
+                        '爆牌赔率',
+                        '',
+                        [],
+                        [
+                            (
+                                '庄家爆牌时的牌张数',
+                                ['牌张数', '净赔率'],
+                                [
+                                    ['3张', '1:1'],
+                                    ['4张', '2:1'],
+                                    ['5张', '9:1'],
+                                    ['6张', '50:1'],
+                                    ['7张', '100:1'],
+                                    ['8张或以上', '250:1'],
+                                ],
+                            ),
+                        ],
+                    ],
+                ],
+            ),
+            (
+                '牌型等级表',
+                '牌型由强到弱排列；\n同级牌型继续比较相关点数。',
+                [
+                    [
+                        '点数与牌例',
+                        '下方图片展示牌型示例；\n同一牌型也可能由其他牌面组成。',
+                        [],
+                        [
+                            (
+                                '庄家点数牌例',
+                                ['结果', '牌例'],
+                                [
+                                    [
+                                        '庄家黑杰克',
+                                        (
+                                            '__CARD_IMAGES__',
+                                            (
+                                                ('♠', 'A'),
+                                                ('♥', 'K'),
+                                            ),
+                                        ),
+                                    ],
+                                    [
+                                        '三张组成21点',
+                                        (
+                                            '__CARD_IMAGES__',
+                                            (
+                                                ('♠', '7'),
+                                                ('♥', '7'),
+                                                ('♦', '7'),
+                                            ),
+                                        ),
+                                    ],
+                                    [
+                                        '20点',
+                                        (
+                                            '__CARD_IMAGES__',
+                                            (
+                                                ('♠', 'K'),
+                                                ('♥', 'Q'),
+                                            ),
+                                        ),
+                                    ],
+                                    [
+                                        '22点，按爆牌处理',
+                                        (
+                                            '__CARD_IMAGES__',
+                                            (
+                                                ('♠', 'K'),
+                                                ('♥', 'Q'),
+                                                ('♦', '2'),
+                                            ),
+                                        ),
+                                    ],
+                                ],
+                            ),
+                        ],
+                    ],
+                    [
+                        '点数与比较',
+                        '',
+                        [
+                            ('牌值与爆牌', 'A可计1点或11点；\nJ、Q、K各计10点。\n总点数超过21即爆牌；\n22点不视为特殊平局。'),
+                        ],
+                        [],
+                    ],
+                    [
+                        '同牌型如何分胜负',
+                        '',
+                        [
+                            ('比较方法', 'A 可计 1 或 11，J、Q、K 各计 10；\n总点数超过 21 即爆牌。\n庄家前两张合计 21 为黑杰克；\n任意牌张数组合成 21 也可命中庄家 21 点。'),
+                        ],
+                        [],
+                    ],
+                ],
+            ),
+            (
+                '特别事项',
+                '补充说明特殊牌、模式差异和金额结算方式。',
+                [
+                    [
+                        '连续洗牌与发牌',
+                        '',
+                        [
+                            ('八副牌连续洗牌', '使用8副完整扑克牌，共416张；\n所有牌局均由连续洗牌机（CSM）发牌并持续回收牌张。'),
+                            ('无需切牌牌靴', '不使用传统切牌、烧牌或剩余牌阈值流程；\n每局结束后牌张由CSM重新混入牌仓。'),
+                            ('发牌条件', '系统可用牌不足30张时，暂不能开始新一局。'),
+                        ],
+                        [],
+                    ],
+                    [
+                        '重叠与返还规则',
+                        '',
+                        [
+                            ('庄家黑杰克也算庄家21点', '庄家前两张组成Blackjack时，“庄家黑杰克”和“庄家21点”两项可同时命中。'),
+                            ('净赔率与本金', '表中赔率为净赢赔率；\n获胜时另返下注本金，平局只退回原下注。'),
+                            ('派彩显示', '本金筹码保持居中，净赢筹码显示在本金左侧；\n不显示尖嘴赔率牌。下注格闪烁结束后，两者一起返回筹码区。'),
+                            ('平局显示', '16–20点下注平局时退回原下注，画面以蓝色平局提示显示。'),
+                        ],
+                        [],
+                    ],
+                    [
+                        '特殊下注规则',
+                        '',
+                        [
+                            ('开始条件', '每局所有下注合计至少$100，且余额足够时，才可开始发牌。'),
+                            ('下注上限', '16–20点每项最高$500,000，大小各最高$300,000，其他各最高$100,000；\n筹码超过该格剩余额度时，自动补齐至上限，不弹提示。'),
+                        ],
+                        [],
+                    ],
+                ],
+            ),
+        ]
+
+
+
+        BG = '#faf5e8'
+
+        HEADER = '#f1e7cd'
+
+        SIDEBAR = '#f2e8d0'
+
+        PANEL = '#fffdf7'
+
+        PANEL_2 = '#f5ecd6'
+
+        BORDER = '#c9b88a'
+
+        GOLD = '#a8842c'
+
+        GOLD_BAR = '#e7d36c'
+
+        TEXT = '#3a2f1e'
+
+        MUTED = '#7a6a50'
 
         font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
 
-        BG = '#0f1311'
-        HEADER = '#151b18'
-        PANEL = '#18201c'
-        PANEL_2 = '#202923'
-        BORDER = '#43534a'
-        GOLD = '#e7d36c'
-        TEXT = '#f4f4ee'
-        MUTED = '#c1cbc6'
-        WHITE = '#ffffff'
-        RED = '#8c3f43'
-        GREEN = '#0b5f4c'
-        GREEN_2 = '#164f47'
-        BLACK = '#111111'
 
-        FONT_SMALL = 14
-        FONT_MEDIUM = 16
-        FONT_LARGE = 18
-        FONT_TITLE = 20
 
-        header = tk.Frame(dialog, bg=HEADER, height=82)
+        header = tk.Frame(dialog, bg=HEADER, height=76)
+
         header.pack(fill=tk.X, side=tk.TOP)
-        header.pack_propagate(False)
-        tk.Label(
-            header, text='简单黑杰克  EASY BLACKJACK',
-            font=(font_name, FONT_TITLE, 'bold'), fg=GOLD, bg=HEADER
-        ).place(x=24, y=10)
-        tk.Label(
-            header, text='玩法 · 连续洗牌 · 下注区域 · 结算与赔付',
-            font=(font_name, FONT_SMALL), fg=MUTED, bg=HEADER
-        ).place(x=25, y=48)
-        close_btn = tk.Button(
-            header, text='关闭  ESC', command=dialog.destroy,
-            font=(font_name, FONT_SMALL, 'bold'),
-            bg='#2a332e', fg=TEXT,
-            activebackground='#3a463f', activeforeground=WHITE,
-            relief=tk.FLAT, bd=0, cursor='hand2')
-        close_btn.place(x=850, y=20, width=120, height=42)
-        tk.Frame(dialog, bg=GOLD, height=3).pack(fill=tk.X, side=tk.TOP)
 
-        scroll_host = tk.Frame(dialog, bg=BG)
-        scroll_host.pack(fill=tk.BOTH, expand=True)
-        canvas = tk.Canvas(scroll_host, bg=BG, highlightthickness=0, bd=0, yscrollincrement=40)
-        scrollbar = tk.Scrollbar(
-            scroll_host, orient=tk.VERTICAL, command=canvas.yview,
-            bg='#263029', troughcolor='#111512', activebackground=GOLD,
-            relief=tk.FLAT, bd=0, width=14)
+        header.pack_propagate(False)
+
+        tk.Label(header, text='简单黑杰克 · 游戏说明', font=(font_name, 20, 'bold'),
+
+                 fg=GOLD, bg=HEADER, anchor='w', wraplength=795,
+
+                 justify=tk.LEFT).place(x=24, y=6, width=795, height=41)
+
+        tk.Label(header, text='玩法 · 下注 · 获胜条件 · 牌型 · 特别事项',
+
+                 font=(font_name, 14), fg=MUTED, bg=HEADER, anchor='w').place(x=26, y=46)
+
+
+
+        def close_dialog():
+
+            try:
+
+                self._game_instruction_dialog = None
+
+            except Exception:
+
+                pass
+
+            try:
+
+                dialog.destroy()
+
+            except tk.TclError:
+
+                pass
+
+
+
+        tk.Button(header, text='关闭  ESC', command=close_dialog,
+
+                  font=(font_name, 14, 'bold'), bg='#e8dcc0', fg=TEXT,
+
+                  activebackground='#d9c895', relief=tk.FLAT, bd=0,
+
+                  cursor='hand2').place(x=850, y=17, width=120, height=42)
+
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X, side=tk.TOP)
+
+
+
+        body = tk.Frame(dialog, bg=BG)
+
+        body.pack(fill=tk.BOTH, expand=True)
+
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=205)
+
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+
+        sidebar.pack_propagate(False)
+
+        tk.Label(sidebar, text='说明目录', font=(font_name, 16, 'bold'),
+
+                 fg=GOLD, bg=SIDEBAR, anchor='w').pack(fill=tk.X, padx=18, pady=(17, 10))
+
+
+
+        scroll_host = tk.Frame(body, bg=BG)
+
+        scroll_host.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        canvas = tk.Canvas(scroll_host, bg=BG, highlightthickness=0, bd=0, yscrollincrement=36)
+
+        scrollbar = tk.Scrollbar(scroll_host, orient=tk.VERTICAL, command=canvas.yview,
+
+                                 bg='#ded3b7', troughcolor=BG, activebackground=GOLD_BAR,
+
+                                 relief=tk.FLAT, bd=0, width=13)
+
         canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12, 0), pady=(10, 10))
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 9), pady=(10, 10))
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=10)
 
         content = tk.Frame(canvas, bg=BG)
-        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
-        content.bind('<Configure>', lambda _e=None: canvas.configure(scrollregion=canvas.bbox('all')))
-        canvas.bind('<Configure>', lambda e: canvas.itemconfigure(content_window, width=e.width))
 
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), 'units')
+        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
+
+
+
+        def sync_scrollregion(_event=None):
+
+            canvas.configure(scrollregion=canvas.bbox('all'))
+
+
+
+        def fit_content_width(event):
+
+            canvas.itemconfigure(content_window, width=event.width)
+
+
+
+        content.bind('<Configure>', sync_scrollregion)
+
+        canvas.bind('<Configure>', fit_content_width)
+
+
+
+        def add_rule(parent_frame, title, detail):
+
+            row = tk.Frame(parent_frame, bg=PANEL)
+
+            row.pack(fill=tk.X, padx=16, pady=5)
+
+            tk.Frame(row, bg=GOLD_BAR, width=5).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 11))
+
+            text_box = tk.Frame(row, bg=PANEL)
+
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+            if title:
+                tk.Label(text_box, text=title, font=(font_name, 15, 'bold'),
+
+                         fg=TEXT, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                         wraplength=650).pack(fill=tk.X)
+
+            if detail:
+
+                tk.Label(text_box, text=detail, font=(font_name, 14),
+
+                         fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                         wraplength=650).pack(fill=tk.X, pady=(3, 0))
+
+
+
+        def add_table(parent_frame, title, headers, rows):
+
+            block = tk.Frame(parent_frame, bg=PANEL_2,
+
+                             highlightbackground=BORDER, highlightthickness=1, bd=0)
+
+            block.pack(fill=tk.X, padx=16, pady=8)
+
+            if title:
+                tk.Label(block, text=title, font=(font_name, 14, 'bold'),
+
+                         fg=TEXT, bg=GOLD_BAR, anchor='w', justify=tk.LEFT,
+
+                         wraplength=675, padx=11, pady=7).pack(fill=tk.X)
+
+            grid = tk.Frame(block, bg=PANEL_2)
+
+            grid.pack(fill=tk.X)
+
+            count = max([len(headers)] + [len(row) for row in rows]) if rows else len(headers)
+
+            table_font = tkfont.Font(family=font_name, size=14)
+
+            minimums = []
+
+            preferences = []
+
+            for col in range(count):
+
+                picture_width = max((len(row[col][1]) * 74 + 6
+
+                                     for row in rows if col < len(row)
+
+                                     and isinstance(row[col], (tuple, list))
+
+                                     and len(row[col]) == 2 and row[col][0] == '__CARD_IMAGES__'),
+
+                                    default=0)
+
+                minimums.append(max(62, picture_width))
+
+                text_width = max((table_font.measure(str(row[col]))
+
+                                  for row in ([headers] if headers else []) + rows
+
+                                  if col < len(row) and isinstance(row[col], str)), default=0)
+
+                preferences.append(1 if picture_width else max(50, min(text_width, 260)))
+
+            available = 700
+
+            remaining = max(0, available - sum(minimums))
+
+            total_preference = sum(preferences) or 1
+
+            column_widths = [minimums[col] + remaining * preferences[col] // total_preference
+
+                             for col in range(count)]
+
+            if column_widths:
+
+                column_widths[-1] += available - sum(column_widths)
+
+            for col, width in enumerate(column_widths):
+
+                grid.grid_columnconfigure(col, minsize=width)
+
+            matrix = ([headers] if headers else []) + rows
+
+            for r, row in enumerate(matrix):
+
+                for c in range(count):
+
+                    value = row[c] if c < len(row) else ''
+
+                    head = bool(headers) and r == 0
+
+                    bg = GOLD_BAR if head else (PANEL if r % 2 else '#fbf6e9')
+
+                    fg = TEXT if head else MUTED
+
+                    if isinstance(value, (tuple, list)) and len(value) == 2 and value[0] == '__CARD_IMAGES__':
+
+                        image_cell = tk.Frame(grid, bg=bg, borderwidth=1, relief=tk.SOLID)
+
+                        image_cell.grid(row=r, column=c, sticky='nsew')
+
+                        game_dir = os.path.dirname(os.path.abspath(__file__))
+
+                        search_roots = (game_dir, os.path.dirname(game_dir),
+
+                                        os.path.dirname(os.path.dirname(game_dir)))
+
+                        card_dir = next((os.path.join(root, 'A_Tools', 'Card', 'Poker2')
+
+                                         for root in search_roots
+
+                                         if os.path.isdir(os.path.join(root, 'A_Tools', 'Card', 'Poker2'))),
+
+                                        os.path.join(search_roots[1], 'A_Tools', 'Card', 'Poker2'))
+
+                        suits = {'♠': 'Spade', '♥': 'Heart', '♦': 'Diamond', '♣': 'Club'}
+
+                        for suit, rank in value[1]:
+
+                            filename = 'JOKER-A.png' if suit == 'JOKER' else f'{suits.get(suit, suit)}{rank}.png'
+
+                            path = os.path.join(card_dir, filename)
+
+                            try:
+
+                                with Image.open(path) as source_image:
+
+                                    card_width = 70
+
+                                    card_height = max(1, round(source_image.height * card_width / source_image.width))
+
+                                    small_image = source_image.resize((card_width, card_height), Image.LANCZOS)
+
+                                photo = ImageTk.PhotoImage(small_image)
+
+                                image_label = tk.Label(image_cell, image=photo, bg=bg, bd=0)
+
+                                image_label.image = photo
+
+                                image_label.pack(side=tk.LEFT, padx=2, pady=3)
+
+                            except Exception:
+
+                                # Keep the example cell image-only if an asset is unavailable.
+
+                                tk.Label(image_cell, text='', bg='#fffdf7', width=3, height=2,
+
+                                         borderwidth=1, relief=tk.SOLID).pack(side=tk.LEFT, padx=2, pady=3)
+
+                    else:
+
+                        tk.Message(grid, text=value, font=(font_name, 14, 'bold' if head else 'normal'),
+
+                                   fg=fg, bg=bg, anchor='w', justify=tk.LEFT,
+
+                                   width=max(42, column_widths[c] - 16),
+
+                                   padx=7, pady=5, borderwidth=1,
+
+                                   relief=tk.SOLID).grid(row=r, column=c, sticky='nsew')
+
+
+
+        def render_page(index):
+
+            for child in content.winfo_children():
+
+                child.destroy()
+
+            for idx, button in enumerate(nav_buttons):
+
+                button.configure(bg='#e6d9b9' if idx == index else SIDEBAR,
+
+                                 fg=GOLD if idx == index else MUTED)
+
+            page_title, subtitle, cards = manual_pages[index]
+
+            top = tk.Frame(content, bg=BG)
+
+            top.pack(fill=tk.X, padx=14, pady=(7, 2))
+
+            tk.Label(top, text=page_title, font=(font_name, 20, 'bold'),
+
+                     fg=GOLD, bg=BG, anchor='w', justify=tk.LEFT,
+
+                     wraplength=690).pack(fill=tk.X)
+
+            if subtitle:
+
+                tk.Label(top, text=subtitle, font=(font_name, 14),
+
+                         fg=MUTED, bg=BG, anchor='w', justify=tk.LEFT,
+
+                         wraplength=690).pack(fill=tk.X, pady=(3, 0))
+
+            for card_title, card_subtitle, rules, tables in cards:
+
+                card = tk.Frame(content, bg=PANEL, highlightbackground=BORDER,
+
+                                highlightcolor=BORDER, highlightthickness=1, bd=0)
+
+                card.pack(fill=tk.X, padx=10, pady=7)
+
+                head = tk.Frame(card, bg=PANEL)
+
+                head.pack(fill=tk.X, padx=16, pady=(12, 5))
+
+                tk.Label(head, text=card_title, font=(font_name, 16, 'bold'),
+
+                         fg=GOLD, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                         wraplength=680).pack(fill=tk.X)
+
+                if card_subtitle:
+
+                    tk.Label(head, text=card_subtitle, font=(font_name, 14),
+
+                             fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                             wraplength=680).pack(fill=tk.X)
+
+                for rule_title, detail in rules:
+
+                    add_rule(card, rule_title, detail)
+
+                for table_title, table_headers, rows in tables:
+
+                    add_table(card, table_title, table_headers, rows)
+
+                tk.Frame(card, bg=PANEL, height=6).pack(fill=tk.X)
+
+            content.update_idletasks()
+
+            canvas.configure(scrollregion=canvas.bbox('all'))
+
+            canvas.yview_moveto(0)
+
+
+
+        nav_buttons = []
+
+        for index, (page_title, _subtitle, _cards) in enumerate(manual_pages):
+
+            button = tk.Button(sidebar, text=page_title, command=lambda i=index: render_page(i),
+
+                               font=(font_name, 14), fg=MUTED, bg=SIDEBAR,
+
+                               activebackground='#e8d49a', activeforeground=GOLD,
+
+                               relief=tk.FLAT, bd=0, anchor='w', padx=18, pady=10,
+
+                               cursor='hand2')
+
+            button.pack(fill=tk.X)
+
+            nav_buttons.append(button)
+
+
+
+        def on_mousewheel(event):
+
+            canvas.yview_scroll(int(-event.delta / 120), 'units')
+
             return 'break'
 
-        dialog.bind('<MouseWheel>', _on_mousewheel)
+
+
+        dialog.bind('<MouseWheel>', on_mousewheel)
+
         dialog.bind('<Button-4>', lambda _e: (canvas.yview_scroll(-1, 'units'), 'break')[1])
+
         dialog.bind('<Button-5>', lambda _e: (canvas.yview_scroll(1, 'units'), 'break')[1])
 
-        def make_card(title, subtitle=None, pady=(8, 8)):
-            card = tk.Frame(content, bg=PANEL,
-                            highlightbackground=BORDER, highlightcolor=BORDER,
-                            highlightthickness=1, bd=0)
-            card.pack(fill=tk.X, padx=10, pady=pady)
-            head = tk.Frame(card, bg=PANEL)
-            head.pack(fill=tk.X, padx=18, pady=(15, 10))
-            tk.Label(head, text=title, font=(font_name, FONT_LARGE, 'bold'),
-                     fg=GOLD, bg=PANEL, anchor='w').pack(side=tk.LEFT)
-            if subtitle:
-                tk.Label(head, text=subtitle, font=(font_name, FONT_SMALL),
-                         fg=MUTED, bg=PANEL, anchor='e').pack(side=tk.RIGHT)
-            return card
+        dialog.bind('<Escape>', lambda _e: close_dialog())
 
-        def add_rule(parent_frame, title, body, accent=GOLD):
-            row = tk.Frame(parent_frame, bg=PANEL)
-            row.pack(fill=tk.X, padx=18, pady=6)
-            tk.Frame(row, bg=accent, width=5).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 12))
-            box = tk.Frame(row, bg=PANEL)
-            box.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            tk.Label(box, text=title, font=(font_name, FONT_MEDIUM, 'bold'),
-                     fg=TEXT, bg=PANEL, anchor='w').pack(fill=tk.X)
-            tk.Label(box, text=body, font=(font_name, FONT_SMALL), fg=MUTED, bg=PANEL,
-                     anchor='w', justify=tk.LEFT, wraplength=850).pack(fill=tk.X, pady=(4, 0))
+        dialog.protocol('WM_DELETE_WINDOW', close_dialog)
 
-        def table_block(parent_frame, title, rows):
-            block = tk.Frame(parent_frame, bg=PANEL_2,
-                             highlightbackground='#354139', highlightthickness=1, bd=0)
-            tk.Label(block, text=title, font=(font_name, FONT_MEDIUM, 'bold'),
-                     fg=BLACK, bg=GOLD, anchor='w', padx=12, pady=8).pack(fill=tk.X)
-            grid = tk.Frame(block, bg=PANEL_2)
-            grid.pack(fill=tk.BOTH, expand=True)
-            grid.grid_columnconfigure(0, weight=1)
-            grid.grid_columnconfigure(1, minsize=120)
-            for i, (condition, payout) in enumerate(rows):
-                row_bg = '#1b241f' if i % 2 == 0 else '#202923'
-                tk.Label(grid, text=condition, font=(font_name, FONT_SMALL),
-                         fg=TEXT, bg=row_bg, anchor='w', padx=12, pady=7
-                ).grid(row=i, column=0, sticky='nsew', padx=(0, 1), pady=(0, 1))
-                tk.Label(grid, text=payout, font=(font_name, FONT_SMALL, 'bold'),
-                         fg=GOLD, bg=row_bg, anchor='center', padx=8, pady=7
-                ).grid(row=i, column=1, sticky='nsew', pady=(0, 1))
-            return block
+        if nav_buttons:
 
-        # 01 rules
-        rules_card = make_card('01  游戏玩法与连续洗牌说明', '8副完整牌 · CSM · 庄家任何17点停牌')
-        columns = tk.Frame(rules_card, bg=PANEL)
-        columns.pack(fill=tk.X, padx=6, pady=(0, 14))
-        left_rules = tk.Frame(columns, bg=PANEL)
-        right_rules = tk.Frame(columns, bg=PANEL)
-        left_rules.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 7))
-        right_rules.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(7, 0))
+            render_page(0)
 
-        add_rule(left_rules, '基本目标',
-                 '本游戏没有玩家手牌动作层，玩家只下注庄家的最终结果。庄家16点及以下补牌，任何17点或以上停牌。')
-        add_rule(left_rules, '16-20点下注',
-                 '下注庄家最终点数门槛。庄家爆牌或最终点数低于所下注点数时获胜；相同点数为平局并退回本金。')
-        add_rule(left_rules, '22点规则',
-                 '庄家22点不再视为特殊平局，按普通爆牌处理。')
-        add_rule(left_rules, '庄家黑杰克',
-                 '“庄家黑杰克”只看庄家前两张是否为21点；花色组合决定赔率层级。')
-        add_rule(left_rules, '庄家21点',
-                 '“庄家21点”看庄家最终整手牌是否达到21点，不限制牌张数；两张Blackjack也同时命中庄家21点。')
-
-        add_rule(right_rules, '① 连续洗牌机',
-                 '使用与经典版相同的 ContinuousShuffleMachine 连续洗牌机；所有牌局都从CSM发牌。', accent='#7cc8aa')
-        add_rule(right_rules, '② 连续供牌',
-                 '不建立传统切牌牌靴，也不使用旧 Easy 的 shuffle.py 与切牌逻辑。', accent='#7cc8aa')
-        add_rule(right_rules, '③ 牌张回收',
-                 '每局结束后，庄家本局已用牌会归还至连续洗牌系统，再由系统重新混入牌仓。', accent='#7cc8aa')
-        add_rule(right_rules, '④ 庄家流程',
-                 '开局先发庄家明牌；随后发第二张并继续补牌直到满足停牌条件。', accent='#7cc8aa')
-        add_rule(right_rules, '⑤ 动画与界面',
-                 '下注筹码飞行动画、发牌飞行、翻牌、结算闪烁和筹码回收均与经典版保持一致。', accent='#7cc8aa')
-
-        # 02 bet area
-        bet_card = make_card('02  下注区域', '10个主排列下注位 + 小 · 仅庄家结算项目')
-        bet_cv = tk.Canvas(bet_card, width=930, height=360, bg=PANEL, highlightthickness=0)
-        bet_cv.pack(fill=tk.X, padx=16, pady=(0, 15))
-        bet_cv.create_rectangle(8, 8, 922, 352, fill='#103f36', outline='#4f6f64', width=2)
-        bet_cv.create_text(30, 30, anchor='w', text='可下注区域示意',
-                           font=(font_name, FONT_MEDIUM, 'bold'), fill=TEXT)
-        bet_cv.create_text(900, 30, anchor='e', text='最低 $100',
-                           font=(font_name, FONT_SMALL), fill='#bcd2c8')
-        spots = [
-            (42, 55, 202, 145, '16点', '2.45:1'),
-            (218, 55, 378, 145, '17点', '1.93:1'),
-            (394, 55, 554, 145, '18点', '0.95:1'),
-            (570, 55, 730, 145, '19点', '0.48:1'),
-            (746, 55, 906, 145, '20点', '0.13:1'),
-            (42, 245, 202, 335, '爆牌', '1-250:1'),
-            (218, 245, 378, 335, '对子', '7-60:1'),
-            (394, 245, 554, 335, '庄家黑杰克', '11-50:1'),
-            (570, 245, 730, 335, '庄家21点', '8-50:1'),
-            (746, 245, 906, 335, '大', '3.5:1'),
-            (746, 155, 906, 235, '小', '1.75:1'),
-        ]
-        for x0, y0, x1, y1, label, payout in spots:
-            bet_cv.create_oval(x0, y0, x1, y1, fill=GREEN_2, outline='#9de46f', width=3)
-            bet_cv.create_text((x0 + x1) / 2, (y0 + y1) / 2 - 12,
-                               text=label, font=(font_name, FONT_SMALL, 'bold'), fill=WHITE)
-            bet_cv.create_text((x0 + x1) / 2, (y0 + y1) / 2 + 16,
-                               text=payout, font=(font_name, FONT_SMALL), fill=WHITE)
-        tk.Label(
-            bet_card,
-            text='左键下注，右键清除对应下注。小位于20点与大之间，赔率1.75:1。桌面赔率若有多档，仅显示最小值-最大值；实际结算按命中的具体档位支付。',
-            font=(font_name, FONT_SMALL), fg=MUTED, bg=PANEL,
-            anchor='w', justify=tk.LEFT, wraplength=920
-        ).pack(fill=tk.X, padx=20, pady=(0, 16))
-
-        # 03 payouts
-        payout_card = make_card('03  赔付表', '赔率表示利润赔率；命中时同时返还本金')
-        main_table = table_block(payout_card, '点数与张数下注', [
-            ('16点', '2.45:1'),
-            ('17点', '1.93:1'),
-            ('18点', '0.95:1'),
-            ('19点', '0.48:1'),
-            ('20点', '0.13:1'),
-            ('小（庄家2张停牌）', '1.75:1'),
-            ('大（庄家至少4张停牌）', '3.5:1'),
-            ('点数注平局', '退回本金'),
-        ])
-        main_table.pack(fill=tk.X, padx=18, pady=(0, 16))
-
-        side_grid = tk.Frame(payout_card, bg=PANEL)
-        side_grid.pack(fill=tk.X, padx=18, pady=(0, 16))
-        side_grid.grid_columnconfigure(0, weight=1, uniform='payout')
-        side_grid.grid_columnconfigure(1, weight=1, uniform='payout')
-
-        tables = [
-            ('对子', [
-                ('AA同花', '60:1'),
-                ('其他同花对子', '30:1'),
-                ('同色对子', '15:1'),
-                ('杂色对子', '7:1'),
-            ]),
-            ('庄家黑杰克', [
-                ('同花', '50:1'),
-                ('同色', '25:1'),
-                ('杂色', '11:1'),
-            ]),
-            ('庄家21点', [
-                ('任意张数组合成21点 · 同花', '50:1'),
-                ('任意张数组合成21点 · 同色', '20:1'),
-                ('任意张数组合成21点 · 杂色', '8:1'),
-            ]),
-            ('爆牌', [
-                ('庄家3张爆牌', '1:1'),
-                ('庄家4张爆牌', '2:1'),
-                ('庄家5张爆牌', '9:1'),
-                ('庄家6张爆牌', '50:1'),
-                ('庄家7张爆牌', '100:1'),
-                ('庄家8张或以上爆牌', '250:1'),
-            ]),
-        ]
-        for idx, (title, rows) in enumerate(tables):
-            block = table_block(side_grid, title, rows)
-            block.grid(row=idx // 2, column=idx % 2, sticky='nsew',
-                       padx=(0, 7) if idx % 2 == 0 else (7, 0), pady=7)
-
-        notes_card = make_card('04  重要提示', pady=(8, 18))
-        add_rule(notes_card, '平局动画',
-                 '16-20 任一点数下注平局时，都使用与经典版 Push 同风格的浅蓝色闪烁，并在结束后只退回原下注。')
-        add_rule(notes_card, '赔率尖嘴标记',
-                 '结算时只有“对子 / 庄家黑杰克 / 庄家21点 / 爆牌”会显示尖嘴赔率标记；其他下注项不显示。')
-        add_rule(notes_card, '庄家21点与庄家黑杰克关系',
-                 '若庄家前两张组成Blackjack，则庄家黑杰克和庄家21点两个下注可同时命中。')
-
-        def _close_instruction():
-            try:
-                self._instruction_window = None
-            except Exception:
-                pass
-            try:
-                dialog.destroy()
-            except tk.TclError:
-                pass
-
-        close_btn.configure(command=_close_instruction)
-        dialog.protocol('WM_DELETE_WINDOW', _close_instruction)
-        dialog.bind('<Escape>', lambda _e: _close_instruction())
         dialog.after(30, dialog.focus_force)
-
 
 # Compatibility wrapper used by the casino host.
 class BlackjackGame(EasyBlackjackGame):

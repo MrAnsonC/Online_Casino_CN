@@ -2,1302 +2,6 @@
     "temp_finish_data": {
         "records": [
             {
-                "time": "2026-09-09 20:18:23",
-                "winner": "Dragon",
-                "dragon_score": 8,
-                "tiger_score": 3,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "8"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "3"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:18:29",
-                "winner": "Tie",
-                "dragon_score": 5,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "5"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:18:35",
-                "winner": "Dragon",
-                "dragon_score": 6,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "6"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:18:41",
-                "winner": "Dragon",
-                "dragon_score": 9,
-                "tiger_score": 3,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "9"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "3"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:18:46",
-                "winner": "Tiger",
-                "dragon_score": 4,
-                "tiger_score": 10,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "4"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "10"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:18:52",
-                "winner": "Tiger",
-                "dragon_score": 11,
-                "tiger_score": 13,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "J"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "K"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:18:59",
-                "winner": "Tiger",
-                "dragon_score": 2,
-                "tiger_score": 4,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "2"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "4"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:05",
-                "winner": "Tiger",
-                "dragon_score": 4,
-                "tiger_score": 6,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "4"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "6"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:10",
-                "winner": "Dragon",
-                "dragon_score": 5,
-                "tiger_score": 4,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "5"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "4"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:16",
-                "winner": "Tiger",
-                "dragon_score": 7,
-                "tiger_score": 9,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "7"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "9"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:22",
-                "winner": "Dragon",
-                "dragon_score": 10,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "10"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:28",
-                "winner": "Tiger",
-                "dragon_score": 2,
-                "tiger_score": 3,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "2"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "3"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:34",
-                "winner": "Dragon",
-                "dragon_score": 7,
-                "tiger_score": 1,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "7"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "A"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:39",
-                "winner": "Dragon",
-                "dragon_score": 5,
-                "tiger_score": 4,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "5"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "4"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:46",
-                "winner": "Dragon",
-                "dragon_score": 9,
-                "tiger_score": 1,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "9"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "A"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:51",
-                "winner": "Dragon",
-                "dragon_score": 12,
-                "tiger_score": 3,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "Q"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "3"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:19:57",
-                "winner": "Tiger",
-                "dragon_score": 6,
-                "tiger_score": 13,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "6"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "K"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:03",
-                "winner": "Dragon",
-                "dragon_score": 4,
-                "tiger_score": 1,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "4"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "A"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:09",
-                "winner": "Dragon",
-                "dragon_score": 10,
-                "tiger_score": 6,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "10"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "6"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:14",
-                "winner": "Tiger",
-                "dragon_score": 3,
-                "tiger_score": 13,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "3"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "K"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:20",
-                "winner": "Tiger",
-                "dragon_score": 3,
-                "tiger_score": 8,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "3"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "8"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:26",
-                "winner": "Dragon",
-                "dragon_score": 6,
-                "tiger_score": 1,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "6"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "A"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:33",
-                "winner": "Dragon",
-                "dragon_score": 10,
-                "tiger_score": 1,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "10"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "A"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:38",
-                "winner": "Dragon",
-                "dragon_score": 9,
-                "tiger_score": 2,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "9"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "2"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:44",
-                "winner": "Tiger",
-                "dragon_score": 1,
-                "tiger_score": 10,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "A"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "10"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:50",
-                "winner": "Tie",
-                "dragon_score": 5,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "5"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:20:57",
-                "winner": "Tiger",
-                "dragon_score": 9,
-                "tiger_score": 10,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "9"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "10"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:21:02",
-                "winner": "Dragon",
-                "dragon_score": 13,
-                "tiger_score": 6,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "K"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "6"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:21:07",
-                "winner": "Tiger",
-                "dragon_score": 4,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "4"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:21:14",
-                "winner": "Tiger",
-                "dragon_score": 2,
-                "tiger_score": 6,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "2"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "6"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:21:20",
-                "winner": "Tiger",
-                "dragon_score": 6,
-                "tiger_score": 12,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "6"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "Q"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:21:25",
-                "winner": "Tiger",
-                "dragon_score": 9,
-                "tiger_score": 10,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "9"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "10"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:21:30",
-                "winner": "Tiger",
-                "dragon_score": 5,
-                "tiger_score": 6,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "5"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "6"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:21:37",
-                "winner": "Dragon",
-                "dragon_score": 13,
-                "tiger_score": 9,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "K"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "9"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:21:44",
-                "winner": "Dragon",
-                "dragon_score": 11,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "J"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:21:49",
-                "winner": "Dragon",
-                "dragon_score": 12,
-                "tiger_score": 9,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "Q"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "9"
-                    ]
-                ]
-            },
-            {
                 "time": "2026-09-09 20:21:55",
                 "winner": "Dragon",
                 "dragon_score": 8,
@@ -10822,1307 +9526,1511 @@
                         "A"
                     ]
                 ]
+            },
+            {
+                "time": "2026-09-28 23:24:02",
+                "winner": "Dragon",
+                "dragon_score": 9,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "7"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Diamond",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-02 15:23:34",
+                "winner": "Tie",
+                "dragon_score": 5,
+                "tiger_score": 5,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "5"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-10-23 21:52:29",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 2,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "2"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-10-23 21:52:54",
+                "winner": "Dragon",
+                "dragon_score": 8,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "8"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "J",
+                    "rank_multiplier": 5
+                }
+            },
+            {
+                "time": "2026-10-23 21:59:56",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 4,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "4"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "2",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:02",
+                "winner": "Tiger",
+                "dragon_score": 10,
+                "tiger_score": 11,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "10"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "J"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:09",
+                "winner": "Tiger",
+                "dragon_score": 5,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "Q",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:15",
+                "winner": "Dragon",
+                "dragon_score": 12,
+                "tiger_score": 11,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "Q"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "J"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "10",
+                    "rank_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:22",
+                "winner": "Tiger",
+                "dragon_score": 4,
+                "tiger_score": 9,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "4"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "9"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "3",
+                    "rank_multiplier": 8
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:28",
+                "winner": "Tie",
+                "dragon_score": 7,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small",
+                    "Perfect Suited Tie"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small",
+                        "Perfect Suited Tie"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small",
+                        "Perfect Suited Tie"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "7"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "7"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "Q",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:35",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "7"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 3,
+                    "rank": "6",
+                    "rank_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:42",
+                "winner": "Dragon",
+                "dragon_score": 9,
+                "tiger_score": 2,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "2"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:31:46",
+                "winner": "Dragon",
+                "dragon_score": 3,
+                "tiger_score": 1,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "3"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "A"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "8",
+                    "rank_multiplier": 4
+                }
+            },
+            {
+                "time": "2026-10-23 22:31:56",
+                "winner": "Dragon",
+                "dragon_score": 6,
+                "tiger_score": 5,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "6"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "5"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-23 22:32:03",
+                "winner": "Tiger",
+                "dragon_score": 5,
+                "tiger_score": 10,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Big"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Big"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Big"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "10"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 4,
+                    "rank": "8",
+                    "rank_multiplier": 5
+                }
+            },
+            {
+                "time": "2026-10-23 22:32:13",
+                "winner": "Dragon",
+                "dragon_score": 5,
+                "tiger_score": 3,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "3"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:32:44",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 13,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "K"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 3,
+                    "rank": "3",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 09:31:44",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Win 7"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Win 7"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Win 7"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "7"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-10-24 09:48:24",
+                "winner": "Dragon",
+                "dragon_score": 2,
+                "tiger_score": 1,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Win 2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Win 2"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Win 2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "2"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 09:48:34",
+                "winner": "Dragon",
+                "dragon_score": 6,
+                "tiger_score": 4,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Win 6"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Win 6"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Win 6"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "6"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "4"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "6",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 13:44:46",
+                "winner": "Dragon",
+                "dragon_score": 9,
+                "tiger_score": 5,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Win 9"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Win 9"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Win 9"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "5"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 4
+                }
+            },
+            {
+                "time": "2026-10-24 14:12:19",
+                "winner": "Tiger",
+                "dragon_score": 7,
+                "tiger_score": 12,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big",
+                    "Win Q"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big",
+                        "Win Q"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big",
+                        "Win Q"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "7"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "Q"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Diamond",
+                    "suit_multiplier": 3,
+                    "rank": "5",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 15:27:55",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small",
+                    "Win 6"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small",
+                        "Win 6"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small",
+                        "Win 6"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "10",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 16:13:07",
+                "winner": "Tiger",
+                "dragon_score": 8,
+                "tiger_score": 10,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Big",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Big",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Big",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "8"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "10"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Diamond",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-24 16:13:19",
+                "winner": "Dragon",
+                "dragon_score": 8,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "8"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "7"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-24 16:14:47",
+                "winner": "Tiger",
+                "dragon_score": 9,
+                "tiger_score": 13,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big",
+                    "Gap 3-5"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big",
+                        "Gap 3-5"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big",
+                        "Gap 3-5"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "K"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 2,
+                    "rank": "Q",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 16:18:14",
+                "winner": "Dragon",
+                "dragon_score": 5,
+                "tiger_score": 3,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "3"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "J",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 16:45:40",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 2,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "2"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Diamond",
+                    "suit_multiplier": 2,
+                    "rank": "7",
+                    "rank_multiplier": 4
+                }
+            },
+            {
+                "time": "2026-10-24 16:45:51",
+                "winner": "Tiger",
+                "dragon_score": 4,
+                "tiger_score": 11,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Big",
+                    "Gap 6-9"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Big",
+                        "Gap 6-9"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Big",
+                        "Gap 6-9"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "4"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "J"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "6",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 19:19:32",
+                "winner": "Dragon",
+                "dragon_score": 9,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small",
+                    "Gap 3-5"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small",
+                        "Gap 3-5"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small",
+                        "Gap 3-5"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 3,
+                    "rank": "7",
+                    "rank_multiplier": 8
+                }
+            },
+            {
+                "time": "2026-10-24 19:19:48",
+                "winner": "Dragon",
+                "dragon_score": 11,
+                "tiger_score": 9,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Big",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Big",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Big",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "J"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "9"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 19:42:08",
+                "winner": "Dragon",
+                "dragon_score": 6,
+                "tiger_score": 1,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Gap 3-5"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Gap 3-5"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Gap 3-5"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "A"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "8",
+                    "rank_multiplier": 5
+                }
+            },
+            {
+                "time": "2026-10-24 19:42:56",
+                "winner": "Dragon",
+                "dragon_score": 12,
+                "tiger_score": 11,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Big",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Big",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Big",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "Q"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "J"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-10-24 19:48:00",
+                "winner": "Dragon",
+                "dragon_score": 7,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "7"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 3,
+                    "rank": "3",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 19:48:15",
+                "winner": "Tiger",
+                "dragon_score": 2,
+                "tiger_score": 8,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small",
+                    "Gap 6-9"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small",
+                        "Gap 6-9"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small",
+                        "Gap 6-9"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "2"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "8"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-24 19:48:25",
+                "winner": "Dragon",
+                "dragon_score": 13,
+                "tiger_score": 1,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Big",
+                    "Gap 10-12"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Big",
+                        "Gap 10-12"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Big",
+                        "Gap 10-12"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "K"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "A"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 3
+                }
             }
         ]
     },
     "last_72_record": {
         "records": [
-            {
-                "time": "2026-09-09 20:41:01",
-                "winner": "Dragon",
-                "dragon_score": 8,
-                "tiger_score": 7,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "8"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "7"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:41:08",
-                "winner": "Tiger",
-                "dragon_score": 1,
-                "tiger_score": 8,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "A"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "8"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:41:15",
-                "winner": "Tiger",
-                "dragon_score": 8,
-                "tiger_score": 12,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "8"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "Q"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:41:20",
-                "winner": "Tiger",
-                "dragon_score": 1,
-                "tiger_score": 6,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "A"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "6"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:41:25",
-                "winner": "Tiger",
-                "dragon_score": 2,
-                "tiger_score": 11,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "2"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "J"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:41:31",
-                "winner": "Dragon",
-                "dragon_score": 11,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "J"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:41:37",
-                "winner": "Tiger",
-                "dragon_score": 7,
-                "tiger_score": 11,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "7"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "J"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:41:43",
-                "winner": "Dragon",
-                "dragon_score": 13,
-                "tiger_score": 7,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "K"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "7"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:41:48",
-                "winner": "Tiger",
-                "dragon_score": 7,
-                "tiger_score": 9,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "7"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "9"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:41:55",
-                "winner": "Tiger",
-                "dragon_score": 1,
-                "tiger_score": 7,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "A"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "7"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:01",
-                "winner": "Tiger",
-                "dragon_score": 2,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "2"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:06",
-                "winner": "Dragon",
-                "dragon_score": 11,
-                "tiger_score": 10,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "J"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "10"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:12",
-                "winner": "Dragon",
-                "dragon_score": 6,
-                "tiger_score": 1,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "6"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "A"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:19",
-                "winner": "Tiger",
-                "dragon_score": 7,
-                "tiger_score": 9,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "7"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "9"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:25",
-                "winner": "Tiger",
-                "dragon_score": 4,
-                "tiger_score": 7,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "4"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "7"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:30",
-                "winner": "Tiger",
-                "dragon_score": 6,
-                "tiger_score": 7,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "6"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "7"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:36",
-                "winner": "Tiger",
-                "dragon_score": 7,
-                "tiger_score": 10,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "7"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "10"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:42",
-                "winner": "Tiger",
-                "dragon_score": 12,
-                "tiger_score": 13,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "Q"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "K"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:48",
-                "winner": "Dragon",
-                "dragon_score": 4,
-                "tiger_score": 3,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "4"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "3"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:53",
-                "winner": "Tiger",
-                "dragon_score": 7,
-                "tiger_score": 12,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "7"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "Q"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:42:59",
-                "winner": "Tiger",
-                "dragon_score": 3,
-                "tiger_score": 6,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "3"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "6"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:05",
-                "winner": "Tiger",
-                "dragon_score": 2,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "2"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:10",
-                "winner": "Dragon",
-                "dragon_score": 8,
-                "tiger_score": 1,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "8"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "A"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:16",
-                "winner": "Dragon",
-                "dragon_score": 12,
-                "tiger_score": 11,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "Q"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "J"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:22",
-                "winner": "Tiger",
-                "dragon_score": 3,
-                "tiger_score": 13,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "3"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "K"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:28",
-                "winner": "Tiger",
-                "dragon_score": 2,
-                "tiger_score": 3,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "2"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "3"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:33",
-                "winner": "Dragon",
-                "dragon_score": 9,
-                "tiger_score": 3,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "9"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "3"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:39",
-                "winner": "Tiger",
-                "dragon_score": 4,
-                "tiger_score": 9,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "4"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "9"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:45",
-                "winner": "Dragon",
-                "dragon_score": 6,
-                "tiger_score": 2,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Diamond",
-                        "6"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "2"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:52",
-                "winner": "Tie",
-                "dragon_score": 2,
-                "tiger_score": 2,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "2"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "2"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:43:57",
-                "winner": "Dragon",
-                "dragon_score": 13,
-                "tiger_score": 4,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "K"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "4"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:44:02",
-                "winner": "Dragon",
-                "dragon_score": 13,
-                "tiger_score": 6,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "K"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "6"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:44:09",
-                "winner": "Tiger",
-                "dragon_score": 3,
-                "tiger_score": 5,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Club",
-                        "3"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Heart",
-                        "5"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:44:15",
-                "winner": "Tie",
-                "dragon_score": 9,
-                "tiger_score": 9,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Red Black",
-                    "Small"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Red Black",
-                        "Small"
-                    ],
-                    "treasure": [
-                        "Red Black",
-                        "Small"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "9"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Club",
-                        "9"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:44:21",
-                "winner": "Dragon",
-                "dragon_score": 11,
-                "tiger_score": 9,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Black",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Black",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Black",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Spade",
-                        "J"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "9"
-                    ]
-                ]
-            },
-            {
-                "time": "2026-09-09 20:44:26",
-                "winner": "Dragon",
-                "dragon_score": 11,
-                "tiger_score": 9,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "Both Red",
-                    "Big"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "Both Red",
-                        "Big"
-                    ],
-                    "treasure": [
-                        "Both Red",
-                        "Big"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "J"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Diamond",
-                        "9"
-                    ]
-                ]
-            },
             {
                 "time": "2026-09-09 20:44:32",
                 "winner": "Tie",
@@ -13418,13 +12326,1513 @@
                         "A"
                     ]
                 ]
+            },
+            {
+                "time": "2026-09-28 23:24:02",
+                "winner": "Dragon",
+                "dragon_score": 9,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "7"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Diamond",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-02 15:23:34",
+                "winner": "Tie",
+                "dragon_score": 5,
+                "tiger_score": 5,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "5"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-10-23 21:52:29",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 2,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "2"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-10-23 21:52:54",
+                "winner": "Dragon",
+                "dragon_score": 8,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "8"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "J",
+                    "rank_multiplier": 5
+                }
+            },
+            {
+                "time": "2026-10-23 21:59:56",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 4,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "4"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "2",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:02",
+                "winner": "Tiger",
+                "dragon_score": 10,
+                "tiger_score": 11,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "10"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "J"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:09",
+                "winner": "Tiger",
+                "dragon_score": 5,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "Q",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:15",
+                "winner": "Dragon",
+                "dragon_score": 12,
+                "tiger_score": 11,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "Q"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "J"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "10",
+                    "rank_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:22",
+                "winner": "Tiger",
+                "dragon_score": 4,
+                "tiger_score": 9,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "4"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "9"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "3",
+                    "rank_multiplier": 8
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:28",
+                "winner": "Tie",
+                "dragon_score": 7,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small",
+                    "Perfect Suited Tie"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small",
+                        "Perfect Suited Tie"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small",
+                        "Perfect Suited Tie"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "7"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "7"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "Q",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:35",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "7"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 3,
+                    "rank": "6",
+                    "rank_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-23 22:00:42",
+                "winner": "Dragon",
+                "dragon_score": 9,
+                "tiger_score": 2,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "2"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:31:46",
+                "winner": "Dragon",
+                "dragon_score": 3,
+                "tiger_score": 1,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "3"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "A"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "8",
+                    "rank_multiplier": 4
+                }
+            },
+            {
+                "time": "2026-10-23 22:31:56",
+                "winner": "Dragon",
+                "dragon_score": 6,
+                "tiger_score": 5,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "6"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "5"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-23 22:32:03",
+                "winner": "Tiger",
+                "dragon_score": 5,
+                "tiger_score": 10,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Big"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Big"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Big"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "10"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 4,
+                    "rank": "8",
+                    "rank_multiplier": 5
+                }
+            },
+            {
+                "time": "2026-10-23 22:32:13",
+                "winner": "Dragon",
+                "dragon_score": 5,
+                "tiger_score": 3,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "3"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-23 22:32:44",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 13,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "K"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 3,
+                    "rank": "3",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 09:31:44",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Win 7"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Win 7"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Win 7"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "7"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-10-24 09:48:24",
+                "winner": "Dragon",
+                "dragon_score": 2,
+                "tiger_score": 1,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Win 2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Win 2"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Win 2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "2"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 09:48:34",
+                "winner": "Dragon",
+                "dragon_score": 6,
+                "tiger_score": 4,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Win 6"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Win 6"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Win 6"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "6"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "4"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "6",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 13:44:46",
+                "winner": "Dragon",
+                "dragon_score": 9,
+                "tiger_score": 5,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Win 9"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Win 9"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Win 9"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "5"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 4
+                }
+            },
+            {
+                "time": "2026-10-24 14:12:19",
+                "winner": "Tiger",
+                "dragon_score": 7,
+                "tiger_score": 12,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big",
+                    "Win Q"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big",
+                        "Win Q"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big",
+                        "Win Q"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "7"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "Q"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Diamond",
+                    "suit_multiplier": 3,
+                    "rank": "5",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 15:27:55",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small",
+                    "Win 6"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small",
+                        "Win 6"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small",
+                        "Win 6"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "10",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 16:13:07",
+                "winner": "Tiger",
+                "dragon_score": 8,
+                "tiger_score": 10,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Big",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Big",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Big",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "8"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "10"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Diamond",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-24 16:13:19",
+                "winner": "Dragon",
+                "dragon_score": 8,
+                "tiger_score": 7,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "8"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "7"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-24 16:14:47",
+                "winner": "Tiger",
+                "dragon_score": 9,
+                "tiger_score": 13,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Big",
+                    "Gap 3-5"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Big",
+                        "Gap 3-5"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Big",
+                        "Gap 3-5"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "K"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 2,
+                    "rank": "Q",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 16:18:14",
+                "winner": "Dragon",
+                "dragon_score": 5,
+                "tiger_score": 3,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "5"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "3"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "J",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 16:45:40",
+                "winner": "Tiger",
+                "dragon_score": 1,
+                "tiger_score": 2,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "A"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "2"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Diamond",
+                    "suit_multiplier": 2,
+                    "rank": "7",
+                    "rank_multiplier": 4
+                }
+            },
+            {
+                "time": "2026-10-24 16:45:51",
+                "winner": "Tiger",
+                "dragon_score": 4,
+                "tiger_score": 11,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Big",
+                    "Gap 6-9"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Big",
+                        "Gap 6-9"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Big",
+                        "Gap 6-9"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "4"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "J"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "6",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 19:19:32",
+                "winner": "Dragon",
+                "dragon_score": 9,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small",
+                    "Gap 3-5"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small",
+                        "Gap 3-5"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small",
+                        "Gap 3-5"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "9"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 3,
+                    "rank": "7",
+                    "rank_multiplier": 8
+                }
+            },
+            {
+                "time": "2026-10-24 19:19:48",
+                "winner": "Dragon",
+                "dragon_score": 11,
+                "tiger_score": 9,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Big",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Big",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Big",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "J"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Diamond",
+                        "9"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Spade",
+                    "suit_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 19:42:08",
+                "winner": "Dragon",
+                "dragon_score": 6,
+                "tiger_score": 1,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Red Black",
+                    "Small",
+                    "Gap 3-5"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Red Black",
+                        "Small",
+                        "Gap 3-5"
+                    ],
+                    "treasure": [
+                        "Red Black",
+                        "Small",
+                        "Gap 3-5"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "A"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "rank": "8",
+                    "rank_multiplier": 5
+                }
+            },
+            {
+                "time": "2026-10-24 19:42:56",
+                "winner": "Dragon",
+                "dragon_score": 12,
+                "tiger_score": 11,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Big",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Big",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Big",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "Q"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Club",
+                        "J"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-10-24 19:48:00",
+                "winner": "Dragon",
+                "dragon_score": 7,
+                "tiger_score": 6,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Black",
+                    "Small",
+                    "Gap 0-2"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Black",
+                        "Small",
+                        "Gap 0-2"
+                    ],
+                    "treasure": [
+                        "Both Black",
+                        "Small",
+                        "Gap 0-2"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Club",
+                        "7"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "6"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Heart",
+                    "suit_multiplier": 3,
+                    "rank": "3",
+                    "rank_multiplier": 2
+                }
+            },
+            {
+                "time": "2026-10-24 19:48:15",
+                "winner": "Tiger",
+                "dragon_score": 2,
+                "tiger_score": 8,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Small",
+                    "Gap 6-9"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Small",
+                        "Gap 6-9"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Small",
+                        "Gap 6-9"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Heart",
+                        "2"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "8"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 3
+                }
+            },
+            {
+                "time": "2026-10-24 19:48:25",
+                "winner": "Dragon",
+                "dragon_score": 13,
+                "tiger_score": 1,
+                "natural": false,
+                "mode": "treasure",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Both Red",
+                    "Big",
+                    "Gap 10-12"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Both Red",
+                        "Big",
+                        "Gap 10-12"
+                    ],
+                    "treasure": [
+                        "Both Red",
+                        "Big",
+                        "Gap 10-12"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "K"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Heart",
+                        "A"
+                    ]
+                ],
+                "treasure_bonus": {
+                    "suit": "Club",
+                    "suit_multiplier": 3
+                }
             }
         ]
     },
     "statistic_data": {
-        "total_game": 1712,
-        "dragon_win": 788,
-        "tiger_win": 783,
-        "tie_win": 141
+        "total_game": 1748,
+        "dragon_win": 806,
+        "tiger_win": 799,
+        "tie_win": 143
     }
 }

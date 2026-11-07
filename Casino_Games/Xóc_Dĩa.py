@@ -1977,24 +1977,577 @@ class XocDiaGame:
                       fill='#C5D1C8',font=('Arial',max(10,round(13*scale))))
 
     def show_game_instructions(self):
-        window=tk.Toplevel(self.root);window.title('越南色碟 · 游戏规则')
-        window.configure(bg='#183B32');window.resizable(False,False)
-        lines=(
-            '系统模拟庄家同时摇动 4 个透明碗；每碗有一碟、一枚红白双面硬币。',
-            '每碗摇 7–20 次，平均 12 次；普通摇动 0.35–0.45 秒，倒立翻转 0.75–0.9 秒。',
-            '摇动结束、硬币停稳后，四碗在同一视角同时开启。',
-            '硬币若立起，本局无效，所有下注全额退还。',
-            '小：0 或 1 红；大：3 或 4 红。2 红时小/大均退还该区本金。',
-            '单：1 或 3 红；双：0、2 或 4 红。',
-            '3 红 1 白、3 白 1 红、4 红、4 白、2 红 2 白按字面颜色判定。',
-            '小 / 大 / 单 / 双净赢 0.95:1；2 红 2 白净赢 3:2。',
-            '3 红 1 白 / 3 白 1 红净赢 5:2；4 红 / 4 白净赢 14:1。',
-            '赔率显示净赢，命中另返本金。左键下注，右键清除下注区。',
+        """Open a themed, scrollable help window for the current game mode."""
+        parent = getattr(self, '_window', None) or self.root.winfo_toplevel()
+
+        existing = getattr(self, '_instruction_window', None)
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.lift()
+                    existing.focus_force()
+                    return
+            except tk.TclError:
+                pass
+
+        dialog = tk.Toplevel(parent)
+        self._instruction_window = dialog
+
+        # -------- 模式相关：普通 / 高额 --------
+        high = bool(self.high_bet_mode)
+        mode = 'high' if high else 'normal'
+        mode_title = '高额模式' if high else '普通模式'
+        min_bet, per_bet, total_bet = self.bet_limits
+
+        dialog.title(f'越南色碟 · 游戏说明 · {mode_title}')
+        dialog.configure(bg='#0a1414')
+        dialog.resizable(False, False)
+        dialog.transient(parent)
+
+        win_w, win_h = 1000, 650
+        parent.update_idletasks()
+        pw = max(1, parent.winfo_width())
+        ph = max(1, parent.winfo_height())
+        px = parent.winfo_rootx()
+        py = parent.winfo_rooty()
+        pos_x = px + (pw - win_w) // 2
+        pos_y = py + (ph - win_h) // 2
+        dialog.geometry(f'{win_w}x{win_h}+{pos_x}+{pos_y}')
+        dialog.minsize(win_w, win_h)
+        dialog.maxsize(win_w, win_h)
+
+        font_name = FONT
+
+        # ==============================================================
+        # 配色
+        # ==============================================================
+        BG = '#0a1414'
+        HEADER = '#0f1c1c'
+        SIDEBAR = '#0e1a1a'
+        PANEL = '#132020'
+        PANEL_2 = '#1a2a2a'
+        ROW_ALT = '#162424'
+        BORDER = '#3d5a55'
+
+        GOLD = '#f0d48b'
+        TEXT = '#eef4f4'
+        MUTED = '#a8bdbd'
+        BLACK = '#111111'
+        WHITE = '#ffffff'
+
+        FONT_SMALL = 14
+        FONT_NORMAL = 15
+        FONT_MEDIUM = 16
+        FONT_LARGE = 18
+        FONT_TITLE = 20
+
+        # ==============================================================
+        # 顶部标题栏
+        # ==============================================================
+        header = tk.Frame(dialog, bg=HEADER, height=82)
+        header.pack(fill=tk.X, side=tk.TOP)
+        header.pack_propagate(False)
+
+        tk.Label(
+            header,
+            text=f'越南色碟  {mode_title}',
+            font=(font_name, FONT_TITLE, 'bold'),
+            fg=GOLD, bg=HEADER
+        ).place(x=24, y=10)
+
+        tk.Label(
+            header,
+            text='玩法 · 摇碗规则 · 下注区 · 限红 · 赔率表',
+            font=(font_name, FONT_SMALL),
+            fg=MUTED, bg=HEADER
+        ).place(x=25, y=48)
+
+        def _close_instruction():
+            try:
+                self._instruction_window = None
+            except Exception:
+                pass
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
+
+        close_btn = tk.Button(
+            header,
+            text='关闭  ESC',
+            command=_close_instruction,
+            font=(font_name, FONT_SMALL, 'bold'),
+            bg='#2a3330',
+            fg=TEXT,
+            activebackground='#3a4644',
+            activeforeground=WHITE,
+            relief=tk.FLAT,
+            bd=0,
+            cursor='hand2'
         )
-        for text in lines:
-            tk.Label(window,text=text,bg='#183B32',fg='#F2E6CA',font=(FONT,11),
-                     anchor='w').pack(fill='x',padx=20,pady=7)
-        tk.Button(window,text='关闭',command=window.destroy,bg='#D7B878').pack(pady=12)
+        close_btn.place(x=850, y=20, width=120, height=42)
+
+        tk.Frame(dialog, bg=GOLD, height=3).pack(fill=tk.X, side=tk.TOP)
+
+        # ==============================================================
+        # 主体：左 sidebar + 右 content
+        # ==============================================================
+        body = tk.Frame(dialog, bg=BG)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        sidebar_w = 220
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=sidebar_w)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+
+        tk.Frame(body, bg=BORDER, width=1).pack(side=tk.LEFT, fill=tk.Y)
+
+        tk.Label(
+            sidebar,
+            text='主题',
+            font=(font_name, FONT_SMALL, 'bold'),
+            fg=GOLD, bg=SIDEBAR, anchor='w'
+        ).pack(fill=tk.X, padx=16, pady=(18, 10))
+
+        right_wrap = tk.Frame(body, bg=BG)
+        right_wrap.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        right_wrap.grid_rowconfigure(0, weight=1)
+        right_wrap.grid_columnconfigure(0, weight=1)
+        right_wrap.grid_columnconfigure(1, weight=0)
+
+        content_canvas = tk.Canvas(
+            right_wrap, bg=BG, highlightthickness=0, bd=0, yscrollincrement=40)
+        content_scrollbar = tk.Scrollbar(
+            right_wrap, orient=tk.VERTICAL, command=content_canvas.yview,
+            bg='#1f2a29', troughcolor='#0d1515', activebackground=GOLD,
+            relief=tk.FLAT, bd=0, width=12)
+        content_canvas.configure(yscrollcommand=content_scrollbar.set)
+
+        content_canvas.grid(row=0, column=0, sticky='nsew', padx=(0, 4), pady=(6, 6))
+        content_scrollbar.grid(row=0, column=1, sticky='ns', padx=(0, 8), pady=(6, 6))
+
+        content = tk.Frame(content_canvas, bg=BG)
+        content_window = content_canvas.create_window((0, 0), window=content, anchor='nw')
+
+        def _sync_scrollregion(_event=None):
+            content_canvas.configure(scrollregion=content_canvas.bbox('all'))
+
+        def _fit_content_width(event):
+            content_canvas.itemconfigure(content_window, width=event.width)
+
+        content.bind('<Configure>', _sync_scrollregion)
+        content_canvas.bind('<Configure>', _fit_content_width)
+
+        def _scroll_units(event):
+            try:
+                return int(-1 * (event.delta / 120))
+            except Exception:
+                return 0
+
+        def _on_mousewheel(event):
+            units = _scroll_units(event)
+            if units:
+                content_canvas.yview_scroll(units, 'units')
+            return 'break'
+
+        def _on_mousewheel_linux_up(_event):
+            content_canvas.yview_scroll(-1, 'units')
+            return 'break'
+
+        def _on_mousewheel_linux_down(_event):
+            content_canvas.yview_scroll(1, 'units')
+            return 'break'
+
+        dialog.bind('<MouseWheel>', _on_mousewheel)
+        dialog.bind('<Button-4>', _on_mousewheel_linux_up)
+        dialog.bind('<Button-5>', _on_mousewheel_linux_down)
+
+        # ==============================================================
+        # 排版辅助
+        # ==============================================================
+        def clear_content():
+            for child in content.winfo_children():
+                child.destroy()
+
+        def reset_scroll():
+            try:
+                content_canvas.yview_moveto(0.0)
+            except tk.TclError:
+                pass
+
+        def section_title(text, subtitle=None):
+            block = tk.Frame(content, bg=BG)
+            block.pack(fill=tk.X, padx=24, pady=(14, 0))
+            tk.Label(block, text=text, font=(font_name, FONT_LARGE, 'bold'),
+                    fg=GOLD, bg=BG, anchor='w').pack(side=tk.LEFT)
+            if subtitle:
+                tk.Label(block, text=subtitle, font=(font_name, FONT_SMALL),
+                        fg=MUTED, bg=BG, anchor='e').pack(side=tk.RIGHT)
+            tk.Frame(content, bg=BORDER, height=1).pack(
+                fill=tk.X, padx=24, pady=(10, 16))
+
+        def make_card(title=None, subtitle=None, pady=(0, 16)):
+            card = tk.Frame(content, bg=PANEL,
+                            highlightbackground=BORDER, highlightcolor=BORDER,
+                            highlightthickness=1, bd=0)
+            card.pack(fill=tk.X, padx=24, pady=pady)
+            if title:
+                head = tk.Frame(card, bg=PANEL)
+                head.pack(fill=tk.X, padx=22, pady=(16, 10))
+                tk.Label(head, text=title, font=(font_name, FONT_MEDIUM, 'bold'),
+                        fg=GOLD, bg=PANEL, anchor='w').pack(side=tk.LEFT)
+                if subtitle:
+                    tk.Label(head, text=subtitle, font=(font_name, FONT_SMALL),
+                            fg=MUTED, bg=PANEL, anchor='e').pack(side=tk.RIGHT)
+            return card
+
+        def add_rule(parent_frame, title, body, accent=GOLD):
+            row_wrap = tk.Frame(parent_frame, bg=PANEL)
+            row_wrap.pack(fill=tk.X, padx=22, pady=(0, 14))
+            row = tk.Frame(row_wrap, bg=PANEL)
+            row.pack(fill=tk.X)
+            tk.Frame(row, bg=accent, width=4).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 16))
+            text_box = tk.Frame(row, bg=PANEL)
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(text_box, text=title, font=(font_name, FONT_MEDIUM, 'bold'),
+                    fg=TEXT, bg=PANEL, anchor='w', justify=tk.LEFT).pack(fill=tk.X)
+            tk.Label(text_box, text=body, font=(font_name, FONT_SMALL),
+                    fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+                    pady=6).pack(fill=tk.X)
+
+        def table_block(parent_frame, title, rows):
+            block = tk.Frame(parent_frame, bg=PANEL_2,
+                            highlightbackground='#2b3d3d',
+                            highlightthickness=1, bd=0)
+            tk.Label(block, text=title, font=(font_name, FONT_SMALL, 'bold'),
+                    fg=BLACK, bg=GOLD, anchor='w', padx=16, pady=8
+                    ).pack(fill=tk.X)
+            grid = tk.Frame(block, bg=PANEL_2)
+            grid.pack(fill=tk.BOTH, expand=True)
+            grid.grid_columnconfigure(0, weight=1)
+            grid.grid_columnconfigure(1, minsize=160)
+            for i, (condition, payout) in enumerate(rows):
+                row_bg = ROW_ALT if i % 2 == 0 else PANEL_2
+                tk.Label(grid, text=condition, font=(font_name, FONT_SMALL),
+                        fg=TEXT, bg=row_bg, anchor='w', justify=tk.LEFT,
+                        padx=18, pady=10).grid(
+                    row=i, column=0, sticky='nsew', padx=(0, 1), pady=(0, 1))
+                tk.Label(grid, text=payout, font=(font_name, FONT_SMALL, 'bold'),
+                        fg=GOLD, bg=row_bg, anchor='center', padx=10, pady=10
+                        ).grid(row=i, column=1, sticky='nsew', pady=(0, 1))
+            return block
+
+        # ==============================================================
+        # 各模式数据（赔率相同，边注说明与限红不同）
+        # ==============================================================
+        odds_net = {
+            '小': '0.95:1', '单': '0.95:1', '双': '0.95:1', '大': '0.95:1',
+            '3红1白': '2.5:1', '3白1红': '2.5:1',
+            '4红': '14:1', '4白': '14:1', '2红2白': '1.5:1',
+        }
+
+        main_rows = [
+            ('小   —— 红面数量 0 或 1', odds_net['小']),
+            ('大   —— 红面数量 3 或 4', odds_net['大']),
+            ('单   —— 红面数量为奇数（1 / 3）', odds_net['单']),
+            ('双   —— 红面数量为偶数（0 / 2 / 4）', odds_net['双']),
+        ]
+        side_rows = [
+            ('3 红 1 白  —— 恰好 3 红 1 白', odds_net['3红1白']),
+            ('3 白 1 红  —— 恰好 3 白 1 红', odds_net['3白1红']),
+            ('4 红       —— 四枚全为红面', odds_net['4红']),
+            ('4 白       —— 四枚全为白面', odds_net['4白']),
+            ('2 红 2 白  —— 恰好 2 红 2 白', odds_net['2红2白']),
+        ]
+
+        limit_rows_normal = [
+            ('下注下限', f'${min_bet:,}'),
+            ('单区上限', f'${per_bet:,}'),
+            ('总下注上限', f'${total_bet:,}'),
+        ]
+        limit_rows_high = [
+            ('下注下限', f'${min_bet:,}'),
+            ('单区上限', f'${per_bet:,}'),
+            ('总下注上限', f'${total_bet:,}'),
+        ]
+        limit_rows = limit_rows_high if high else limit_rows_normal
+
+        # 各模式专属说明（“重要提示”页）
+        notes_by_mode = {
+            'normal': (
+                ('普通模式 · 限红',
+                f'下注下限 ${min_bet:,}；单区上限 ${per_bet:,}；'
+                f'总下注上限 ${total_bet:,}。'),
+            ),
+            'high': (
+                ('高额模式 · 限红',
+                f'下注下限 ${min_bet:,}；单区上限 ${per_bet:,}；'
+                f'总下注上限 ${total_bet:,}。'),
+            ),
+        }
+
+        # ==============================================================
+        # 各主题页面
+        # ==============================================================
+        def page_rules():
+            section_title('玩法与摇碗规则', '四碗 · 四币 · 同时揭晓')
+
+            intro = make_card(title='基本流程')
+            add_rule(
+                intro, '桌面结构',
+                '系统模拟庄家同时摇动 4 个透明碗；每个碗里有一碟、一枚红白双面硬币。')
+            add_rule(
+                intro, '摇碗规则',
+                '每碗摇 7–20 次（三角分布，众数 9，均值 12）。\n'
+                '普通摇动 0.35–0.45 秒，倒立翻转 0.75–0.9 秒。')
+            add_rule(
+                intro, '揭晓',
+                '四碗摇动结束、硬币全部停稳后，四碗在同一视角同时开启。')
+            add_rule(
+                intro, '立币无效',
+                '任意一枚硬币若最终立起（未平放），本局无效，所有下注全额退还。')
+
+            rule_card = make_card(title='摇动与结算细节')
+            add_rule(
+                rule_card, '多次摇动',
+                '每碗的摇动次数相互独立；每次摇动由 x / y 两个方向的'
+                '正弦与四阶脉冲叠加，模拟真实碗碟的晃动。')
+            add_rule(
+                rule_card, '180° 翻转',
+                '若干次摇动可被随机指定为「起 / 落」成对翻转，翻转过程\n'
+                '带动硬币翻面，因此结果由真实物理决定，而非预先指定。')
+            add_rule(
+                rule_card, '物理停稳',
+                '硬币停稳判据：高度 < 4 mm、竖直速度 < 0.04 m/s、\n'
+                '水平速度 < 0.035 m/s、角速度 < 0.25 rad/s。')
+            add_rule(
+                rule_card, '结果读取',
+                '硬币法线朝上且接近水平 → 红面；朝下 → 白面；\n'
+                '法线接近水平（|nz| < 0.25）→ 立起（无效）。')
+
+            hist_card = make_card(title='历史记录')
+            add_rule(
+                hist_card, '自动保存',
+                '每局结果与四枚硬币的完整姿态会写入日志文件；\n'
+                '重新打开游戏时会从日志恢复硬币姿态，接着上一局继续。')
+
+        def page_board():
+            section_title('下注区示意', '左键下注 · 右键清除单区 · 底部清除/重复/开牌')
+
+            card = make_card()
+            bet_cv = tk.Canvas(card, width=640, height=344,
+                            bg=PANEL, highlightthickness=0)
+            bet_cv.pack(padx=14, pady=(6, 16))
+
+            bet_cv.create_rectangle(6, 6, 634, 338,
+                                    fill='#0e3d3d', outline='#3d6a68', width=2)
+            bet_cv.create_text(22, 26, anchor='w',
+                            text=f'{mode_title} · 下注区',
+                            font=(font_name, FONT_SMALL, 'bold'), fill=TEXT)
+            bet_cv.create_text(618, 26, anchor='e',
+                            text=f'最低 ${min_bet:,}',
+                            font=(font_name, 12), fill='#a8c2c0')
+
+            board_x0, board_x1 = 22, 618
+            band_total = board_x1 - board_x0
+
+            palette = {
+                '小': '#3f6fa8', '单': '#3f6fa8',
+                '双': '#3f6fa8', '大': '#3f6fa8',
+                '3红1白': '#b06532', '3白1红': '#b06532',
+                '4红': '#a83232', '4白': '#8f8f8f',
+                '2红2白': '#6c7a3f',
+            }
+
+            def draw_row(names, y0, y1):
+                cell_w = band_total / len(names)
+                for i, name in enumerate(names):
+                    x0 = board_x0 + i * cell_w
+                    x1 = x0 + cell_w
+                    color = palette.get(name, '#45665c')
+                    bet_cv.create_rectangle(x0 + 2, y0 + 2, x1 - 2, y1 - 2,
+                                            fill=color, outline='#d5cbbd', width=1)
+                    bet_cv.create_text((x0 + x1) / 2, y0 + 26, text=name,
+                                    font=(font_name, 15, 'bold'), fill=WHITE)
+                    bet_cv.create_text((x0 + x1) / 2, y1 - 16,
+                                    text=odds_net.get(name, ''),
+                                    font=(font_name, 12, 'bold'),
+                                    fill='#f6e6b8')
+
+            draw_row(['小', '单', '双', '大'], 46, 110)
+            draw_row(['3红1白', '3白1红'],     116, 180)
+            draw_row(['4红', '4白'],           186, 250)
+
+            # 最后一格跨满整行
+            name = '2红2白'
+            color = palette[name]
+            bet_cv.create_rectangle(board_x0 + 2, 256 + 2, board_x1 - 2, 320 - 2,
+                                    fill=color, outline='#d5cbbd', width=1)
+            bet_cv.create_text((board_x0 + board_x1) / 2, 256 + 26, text=name,
+                            font=(font_name, 15, 'bold'), fill=WHITE)
+            bet_cv.create_text((board_x0 + board_x1) / 2, 320 - 16,
+                            text=odds_net[name],
+                            font=(font_name, 12, 'bold'), fill='#f6e6b8')
+
+            tip_card = make_card()
+            add_rule(tip_card, '左键下注',
+                    f'点击任意下注区，投入当前选中的筹码面额（最低 ${min_bet:,}）。')
+            add_rule(tip_card, '右键清除',
+                    '右键点击某个下注区，退还该区域的全部下注。')
+            add_rule(tip_card, '清除 / 重复',
+                    '底部「清除下注」退还本局所有下注；\n'
+                    '「重复上局下注」按上一局金额重新下注。')
+            add_rule(tip_card, '开始游戏',
+                    '点击「开始游戏」或按 Enter 键开始本局摇碗。')
+
+        def page_odds():
+            section_title('赔率表', '显示净赢赔率 · 命中另返本金')
+
+            card = make_card()
+            main_table = table_block(card, f'{mode_title} · 主注赔率', main_rows)
+            main_table.pack(fill=tk.X, padx=16, pady=(6, 16))
+
+            side_card = make_card()
+            side_table = table_block(
+                side_card, f'{mode_title} · 特殊下注赔率', side_rows)
+            side_table.pack(fill=tk.X, padx=16, pady=(6, 16))
+
+            note_card = make_card(title='附加说明')
+            add_rule(
+                note_card, '2 红 2 白 · 退本金',
+                '当本局结果为「2 红 2 白」时，下注「小」或「大」的注金\n'
+                '全额退还（不输不赢）；其他下注区照常按赔率结算。')
+            add_rule(
+                note_card, '立币无效',
+                '任意一枚硬币立起时，整局作废，所有下注区全额退还。')
+            add_rule(
+                note_card, '结算顺序',
+                '先按各区净赢赔率计算返还，再加上本金；命中时返还 = \n本金 × '
+                '（1 + 净赢赔率）。')
+
+        def page_limits():
+            section_title('下注限制与操作',
+                        f'{mode_title} · 总下注上限 ${total_bet:,}')
+
+            card = make_card()
+            limits_table = table_block(card, f'{mode_title} · 限红', limit_rows)
+            limits_table.pack(fill=tk.X, padx=16, pady=(6, 12))
+
+            op_card = make_card(title='操作说明')
+            add_rule(op_card, '左键下注',
+                    '点击顶部筹码选中面额，再点击下注区即可下注。')
+            add_rule(op_card, '右键清除',
+                    '右键点击某个下注区，退还该区域的全部下注。')
+            add_rule(op_card, '清除本局',
+                    '点击底部「清除下注」按钮，退还本局所有下注。')
+            add_rule(op_card, '重复上局下注',
+                    '点击「重复上局下注」按钮，按上一局的下注金额重新下注。')
+            add_rule(op_card, 'Enter 开始',
+                    '按 Enter 键或点击「开始游戏」按钮开始本局摇碗。')
+
+        def page_history():
+            section_title('历史记录说明', '右侧面板 · 最近 15 局 · 大小单数占比')
+
+            overview = make_card(title='历史记录面板')
+            add_rule(overview, '位置',
+                    '主界面右侧下部，显示最近 15 局结果。')
+            add_rule(overview, '每列一局',
+                    '每列从上到下按 白 → 立 → 红 排列四枚硬币，\n'
+                    '直观反映该局的颜色组合。')
+            add_rule(overview, '列宽自适应',
+                    '15 列等宽铺满面板；每行高度 = 面板高 / 4。')
+
+            stats_card = make_card(title='统计数据')
+            add_rule(stats_card, '统计项目',
+                    '面板底部显示「小 / 大」与「单 / 双」的占比，\n'
+                    '统计范围由按钮决定，默认最近 50 局。')
+            add_rule(stats_card, '排除无效局',
+                    '存在「立币」的无效局不计入占比统计。')
+
+            log_card = make_card(title='日志文件')
+            add_rule(log_card, '保存内容',
+                    '四枚硬币的颜色结果、时间戳，以及硬币的完整姿态\n'
+                    '（位置 + 四元数），用于下次打开游戏时恢复。')
+            add_rule(log_card, '上限',
+                    '最多保存最近 2000 局；更早的记录会被移除。')
+
+        def page_notes():
+            section_title('重要提示', f'{mode_title} 专属说明')
+            card = make_card()
+            for title, body in notes_by_mode.get(mode, ()):
+                add_rule(card, title, body)
+
+            common = make_card(title='通用提示')
+            add_rule(common, '立币无效',
+                    '任意硬币立起 → 整局作废 → 所有下注全额退还。')
+            add_rule(common, '退本金特例',
+                    '结果「2 红 2 白」时，小 / 大 两区退还本金。')
+            add_rule(common, 'Enter 快捷键',
+                    '主窗口按 Enter 与点击「开始游戏」等效。')
+
+        # ==============================================================
+        # 左侧主题按钮
+        # ==============================================================
+        themes = [
+            ('玩法与摇碗规则', page_rules),
+            ('下注区示意',     page_board),
+            ('赔率表',         page_odds),
+            ('下注限制与操作', page_limits),
+            ('历史记录说明',   page_history),
+            ('重要提示',       page_notes),
+        ]
+
+        theme_buttons = {}
+        current_theme = {'name': None}
+
+        def select_theme(name):
+            if current_theme['name'] == name:
+                return
+            current_theme['name'] = name
+            for theme_name, btn in theme_buttons.items():
+                active = theme_name == name
+                btn.configure(
+                    bg='#1e3433' if active else SIDEBAR,
+                    fg=GOLD if active else MUTED,
+                    activebackground='#24403e',
+                    activeforeground=GOLD,
+                )
+            clear_content()
+            for theme_name, builder in themes:
+                if theme_name == name:
+                    builder()
+                    break
+            content_canvas.update_idletasks()
+            reset_scroll()
+
+        for name, _builder in themes:
+            btn = tk.Button(
+                sidebar,
+                text=name,
+                command=lambda n=name: select_theme(n),
+                font=(font_name, FONT_SMALL),
+                fg=MUTED, bg=SIDEBAR,
+                activebackground='#24403e',
+                activeforeground=GOLD,
+                relief=tk.FLAT,
+                bd=0,
+                anchor='w',
+                padx=20,
+                pady=12,
+                cursor='hand2'
+            )
+            btn.pack(fill=tk.X)
+            theme_buttons[name] = btn
+
+        select_theme(themes[0][0])
+
+        # ==============================================================
+        # 关闭事件
+        # ==============================================================
+        dialog.protocol('WM_DELETE_WINDOW', _close_instruction)
+        dialog.bind('<Escape>', lambda _e: _close_instruction())
+        dialog.after(30, dialog.focus_force)
 
     def _cancel_jobs(self):
         self._stop_flash()

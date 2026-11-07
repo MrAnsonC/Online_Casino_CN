@@ -2,47 +2,6 @@
     "temp_finish_data": {
         "records": [
             {
-                "time": "2026-09-10 16:36:09",
-                "winner": "Phoenix",
-                "dragon_score": 5,
-                "tiger_score": 1,
-                "phoenix_score": 10,
-                "tied_winners": [],
-                "tie_count": 0,
-                "natural": false,
-                "mode": "classic",
-                "dragon_pair": false,
-                "tiger_pair": false,
-                "specials": [
-                    "One Red Two Black",
-                    "Gap 7-12"
-                ],
-                "special_by_mode": {
-                    "classic": [
-                        "One Red Two Black",
-                        "Gap 7-12"
-                    ]
-                },
-                "dragon_hand": [
-                    [
-                        "Heart",
-                        "5"
-                    ]
-                ],
-                "tiger_hand": [
-                    [
-                        "Spade",
-                        "A"
-                    ]
-                ],
-                "phoenix_hand": [
-                    [
-                        "Club",
-                        "10"
-                    ]
-                ]
-            },
-            {
                 "time": "2026-09-10 16:36:15",
                 "winner": "Phoenix",
                 "dragon_score": 3,
@@ -8818,9 +8777,7 @@
                 "dragon_score": 4,
                 "tiger_score": 7,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -8861,9 +8818,7 @@
                 "dragon_score": 7,
                 "tiger_score": 5,
                 "phoenix_score": 6,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -8904,9 +8859,7 @@
                 "dragon_score": 5,
                 "tiger_score": 5,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -8947,9 +8900,7 @@
                 "dragon_score": 9,
                 "tiger_score": 12,
                 "phoenix_score": 10,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -8990,9 +8941,7 @@
                 "dragon_score": 7,
                 "tiger_score": 1,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9033,9 +8982,7 @@
                 "dragon_score": 1,
                 "tiger_score": 8,
                 "phoenix_score": 2,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9076,9 +9023,7 @@
                 "dragon_score": 4,
                 "tiger_score": 6,
                 "phoenix_score": 9,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9119,9 +9064,7 @@
                 "dragon_score": 12,
                 "tiger_score": 11,
                 "phoenix_score": 11,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9162,9 +9105,7 @@
                 "dragon_score": 5,
                 "tiger_score": 2,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9205,9 +9146,7 @@
                 "dragon_score": 7,
                 "tiger_score": 5,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9248,9 +9187,7 @@
                 "dragon_score": 2,
                 "tiger_score": 9,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9291,9 +9228,7 @@
                 "dragon_score": 10,
                 "tiger_score": 11,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9334,9 +9269,7 @@
                 "dragon_score": 1,
                 "tiger_score": 11,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9377,9 +9310,7 @@
                 "dragon_score": 4,
                 "tiger_score": 8,
                 "phoenix_score": 2,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9420,9 +9351,7 @@
                 "dragon_score": 7,
                 "tiger_score": 9,
                 "phoenix_score": 6,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9463,9 +9392,7 @@
                 "dragon_score": 6,
                 "tiger_score": 11,
                 "phoenix_score": 9,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9506,9 +9433,7 @@
                 "dragon_score": 12,
                 "tiger_score": 8,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9549,9 +9474,7 @@
                 "dragon_score": 4,
                 "tiger_score": 10,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9680,9 +9603,7 @@
                 "dragon_score": 3,
                 "tiger_score": 4,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9767,9 +9688,7 @@
                 "dragon_score": 5,
                 "tiger_score": 10,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9810,9 +9729,7 @@
                 "dragon_score": 9,
                 "tiger_score": 5,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9853,9 +9770,7 @@
                 "dragon_score": 4,
                 "tiger_score": 7,
                 "phoenix_score": 11,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9896,9 +9811,7 @@
                 "dragon_score": 10,
                 "tiger_score": 11,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9939,9 +9852,7 @@
                 "dragon_score": 1,
                 "tiger_score": 10,
                 "phoenix_score": 9,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -9982,9 +9893,7 @@
                 "dragon_score": 8,
                 "tiger_score": 4,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10025,9 +9934,7 @@
                 "dragon_score": 8,
                 "tiger_score": 13,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10068,9 +9975,7 @@
                 "dragon_score": 6,
                 "tiger_score": 10,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10111,9 +10016,7 @@
                 "dragon_score": 3,
                 "tiger_score": 13,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10154,9 +10057,7 @@
                 "dragon_score": 7,
                 "tiger_score": 6,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10197,9 +10098,7 @@
                 "dragon_score": 3,
                 "tiger_score": 1,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10240,9 +10139,7 @@
                 "dragon_score": 3,
                 "tiger_score": 9,
                 "phoenix_score": 5,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10283,9 +10180,7 @@
                 "dragon_score": 13,
                 "tiger_score": 6,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10326,9 +10221,7 @@
                 "dragon_score": 1,
                 "tiger_score": 2,
                 "phoenix_score": 5,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10369,9 +10262,7 @@
                 "dragon_score": 7,
                 "tiger_score": 12,
                 "phoenix_score": 9,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10412,9 +10303,7 @@
                 "dragon_score": 8,
                 "tiger_score": 2,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10455,9 +10344,7 @@
                 "dragon_score": 11,
                 "tiger_score": 1,
                 "phoenix_score": 6,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10498,9 +10385,7 @@
                 "dragon_score": 9,
                 "tiger_score": 12,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10541,9 +10426,7 @@
                 "dragon_score": 1,
                 "tiger_score": 5,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10584,9 +10467,7 @@
                 "dragon_score": 5,
                 "tiger_score": 11,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10627,9 +10508,7 @@
                 "dragon_score": 1,
                 "tiger_score": 4,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10670,9 +10549,7 @@
                 "dragon_score": 7,
                 "tiger_score": 2,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10713,9 +10590,7 @@
                 "dragon_score": 2,
                 "tiger_score": 13,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10756,9 +10631,7 @@
                 "dragon_score": 1,
                 "tiger_score": 9,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10799,9 +10672,7 @@
                 "dragon_score": 10,
                 "tiger_score": 6,
                 "phoenix_score": 9,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10886,9 +10757,7 @@
                 "dragon_score": 2,
                 "tiger_score": 2,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10929,9 +10798,7 @@
                 "dragon_score": 7,
                 "tiger_score": 13,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -10972,9 +10839,7 @@
                 "dragon_score": 4,
                 "tiger_score": 4,
                 "phoenix_score": 6,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11015,9 +10880,7 @@
                 "dragon_score": 9,
                 "tiger_score": 3,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11058,9 +10921,7 @@
                 "dragon_score": 9,
                 "tiger_score": 4,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11101,9 +10962,7 @@
                 "dragon_score": 1,
                 "tiger_score": 8,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11188,9 +11047,7 @@
                 "dragon_score": 4,
                 "tiger_score": 9,
                 "phoenix_score": 10,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11231,9 +11088,7 @@
                 "dragon_score": 11,
                 "tiger_score": 4,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11274,9 +11129,7 @@
                 "dragon_score": 9,
                 "tiger_score": 11,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11317,9 +11170,7 @@
                 "dragon_score": 10,
                 "tiger_score": 11,
                 "phoenix_score": 6,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11360,9 +11211,7 @@
                 "dragon_score": 1,
                 "tiger_score": 6,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11403,9 +11252,7 @@
                 "dragon_score": 13,
                 "tiger_score": 12,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11446,9 +11293,7 @@
                 "dragon_score": 13,
                 "tiger_score": 5,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11489,9 +11334,7 @@
                 "dragon_score": 5,
                 "tiger_score": 8,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11532,9 +11375,7 @@
                 "dragon_score": 13,
                 "tiger_score": 12,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11575,9 +11416,7 @@
                 "dragon_score": 4,
                 "tiger_score": 11,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11618,9 +11457,7 @@
                 "dragon_score": 4,
                 "tiger_score": 10,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11661,9 +11498,7 @@
                 "dragon_score": 13,
                 "tiger_score": 3,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11704,9 +11539,7 @@
                 "dragon_score": 2,
                 "tiger_score": 5,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11791,9 +11624,7 @@
                 "dragon_score": 13,
                 "tiger_score": 7,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11834,9 +11665,7 @@
                 "dragon_score": 8,
                 "tiger_score": 10,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11877,9 +11706,7 @@
                 "dragon_score": 10,
                 "tiger_score": 5,
                 "phoenix_score": 11,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11920,9 +11747,7 @@
                 "dragon_score": 12,
                 "tiger_score": 12,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -11963,9 +11788,7 @@
                 "dragon_score": 8,
                 "tiger_score": 7,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12006,9 +11829,7 @@
                 "dragon_score": 12,
                 "tiger_score": 13,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12093,9 +11914,7 @@
                 "dragon_score": 11,
                 "tiger_score": 2,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12136,9 +11955,7 @@
                 "dragon_score": 7,
                 "tiger_score": 9,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12179,9 +11996,7 @@
                 "dragon_score": 5,
                 "tiger_score": 3,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12222,9 +12037,7 @@
                 "dragon_score": 13,
                 "tiger_score": 1,
                 "phoenix_score": 2,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12265,9 +12078,7 @@
                 "dragon_score": 11,
                 "tiger_score": 8,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12308,9 +12119,7 @@
                 "dragon_score": 3,
                 "tiger_score": 2,
                 "phoenix_score": 11,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12351,9 +12160,7 @@
                 "dragon_score": 13,
                 "tiger_score": 12,
                 "phoenix_score": 10,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12394,9 +12201,7 @@
                 "dragon_score": 3,
                 "tiger_score": 1,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12437,9 +12242,7 @@
                 "dragon_score": 7,
                 "tiger_score": 2,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12480,9 +12283,7 @@
                 "dragon_score": 10,
                 "tiger_score": 9,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12523,9 +12324,7 @@
                 "dragon_score": 4,
                 "tiger_score": 3,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12551,6 +12350,47 @@
                     [
                         "Diamond",
                         "3"
+                    ]
+                ],
+                "phoenix_hand": [
+                    [
+                        "Heart",
+                        "3"
+                    ]
+                ]
+            },
+            {
+                "time": "2026-10-02 15:23:42",
+                "winner": "Tiger",
+                "dragon_score": 3,
+                "tiger_score": 5,
+                "phoenix_score": 3,
+                "tied_winners": [],
+                "tie_count": 0,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Two Red One Black",
+                    "Gap 0-6"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Two Red One Black",
+                        "Gap 0-6"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "3"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "5"
                     ]
                 ],
                 "phoenix_hand": [
@@ -12614,9 +12454,7 @@
                 "dragon_score": 3,
                 "tiger_score": 4,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12701,9 +12539,7 @@
                 "dragon_score": 5,
                 "tiger_score": 10,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12744,9 +12580,7 @@
                 "dragon_score": 9,
                 "tiger_score": 5,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12787,9 +12621,7 @@
                 "dragon_score": 4,
                 "tiger_score": 7,
                 "phoenix_score": 11,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12830,9 +12662,7 @@
                 "dragon_score": 10,
                 "tiger_score": 11,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12873,9 +12703,7 @@
                 "dragon_score": 1,
                 "tiger_score": 10,
                 "phoenix_score": 9,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12916,9 +12744,7 @@
                 "dragon_score": 8,
                 "tiger_score": 4,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -12959,9 +12785,7 @@
                 "dragon_score": 8,
                 "tiger_score": 13,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13002,9 +12826,7 @@
                 "dragon_score": 6,
                 "tiger_score": 10,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13045,9 +12867,7 @@
                 "dragon_score": 3,
                 "tiger_score": 13,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13088,9 +12908,7 @@
                 "dragon_score": 7,
                 "tiger_score": 6,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13131,9 +12949,7 @@
                 "dragon_score": 3,
                 "tiger_score": 1,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13174,9 +12990,7 @@
                 "dragon_score": 3,
                 "tiger_score": 9,
                 "phoenix_score": 5,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13217,9 +13031,7 @@
                 "dragon_score": 13,
                 "tiger_score": 6,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13260,9 +13072,7 @@
                 "dragon_score": 1,
                 "tiger_score": 2,
                 "phoenix_score": 5,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13303,9 +13113,7 @@
                 "dragon_score": 7,
                 "tiger_score": 12,
                 "phoenix_score": 9,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13346,9 +13154,7 @@
                 "dragon_score": 8,
                 "tiger_score": 2,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13389,9 +13195,7 @@
                 "dragon_score": 11,
                 "tiger_score": 1,
                 "phoenix_score": 6,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13432,9 +13236,7 @@
                 "dragon_score": 9,
                 "tiger_score": 12,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13475,9 +13277,7 @@
                 "dragon_score": 1,
                 "tiger_score": 5,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13518,9 +13318,7 @@
                 "dragon_score": 5,
                 "tiger_score": 11,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13561,9 +13359,7 @@
                 "dragon_score": 1,
                 "tiger_score": 4,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13604,9 +13400,7 @@
                 "dragon_score": 7,
                 "tiger_score": 2,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13647,9 +13441,7 @@
                 "dragon_score": 2,
                 "tiger_score": 13,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13690,9 +13482,7 @@
                 "dragon_score": 1,
                 "tiger_score": 9,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13733,9 +13523,7 @@
                 "dragon_score": 10,
                 "tiger_score": 6,
                 "phoenix_score": 9,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13820,9 +13608,7 @@
                 "dragon_score": 2,
                 "tiger_score": 2,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13863,9 +13649,7 @@
                 "dragon_score": 7,
                 "tiger_score": 13,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13906,9 +13690,7 @@
                 "dragon_score": 4,
                 "tiger_score": 4,
                 "phoenix_score": 6,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13949,9 +13731,7 @@
                 "dragon_score": 9,
                 "tiger_score": 3,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -13992,9 +13772,7 @@
                 "dragon_score": 9,
                 "tiger_score": 4,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14035,9 +13813,7 @@
                 "dragon_score": 1,
                 "tiger_score": 8,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14122,9 +13898,7 @@
                 "dragon_score": 4,
                 "tiger_score": 9,
                 "phoenix_score": 10,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14165,9 +13939,7 @@
                 "dragon_score": 11,
                 "tiger_score": 4,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14208,9 +13980,7 @@
                 "dragon_score": 9,
                 "tiger_score": 11,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14251,9 +14021,7 @@
                 "dragon_score": 10,
                 "tiger_score": 11,
                 "phoenix_score": 6,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14294,9 +14062,7 @@
                 "dragon_score": 1,
                 "tiger_score": 6,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14337,9 +14103,7 @@
                 "dragon_score": 13,
                 "tiger_score": 12,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14380,9 +14144,7 @@
                 "dragon_score": 13,
                 "tiger_score": 5,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14423,9 +14185,7 @@
                 "dragon_score": 5,
                 "tiger_score": 8,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14466,9 +14226,7 @@
                 "dragon_score": 13,
                 "tiger_score": 12,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14509,9 +14267,7 @@
                 "dragon_score": 4,
                 "tiger_score": 11,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14552,9 +14308,7 @@
                 "dragon_score": 4,
                 "tiger_score": 10,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14595,9 +14349,7 @@
                 "dragon_score": 13,
                 "tiger_score": 3,
                 "phoenix_score": 8,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14638,9 +14390,7 @@
                 "dragon_score": 2,
                 "tiger_score": 5,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14725,9 +14475,7 @@
                 "dragon_score": 13,
                 "tiger_score": 7,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14768,9 +14516,7 @@
                 "dragon_score": 8,
                 "tiger_score": 10,
                 "phoenix_score": 7,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14811,9 +14557,7 @@
                 "dragon_score": 10,
                 "tiger_score": 5,
                 "phoenix_score": 11,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14854,9 +14598,7 @@
                 "dragon_score": 12,
                 "tiger_score": 12,
                 "phoenix_score": 13,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14897,9 +14639,7 @@
                 "dragon_score": 8,
                 "tiger_score": 7,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -14940,9 +14680,7 @@
                 "dragon_score": 12,
                 "tiger_score": 13,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15027,9 +14765,7 @@
                 "dragon_score": 11,
                 "tiger_score": 2,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15070,9 +14806,7 @@
                 "dragon_score": 7,
                 "tiger_score": 9,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Tiger"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15113,9 +14847,7 @@
                 "dragon_score": 5,
                 "tiger_score": 3,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15156,9 +14888,7 @@
                 "dragon_score": 13,
                 "tiger_score": 1,
                 "phoenix_score": 2,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15199,9 +14929,7 @@
                 "dragon_score": 11,
                 "tiger_score": 8,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15242,9 +14970,7 @@
                 "dragon_score": 3,
                 "tiger_score": 2,
                 "phoenix_score": 11,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15285,9 +15011,7 @@
                 "dragon_score": 13,
                 "tiger_score": 12,
                 "phoenix_score": 10,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15328,9 +15052,7 @@
                 "dragon_score": 3,
                 "tiger_score": 1,
                 "phoenix_score": 12,
-                "tied_winners": [
-                    "Phoenix"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15371,9 +15093,7 @@
                 "dragon_score": 7,
                 "tiger_score": 2,
                 "phoenix_score": 4,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15414,9 +15134,7 @@
                 "dragon_score": 10,
                 "tiger_score": 9,
                 "phoenix_score": 1,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15457,9 +15175,7 @@
                 "dragon_score": 4,
                 "tiger_score": 3,
                 "phoenix_score": 3,
-                "tied_winners": [
-                    "Dragon"
-                ],
+                "tied_winners": [],
                 "tie_count": 0,
                 "natural": false,
                 "mode": "classic",
@@ -15493,13 +15209,54 @@
                         "3"
                     ]
                 ]
+            },
+            {
+                "time": "2026-10-02 15:23:42",
+                "winner": "Tiger",
+                "dragon_score": 3,
+                "tiger_score": 5,
+                "phoenix_score": 3,
+                "tied_winners": [],
+                "tie_count": 0,
+                "natural": false,
+                "mode": "classic",
+                "dragon_pair": false,
+                "tiger_pair": false,
+                "specials": [
+                    "Two Red One Black",
+                    "Gap 0-6"
+                ],
+                "special_by_mode": {
+                    "classic": [
+                        "Two Red One Black",
+                        "Gap 0-6"
+                    ]
+                },
+                "dragon_hand": [
+                    [
+                        "Diamond",
+                        "3"
+                    ]
+                ],
+                "tiger_hand": [
+                    [
+                        "Spade",
+                        "5"
+                    ]
+                ],
+                "phoenix_hand": [
+                    [
+                        "Heart",
+                        "3"
+                    ]
+                ]
             }
         ]
     },
     "statistic_data": {
-        "total_game": 668,
+        "total_game": 669,
         "dragon_win": 203,
-        "tiger_win": 195,
+        "tiger_win": 196,
         "phoenix_win": 194,
         "tie_win": 76
     }

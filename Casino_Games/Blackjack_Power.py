@@ -9,7 +9,7 @@ from A_Tools.Account import install_secure_json as _install_secure_json
 _install_secure_json()
 del _install_secure_json, _account_root, _AccountPath, _account_sys
 
-# Double Bet Blackjack V29 — no 9/10 ranks / selectable 2X-4X double
+# Blackjack Power — Classic UI / no 9-10 ranks / selectable 2X-4X double
 import json
 import math
 import os
@@ -39,7 +39,7 @@ if _CARD_TOOLS_DIR not in sys.path:
 
 from CSM_Shuffler import CSMError, ContinuousShuffleMachine  # type: ignore
 
-BLACKJACK_VERSION = "V29-CSM-NO9-10-D2-4"
+BLACKJACK_VERSION = "V30-CSM-POWER-CLASSIC-UI-NO9-10-D2-4"
 
 try:
     from PIL import Image, ImageTk, ImageDraw, ImageFont
@@ -220,6 +220,7 @@ class BlackjackEngine:
 # UI
 # -----------------------------------------------------------------------------
 class BubbleBlackjackGame(tk.Frame):
+    CASHOUT_FACTOR = 0.90
     WIDTH = 1150
     HEIGHT = 750
     GAME_X0 = 12
@@ -227,13 +228,13 @@ class BubbleBlackjackGame(tk.Frame):
     HISTORY_X0 = 778  # compatibility only; no right-side panel in Blackjack
     HISTORY_X1 = 1138
 
-    BG = '#17120f'
-    PANEL = '#211811'
-    PANEL_LINE = '#665240'
+    BG = '#1B3D31'
+    PANEL = '#183B30'
+    PANEL_LINE = '#6C7850'
     FELT = '#083f38'
     FELT_2 = '#0c5148'
     LINE = '#c3d5ca'
-    GOLD = '#e7d36c'
+    GOLD = '#D4AF37'
     PLAYER_BLUE = '#3d67d8'
     DEALER_RED = '#d94a4e'
     TIE_GREEN = '#43a665'
@@ -242,7 +243,13 @@ class BubbleBlackjackGame(tk.Frame):
     MAX_MAIN_BET = 500_000.0
     MAX_SIDE_BET = 100_000.0
     MAX_SPLIT_ACTIONS = 3       # up to 4 player hands (3 split actions)
-    MAX_HANDS = 4
+    MAX_HANDS = 4              # one starting hand, up to 4 after 3 splits
+    SEATS = ('Player1',)
+    SEAT_NAMES = {'Player1': '玩家'}
+    SEAT_BOUNDS = {'Player1': (22.0, 1128.0)}
+    ZONE_COLORS = {'Player1': '#35634B'}
+    CARD_WIDTH, CARD_HEIGHT = 80, 112
+    SIDE_BET_DIAMETER = 122.0 * 2 / 3
     BLACKJACK_PROFIT = 1.5      # 3:2
     INSURANCE_PROFIT = 2.0      # 2:1
     SPLIT_ACES_ONE_CARD_ONLY = True
@@ -266,23 +273,30 @@ class BubbleBlackjackGame(tk.Frame):
 
     M_CHIP_COLOR = '#102d47'
 
-    # phase_text is intentionally restricted to these game-state messages.
-    PHASE_BETTING = '倍注黑杰克 · 请下注'
-    PHASE_INSURANCE = '倍注黑杰克 · 保险？'
-    PHASE_EVEN_MONEY = '倍注黑杰克 · 立刻获胜？'
-    PHASE_PLAYING = '倍注黑杰克 · 游戏中'
-    PHASE_DOUBLE = '倍注黑杰克 · 选择加倍倍数'
-    PHASE_SETTLING = '倍注黑杰克 · 结算中'
 
     CHIP_SPECS = [
         (100, '#202020', '100'),
-        (500, '#d780c0', '500'),
+        (500, '#FF7DDA', '500'),
         (1000, '#ab0058', '1K'),
         (5000, '#ba3438', '5K'),
         (10000, '#70439a', '10K'),
-        (50000, '#2e7542', '50K'),
+        (50000, '#FFD166', '50K'),
         (250000, '#ffffff', '250K'),
     ]
+
+
+    # Shared HCI geometry for stationary chips, split hands and animations.
+    WAGER_CHIP_RADIUS = 30.0
+    INSURANCE_CHIP_RADIUS = 20.0
+    CHIP_RIM_INSET = 3.0
+    CHIP_GAP = 4.0
+    CHIP_PITCH = 2 * WAGER_CHIP_RADIUS + CHIP_GAP
+    MAIN_BET_RADIUS = 48.0
+    MAIN_BET_Y = 557.0
+    MAIN_RING_START = 140.0
+    MAIN_RING_EXTENT = 260.0
+    MAIN_WAGER_LIFT = 72.0
+    CARD_WAGER_GAP = 6.0
 
     def __init__(self, parent, balance=10000, user=None, on_back=None,
                  on_balance_change=None, close_returns_to_parent=False):
@@ -306,6 +320,9 @@ class BubbleBlackjackGame(tk.Frame):
         self.cn_font = next((name for name in (
             'Microsoft YaHei UI', 'Microsoft YaHei', '微软雅黑', 'Noto Sans CJK SC',
             'SimHei', '黑体', 'Arial Unicode MS') if name in families), 'Arial')
+        self.chip_font = next((name for name in ('Arial', 'Liberation Sans', 'DejaVu Sans')
+                               if name in families), 'Arial')
+        self._chip_fonts = {}
 
         # One stable local game identity is used so an orderly restart can
         # recover any chamber lease left by the previous instance.
@@ -315,13 +332,23 @@ class BubbleBlackjackGame(tk.Frame):
         self.engine = BlackjackEngine(self.csm, self.csm_game_id)
         self.selected_chip = 1000.0
         self.current_bet = 0.0
-        self.current_side_bets = {key: 0.0 for key in self.SIDE_BET_KEYS}
+        self.current_bets = {seat: 0.0 for seat in self.SEATS}
+        self.last_bets = {seat: 0.0 for seat in self.SEATS}
+        self.round_original_bets = {seat: 0.0 for seat in self.SEATS}
+        self.split_actions_by_seat = {seat: 0 for seat in self.SEATS}
+        self.seat_insurance = {seat: dict(bet=0.0, returned=0.0, visible=False) for seat in self.SEATS}
+        self.insurance_resolved = False
+        self.ace_decision_seat = None
+        self.ace_decision_queue = []
+        self.seat_deal_sequences = {seat: [] for seat in self.SEATS}
+        self.round_initial_cards = {}
+        self.current_side_bets = self._empty_side_bets()
         self.last_bet = 0.0
-        self.last_side_bets = {key: 0.0 for key in self.SIDE_BET_KEYS}
+        self.last_side_bets = self._empty_side_bets()
         self.last_win_amount = 0.0
         self.show_last_win = False
         self.round_original_bet = 0.0
-        self.round_side_bets = {key: 0.0 for key in self.SIDE_BET_KEYS}
+        self.round_side_bets = self._empty_side_bets()
         self.insurance_bet = 0.0
         self.insurance_result = ''
         self.insurance_return_amount = 0.0
@@ -353,6 +380,9 @@ class BubbleBlackjackGame(tk.Frame):
         # this to recolour the already-visible side-bet pointed markers.
         self.dealer_phase_active = False
         self.settlement_running = False
+        self.settlement_visual_stage = None
+        self.pending_profit_chips = set()
+        self._opening_wager_animation = False
         self.settlement_flash_step = 0
         self.flash_mode = None
         self.flash_winning_side_bets = set()
@@ -367,7 +397,7 @@ class BubbleBlackjackGame(tk.Frame):
         # Used both for drawing the 1–5 base chips / Double chip and settlement flash.
         self.main_wager_positions = {}
         self.bet_chip_animation_count = 0
-        self.pending_bet_animation = {'MAIN': 0.0, **{key: 0.0 for key in self.SIDE_BET_KEYS}}
+        self.pending_bet_animation = {(seat, key): 0.0 for seat in self.SEATS for key in ('MAIN',)+self.SIDE_BET_KEYS}
         self._closing = False
         self.last_result_lines = []  # internal only; never shown to the player
         self.runtime_data_file = os.path.abspath(
@@ -376,7 +406,7 @@ class BubbleBlackjackGame(tk.Frame):
                 '..',
                 'A_Logs',
                 'Json',
-                'Blackjack_Classic.json'
+                'Blackjack_Power.json'
             )
         )
         self.shoe_resumed = False
@@ -422,9 +452,11 @@ class BubbleBlackjackGame(tk.Frame):
             self._previous_escape_binding = ''
         self._host_bindings_restored = False
 
+        self._host_bindings_restored = False
+
         try:
-            top.geometry('1150x750+50+10')
-            top.resizable(False, False)
+            top.bind('<Return>', self.handle_enter)
+            top.bind('<Escape>', lambda _e: self.exit_game())
         except tk.TclError:
             pass
         try:
@@ -434,16 +466,16 @@ class BubbleBlackjackGame(tk.Frame):
             pass
 
         self.accept_bets = True
-        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_BETTING)
         self.update_display()
+
 
     # ------------------------------------------------------------------ assets
     def find_original_card_asset_dir(self):
         current = os.path.dirname(os.path.abspath(__file__))
         candidates = [
-            os.path.join(current, 'A_Tools', 'Card', 'Poker1'),
-            os.path.join(os.path.dirname(current), 'A_Tools', 'Card', 'Poker1'),
-            os.path.join(os.path.dirname(os.path.dirname(current)), 'A_Tools', 'Card', 'Poker1'),
+            os.path.join(current, 'A_Tools', 'Card', 'Poker2'),
+            os.path.join(os.path.dirname(current), 'A_Tools', 'Card', 'Poker2'),
+            os.path.join(os.path.dirname(os.path.dirname(current)), 'A_Tools', 'Card', 'Poker2'),
         ]
         for directory in candidates:
             if os.path.isdir(directory) and os.path.exists(os.path.join(directory, 'Background.png')):
@@ -462,12 +494,12 @@ class BubbleBlackjackGame(tk.Frame):
                         path = os.path.join(directory, f'{suit}{rank}.png')
                         if not os.path.exists(path):
                             continue
-                        base = Image.open(path).convert('RGBA').resize((100, 140), resample)
+                        base = Image.open(path).convert('RGBA').resize((self.CARD_WIDTH, self.CARD_HEIGHT), resample)
                         self.external_card_pil[(suit, rank)] = base
                         self.external_card_images[(suit, rank)] = ImageTk.PhotoImage(base, master=self)
                 back_path = os.path.join(directory, 'Background.png')
                 if os.path.exists(back_path):
-                    back = Image.open(back_path).convert('RGBA').resize((100, 140), resample)
+                    back = Image.open(back_path).convert('RGBA').resize((self.CARD_WIDTH, self.CARD_HEIGHT), resample)
                     self.external_back_pil = back
                     self.external_back_image = ImageTk.PhotoImage(back, master=self)
                 if self.external_card_images and self.external_back_image is not None:
@@ -495,6 +527,7 @@ class BubbleBlackjackGame(tk.Frame):
             self.external_back_image = None
             self.external_back_pil = None
 
+
     def _make_fallback_card_pil(self, card, face_up=True):
         image = Image.new('RGBA', (100, 140), '#f4efe4' if face_up else '#253e66')
         draw = ImageDraw.Draw(image)
@@ -504,7 +537,7 @@ class BubbleBlackjackGame(tk.Frame):
             draw.rectangle((12, 12, 87, 127), outline='#e4d490', width=2)
             draw.line((16, 16, 83, 123), fill='#e4d490', width=2)
             draw.line((83, 16, 16, 123), fill='#e4d490', width=2)
-            return image
+            return image.resize((self.CARD_WIDTH, self.CARD_HEIGHT), getattr(Image, 'Resampling', Image).LANCZOS)
         suit, rank = card
         suit_map = {'Club': '♣', 'Diamond': '♦', 'Heart': '♥', 'Spade': '♠'}
         color = '#c22631' if suit in ('Diamond', 'Heart') else '#111111'
@@ -516,7 +549,8 @@ class BubbleBlackjackGame(tk.Frame):
             font_suit = None
         draw.text((8, 6), str(rank), fill=color, font=font_big)
         draw.text((9, 42), suit_map.get(suit, suit[:1]), fill=color, font=font_suit)
-        return image
+        return image.resize((self.CARD_WIDTH, self.CARD_HEIGHT), getattr(Image, 'Resampling', Image).LANCZOS)
+
 
     # --------------------------------------------------------------------- UI
     def create_ui(self):
@@ -535,323 +569,264 @@ class BubbleBlackjackGame(tk.Frame):
 
     def draw_animation_panel(self):
         c = self.canvas
-        # V11 keeps the V8 162px/192px dealer/player heights.  During betting
-        # the player zone is at the original V8 position (182..374).  After 开牌
-        # it translates down 40px to make room for the 30px rules bar, and after
-        # settlement it returns to the original position.  Dealer never moves.
-        x0, y0, x1, y1 = self.GAME_X0, 4, self.GAME_X1, 422
-        self.animation_panel = (x0, y0, x1, y1)
-        c.create_rectangle(x0, y0, x1, y1, fill=self.PANEL,
-                           outline=self.PANEL_LINE, width=2, tags='static')
+        self.animation_panel = (22, 44, 1128, 617)
+        c.create_text(575, 18, text='倍注黑杰克  POWER BLACKJACK',
+                      font=(self.cn_font, 16, 'bold'), fill=self.GOLD, tags='static')
+        self.dealer_zone_rect = c.create_rectangle(355, 44, 795, 197,
+                                                   fill='#4b1e22', outline='', tags='static')
+        c.create_text(575, 57, text='庄家', font=(self.cn_font, 16, 'bold'),
+                      fill='#F2E6C9', tags='static')
+        self.seat_zone_rects = {}
+        self.seat_title_items = {}
+        for seat, (x0, x1) in self.SEAT_BOUNDS.items():
+            self.seat_zone_rects[seat] = c.create_rectangle(
+                x0, 252, x1, 617, fill=self.ZONE_COLORS[seat], outline='', tags='static')
+            self.seat_title_items[seat] = c.create_text(
+                (x0+x1)/2, 266, text=self.SEAT_NAMES[seat],
+                font=(self.cn_font, 16, 'bold'), fill='#F2E6C9', tags='static')
+        # Same three-column limit table and gold/green palette as Caribbean Stud.
+        c.create_rectangle(30, 75, 349, 181, fill='#183B30', outline=self.GOLD, tags='static')
+        c.create_rectangle(30, 75, 349, 104, fill='#40634B', outline=self.GOLD, tags='static')
+        c.create_text(189.5, 89, text='下注上限', font=(self.cn_font, 13, 'bold'),
+                      fill='#F2E6C9', tags='static')
+        for col, (label, amount) in enumerate((('主注最低', self.MIN_BET),
+                                               ('主注最高', self.MAX_MAIN_BET),
+                                               ('边注最高', self.MAX_SIDE_BET))):
+            left, right = 30+col*319/3, 30+(col+1)*319/3
+            c.create_rectangle(left, 104, right, 141, outline='#77906B', tags='static')
+            c.create_rectangle(left, 141, right, 181, outline='#77906B', tags='static')
+            c.create_text((left+right)/2, 122, text=label, font=(self.cn_font, 11, 'bold'),
+                          fill='#F2E6C9', tags='static')
+            c.create_text((left+right)/2, 161, text=f'${amount:,.0f}',
+                          font=(self.cn_font, 12, 'bold'), fill=self.GOLD, tags='static')
+        self.insurance_positions = {'Player1': (575.0, 224.0)}
+        self.dealer_total_text = c.create_text(575, 193, text='', state='hidden')
+        self.rule_strip_bounds = (22.0, 200.0, 1128.0, 248.0)
+        self.rule_strip_rect = c.create_rectangle(*self.rule_strip_bounds,
+            fill='#173C2E', outline='#65784B', tags='round_rule_strip')
+        c.create_line(25, 201, 1125, 201, fill='#E0C879', width=2, tags='round_rule_strip')
+        c.create_line(25, 247, 1125, 247, fill='#0C241B', width=2, tags='round_rule_strip')
+        self.rule_strip_text = c.create_text(575, 224,
+            text='移除9/10   庄家17停牌   保险2:1   黑杰克3:2   加倍2–4X   最多分牌3次',
+            font=(self.cn_font, 13, 'bold'), fill=self.GOLD, tags='rule_strip_text')
+        self.rule_strip_left_text = c.create_text(545, 224, text='', state='hidden')
+        self.rule_strip_right_text = c.create_text(605, 224, text='', state='hidden')
+        self.rule_strip_chip_pos = (575, 224)  # legacy helper compatibility
+        self.shoe_origin = (575, 52)  # identical to Caribbean Stud's deal origin
 
-        self.player_zone_home = (x0 + 8, 182.0, x1 - 8, 374.0)
-        self.player_zone_round = (x0 + 8, 222.0, x1 - 8, 414.0)
-        self.player_label_home = (x0 + 22, 195.0)
-        self.player_label_round = (x0 + 22, 235.0)
-        self.player_zone_mode = 'home'
-        self.dealer_zone_rect = c.create_rectangle(
-            x0 + 8, y0 + 8, x1 - 8, 174,
-            fill='#4b1e22', outline='#865158', width=2, tags='static')
-        self.player_zone_rect = c.create_rectangle(
-            *self.player_zone_home, fill='#102d47', outline='#4c6682', width=2, tags='static')
-        c.create_text(x0 + 22, y0 + 22, anchor='nw', text='庄家 DEALER',
-                      font=(self.cn_font, 17, 'bold'), fill='#ffb5b9', tags='static')
-        self.player_zone_title = c.create_text(
-            *self.player_label_home, anchor='nw', text='玩家 PLAYER',
-            font=(self.cn_font, 17, 'bold'), fill='#b9d6ff', tags='static')
-
-        self.dealer_total_text = c.create_text(
-            x0 + 24, 161, anchor='w', text='', font=(self.cn_font, 13, 'bold'),
-            fill='white', state='hidden', tags=('dynamic', 'cards'))
-        self.phase_text = c.create_text(
-            (x0 + x1) / 2, 18, text=self.PHASE_PLAYING,
-            font=(self.cn_font, 13, 'bold'), fill=self.GOLD, tags=('dynamic', 'cards'))
-
-        # Exact 30px-high dealer/player rule bar.
-        self.rule_strip_bounds = (250.0, 182.0, 900.0, 212.0)
-        rx0, ry0, rx1, ry1 = self.rule_strip_bounds
-        self.rule_strip_rect = c.create_rectangle(
-            rx0, ry0, rx1, ry1, fill='#0c5148', outline='#d7e8df', width=1,
-            state='hidden', tags=('round_rule_strip',))
-        self.rule_strip_text = c.create_text(
-            (rx0 + rx1) / 2, (ry0 + ry1) / 2,
-            text='庄家任何17点停牌   移除全部9点和10点   保险2:1   黑杰克3:2',
-            font=(self.cn_font, 12, 'bold'), fill='white', state='hidden',
-            tags=('round_rule_strip', 'rule_strip_text'))
-        # V11: insurance never makes the wording move or split.  The chip is
-        # layered above the BAR at its horizontal centre; the full sentence stays
-        # exactly where it is.  Legacy split-text items remain hidden for API
-        # compatibility with the settlement colour helper.
-        self.rule_strip_left_text = c.create_text(
-            545, (ry0 + ry1) / 2, anchor='e', text='',
-            font=(self.cn_font, 12, 'bold'), fill='white', state='hidden',
-            tags=('round_rule_strip', 'rule_strip_split_text'))
-        self.rule_strip_right_text = c.create_text(
-            605, (ry0 + ry1) / 2, anchor='w', text='',
-            font=(self.cn_font, 12, 'bold'), fill='white', state='hidden',
-            tags=('round_rule_strip', 'rule_strip_split_text'))
-        self.rule_strip_chip_pos = ((rx0 + rx1) / 2, (ry0 + ry1) / 2)
-
-        # V19: keep the off-table deal origin for card-flight animation, but do
-        # not draw any SHOE object in the upper-right corner.
-        self.shoe_origin = (x1 - 92, 46)
 
     def draw_board(self):
-        """Draw the Evoplay-style station and remember HOME/ROUND geometries."""
         c = self.canvas
-        board_x0, board_y0, board_x1, board_y1 = self.GAME_X0, 388, self.GAME_X1, 620
-        felt = '#075443'
-        self.betting_board_home_bounds = (board_x0, board_y0, board_x1, board_y1)
-        # Only the WHOLE betting-area background becomes 30px shorter in-round.
-        # The seven individual betting ovals keep their established dimensions.
-        self.betting_board_round_bounds = (board_x0, board_y0 + 30.0, board_x1, board_y1)
-        self.betting_board_rect = c.create_rectangle(
-            *self.betting_board_home_bounds, fill=felt, outline=self.LINE, width=2, tags='static')
-
-        home = {
-            'MAIN': ((455.0, 402.0, 695.0, 548.0), (575.0, 430.0), (575.0, 492.0)),
-            'Perfect Pair': ((220.0, 486.0, 380.0, 568.0), (300.0, 507.0), (300.0, 542.0)),
-            '21+3': ((330.0, 536.0, 450.0, 614.0), (390.0, 554.0), (390.0, 586.0)),
-            'Open Card Luck': ((458.0, 552.0, 568.0, 618.0), (513.0, 567.0), (513.0, 594.0)),
-            'Crazy 7': ((582.0, 552.0, 692.0, 618.0), (637.0, 567.0), (637.0, 594.0)),
-            'Hot 21': ((700.0, 536.0, 820.0, 614.0), (760.0, 554.0), (760.0, 586.0)),
-            'Bust!': ((770.0, 486.0, 930.0, 568.0), (850.0, 507.0), (850.0, 542.0)),
-        }
-        # After Enter, MAIN drops exactly 50 px and the six side bets fan
-        # outward to one horizontal level.  V11 restores the exact V9 oval sizes;
-        # the 30px reduction applies to the betting AREA background, not these seven ovals.
-        round_layout = {
-            'MAIN': ((455.0, 452.0, 695.0, 598.0), (575.0, 480.0), (575.0, 542.0)),
-            # V16: after 开牌, every SIDE-BET spot sits 20px lower than V15.
-            # MAIN deliberately keeps its existing in-round position.
-            'Perfect Pair': ((18.0, 504.0, 154.0, 586.0), (86.0, 525.0), (86.0, 560.0)),
-            '21+3': ((164.0, 504.0, 274.0, 586.0), (219.0, 525.0), (219.0, 560.0)),
-            'Open Card Luck': ((284.0, 504.0, 414.0, 586.0), (349.0, 525.0), (349.0, 560.0)),
-            'Crazy 7': ((736.0, 504.0, 846.0, 586.0), (791.0, 525.0), (791.0, 560.0)),
-            'Hot 21': ((856.0, 504.0, 966.0, 586.0), (911.0, 525.0), (911.0, 560.0)),
-            'Bust!': ((976.0, 504.0, 1132.0, 586.0), (1054.0, 525.0), (1054.0, 560.0)),
-        }
-        self.bet_layout_home = home
-        self.bet_layout_round = round_layout
+        self.bet_spots, self.side_bet_spots = {}, {}
+        for seat, (x0, x1) in self.SEAT_BOUNDS.items():
+            cx = (x0+x1)/2
+            # MAIN stays circular; side titles have their own row below the amount.
+            radius = self.SIDE_BET_DIAMETER/2
+            layouts = {'MAIN': self._bet_surface_layout(cx, main=True)}
+            for kind, x in zip(self.SIDE_BET_KEYS, (135, 285, 435, 715, 865, 1015)):
+                layouts[kind] = self._bet_surface_layout(x)
+            for index, (kind, (bounds, label_pos, chip_pos)) in enumerate(layouts.items()):
+                key = (seat, kind)
+                tag = f'bet_{seat}_{index}'
+                fill = '#2677A6' if kind=='MAIN' else '#173B32'
+                outline = '#B9D8E8' if kind=='MAIN' else self.GOLD
+                shape = self._draw_bet_surface(bounds, fill, outline, tag, kind == 'MAIN')
+                label = None
+                if kind!='MAIN':
+                    label = c.create_text(*label_pos, text=self.SIDE_BET_LABELS[kind],
+                        font=(self.cn_font, -14, 'bold'), fill='#F2E6C9',
+                        tags=(tag, 'betting_spot_label'))
+                spot = dict(key=key, bounds=bounds, label_pos=label_pos, chip_pos=chip_pos,
+                    rect=shape, label=label, tag=tag, shape='oval' if kind == 'MAIN' else 'rounded_rect', normal_fill=fill,
+                    normal_outline=outline, normal_width=2)
+                self.bet_spots[key] = spot
+                if spot['shape'] == 'oval':
+                    self._decorate_main_bet_surface(spot)
+                if kind != 'MAIN':
+                    self.side_bet_spots[key] = spot
+                c.tag_bind(tag, '<Button-1>', lambda _e, s=seat, k=kind: self._place_seat_bet(s, k))
+                c.tag_bind(tag, '<Button-3>', lambda _e, s=seat, k=kind: self._clear_seat_bet(s, k))
+                c.tag_bind(tag, '<Enter>', lambda _e: c.configure(cursor='hand2'))
+                c.tag_bind(tag, '<Leave>', lambda _e: c.configure(cursor=''))
         self.bet_layout_mode = 'home'
-
-        c.create_oval(427, 394, 723, 562, fill='', outline='#5ea85b', width=1,
-                      dash=(5, 6), tags=('static', 'betting_station_guide'))
-
-        self.bet_spots = {}
-        self.side_bet_spots = {}
-        labels = {'MAIN': '主注\nBLACKJACK', **self.SIDE_BET_LABELS}
-        widths = {'MAIN': 4, **{key: 3 for key in self.SIDE_BET_KEYS}}
-        fills = {'MAIN': '#0b5f4c', **{key: '#164f47' for key in self.SIDE_BET_KEYS}}
-        fonts = {'MAIN': 15, **{key: 12 for key in self.SIDE_BET_KEYS}}
-        fonts['Open Card Luck'] = 11
-
-        for index, key in enumerate(('MAIN',) + self.SIDE_BET_KEYS):
-            bounds, label_pos, chip_pos = home[key]
-            tag = 'main_bet_spot' if key == 'MAIN' else f'side_bet_{index - 1}'
-            shape = c.create_oval(*bounds, fill=fills[key], outline='#9de46f', width=widths[key],
-                                  tags=(tag, 'betting_spot'))
-            label = c.create_text(*label_pos, text=labels[key],
-                                  font=(self.cn_font, fonts[key], 'bold'), fill='white',
-                                  justify='center', tags=(tag, 'betting_spot_label'))
-            spot = {
-                'key': key, 'bounds': tuple(bounds), 'label_pos': tuple(label_pos),
-                'chip_pos': tuple(chip_pos), 'rect': shape, 'shape': 'oval',
-                'label': label, 'tag': tag, 'normal_fill': fills[key],
-                'normal_outline': '#9de46f', 'normal_width': widths[key],
-            }
-            self.bet_spots[key] = spot
-            if key == 'MAIN':
-                self.bet_spot_bounds = spot['bounds']; self.bet_spot_rect = shape; self.bet_spot_label = label
-                c.tag_bind(tag, '<Button-1>', lambda _e: self.place_bet())
-                c.tag_bind(tag, '<Button-3>', lambda _e: self.clear_bets())
-            else:
-                self.side_bet_spots[key] = spot
-                c.tag_bind(tag, '<Button-1>', lambda _e, k=key: self.place_side_bet(k))
-                c.tag_bind(tag, '<Button-3>', lambda _e, k=key: self.clear_side_bet(k))
-            c.tag_bind(tag, '<Enter>', lambda _e: c.configure(cursor='hand2'))
-            c.tag_bind(tag, '<Leave>', lambda _e: c.configure(cursor=''))
         self.update_bet_chips()
+
 
     def draw_bottom_controls(self):
         c = self.canvas
-        y0, y1 = 625, 748
-        c.create_rectangle(0, y0, self.WIDTH, y1, fill=self.BG,
-                           outline=self.PANEL_LINE, width=2, tags='controls')
-        self.balance_text = c.create_text(10, 665, anchor='w', text='余额: $0',
-                                          font=(self.cn_font, 18, 'bold'), fill='white',
-                                          tags=('dynamic', 'controls'))
-        self.total_bet_text = c.create_text(10, 710, anchor='w', text='本局下注: $0.00',
-                                            font=(self.cn_font, 15, 'bold'), fill='white',
-                                            tags=('dynamic', 'controls'))
-        self.clear_button = self._create_canvas_button(
-            270, 650, 336, 704, '清除', self.clear_bets, '#7c3b40',
-            tag='control_clear', font_size=11)
-
-        chip_diameter = 56; chip_gap = 8
-        total_width = len(self.CHIP_SPECS) * chip_diameter + (len(self.CHIP_SPECS) - 1) * chip_gap
-        chip_x = (self.WIDTH - total_width) / 2; chip_y = 646
-        self.chip_selector_centers = {}
+        c.create_rectangle(0, 625, 1150, 748, fill=self.BG, outline='#6C7850', width=2,
+                           tags='controls')
+        self.balance_text = c.create_text(10, 665, anchor='w', text='',
+            font=(self.cn_font, 18, 'bold'), fill='white', tags='controls')
+        self.total_bet_text = c.create_text(10, 710, anchor='w', text='',
+            font=(self.cn_font, 18, 'bold'), fill='white', tags='controls')
+        self.clear_button = self._create_canvas_button(278, 650, 344, 704, '清除',
+            self.clear_bets, '#9B403A', tag='control_clear', font_size=11)
+        diameter, gap = 56, 8
+        chip_x = (self.WIDTH-(len(self.CHIP_SPECS)*diameter+(len(self.CHIP_SPECS)-1)*gap))/2
         for value, color, label in self.CHIP_SPECS:
             tag = f'chip_select_{value}'
-            outer = c.create_oval(chip_x, chip_y, chip_x + chip_diameter, chip_y + chip_diameter,
-                                  fill='#292522', outline='#6d6259', width=3,
-                                  tags=(tag, 'chip_selector', 'predeal_controls'))
-            inner = c.create_oval(chip_x + 5, chip_y + 5,
-                                  chip_x + chip_diameter - 5, chip_y + chip_diameter - 5,
-                                  fill=color, outline='#eee3d6', width=2,
-                                  tags=(tag, 'chip_selector', 'predeal_controls'))
-            label_id = c.create_text(chip_x + chip_diameter / 2, chip_y + chip_diameter / 2,
-                                     text=label, font=(self.cn_font, 10, 'bold'),
-                                     fill=self.contrast_text_color(color),
-                                     tags=(tag, 'chip_selector', 'predeal_controls'))
+            outer = c.create_oval(chip_x, 646, chip_x+56, 702, fill='#182F25',
+                outline='#6C7850', width=3, tags=(tag, 'chip_selector'))
+            inner = c.create_oval(chip_x+5, 651, chip_x+51, 697, fill=color,
+                outline='#F2E6C9', width=2, tags=(tag, 'chip_selector'))
+            text = c.create_text(chip_x+28, 674, text=label,
+                font=self._fit_chip_font(label, 25), fill=self.contrast_text_color(color),
+                tags=(tag, 'chip_selector'))
+            self.chip_selector_items[value] = (outer, inner, text)
+            self.chip_selector_centers[float(value)] = (chip_x+28, 674)
             c.tag_bind(tag, '<Button-1>', lambda _e, v=value: self.select_chip(v))
-            self.chip_selector_items[value] = (outer, inner, label_id)
-            self.chip_selector_centers[float(value)] = (chip_x + chip_diameter / 2,
-                                                        chip_y + chip_diameter / 2)
-            chip_x += chip_diameter + chip_gap
-
-        self.info_button = self._create_canvas_button(
-            810, 650, 855, 695, '❓', self.show_game_instructions, '#315b72',
-            tag='control_info', font_size=17)
-        self.repeat_button = self._create_canvas_button(
-            862, 638, 1000, 708, '重复下注', self.repeat_last_bet, '#5b4938',
-            tag='control_repeat', font_size=11)
-        self.deal_button = self._create_canvas_button(
-            1012, 628, 1138, 720, '开牌\nENTER', self.deal_cards, '#d5ad4d',
-            fg='#111111', tag='control_deal', font_size=13)
-
-        specs = [
-            ('hit', 270, 638, 432, 720, '要牌', self.hit, '#315b72'),
-            ('stand', 442, 638, 604, 720, '停牌', self.stand, '#5b4938'),
-            ('double', 614, 638, 776, 720, '加倍', self.double, '#a56d2c'),
-            ('split', 786, 638, 948, 720, '分牌', self.split, '#70439a'),
-            ('surrender', 958, 638, 1138, 720, '兑现金额\n$0.00', self.instant_surrender, '#7c3b40'),
-        ]
-        for key, x0, yy0, x1, yy1, label, command, color in specs:
-            self.action_buttons[key] = self._create_canvas_button(
-                x0, yy0, x1, yy1, label, command, color,
-                tag=f'action_{key}', font_size=12)
-
-        # Dealer-A decisions replace the chip rack; no messagebox is used.
-        self.decision_buttons['accept'] = self._create_canvas_button(
-            405, 642, 565, 716, '购买保险', lambda: self._resolve_ace_decision(True),
-            '#a56d2c', tag='decision_accept', font_size=13)
-        self.decision_buttons['decline'] = self._create_canvas_button(
-            585, 642, 745, 716, '不购买', lambda: self._resolve_ace_decision(False),
-            '#315b72', tag='decision_decline', font_size=13)
-
-        # Double first opens a dedicated multiplier chooser.  While it is open,
-        # every ordinary hand action is hidden; Back restores the same hand.
-        double_specs = [
-            ('2x', 270, 638, 472, 720, '2X', lambda: self._resolve_double_choice(2), '#a56d2c'),
-            ('3x', 482, 638, 684, 720, '3X', lambda: self._resolve_double_choice(3), '#a56d2c'),
-            ('4x', 694, 638, 896, 720, '4X', lambda: self._resolve_double_choice(4), '#a56d2c'),
-            ('back', 906, 638, 1138, 720, '返回', self._cancel_double_choice, '#315b72'),
-        ]
-        for key, x0, y0, x1, y1, label, command, color in double_specs:
-            self.double_choice_buttons[key] = self._create_canvas_button(
-                x0, y0, x1, y1, label, command, color,
-                tag=f'double_choice_{key}', font_size=13)
+            chip_x += diameter+gap
+        self.info_button = self._create_canvas_button(810, 650, 855, 695, '?',
+            self.show_game_instructions, '#173f66', tag='control_info', font_size=17)
+        self.repeat_button = self._create_canvas_button(862, 638, 1000, 708, '重复下注',
+            self.repeat_last_bet, '#536A43', tag='control_repeat', font_size=11)
+        self.deal_button = self._create_canvas_button(1012, 628, 1138, 720, '开牌\nENTER',
+            self.deal_cards, '#D8B46A', fg='#2A1B08', tag='control_deal', font_size=14)
+        specs = (('hit', '要牌', self.hit, '#397A48'),
+                 ('stand', '停牌', self.stand, "#FC003F"),
+                 ('double', '加倍', self.double, '#A57A36'),
+                 ('split', '分牌', self.split, '#635182'),
+                 ('surrender', '兑现金额\n$0.00', self.instant_surrender, '#9B403A'))
+        for seat, (x0, x1) in self.SEAT_BOUNDS.items():
+            for index, (action, label, command, color) in enumerate(specs):
+                left = 278+index*174
+                self.action_buttons[(seat, action)] = self._create_canvas_button(
+                    left, 638, left+164, 720, label,
+                    lambda s=seat, cmd=command: self._invoke_seat_action(s, cmd), color,
+                    tag=f'action_{seat}_{action}', font_size=12)
+            for action, left, right, label, accept in (
+                    ('accept', 405, 565, '购买保险', True),
+                    ('decline', 585, 745, '不购买', False)):
+                self.decision_buttons[(seat, action)] = self._create_canvas_button(
+                    left, 642, right, 716, label, lambda a=accept: self._resolve_ace_decision(a),
+                    '#A57A36' if accept else '#173f66', tag=f'decision_{seat}_{action}', font_size=12)
+        # Power's multiplier picker uses Classic's existing bottom strip.
+        for index, (choice, label, command, color) in enumerate((
+                (2, '2X加倍', lambda: self._resolve_double_choice(2), '#A57A36'),
+                (3, '3X加倍', lambda: self._resolve_double_choice(3), '#A57A36'),
+                (4, '4X加倍', lambda: self._resolve_double_choice(4), '#A57A36'),
+                ('cancel', '返回', self._cancel_double_choice, '#173f66'))):
+            left = 278 + index * 216
+            self.double_choice_buttons[choice] = self._create_canvas_button(
+                left, 638, left + 206, 720, label, command, color,
+                tag=f'double_choice_{choice}', font_size=12)
         self._set_round_control_visibility(False)
+
 
     def _create_canvas_button(self, x0, y0, x1, y1, text, command, color,
                               fg='white', tag=None, font_size=12):
         tag = tag or f'button_{len(self.control_buttons)}'
-        rect = self.canvas.create_rectangle(x0, y0, x1, y1, fill=color,
-                                            outline='#d5cbbd', width=2,
-                                            tags=(tag, 'ui_button'))
-        txt = self.canvas.create_text((x0 + x1) / 2, (y0 + y1) / 2,
-                                      text=text, font=(self.cn_font, font_size, 'bold'),
-                                      fill=fg, justify='center', tags=(tag, 'ui_button'))
-        button = {'rect': rect, 'text': txt, 'tag': tag, 'command': command,
-                  'color': color, 'fg': fg, 'enabled': True}
+        c = self.canvas
+        rim = c.create_rectangle(x0, y0, x1, y1, fill=self._shade_color(color, .55),
+            outline='#b7a58d', width=2, tags=(tag, 'ui_button'))
+        face = c.create_rectangle(x0+4, y0+4, x1-4, y1-4, fill=color,
+            outline=self._shade_color(color, 1.25), width=2, tags=(tag, 'ui_button'))
+        highlight = c.create_line(x0+8, y0+8, x1-8, y0+8,
+            fill=self._shade_color(color, 1.45), width=2, tags=(tag, 'ui_button'))
+        y = (y0+y1)/2-1
+        text_id = c.create_text((x0+x1)/2, y, text=text, font=(self.cn_font, font_size, 'bold'),
+                                fill=fg, justify='center', tags=(tag, 'ui_button'))
+        button = dict(rect=face, rim=rim, highlight=highlight, text=text_id, tag=tag,
+                      command=command, color=color, fg=fg, enabled=True, visible=True,
+                      pressed=False, text_y=y)
         self.control_buttons[tag] = button
-
-        def invoke(_event=None, b=button):
-            if b.get('enabled', False) and callable(b.get('command')):
-                b['command']()
-
-        self.canvas.tag_bind(tag, '<Button-1>', invoke)
-        self.canvas.tag_bind(tag, '<Enter>', lambda _e: self.canvas.configure(cursor='hand2'))
-        self.canvas.tag_bind(tag, '<Leave>', lambda _e: self.canvas.configure(cursor=''))
+        def inside(event):
+            if event is None or not button['visible']:
+                return False
+            x, pointer_y = c.canvasx(event.x), c.canvasy(event.y)
+            return x0-1 <= x <= x1+1 and y0-1 <= pointer_y <= y1+1
+        def enter(_event=None):
+            c.configure(cursor='hand2' if button['enabled'] else '')
+            if button['enabled'] and not button['pressed']:
+                c.itemconfigure(face, fill=self._shade_color(color, 1.12))
+        def leave(event=None):
+            # Canvas Enter/Leave also fires between a button's own layers.
+            if inside(event):
+                return
+            c.configure(cursor='')
+            self._set_button(button, button['enabled'])
+        def press(event=None):
+            if button['enabled'] and inside(event):
+                button['pressed'] = True
+                c.itemconfigure(face, fill=self._shade_color(color, .72))
+                c.coords(text_id, (x0+x1)/2, y+2)
+        def release(event=None):
+            if not button['pressed']:
+                return
+            activate = button['enabled'] and inside(event)
+            self._set_button(button, button['enabled'])
+            if activate:
+                command()
+        c.tag_bind(tag, '<Enter>', enter)
+        c.tag_bind(tag, '<Leave>', leave)
+        # Receive clicks for the full button bounds regardless of the top item.
+        c.bind('<ButtonPress-1>', press, add='+')
+        c.bind('<ButtonRelease-1>', release, add='+')
         return button
+
 
     def _set_button(self, button, enabled, text=None):
         if not button:
             return
-        button['enabled'] = bool(enabled)
+        button['enabled'], button['pressed'] = bool(enabled), False
+        c, color = self.canvas, button['color']
+        x, _y = c.coords(button['text'])
+        c.coords(button['text'], x, button['text_y'])
         if text is not None:
-            self.canvas.itemconfigure(button['text'], text=text)
-        # Hidden controls stay hidden; enabling only changes their visual style.
-        if enabled:
-            self.canvas.itemconfigure(button['rect'], fill=button['color'], stipple='')
-            self.canvas.itemconfigure(button['text'], fill=button['fg'])
-        else:
-            self.canvas.itemconfigure(button['rect'], fill='#3d3833', stipple='gray50')
-            self.canvas.itemconfigure(button['text'], fill='#8f8880')
+            c.itemconfigure(button['text'], text=text)
+        c.itemconfigure(button['rect'], fill=color if enabled else '#4a4743')
+        c.itemconfigure(button['rim'], fill=self._shade_color(color, .55) if enabled else '#262422')
+        c.itemconfigure(button['highlight'], fill=self._shade_color(color, 1.45) if enabled else '#66615b')
+        c.itemconfigure(button['text'], fill=button['fg'] if enabled else '#9b9690')
+
 
     def _button_state(self, button, visible):
-        if not button:
-            return
-        state = 'normal' if visible else 'hidden'
-        self.canvas.itemconfigure(button['rect'], state=state)
-        self.canvas.itemconfigure(button['text'], state=state)
+        if button:
+            button['visible'] = bool(visible)
+            if not visible and button['pressed']:
+                self._set_button(button, button['enabled'])
+            self.canvas.itemconfigure(button['tag'], state='normal' if visible else 'hidden')
+
 
     def _raise_visible_bottom_controls(self, in_round):
-        """Keep only the actual visible controls above the panel background."""
-        if not in_round:
-            self.canvas.tag_raise('chip_selector')
-            buttons = (getattr(self, 'clear_button', None), getattr(self, 'info_button', None),
-                       getattr(self, 'repeat_button', None), getattr(self, 'deal_button', None))
-        elif self.ace_decision_mode:
-            buttons = tuple(getattr(self, 'decision_buttons', {}).values())
-        elif self.double_choice_mode:
-            buttons = tuple(getattr(self, 'double_choice_buttons', {}).values())
-        else:
-            buttons = tuple(getattr(self, 'action_buttons', {}).values())
-        for button in buttons:
-            if button:
-                self.canvas.tag_raise(button['rect']); self.canvas.tag_raise(button['text'])
-        for item_name in ('balance_text', 'total_bet_text'):
-            item = getattr(self, item_name, None)
-            if item: self.canvas.tag_raise(item)
+        self.canvas.tag_raise('chip_selector')
+        for button in self.control_buttons.values():
+            self.canvas.tag_raise(button['tag'])
+        for name in ('balance_text', 'total_bet_text'):
+            item = getattr(self, name, None)
+            if item:
+                self.canvas.tag_raise(item)
+
 
     def _set_round_control_visibility(self, in_round):
-        """Switch bottom strip between betting, Ace-decision, and hand-action modes."""
-        predeal = not in_round
+        # The same strip switches between betting, actions, insurance and Double.
+        in_round = bool(in_round or (self.animation_running and not self.accept_bets))
         decision = bool(in_round and self.ace_decision_mode)
-        double_choice = bool(in_round and not decision and self.double_choice_mode)
-        actions = bool(in_round and not decision and not double_choice)
-        self.canvas.itemconfigure('chip_selector', state='normal' if predeal else 'hidden')
-        for button in (getattr(self, 'clear_button', None), getattr(self, 'info_button', None),
-                       getattr(self, 'repeat_button', None), getattr(self, 'deal_button', None)):
-            self._button_state(button, predeal)
-        for button in getattr(self, 'action_buttons', {}).values():
-            self._button_state(button, actions)
-        for button in getattr(self, 'decision_buttons', {}).values():
+        choosing_double = bool(in_round and self.double_choice_mode and not decision)
+        self.canvas.itemconfigure('chip_selector', state='hidden' if in_round else 'normal')
+        for button in (self.clear_button, self.repeat_button, self.deal_button, self.info_button):
+            self._button_state(button, not in_round)
+        for button in self.action_buttons.values():
+            self._button_state(button, in_round and not decision and not choosing_double)
+        for button in self.decision_buttons.values():
             self._button_state(button, decision)
-        for button in getattr(self, 'double_choice_buttons', {}).values():
-            self._button_state(button, double_choice)
+        for button in self.double_choice_buttons.values():
+            self._button_state(button, choosing_double)
         self._raise_visible_bottom_controls(in_round)
 
+
     def _set_rules_strip_visible(self, visible):
-        state = 'normal' if visible else 'hidden'
-        self.canvas.itemconfigure(self.rule_strip_rect, state=state)
-        if not visible:
-            for item in (self.rule_strip_text, self.rule_strip_left_text, self.rule_strip_right_text):
-                self.canvas.itemconfigure(item, state='hidden')
-            self.canvas.delete('insurance_chip')
-            return
+        self.canvas.itemconfigure('round_rule_strip', state='normal')
         self._refresh_rule_strip_text()
-        self.canvas.tag_raise('round_rule_strip')
-        self._render_insurance_chip()
+
 
     def _refresh_rule_strip_text(self):
-        # V12: insurance overlays the centre of the BAR; wording never shifts.
+        # The full line stays in place even when an insurance chip lands on it.
         self.canvas.itemconfigure(self.rule_strip_text, state='normal')
-        self.canvas.itemconfigure(self.rule_strip_left_text, state='hidden')
-        self.canvas.itemconfigure(self.rule_strip_right_text, state='hidden')
+        for item in (self.rule_strip_left_text, self.rule_strip_right_text):
+            self.canvas.itemconfigure(item, state='hidden')
+
 
     def _set_rule_strip_text_color(self, color):
         for item in (self.rule_strip_text, self.rule_strip_left_text, self.rule_strip_right_text):
@@ -860,166 +835,71 @@ class BubbleBlackjackGame(tk.Frame):
 
     def _render_insurance_chip(self):
         self.canvas.delete('insurance_chip')
-        if not self.insurance_chip_visible or self.insurance_bet <= 0:
-            return
-        if self.settlement_running and not self.flash_insurance_rule:
-            return  # losing insurance disappears at settlement
-        amount = self.insurance_bet
-        if self.settlement_running and self.flash_insurance_rule and self.flash_mode == 'win':
-            amount = self.insurance_return_amount or self.insurance_bet * (1.0 + self.INSURANCE_PROFIT)
-        x, y = self.rule_strip_chip_pos
-        self._draw_baccarat_chip(x, y, amount, tags=('insurance_chip',), radius=18)
-        self.canvas.tag_raise('insurance_chip')
+        self._refresh_rule_strip_text()
+        for seat, info in self.seat_insurance.items():
+            if not info['visible'] or info['bet']<=0:
+                continue
+            if self.settlement_running and info['returned']<=0:
+                continue
+            returned = info['returned'] if self.settlement_running else None
+            self._draw_outcome_rows(self._outcome_chip_rows(('insurance',seat),
+                info['bet'],returned,self.insurance_positions[seat],self.INSURANCE_CHIP_RADIUS,('insurance_chip',)))
 
-    def _animate_insurance_chip_to_rule(self, on_complete=None):
-        """Fly half of the MAIN bet from the hidden chip-rack area to the rule strip."""
-        amount = float(self.insurance_bet)
-        sx, sy = 575.0, 674.0
-        tx, ty = self.rule_strip_chip_pos
-        items = self._draw_baccarat_chip(sx, sy, amount, tags=('insurance_chip_fly',), radius=18)
-        self.canvas.tag_raise('insurance_chip_fly')
-        steps = 10; frame_ms = 20
-        def frame(step=1):
-            t = min(1.0, step / steps); e = 1.0 - (1.0 - t) ** 2
-            cx, cy = sx + (tx-sx)*e, sy + (ty-sy)*e; r=18
-            self.canvas.coords(items[0], cx-r, cy-r, cx+r, cy+r)
-            self.canvas.coords(items[1], cx-r+3, cy-r+3, cx+r-3, cy+r-3)
-            self.canvas.coords(items[2], cx, cy)
-            if step < steps:
-                self._queue(frame_ms, frame, step+1)
-            else:
-                self.canvas.delete('insurance_chip_fly')
-                self.insurance_chip_visible = True
-                self._refresh_rule_strip_text(); self._render_insurance_chip(); self.update_display()
-                if callable(on_complete): on_complete()
-        self._queue(frame_ms, frame, 1)
+
+    def _animate_insurance_chip_to_rule(self, seat, on_complete=None):
+        amount = self.seat_insurance[seat]['bet']
+        sx, sy = self._selected_chip_origin()
+        self._animate_settlement_chips([(sx, sy, amount, self.INSURANCE_CHIP_RADIUS)],
+            self.insurance_positions[seat], 220, f'insurance_chip_fly_{seat}', on_complete)
+
 
     def _show_ace_decision(self, mode):
         self.ace_decision_mode = mode
-        if mode == 'even_money':
-            self._set_button(self.decision_buttons['accept'], True, '立刻获胜')
-            self._set_button(self.decision_buttons['decline'], True, '赌！')
-            self.canvas.itemconfigure(self.phase_text, text=self.PHASE_EVEN_MONEY)
-        else:
-            can_buy = self.balance + 1e-9 >= self.round_original_bet / 2.0
-            self._set_button(self.decision_buttons['accept'], can_buy, '购买保险')
-            self._set_button(self.decision_buttons['decline'], True, '不购买')
-            self.canvas.itemconfigure(self.phase_text, text=self.PHASE_INSURANCE)
-        self._set_round_control_visibility(True); self._raise_visible_bottom_controls(True)
+        self._set_round_control_visibility(True)
+
 
     def _resolve_ace_decision(self, accept):
-        mode = self.ace_decision_mode
-        if not mode or self.settlement_running:
+        mode, seat = self.ace_decision_mode, self.ace_decision_seat
+        if not mode or self.animation_running or self.settlement_running:
             return
-        hand = self.hands[0] if self.hands else None
-        if mode == 'even_money':
-            self.ace_decision_mode = None
-            if accept and hand:
-                hand['status'] = 'even_money'; hand['result'] = 'Even Money +1:1'
-                hand['settlement'] = 'win'; hand['base_settlement'] = 'win'
-                hand['double_settlement'] = None
-                hand['settlement_return'] = self.round_original_bet * 2.0
-                self.balance += self.round_original_bet * 2.0; self.save_balance()
-                self.render_cards(); self.update_display()
-                # V16: without a Bust! wager, Even Money is final immediately;
-                # the dealer does not draw a second card.  A live Bust! wager still
-                # requires the ordinary dealer run so that side bet can resolve.
-                if not self._has_bust_wager():
-                    self._queue(250, self._finish_even_money_without_dealer_card)
-                else:
-                    self._queue(250, self._start_dealer_turn)
-            elif hand:
-                hand['status'] = 'blackjack'
-                self.render_cards(); self.update_display()
-                self._queue(250, self._start_dealer_turn)
-            return
-
-        # Insurance decision.
-        if accept:
-            amount = self.round_original_bet / 2.0
-            if self.balance + 1e-9 < amount:
+        hand = next(hand for hand in self.hands if hand['seat']==seat and hand['contains_original'])
+        if mode == 'even_money' and accept:
+            credit = hand['base_bet']*2.0
+            self.balance += credit
+            hand.update(status='even_money', result='Even Money +1:1', settlement='win',
+                        base_settlement='win', settlement_return=credit)
+        elif mode == 'insurance' and accept:
+            amount = self.round_original_bets[seat]/2.0
+            if self.balance+1e-9 < amount:
                 return
-            self.balance -= amount; self.insurance_bet = amount
-            self.insurance_result = '保险待定'; self.save_balance()
-            self.ace_decision_mode = None
+            self.balance -= amount
+            self.seat_insurance[seat].update(bet=amount, visible=False)
+            self.insurance_bet += amount
             self.animation_running = True
-            self._set_round_control_visibility(True); self.update_display()
-            def done():
+            self.save_balance()
+            self.update_display()
+            def landed():
+                self.seat_insurance[seat]['visible'] = True
+                self.insurance_chip_visible = True
                 self.animation_running = False
-                self.canvas.itemconfigure(self.phase_text, text=self.PHASE_PLAYING)
-                self.update_display(); self._raise_visible_bottom_controls(True)
-            self._animate_insurance_chip_to_rule(done)
-        else:
-            self.ace_decision_mode = None
-            self.insurance_result = '未购买保险'
-            self.canvas.itemconfigure(self.phase_text, text=self.PHASE_PLAYING)
-            self.update_display(); self._raise_visible_bottom_controls(True)
+                self.ace_decision_mode = self.ace_decision_seat = None
+                self.render_cards()
+                self._next_ace_decision()
+            self._animate_insurance_chip_to_rule(seat, landed)
+            return
+        self.ace_decision_mode = self.ace_decision_seat = None
+        self.save_balance()
+        self.render_cards()
+        self._next_ace_decision()
 
-    def _apply_bet_layout_fraction(self, target_layout, starts, fraction,
-                                   board_start=None, board_target=None,
-                                   player_start=None, player_target=None,
-                                   player_label_start=None, player_label_target=None,
-                                   move_existing_player_visuals=False):
-        for key, spot in self.bet_spots.items():
-            sb, sl, sc = starts[key]
-            tb, tl, tc = target_layout[key]
-            b = tuple(sb[i] + (tb[i]-sb[i])*fraction for i in range(4))
-            lp = tuple(sl[i] + (tl[i]-sl[i])*fraction for i in range(2))
-            cp = tuple(sc[i] + (tc[i]-sc[i])*fraction for i in range(2))
-            self.canvas.coords(spot['rect'], *b); self.canvas.coords(spot['label'], *lp)
-            spot['bounds'] = b; spot['label_pos'] = lp; spot['chip_pos'] = cp
-        if board_start and board_target:
-            bb = tuple(board_start[i] + (board_target[i]-board_start[i])*fraction for i in range(4))
-            self.canvas.coords(self.betting_board_rect, *bb)
-        if player_start and player_target:
-            pb = tuple(player_start[i] + (player_target[i]-player_start[i])*fraction for i in range(4))
-            self.canvas.coords(self.player_zone_rect, *pb)
-        if player_label_start and player_label_target:
-            pp = tuple(player_label_start[i] + (player_label_target[i]-player_label_start[i])*fraction for i in range(2))
-            self.canvas.coords(self.player_zone_title, *pp)
-        self.bet_spot_bounds = self.bet_spots['MAIN']['bounds']
-        self.update_bet_chips()
+
 
     def _animate_betting_station(self, to_round, on_complete=None):
-        target = self.bet_layout_round if to_round else self.bet_layout_home
-        starts = {k: (tuple(v['bounds']), tuple(v.get('label_pos', self.canvas.coords(v['label']))),
-                      tuple(v['chip_pos'])) for k,v in self.bet_spots.items()}
-        board_start = tuple(self.canvas.coords(self.betting_board_rect))
-        board_target = self.betting_board_round_bounds if to_round else self.betting_board_home_bounds
-        player_start = tuple(self.canvas.coords(self.player_zone_rect))
-        player_target = self.player_zone_round if to_round else self.player_zone_home
-        player_label_start = tuple(self.canvas.coords(self.player_zone_title))
-        player_label_target = self.player_label_round if to_round else self.player_label_home
-        # Existing previous-round PLAYER graphics move with the zone on the return
-        # trip. Dealer graphics stay fixed.  New cards are rendered directly into
-        # the round geometry, so no move is needed on the outward trip.
-        move_existing = (not to_round and self.previous_round_cards_present)
-        moved_fraction = [0.0]
-        self.bet_layout_mode = 'moving'
-        if to_round:
-            self.canvas.itemconfigure('betting_station_guide', state='hidden')
-            self._set_rules_strip_visible(True)
-        steps=10; frame_ms=20
-        def frame(step=1):
-            t=min(1.0, step/steps); e=t*t*(3.0-2.0*t)
-            self._apply_bet_layout_fraction(
-                target, starts, e, board_start, board_target, player_start, player_target,
-                player_label_start, player_label_target)
-            if move_existing:
-                de = e - moved_fraction[0]; moved_fraction[0] = e
-                dy = -40.0 * de
-                for tag in ('player_dealt_card','player_hand_overlay'):
-                    try: self.canvas.move(tag, 0, dy)
-                    except tk.TclError: pass
-            if step < steps: self._queue(frame_ms, frame, step+1)
-            else:
-                self.bet_layout_mode = 'round' if to_round else 'home'
-                self.player_zone_mode = 'round' if to_round else 'home'
-                if not to_round:
-                    self._set_rules_strip_visible(False)
-                    self.canvas.itemconfigure('betting_station_guide', state='normal')
-                if callable(on_complete): on_complete()
-        self._queue(frame_ms, frame, 1)
+        self.bet_layout_mode = 'round' if to_round else 'home'
+        self._update_main_spot_visibility()
+        if callable(on_complete):
+            on_complete()
+
 
     def _animate_previous_round_cards_out(self, on_complete=None):
         """At the next 开牌, slide the previous round's cards upper-left for 0.20 s."""
@@ -1050,12 +930,14 @@ class BubbleBlackjackGame(tk.Frame):
 
     @staticmethod
     def contrast_text_color(color):
-        color = color.lstrip('#')
-        if len(color) != 6:
-            return 'white'
-        r, g, b = int(color[:2], 16), int(color[2:4], 16), int(color[4:], 16)
-        luminance = 0.299 * r + 0.587 * g + 0.114 * b
-        return '#111111' if luminance > 165 else 'white'
+        # Choose the higher-contrast foreground using linear sRGB luminance.
+        rgb = [int(color[i:i+2], 16)/255.0 for i in (1, 3, 5)]
+        linear = [v/12.92 if v <= .04045 else ((v+.055)/1.055)**2.4 for v in rgb]
+        luminance = sum(v*w for v, w in zip(linear, (.2126, .7152, .0722)))
+        black_contrast = (luminance+.05)/.05
+        white_contrast = 1.05/(luminance+.05)
+        return '#000000' if black_contrast >= white_contrast else '#FFFFFF'
+
 
     @staticmethod
     def format_money(value):
@@ -1069,35 +951,24 @@ class BubbleBlackjackGame(tk.Frame):
 
     @staticmethod
     def _compact_amount(amount):
-        """Compact a chip amount to K/M with at most one visible decimal.
-
-        V16 deliberately truncates rather than rounds.  When non-zero value is
-        hidden beyond the visible tenth, append ``+`` (2111 -> 2.1K+,
-        1_010_000 -> 1.0M+).  Exact values keep the shorter form.
-        """
-        amount = float(amount)
-        if amount >= 1_000_000:
-            scale, suffix = 1_000_000.0, 'M'
-        elif amount >= 1_000:
-            scale, suffix = 1_000.0, 'K'
+        """K/M筹码取两位有效数字并截断；有省略才加+，不改动真实金额。"""
+        from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
+        value=Decimal(str(amount)).quantize(Decimal('.01'),rounding=ROUND_HALF_UP)
+        if value==Decimal('2.50'):return '2.50'
+        if abs(value)>=1000000:
+            divisor,suffix=Decimal(1000000),'M'
+        elif abs(value)>=1000:
+            divisor,suffix=Decimal(1000),'K'
         else:
-            return f'{amount:g}'
+            label=format(value,'f')
+            return label.rstrip('0').rstrip('.') if '.' in label else label
+        scaled=value/divisor
+        precision=Decimal(1).scaleb(abs(scaled).adjusted()-1)
+        shown=scaled.quantize(precision,rounding=ROUND_DOWN)
+        label=format(shown,'f')
+        if '.' in label:label=label.rstrip('0').rstrip('.')
+        return label+suffix+('+' if shown!=scaled else '')
 
-        scaled = amount / scale
-        # Bets/returns are non-negative.  A tiny epsilon protects exact decimal
-        # amounts from binary floating-point noise before truncation.
-        tenths = int((scaled + 1e-12) * 10.0)
-        shown = tenths / 10.0
-        hidden = amount - shown * scale > max(1e-7, scale * 1e-10)
-
-        if hidden:
-            # Keep the .0 when it carries information: 1.01M -> 1.0M+.
-            label = f'{shown:.1f}'
-        elif abs(shown - round(shown)) < 1e-12:
-            label = f'{int(round(shown))}'
-        else:
-            label = f'{shown:.1f}'
-        return f'{label}{suffix}{"+" if hidden else ""}'
 
     @classmethod
     def bet_chip_color(cls, amount):
@@ -1112,21 +983,149 @@ class BubbleBlackjackGame(tk.Frame):
                 break
         return color
 
-    def _draw_baccarat_chip(self, cx, cy, amount, tags, radius=20, force_color=None):
-        """Draw the same two-ring amount chip used by the Baccarat betting board."""
-        amount = float(amount)
-        chip_color = force_color or self.bet_chip_color(amount)
-        text_color = self.contrast_text_color(chip_color)
-        outer = self.canvas.create_oval(
-            cx-radius, cy-radius, cx+radius, cy+radius,
-            fill='#292522', outline='#151311', width=1, tags=tags)
-        inner = self.canvas.create_oval(
-            cx-radius+3, cy-radius+3, cx+radius-3, cy+radius-3,
-            fill=chip_color, outline='#e2ddd5', width=1, tags=tags)
-        text = self.canvas.create_text(
-            cx, cy, text=self._compact_amount(amount),
-            font=('Arial', 9, 'bold'), fill=text_color, tags=tags)
-        return (outer, inner, text)
+    def _draw_baccarat_chip(self, cx, cy, amount, tags, radius=None, force_color=None):
+        radius = self.WAGER_CHIP_RADIUS if radius is None else float(radius)
+        color = force_color or self.bet_chip_color(amount)
+        label = self._compact_amount(amount)
+        chip_tags = (tags,) if isinstance(tags, str) else tuple(tags)
+        if 'wager_chip' not in chip_tags:
+            chip_tags += ('wager_chip',)
+        outer = self.canvas.create_oval(cx-radius, cy-radius, cx+radius, cy+radius,
+            fill='#F7F3E8', outline='#111820', width=2, tags=chip_tags)
+        # The light rim also separates dark denominations from the green felt.
+        # Preserve the three-item animation contract: outer, face, amount text.
+        inset = self.CHIP_RIM_INSET
+        inner = self.canvas.create_oval(cx-radius+inset, cy-radius+inset,
+            cx+radius-inset, cy+radius-inset,
+            fill=color, outline='', tags=chip_tags)
+        text = self.canvas.create_text(cx, cy, text=label,
+            font=self._fit_chip_font(label, radius),
+            fill=self.contrast_text_color(color), tags=chip_tags)
+        return outer, inner, text
+
+
+    def _decorate_main_bet_surface(self, spot):
+        """Draw the circular blue MAIN spot and its Chinese open-ring title."""
+        c = self.canvas
+        left, top, right, bottom = spot['bounds']
+        cx, cy = (left + right) / 2, (top + bottom) / 2
+        radius = (right - left) / 2
+        spot['surface_tag'] = f"{spot['tag']}_surface"
+        spot['title_tag'] = f"{spot['tag']}_title"
+        c.addtag_withtag(spot['surface_tag'], spot['rect'])
+        surface_tags = (spot['tag'], spot['surface_tag'], 'betting_spot')
+
+        # Layer smaller circles to make the same blue-to-light gradient as Premiere.
+        outer, centre = (23, 92, 152), (221, 226, 196)
+        for step in range(1, 25):
+            t = step / 24.0
+            color = '#' + ''.join(
+                f'{round(a + (b - a) * t):02x}'
+                for a, b in zip(outer, centre)
+            )
+            r = radius * (1.0 - 0.96 * t)
+            c.create_oval(
+                cx-r, cy-r, cx+r, cy+r,
+                fill=color, outline='', tags=surface_tags,
+            )
+
+        # Draw a 260-degree ring, leaving the bottom open for the title.
+        ring = []
+        for step in range(65):
+            degrees = self.MAIN_RING_START + self.MAIN_RING_EXTENT * step / 64
+            theta = math.radians(degrees)
+            ring.extend((cx + radius * math.cos(theta),
+                         cy + radius * math.sin(theta)))
+        for color, width in (('#A5BED4', 9), ('#19345D', 6)):
+            c.create_line(
+                *ring, fill=color, width=width,
+                capstyle=tk.ROUND, tags=surface_tags,
+            )
+
+        key = spot['key']
+        if isinstance(key, tuple):
+            seat = key[0]
+        else:
+            seats = getattr(self, 'SEATS', ('Player1',))
+            seat = seats[0] if seats else 'Player1'
+        seat_names = getattr(self, 'SEAT_NAMES', {})
+        title = "玩家主注"
+        for index, char in enumerate(title):
+            # Place each character on the circular edge inside the bottom opening.
+            degrees = 122.0 - index * 64.0 / max(1, len(title) - 1)
+            theta = math.radians(degrees)
+            c.create_text(
+                cx + radius * math.cos(theta),
+                cy + radius * math.sin(theta),
+                text=char,
+                angle=90.0-degrees,
+                font=(self.cn_font, -14, 'bold'),
+                fill='#F2E6C9',
+                tags=(spot['tag'], spot['title_tag'], 'betting_spot_label'),
+            )
+    def _bet_surface_layout(self, x, main=False):
+        if main:
+            r, y = self.MAIN_BET_RADIUS, self.MAIN_BET_Y
+            return (x-r, y-r, x+r, y+r), (x, y+r+10), (x, y)
+        return (x-60, 535, x+60, 616), (x, 608), (x, 566)
+
+    def _draw_bet_surface(self, bounds, fill, outline, tag, main=False):
+        if main:
+            return self.canvas.create_oval(
+                *bounds, fill=fill, outline='', width=0,
+                tags=(tag, 'betting_spot'))
+        left, top, right, bottom = bounds
+        corner = 10
+        return self.canvas.create_polygon(
+            left+corner, top, right-corner, top, right, top,
+            right, top+corner, right, bottom-corner, right, bottom,
+            right-corner, bottom, left+corner, bottom, left, bottom,
+            left, bottom-corner, left, top+corner, left, top,
+            smooth=True, splinesteps=16, fill=fill, outline=outline,
+            width=2, tags=(tag, 'betting_spot'))
+
+    def _wager_center_x(self, center, geometry, right_slots=1):
+        """Fit the whole principal/profit group inside its hand's lane."""
+        left, right, _center, _order, count = geometry
+        if count > 1:
+            center += (2-right_slots)*self.CHIP_PITCH/2
+        lower = left+2*self.CHIP_PITCH+self.WAGER_CHIP_RADIUS+4
+        upper = right-right_slots*self.CHIP_PITCH-self.WAGER_CHIP_RADIUS-4
+        return max(lower, min(center, upper))
+
+
+    def _position_chip_items(self, items, cx, cy, radius):
+        """Keep animation geometry identical to the chip's initial drawing."""
+        inset = self.CHIP_RIM_INSET
+        self.canvas.coords(items[0], cx-radius, cy-radius, cx+radius, cy+radius)
+        self.canvas.coords(items[1], cx-radius+inset, cy-radius+inset,
+                           cx+radius-inset, cy+radius-inset)
+        self.canvas.coords(items[2], cx, cy)
+
+
+    def _fit_chip_font(self, label, radius):
+        """Measure the complete label (including '+') inside the circular face.
+
+        Negative Tk font sizes are pixels: the fitted label cannot grow beyond
+        its chip when Windows/macOS display scaling changes the point size.
+        """
+        maximum = max(8, min(18, round(float(radius)*.62)))
+        text_radius = max(4.0, float(radius)-4.0)
+        for size in range(maximum, 3, -1):
+            key = (self.chip_font, size)
+            font = self._chip_fonts.get(key)
+            if font is None:
+                font = tkfont.Font(root=self.canvas, family=self.chip_font,
+                                   size=-size, weight='bold')
+                self._chip_fonts[key] = font
+            # Canvas text has a small horizontal bbox padding. Fit its corners,
+            # rather than merely its width, so the text clears the circular rim.
+            width = font.measure(label)+4
+            height = font.metrics('linespace')+2
+            if math.hypot(width/2, height/2) <= text_radius:
+                return font
+        return font
+
 
     def _selected_chip_origin(self):
         return self.chip_selector_centers.get(float(self.selected_chip), (575.0, 674.0))
@@ -1149,7 +1148,7 @@ class BubbleBlackjackGame(tk.Frame):
         selected_color = next((color for value, color, _ in self.CHIP_SPECS
                                if float(value) == selected_amount), self.bet_chip_color(selected_amount))
         items = self._draw_baccarat_chip(
-            sx, sy, amount, tags=('bet_chip_fly',), radius=20, force_color=selected_color)
+            sx, sy, amount, tags=('bet_chip_fly',), radius=self.WAGER_CHIP_RADIUS, force_color=selected_color)
         self.canvas.tag_raise('bet_chip_fly')
         steps = 10
         frame_ms = 20
@@ -1160,7 +1159,7 @@ class BubbleBlackjackGame(tk.Frame):
             eased = 1.0 - (1.0 - ratio) ** 2
             cx = sx + (tx - sx) * eased
             cy = sy + (ty - sy) * eased
-            r = 20
+            r = self.WAGER_CHIP_RADIUS
             self.canvas.coords(items[0], cx-r, cy-r, cx+r, cy+r)
             self.canvas.coords(items[1], cx-r+3, cy-r+3, cx+r-3, cy+r-3)
             self.canvas.coords(items[2], cx, cy)
@@ -1196,7 +1195,7 @@ class BubbleBlackjackGame(tk.Frame):
         sx, sy = self.chip_selector_centers.get(source_value, (575.0, 674.0))
         tx, ty = spot['chip_pos']
         items = self._draw_baccarat_chip(
-            sx, sy, amount, tags=('bet_chip_fly',), radius=20,
+            sx, sy, amount, tags=('bet_chip_fly',), radius=self.WAGER_CHIP_RADIUS,
             force_color=self.bet_chip_color(amount))
         self.canvas.tag_raise('bet_chip_fly')
         steps = 10
@@ -1207,7 +1206,7 @@ class BubbleBlackjackGame(tk.Frame):
             eased = 1.0 - (1.0 - ratio) ** 2
             cx = sx + (tx - sx) * eased
             cy = sy + (ty - sy) * eased
-            r = 20
+            r = self.WAGER_CHIP_RADIUS
             self.canvas.coords(items[0], cx-r, cy-r, cx+r, cy+r)
             self.canvas.coords(items[1], cx-r+3, cy-r+3, cx+r-3, cy+r-3)
             self.canvas.coords(items[2], cx, cy)
@@ -1225,37 +1224,39 @@ class BubbleBlackjackGame(tk.Frame):
         self._queue(frame_ms, frame, 1)
 
     def _bet_amount_for_spot(self, spot_key):
-        if spot_key == 'MAIN':
-            if self.round_active:
-                return 0.0  # main wager has physically moved above the player hand(s)
-            amount = float(self.current_bet)
+        seat, kind = spot_key
+        if kind == 'MAIN':
+            amount = 0.0 if self.round_active else self.current_bets[seat]
+        elif self.round_active:
+            if spot_key in self.side_bet_early_collected:
+                return 0.0
+            amount = self.round_side_bets.get(spot_key, 0.0)
+            if self.settlement_running:
+                amount = min(amount, self.side_bet_return_amounts.get(spot_key,0.0))
         else:
-            if self.round_active:
-                if spot_key in self.side_bet_early_collected:
-                    return 0.0
-                if self.settlement_running:
-                    if spot_key not in self.flash_winning_side_bets:
-                        return 0.0  # losing side-bet chips disappear immediately at settlement
-                    if self.flash_mode == 'win':
-                        return float(self.side_bet_return_amounts.get(spot_key, 0.0))
-                amount = float(self.round_side_bets.get(spot_key, 0.0))
-            else:
-                amount = float(self.current_side_bets.get(spot_key, 0.0))
-
+            amount = self.current_side_bets[spot_key]
         if not self.round_active:
-            amount -= float(self.pending_bet_animation.get(spot_key, 0.0))
+            amount -= self.pending_bet_animation.get(spot_key, 0.0)
         return max(0.0, amount)
+
 
     def update_bet_chips(self):
         self.canvas.delete('bet_chip_dynamic')
+        if self.settlement_visual_stage=='returning':
+            return
         for key, spot in self.bet_spots.items():
             amount = self._bet_amount_for_spot(key)
-            if amount <= 0:
-                continue
-            x, y = spot['chip_pos']
-            self._draw_baccarat_chip(
-                x, y, amount, tags=('bet_chip_dynamic', spot['tag']), radius=20)
+            if amount > 0:
+                self._draw_baccarat_chip(*spot['chip_pos'], amount,
+                    tags=('bet_chip_dynamic', spot['tag'], 'principal_chip'), radius=self.WAGER_CHIP_RADIUS)
+            if self.round_active and key[1]!='MAIN':
+                stake = self.round_side_bets.get(key,0.0)
+                returned = self.side_bet_return_amounts.get(key,0.0)
+                rows = self._outcome_chip_rows(('side',*key), stake, returned,
+                    spot['chip_pos'], self.WAGER_CHIP_RADIUS, ('bet_chip_dynamic',spot['tag']))
+                self._draw_outcome_rows([row for row in rows if row['role']=='profit'])
         self.canvas.tag_raise('bet_chip_dynamic')
+
 
     def _finish_bet_chip_animation(self, spot_key, amount):
         self.pending_bet_animation[spot_key] = max(
@@ -1269,56 +1270,18 @@ class BubbleBlackjackGame(tk.Frame):
         for spot in getattr(self, 'bet_spots', {}).values():
             label = spot.get('label')
             if label:
-                try: self.canvas.itemconfigure(label, fill='white')
+                try: self.canvas.itemconfigure(label, fill='#F2E6C9')
                 except tk.TclError: pass
-        self._set_rule_strip_text_color('white')
+        self._set_rule_strip_text_color(self.GOLD)
+
 
     def _draw_side_bet_progress_badges(self):
-        """Draw non-animated winning side-bet markers during live play.
-
-        V18: known winning side-bet tiers stay WHITE during both player and
-        dealer play.  These markers do not change colour when the dealer starts.
-        Bust! keeps the V15 behaviour and is not previewed before its final
-        dealer-dependent result is settled.  Crazy 7 may update its displayed
-        provisional tier as target cards 0, 2 and 3 become available.
-        """
         self.canvas.delete('side_bet_progress_badge')
-        if not self.round_active or self.settlement_running:
-            return
 
-        visible_keys = set(self.side_bet_hit_odds)
-        for key in self.SIDE_BET_KEYS:
-            if key == 'Bust!' or key not in visible_keys:
-                continue
-            spot = self.bet_spots.get(key)
-            if not spot:
-                continue
-            odds = self.side_bet_hit_odds.get(key)
-            x0, y0, x1, _y1 = spot['bounds']
-            cx = (x0 + x1) / 2.0
-            box_w, box_h, nose_h = 66.0, 34.0, 13.0
-            top = max(426.0, y0 - box_h - nose_h - 5.0)
-            bx0, bx1 = cx - box_w / 2.0, cx + box_w / 2.0
-            by0, by1 = top, top + box_h
-            fill = '#ffffff'
-
-            self.canvas.create_rectangle(
-                bx0, by0, bx1, by1, fill=fill, outline='',
-                tags=('side_bet_progress_badge',))
-            self.canvas.create_polygon(
-                cx - 30.0, by1, cx + 30.0, by1, cx, by1 + nose_h,
-                fill=fill, outline='', tags=('side_bet_progress_badge',))
-            if odds is not None:
-                self.canvas.create_text(
-                    cx, (by0 + by1) / 2.0, text=f'{float(odds):g}:1',
-                    font=(self.cn_font, 17, 'bold'), fill='#000000',
-                    tags=('side_bet_progress_badge',))
-
-        self.canvas.tag_raise('side_bet_progress_badge')
 
     def _collect_losing_side_bet_upward(self, key):
         """Collect one resolved losing side-bet chip upward during live play."""
-        if key == 'Bust!' or key in self.side_bet_early_collected:
+        if key[1] == 'Bust!' or key in self.side_bet_early_collected:
             return
         stake = float(self.round_side_bets.get(key, 0.0))
         spot = self.bet_spots.get(key)
@@ -1328,52 +1291,28 @@ class BubbleBlackjackGame(tk.Frame):
         # Remove the stationary chip first, then animate a clone upward.
         self.update_bet_chips()
         x, y = spot['chip_pos']
-        safe = ''.join(ch if ch.isalnum() else '_' for ch in key)
+        safe = ''.join(ch if ch.isalnum() else '_' for ch in f'{key[0]}_{key[1]}')
         self._animate_settlement_chips(
-            [(x, y, stake, 20)], lambda sx, sy: (sx, -35.0), 300,
+            [(x, y, stake, self.WAGER_CHIP_RADIUS)], lambda sx, sy: (sx, -35.0), 300,
             f'side_bet_collect_{safe}')
 
+
     def _draw_side_bet_win_odds_badges(self):
-        """White downward-pointing badges showing only this round's hit tier."""
         self.canvas.delete('side_bet_win_odds')
-        if not self.settlement_running:
-            return
-        for key in self.flash_winning_side_bets:
-            spot = self.bet_spots.get(key)
-            odds = self.side_bet_hit_odds.get(key)
-            if not spot or odds is None:
-                continue
-            x0, y0, x1, _y1 = spot['bounds']
-            cx = (x0 + x1) / 2.0
-            # Match the supplied reference: a white rectangle with a broad
-            # downward triangular nose aimed at the winning side-bet oval.
-            box_w, box_h, nose_h = 66.0, 34.0, 13.0
-            top = max(426.0, y0 - box_h - nose_h - 5.0)
-            bx0, bx1 = cx - box_w/2.0, cx + box_w/2.0
-            by0, by1 = top, top + box_h
-            self.canvas.create_rectangle(
-                bx0, by0, bx1, by1, fill='#ffffff', outline='',
-                tags=('side_bet_win_odds','settlement_flash'))
-            self.canvas.create_polygon(
-                cx - 30.0, by1, cx + 30.0, by1, cx, by1 + nose_h,
-                fill='#ffffff', outline='', tags=('side_bet_win_odds','settlement_flash'))
-            self.canvas.create_text(
-                cx, (by0 + by1) / 2.0, text=f'{float(odds):g}:1',
-                font=(self.cn_font, 17, 'bold'), fill='#000000',
-                tags=('side_bet_win_odds','settlement_flash'))
+
 
     def _settlement_losing_chip_sources(self):
         """Return visible losing wager components as (x,y,amount,radius)."""
         sources=[]
         # Side bets that were actually staked but did not return anything.
-        for key in self.SIDE_BET_KEYS:
+        for key in self.round_side_bets:
             if key in self.side_bet_early_collected:
                 continue
             stake=float(self.round_side_bets.get(key,0.0))
             returned=float(self.side_bet_return_amounts.get(key,0.0))
             spot=self.bet_spots.get(key)
             if stake>0.0 and returned<=0.0 and spot:
-                x,y=spot['chip_pos']; sources.append((x,y,stake,20))
+                x,y=spot['chip_pos']; sources.append((x,y,stake,self.WAGER_CHIP_RADIUS))
 
         # MAIN is component based so an OBO hand can lose its Original Bet while
         # its Double/supplemental component remains for refund.
@@ -1381,37 +1320,21 @@ class BubbleBlackjackGame(tk.Frame):
         for idx,hand in enumerate(self.hands):
             if idx>=len(layout): break
             if float(hand.get('base_bet',0.0))>0 and hand.get('base_settlement')=='lose':
-                x,y=layout[idx]['base']; sources.append((x,y,float(hand['base_bet']),20))
+                x,y=layout[idx]['base']; sources.append((x,y,float(hand['base_bet']),self.WAGER_CHIP_RADIUS))
             if float(hand.get('double_added',0.0))>0 and hand.get('double_settlement')=='lose':
-                x,y=layout[idx]['double']; sources.append((x,y,float(hand['double_added']),20))
+                x,y=layout[idx]['double']; sources.append((x,y,float(hand['double_added']),self.WAGER_CHIP_RADIUS))
 
-        if self.insurance_bet>0.0 and self.insurance_return_amount<=0.0:
-            x,y=self.rule_strip_chip_pos; sources.append((x,y,float(self.insurance_bet),18))
+        for seat, info in self.seat_insurance.items():
+            if info['bet']>0 and info['returned']<=0:
+                x,y=self.insurance_positions[seat]
+                sources.append((x,y,info['bet'],self.INSURANCE_CHIP_RADIUS))
         return sources
+
 
     def _settlement_return_chip_sources(self):
-        """Return all money-returning chips using their displayed return amounts."""
-        sources=[]
-        for key in self.SIDE_BET_KEYS:
-            returned=float(self.side_bet_return_amounts.get(key,0.0))
-            spot=self.bet_spots.get(key)
-            if returned>0.0 and spot:
-                x,y=spot['chip_pos']; sources.append((x,y,returned,20))
+        return [(*row['pos'],row['amount'],row['radius'])
+                for row in self._settlement_chip_rows()]
 
-        layout=self._main_split_wager_layout(len(self.hands)) if self.hands else []
-        for idx,hand in enumerate(self.hands):
-            if idx>=len(layout): break
-            amount=self._component_return_amount(hand,'base')
-            if amount>0.0:
-                x,y=layout[idx]['base']; sources.append((x,y,amount,20))
-            amount=self._component_return_amount(hand,'double')
-            if amount>0.0:
-                x,y=layout[idx]['double']; sources.append((x,y,amount,20))
-
-        if self.insurance_return_amount>0.0:
-            x,y=self.rule_strip_chip_pos
-            sources.append((x,y,float(self.insurance_return_amount),18))
-        return sources
 
     def _animate_settlement_chips(self, sources, destination, duration_ms, tag, on_complete=None):
         """Animate Baccarat-style amount chips from settlement positions."""
@@ -1454,203 +1377,93 @@ class BubbleBlackjackGame(tk.Frame):
             lambda sx,sy:(sx,-35.0), 300, 'settlement_loss_fly')
 
     def _finish_flash_with_chip_return(self):
-        """After flashing, fly every returned chip to the bottom chip rack in 0.20 s."""
-        self.canvas.delete('win_flash_area'); self.canvas.delete('side_bet_win_odds')
-        self.canvas.delete('side_bet_progress_badge')
-        self._restore_betting_spot_label_colors()
-        sources=self._settlement_return_chip_sources()
-        # Hide the stationary settlement chips before drawing their travelling clones.
-        self.canvas.delete('bet_chip_dynamic'); self.canvas.delete('hand_wager'); self.canvas.delete('insurance_chip')
-        self.flash_mode=None
+        """Return the displayed principal and profit chips once each."""
+        if not self.settlement_running or self.settlement_visual_stage=='returning':
+            return
+        sources = self._settlement_return_chip_sources()
+        self.settlement_visual_stage = 'returning'
+        for tag in ('bet_chip_dynamic','hand_wager','insurance_chip','win_flash_area'):
+            self.canvas.delete(tag)
         def done():
-            self.settlement_running=False
+            self.settlement_running = False
             self._reset_after_round()
         self._animate_settlement_chips(sources,(575.0,674.0),200,'settlement_return_fly',done)
 
+
     def run_settlement_flash(self):
-        """Three Baccarat-style cycles for side bets, whole MAIN, and winning insurance."""
-        if self._closing or not self.settlement_running:
-            return
-        if self.settlement_flash_step >= 6:
-            self._finish_flash_with_chip_return(); return
+        """Compatibility entry point: render a steady outcome without flashing."""
+        if self.settlement_running:
+            self._render_settlement_chips()
 
-        light_phase = (self.settlement_flash_step % 2 == 0)
-        self.flash_mode = 'win' if light_phase else 'original'
-        self.canvas.delete('win_flash_area'); self.canvas.delete('side_bet_win_odds')
-        self._restore_betting_spot_label_colors()
-        if light_phase:
-            for key in set(self.flash_winning_side_bets):
-                spot=self.bet_spots.get(key)
-                if not spot: continue
-                x0,y0,x1,y1=spot['bounds']
-                self.canvas.create_oval(x0,y0,x1,y1,fill='#ffffff',outline='#111111',width=2,
-                                        tags=('win_flash_area','settlement_flash'))
-                self.canvas.itemconfigure(spot['label'],fill='#111111'); self.canvas.tag_raise(spot['label'])
-            if self.flash_main_bet:
-                spot=self.bet_spots.get('MAIN')
-                if spot:
-                    x0,y0,x1,y1=spot['bounds']
-                    main_fill = '#9fdcff' if self.flash_main_push_only else '#ffffff'
-                    self.canvas.create_oval(x0,y0,x1,y1,fill=main_fill,outline='#111111',width=3,
-                                            tags=('win_flash_area','settlement_flash'))
-                    self.canvas.itemconfigure(spot['label'],fill='#111111'); self.canvas.tag_raise(spot['label'])
-            if self.flash_insurance_rule:
-                x0,y0,x1,y1=self.rule_strip_bounds
-                self.canvas.create_rectangle(x0,y0,x1,y1,fill='#ffffff',outline='#111111',width=2,
-                                             tags=('win_flash_area','settlement_flash'))
-                self._set_rule_strip_text_color('#111111')
-
-        self.update_bet_chips()
-        self.canvas.delete('hand_wager'); self._draw_main_hand_wagers()
-        self._render_insurance_chip()
-        self._draw_side_bet_win_odds_badges()
-        self.canvas.tag_raise('win_flash_area')
-        self.canvas.tag_raise('side_bet_win_odds')
-        for tag in ('betting_spot_label','rule_strip_text','rule_strip_split_text','bet_chip_dynamic',
-                    'dealt_card','hand_wager','hand_label','insurance_chip','side_bet_win_odds','settlement_loss_fly'):
-            try: self.canvas.tag_raise(tag)
-            except tk.TclError: pass
-        self._raise_visible_bottom_controls(self.round_active)
-        self.settlement_flash_step += 1
-        self._queue(300, self.run_settlement_flash)
 
     def select_chip(self, value):
+        if self.round_active or self.animation_running or self.settlement_running:
+            return
         self.selected_chip = float(value)
-        for chip_value, (outer, _inner, _txt) in self.chip_selector_items.items():
+        for chip_value, (outer, _inner, _text) in self.chip_selector_items.items():
             selected = float(chip_value) == self.selected_chip
-            self.canvas.itemconfigure(outer,
-                                      outline='#f4d65b' if selected else '#6d6259',
-                                      width=5 if selected else 3)
+            self.canvas.itemconfigure(outer, outline=self.GOLD if selected else '#6C7850',
+                                      width=4 if selected else 3)
 
-    def place_bet(self):
-        if not self.accept_bets or self.round_active or self.animation_running or self.settlement_running:
-            return
-        # Silently clamp the selected denomination to the remaining MAIN limit.
-        # Example: MAIN=450K + selected 250K -> actually place only 50K.
-        remaining_limit = max(0.0, self.MAX_MAIN_BET - float(self.current_bet))
-        amount = min(float(self.selected_chip), remaining_limit)
-        if amount <= 1e-9:
-            return
-        if self.balance + 1e-9 < amount:
-            messagebox.showwarning('余额不足', '余额不足以放置该筹码。', parent=self.winfo_toplevel())
-            return
-        # A new betting action switches the lower-left readout back from
-        # "上局获胜" to the live "本局下注" amount.
-        self.show_last_win = False
-        # Reserve the wager immediately so rapid clicks cannot overspend, while
-        # pending_bet_animation keeps the destination total hidden until arrival.
-        self.balance -= amount
-        self.current_bet += amount
-        self.pending_bet_animation['MAIN'] += amount
-        self.bet_chip_animation_count += 1
-        self.update_display()
-        self._animate_selected_chip_to_spot(
-            'MAIN', lambda: self._finish_bet_chip_animation('MAIN', amount), amount=amount)
 
-    def place_side_bet(self, key):
-        if (key not in self.SIDE_BET_KEYS or not self.accept_bets or self.round_active
-                or self.animation_running or self.settlement_running):
-            return
-        # Each side bet has its own 100K cap.  A denomination larger than the
-        # remaining allowance is silently reduced to exactly fill that side bet.
-        current = float(self.current_side_bets.get(key, 0.0))
-        remaining_limit = max(0.0, self.MAX_SIDE_BET - current)
-        amount = min(float(self.selected_chip), remaining_limit)
-        if amount <= 1e-9:
-            return
-        if self.balance + 1e-9 < amount:
-            messagebox.showwarning('余额不足', '余额不足以放置该筹码。', parent=self.winfo_toplevel())
-            return
-        self.show_last_win = False
-        self.balance -= amount
-        self.current_side_bets[key] += amount
-        self.pending_bet_animation[key] += amount
-        self.bet_chip_animation_count += 1
-        self.update_display()
-        self._animate_selected_chip_to_spot(
-            key, lambda k=key, a=amount: self._finish_bet_chip_animation(k, a), amount=amount)
+    def place_bet(self, seat='Player1'):
+        self._place_seat_bet(seat, 'MAIN')
 
-    def clear_side_bet(self, key):
-        if (key not in self.SIDE_BET_KEYS or not self.accept_bets or self.round_active
-                or self.animation_running or self.settlement_running
-                or self.bet_chip_animation_count > 0):
-            return
-        amount = self.current_side_bets.get(key, 0.0)
-        if amount > 0:
-            self.balance += amount
-            self.current_side_bets[key] = 0.0
-            self.pending_bet_animation[key] = 0.0
-            self.update_display()
-            self.save_balance()
+
+    def place_side_bet(self, key, seat='Player1'):
+        self._place_seat_bet(seat, key)
+
+
+    def clear_side_bet(self, key, seat='Player1'):
+        self._clear_seat_bet(seat, key)
+
 
     def clear_bets(self):
-        if (not self.accept_bets or self.round_active or self.animation_running
-                or self.settlement_running or self.bet_chip_animation_count > 0):
+        if not self._can_change_bets() or self.bet_chip_animation_count:
             return
-        refund = self.current_bet + sum(self.current_side_bets.values())
-        if refund > 0:
-            self.balance += refund
-            self.current_bet = 0.0
-            self.current_side_bets = {key: 0.0 for key in self.SIDE_BET_KEYS}
-            self.pending_bet_animation = {'MAIN': 0.0, **{key: 0.0 for key in self.SIDE_BET_KEYS}}
-            self.update_display()
-            self.save_balance()
+        self.balance += sum(self.current_bets.values())+sum(self.current_side_bets.values())
+        self.current_bets = {seat: 0.0 for seat in self.SEATS}
+        self.current_side_bets = self._empty_side_bets()
+        self.pending_bet_animation = {key: 0.0 for key in self.bet_spots}
+        self._sync_main_totals()
+        self.update_display()
+        self.save_balance()
+
 
     def repeat_last_bet(self):
-        if (not self.accept_bets or self.round_active or self.animation_running
-                or self.settlement_running or self.bet_chip_animation_count > 0):
+        if not self._can_change_bets() or self.bet_chip_animation_count:
             return
-        targets = {'MAIN': self.last_bet, **self.last_side_bets}
-        currents = {'MAIN': self.current_bet, **self.current_side_bets}
-        additions = {
-            key: max(0.0, float(targets[key]) - float(currents.get(key, 0.0)))
-            for key in targets
-        }
+        targets = {(seat, 'MAIN'): self.last_bets[seat] for seat in self.SEATS}
+        targets.update(self.last_side_bets)
+        additions = {key: max(0.0, value-(self.current_bets[key[0]] if key[1]=='MAIN'
+                                        else self.current_side_bets[key]))
+                     for key, value in targets.items()}
         needed = sum(additions.values())
         if needed <= 0:
             return
-        final_main = self.current_bet + additions.get('MAIN', 0.0)
-        if final_main > self.MAX_MAIN_BET + 1e-9:
-            messagebox.showwarning(
-                '无法重复下注',
-                f'主注最高下注 {self.format_money(self.MAX_MAIN_BET)}。',
-                parent=self.winfo_toplevel())
-            return
-        for key in self.SIDE_BET_KEYS:
-            final_side = self.current_side_bets.get(key, 0.0) + additions.get(key, 0.0)
-            if final_side > self.MAX_SIDE_BET + 1e-9:
-                messagebox.showwarning(
-                    '无法重复下注',
-                    f'{self.SIDE_BET_LABELS.get(key, key)}最高下注 {self.format_money(self.MAX_SIDE_BET)}。',
-                    parent=self.winfo_toplevel())
-                return
-        if self.balance + 1e-9 < needed:
+        if self.balance+1e-9 < needed:
             messagebox.showwarning('无法重复下注', '余额不足。', parent=self.winfo_toplevel())
             return
-
+        self.balance -= needed
         self.show_last_win = False
-        # V16: reserve every repeated wager immediately, exactly like a manual
-        # click, but hide each added amount until its rack-to-spot flight lands.
-        # This prevents both overspending and a premature destination-chip jump.
-        for key, add in additions.items():
-            if add <= 0.0:
+        for key, amount in additions.items():
+            if amount <= 0:
                 continue
-            self.balance -= add
-            if key == 'MAIN':
-                self.current_bet += add
+            if key[1] == 'MAIN':
+                self.current_bets[key[0]] += amount
             else:
-                self.current_side_bets[key] += add
-            self.pending_bet_animation[key] += add
+                self.current_side_bets[key] += amount
+            self.pending_bet_animation[key] += amount
             self.bet_chip_animation_count += 1
-
+        self._sync_main_totals()
         self.update_display()
-        for key, add in additions.items():
-            if add <= 0.0:
-                continue
-            self._animate_amount_chip_to_spot(
-                key, add, lambda k=key, a=add: self._finish_bet_chip_animation(k, a))
+        for key, amount in additions.items():
+            if amount > 0:
+                self._animate_amount_chip_to_spot(key, amount,
+                    lambda k=key, a=amount: self._finish_bet_chip_animation(k, a))
 
-    # -------------------------------------------------------------- Classic_Blackjack.json
+
+    # -------------------------------------------------------------- Blackjack_Power.json
     def save_runtime_store(self, burn_complete=True):
         data = {
             'version': 2,
@@ -1672,7 +1485,7 @@ class BubbleBlackjackGame(tk.Frame):
 
     def load_runtime_store(self):
         # The encrypted CSM state is authoritative.  Blackjack deliberately
-        # keeps no duplicate deck order in Classic_Blackjack.json.
+        # keeps no duplicate deck order in Blackjack_Power.json.
         try:
             self.csm.status()
             return True
@@ -1871,7 +1684,6 @@ class BubbleBlackjackGame(tk.Frame):
             return
         self.animation_running = False
         self.accept_bets = True
-        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_BETTING)
         self.update_display()
 
     def _face_photo(self, card):
@@ -1888,64 +1700,74 @@ class BubbleBlackjackGame(tk.Frame):
         return ImageTk.PhotoImage(image, master=self)
 
     def _animate_card_from_shoe(self, card, target_x, target_y, on_complete=None,
-                                flip=True, tag='round_animation_card'):
-        """Baccarat-style movement followed by the same width-collapse flip."""
-        sx, sy = self.shoe_origin
-        start_x, start_y = sx, sy
-        back = self.external_back_image
+                                flip=True, tag='round_animation_card', rotation=0):
+        """Deal the oriented back, then flip on the same oriented axis.
+
+        Double's 90-degree card remains horizontal throughout its movement and
+        reveal: its height collapses, rather than reverting to an upright flip.
+        """
+        sx,sy = self.shoe_origin
+        width,height = self._card_dimensions(rotation)
+        back = self._oriented_card_photo(card,rotation,use_back=True)
         if back is not None:
-            card_id = self.canvas.create_image(start_x, start_y, image=back, anchor='nw',
-                                               tags=(tag, 'animation_card'))
+            card_id = self.canvas.create_image(sx,sy,image=back,anchor='nw',
+                tags=(tag,'animation_card'))
         else:
-            card_id = self.canvas.create_rectangle(start_x, start_y, start_x+100, start_y+140,
-                                                   fill='#253e66', outline='#d7c46a', width=2,
-                                                   tags=(tag, 'animation_card'))
+            card_id = self.canvas.create_rectangle(sx,sy,sx+width,sy+height,
+                fill='#253e66',outline='#d7c46a',width=2,tags=(tag,'animation_card'))
         self._round_anim_item = card_id
 
-        def move_step(step=0):
-            if self._closing: return
-            t = min(1.0, step / 24.0)
-            eased = 1.0 - (1.0 - t) ** 3
-            x = start_x + (target_x - start_x) * eased
-            y = start_y + (target_y - start_y) * eased
-            if self.canvas.type(card_id) == 'image':
-                self.canvas.coords(card_id, x, y)
-            else:
-                self.canvas.coords(card_id, x, y, x+100, y+140)
-            if step < 24:
-                self._queue(12, move_step, step + 1)
-            elif flip:
-                flip_step(0)
-            else:
-                if callable(on_complete): on_complete()
+        def finish():
+            self._temp_flip_images.pop(card_id,None)
+            self.canvas.delete(card_id)
+            self._render_card(card,target_x,target_y,tags=(tag,'animation_card'),rotation=rotation)
+            self._raise_wager_chips()
+            if callable(on_complete):
+                on_complete()
 
         def flip_step(step=0):
-            if self._closing: return
-            steps = 12
-            if step > steps:
-                if self.canvas.type(card_id) == 'image':
-                    final = self._face_photo(card)
-                    if final is not None: self.canvas.itemconfigure(card_id, image=final)
-                    self.canvas.coords(card_id, target_x, target_y)
-                else:
-                    self.canvas.delete(card_id)
-                self._temp_flip_images.pop(card_id, None)
-                if callable(on_complete): on_complete()
+            if self._closing:
                 return
-            half = steps // 2
-            if step <= half:
-                ratio = 1 - step / float(half); use_back = True
+            if step>12:
+                finish()
+                return
+            use_back = step<=6
+            ratio = 1-step/6 if use_back else (step-6)/6
+            fw = width if rotation%180 else max(1,round(width*ratio))
+            fh = max(1,round(height*ratio)) if rotation%180 else height
+            x,y = target_x+(width-fw)/2,target_y+(height-fh)/2
+            if self.canvas.type(card_id)=='image':
+                base = self._oriented_card_pil(card,rotation,use_back)
+                resample = getattr(Image,'Resampling',Image).LANCZOS
+                photo = ImageTk.PhotoImage(base.resize((fw,fh),resample),master=self)
+                self._temp_flip_images[card_id] = photo
+                self.canvas.itemconfigure(card_id,image=photo)
+                self.canvas.coords(card_id,x,y)
             else:
-                ratio = (step - half) / float(half); use_back = False
-            width = max(1, int(100 * ratio))
-            if self.canvas.type(card_id) == 'image':
-                image = self._create_scaled_flip_image(card, width, 140, use_back=use_back)
-                if image is not None:
-                    self._temp_flip_images[card_id] = image
-                    self.canvas.itemconfigure(card_id, image=image)
-                    self.canvas.coords(card_id, target_x + (100-width)/2, target_y)
-            self._queue(20, flip_step, step + 1)
-        move_step(0)
+                self.canvas.coords(card_id,x,y,x+fw,y+fh)
+                self.canvas.itemconfigure(card_id,fill='#253e66' if use_back else '#f4efe4')
+            self._raise_wager_chips()
+            self._queue(20,flip_step,step+1)
+
+        def move_step(step=0):
+            if self._closing:
+                return
+            t = min(1.0,step/24.0)
+            eased = 1-(1-t)**3
+            x,y = sx+(target_x-sx)*eased,sy+(target_y-sy)*eased
+            if self.canvas.type(card_id)=='image':
+                self.canvas.coords(card_id,x,y)
+            else:
+                self.canvas.coords(card_id,x,y,x+width,y+height)
+            self._raise_wager_chips()
+            if step<24:
+                self._queue(12,move_step,step+1)
+            elif flip:
+                flip_step()
+            elif callable(on_complete):
+                on_complete()
+        move_step()
+
 
     def _animate_back_from_shoe(self, target_x, target_y, on_complete=None):
         sx, sy = self.shoe_origin
@@ -1953,16 +1775,17 @@ class BubbleBlackjackGame(tk.Frame):
             item = self.canvas.create_image(sx, sy, image=self.external_back_image,
                                             anchor='nw', tags=('burn_card','animation_card'))
         else:
-            item = self.canvas.create_rectangle(sx,sy,sx+100,sy+140,fill='#253e66',outline='#d7c46a',
+            item = self.canvas.create_rectangle(sx,sy,sx+self.CARD_WIDTH,sy+self.CARD_HEIGHT,fill='#253e66',outline='#d7c46a',
                                                 tags=('burn_card','animation_card'))
         def step(i=0):
             t=min(1.0,i/20.0); e=1-(1-t)**3
             x=sx+(target_x-sx)*e; y=sy+(target_y-sy)*e
             if self.canvas.type(item)=='image': self.canvas.coords(item,x,y)
-            else: self.canvas.coords(item,x,y,x+100,y+140)
+            else: self.canvas.coords(item,x,y,x+self.CARD_WIDTH,y+self.CARD_HEIGHT)
             if i<20: self._queue(12,step,i+1)
             elif callable(on_complete): on_complete()
         step(0)
+
 
     def _start_initial_burn(self):
         if self.engine.remaining_cards() <= 0:
@@ -1971,7 +1794,6 @@ class BubbleBlackjackGame(tk.Frame):
         self.save_runtime_store(burn_complete=False)
         burn_count = BlackjackEngine.burn_value(face)
         self.clear_card_display()
-        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_PLAYING)
 
         # V20 burn layout:
         #   row 1: the single face-up burn-value card, centred;
@@ -1992,7 +1814,6 @@ class BubbleBlackjackGame(tk.Frame):
             return start_x + position * (card_w + gap_x)
 
         def face_arrived():
-            self.canvas.itemconfigure(self.phase_text, text=self.PHASE_PLAYING)
             def burn_rest(index=0):
                 if index >= burn_count or self.engine.remaining_cards() <= 0:
                     self._queue(500, self._finish_burn); return
@@ -2022,7 +1843,6 @@ class BubbleBlackjackGame(tk.Frame):
         self.animation_running = False
         self.accept_bets = True
         self.save_runtime_store(burn_complete=True)
-        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_BETTING)
         self.update_display()
 
     def _draw_single_temp_card(self, card, x, y, tag, face_up=True):
@@ -2062,48 +1882,27 @@ class BubbleBlackjackGame(tk.Frame):
             self.canvas.itemconfigure(self.dealer_total_text, text='')
 
 
-    def _hand_overlap(self, count=None):
-        """Horizontal card overlap for the current 1..4 hand layout."""
-        n = max(1, min(self.MAX_HANDS, int(count if count is not None else len(self.hands) or 1)))
-        if n <= 2:
-            return 34
-        if n == 3:
-            return 27
-        if n == 4:
-            return 21
-        return 17
 
     def _hand_centers(self, count=None):
-        """Exact centres of the 1..4 equal player-hand lanes."""
-        n = max(1, min(self.MAX_HANDS, int(count if count is not None else len(self.hands) or 1)))
-        x0, x1 = 22.0, 1128.0
-        gutter = 8.0
-        cell_w = (x1 - x0 - gutter * (n - 1)) / n
-        return [x0 + cell_w / 2.0 + i * (cell_w + gutter) for i in range(n)]
+        geometry = self._seat_hand_geometry()
+        return [geometry[i][2] for i in range(len(self.hands))]
 
 
 
-    def _main_split_wager_layout(self, count=None):
-        """Return Evoplay-style MAIN-oval chip positions for 1..4 hands."""
-        n = max(1, min(self.MAX_HANDS, int(count if count is not None else len(self.hands) or 1)))
-        spot = self.bet_spots.get('MAIN')
-        if spot:
-            x0, y0, x1, y1 = spot['bounds']
-        else:
-            x0, y0, x1, y1 = (455.0, 402.0, 695.0, 548.0)
-        w, h = x1 - x0, y1 - y0
-        normalized = {
-            1: ((0.50, 0.62),),
-            2: ((0.34, 0.62), (0.66, 0.62)),
-            3: ((0.27, 0.57), (0.50, 0.67), (0.73, 0.57)),
-            4: ((0.18, 0.54), (0.38, 0.63), (0.59, 0.63), (0.81, 0.54)),
-        }[n]
+
+    def _main_split_wager_layout(self, count=None, hands_snapshot=None):
+        hands = self.hands if hands_snapshot is None else hands_snapshot
+        geometry = self._seat_hand_geometry(hands)
         result = []
-        for fx, fy in normalized:
-            bx, by = x0 + fx * w, y0 + fy * h
-            dy = min(y1 - 16.0, by + 0.255 * h)
-            result.append({'base': (bx, by), 'double': (bx, dy)})
+        for index, hand in enumerate(hands):
+            x,y = self._player_card_position(hand, geometry[index], 0)
+            cx = self._wager_center_x(x+self.CARD_WIDTH/2, geometry[index], right_slots=1)
+            # Leave clear space between the first card and its enlarged chip.
+            cy = y+self.CARD_HEIGHT+self.WAGER_CHIP_RADIUS+self.CARD_WAGER_GAP
+            double = (cx+self.CHIP_PITCH,cy)  # Double uses the shared chip spacing.
+            result.append({'base': (cx,cy), 'double': double})
         return result
+
 
 
     def _component_return_amount(self, hand, component):
@@ -2132,59 +1931,20 @@ class BubbleBlackjackGame(tk.Frame):
         return 0.0
 
     def _draw_main_hand_wagers(self):
-        """Draw split wager chips inside MAIN; white flash shows returned amounts."""
         self.main_wager_positions = {}
-        if not self.round_active or not self.hands:
-            return
-        layout = self._main_split_wager_layout(len(self.hands))
-        for idx, hand in enumerate(self.hands):
-            pos = layout[idx]
-            base = float(hand.get('base_bet', 0.0))
-            dbl = float(hand.get('double_added', 0.0))
-            base_state = hand.get('base_settlement')
-            double_state = hand.get('double_settlement')
-            show_base = base > 0.0
-            show_double = dbl > 0.0
-            if self.settlement_running:
-                # Only genuinely losing components disappear. Push/refund/cashout
-                # components still represent money returned to the player.
-                show_base = show_base and base_state != 'lose'
-                show_double = show_double and double_state != 'lose'
-            self.main_wager_positions[idx] = {
-                'base': pos['base'],
-                'double': pos['double'] if dbl > 0.0 else None,
-                'show_base': show_base,
-                'show_double': show_double,
-            }
+        rows = self._main_wager_rows()
+        for index,pos in enumerate(self._main_split_wager_layout()):
+            self.main_wager_positions[index] = dict(base=pos['base'],double=pos['double'],
+                show_base=any(row['key'][:3]==('main',index,'base') for row in rows),
+                show_double=any(row['key'][:3]==('main',index,'double') for row in rows))
+        self._draw_outcome_rows(rows)
 
-            base_display = base
-            double_display = dbl
-            if self.settlement_running and self.flash_mode == 'win':
-                base_display = self._component_return_amount(hand, 'base')
-                double_display = self._component_return_amount(hand, 'double')
-
-            # Draw Double first so the base chip visually sits in front where
-            # their edges overlap, matching the supplied split/Double reference.
-            if show_double and double_display > 0.0:
-                self._draw_baccarat_chip(
-                    pos['double'][0], pos['double'][1], double_display,
-                    tags=('hand_wager', f'hand_wager_{idx}', 'double_wager'), radius=20)
-            if show_base and base_display > 0.0:
-                self._draw_baccarat_chip(
-                    pos['base'][0], pos['base'][1], base_display,
-                    tags=('hand_wager', f'hand_wager_{idx}', 'base_wager'), radius=20)
 
 
     def _player_card_target(self, hand_index, card_index):
-        """Centre each split hand's card fan in its own lane, below the rules strip."""
-        centers = self._hand_centers()
-        cx = centers[min(hand_index, len(centers) - 1)]
-        overlap = self._hand_overlap()
-        cards = self.hands[hand_index]['cards'] if 0 <= hand_index < len(self.hands) else []
-        count = max(1, len(cards))
-        total_w = 100 + max(0, count - 1) * overlap
-        start_x = cx - total_w / 2
-        return start_x + card_index * overlap, 252
+        return self._player_card_position(self.hands[hand_index],
+                                          self._seat_hand_geometry()[hand_index], card_index)
+
 
 
     @staticmethod
@@ -2217,211 +1977,122 @@ class BubbleBlackjackGame(tk.Frame):
         return f'{hard}/{best}' if best != hard else str(hard)
 
     def _player_hand_badge_fill(self, hand_index):
-        """Colour ONLY the pointed score badge; never recolour a hand background.
-
-        During player action: current=gold, waiting=light green, processed=light red.
-        Once all player hands are processed they all return to white for dealer play.
-        At settlement the final hand result takes precedence: win/cashout=green,
-        push/refund=blue, lose=red.
-        """
-        if not (0 <= hand_index < len(self.hands)):
+        if not 0<=hand_index<len(self.hands):
             return '#ffffff'
         hand = self.hands[hand_index]
         settlement = hand.get('settlement')
-        if settlement in ('win', 'cashout'):
+        if settlement == 'cashout' or hand.get('status') == 'surrendered':
+            return '#b9dcff'
+        if settlement == 'win' or hand.get('status')=='even_money':
             return '#b9efb4'
         if settlement in ('push', 'refund'):
             return '#b9dcff'
-        if settlement == 'lose':
+        if settlement=='lose' or hand.get('status')=='bust':
+            return '#e34848'
+        if hand.get('status')=='stood':
             return '#f2b0b0'
-        # A busted player hand is permanently light red, including the interval
-        # after all player decisions finish but before settlement is assigned.
-        if hand.get('status') == 'bust':
-            return '#f2b0b0'
+        return '#ffffff'
 
-        if not self.round_active or not self.hands:
-            return '#ffffff'
-        # Player point badges do NOT change merely because dealer play begins.
-        # Once all player decisions are complete they return to white; only the
-        # dealer point badge changes colour during the dealer phase.
-        all_processed = all(h.get('status') != 'active' for h in self.hands)
-        if all_processed:
-            return '#ffffff'
-        if hand_index == self.active_hand_index and hand.get('status') == 'active':
-            return '#f3cf55'
-        if hand.get('status') == 'active' or hand.get('needs_split_draw', False):
-            return '#b9efb4'
-        return '#f2b0b0'
 
 
     def _draw_hand_total_badge(self, hand_index, left, right, active=False):
-        """Draw the pointed score badge; its colour alone marks hand state."""
-        if not (0 <= hand_index < len(self.hands)):
-            return
-        cards = self.hands[hand_index].get('cards', [])
-        if not cards:
-            return
-        n = max(1, len(self.hands))
-        overlap = self._hand_overlap(n)
-        total_w = 100 + max(0, len(cards) - 1) * overlap
-        cx = self._hand_centers()[hand_index]
-        card_left = cx - total_w / 2.0
-        card_right = card_left + total_w
-        mid_y = 322.0
-        if n >= 4:
-            box_w, box_h, gap, tip, font_size = 46.0, 46.0, 4.0, 17.0, 14
-        elif n == 3:
-            box_w, box_h, gap, tip, font_size = 58.0, 46.0, 5.0, 20.0, 17
-        else:
-            box_w, box_h, gap, tip, font_size = 64.0, 46.0, 5.0, 20.0, 17
-
-        if card_right + gap + box_w + tip <= right - 4:
-            tip_x = card_right + gap
-            box_x0 = tip_x + tip
-            box_x1 = box_x0 + box_w
-            points = (tip_x, mid_y,
-                      box_x0, mid_y - box_h / 2,
-                      box_x1, mid_y - box_h / 2,
-                      box_x1, mid_y + box_h / 2,
-                      box_x0, mid_y + box_h / 2)
-            text_x = (box_x0 + box_x1) / 2
-        else:
-            tip_x = card_left - gap
-            box_x1 = tip_x - tip
-            box_x0 = box_x1 - box_w
-            points = (tip_x, mid_y,
-                      box_x1, mid_y - box_h / 2,
-                      box_x0, mid_y - box_h / 2,
-                      box_x0, mid_y + box_h / 2,
-                      box_x1, mid_y + box_h / 2)
-            text_x = (box_x0 + box_x1) / 2
-
-        fill = self._player_hand_badge_fill(hand_index)
-        self.canvas.create_polygon(*points, fill=fill, outline='',
-                                   tags=('hand_label', 'hand_total_badge', 'player_hand_overlay'))
         hand = self.hands[hand_index]
-        natural_blackjack = bool(
-            not hand.get('from_split', False)
-            and BlackjackEngine.is_blackjack(cards)
-        )
-        total, soft = BlackjackEngine.hand_value(cards)
-        soft_stand = bool(soft and total <= 21 and hand.get('status') == 'stood')
-        self.canvas.create_text(
-            text_x - 4, mid_y,
-            text=self._hand_total_badge_text(
-                cards, blackjack=natural_blackjack, soft_stand=soft_stand),
-            font=(self.cn_font, font_size, 'bold'), fill='#000000',
-            tags=('hand_label', 'hand_total_badge', 'player_hand_overlay'))
+        if not hand['cards']:
+            return
+        card_x, card_y = self._player_card_target(hand_index, 0)
+        tip_x, y = card_x-6, card_y+self.CARD_HEIGHT/2
+        box_right, box_left = tip_x-10, tip_x-62
+        points = (tip_x, y, box_right, y-18, box_left, y-18,
+                  box_left, y+18, box_right, y+18)
+        text_x = (box_left+box_right)/2
+        total, soft = BlackjackEngine.hand_value(hand['cards'])
+        surrendered = hand.get('status') == 'surrendered' or hand.get('settlement') == 'cashout'
+        natural = not surrendered and not hand['from_split'] and BlackjackEngine.is_blackjack(hand['cards'])
+        self.canvas.create_polygon(*points,
+            fill='#000000' if natural else self._player_hand_badge_fill(hand_index), outline='',
+            tags=('hand_label', 'hand_total_badge', 'player_hand_overlay', f'player_score_{hand_index}'))
+        self.canvas.create_text(text_x, y,
+            text="投降" if surrendered else self._hand_total_badge_text(hand['cards'], blackjack=natural,
+                                           soft_stand=soft and total<=21 and hand['status']=='stood'),
+            font=('Segoe UI Emoji', 18) if surrendered else (self.cn_font, 10 if natural else 12, 'bold'),
+            fill='#FFFFFF' if natural else '#111111',
+            tags=('hand_label', 'hand_total_badge', 'player_hand_overlay', f'player_score_{hand_index}'))
+
 
 
     def _dealer_card_target(self, card_index):
-        overlap = 42
         count = max(1, len(self.dealer_cards))
-        total_w = 100 + max(0, count-1)*overlap
-        start_x = 575 - total_w/2
-        return start_x + card_index*overlap, 30
+        # Original Classic's 42px overlapping row, centred in the dealer zone.
+        # Compress only unusually long rows to retain room for the point badge.
+        step = min(42.0, (292-self.CARD_WIDTH)/max(1, count-1))
+        width = self.CARD_WIDTH+(count-1)*step
+        return 575-width/2+card_index*step, 74.0
+
 
     def _draw_dealer_total_badge(self):
-        """Dealer gets the same pointed point badge as the player hands."""
-        if not self.dealer_cards: return
-        overlap=42; total_w=100+max(0,len(self.dealer_cards)-1)*overlap
-        left=575-total_w/2; right=left+total_w; mid_y=100.0
-        box_w=68.0; box_h=48.0; gap=7.0; tip=22.0
-        if right+gap+tip+box_w <= 1118:
-            tip_x=right+gap; x0=tip_x+tip; x1=x0+box_w
-            pts=(tip_x,mid_y,x0,mid_y-box_h/2,x1,mid_y-box_h/2,x1,mid_y+box_h/2,x0,mid_y+box_h/2)
-        else:
-            tip_x=left-gap; x1=tip_x-tip; x0=x1-box_w
-            pts=(tip_x,mid_y,x1,mid_y-box_h/2,x0,mid_y-box_h/2,x0,mid_y+box_h/2,x1,mid_y+box_h/2)
-        dealer_total, dealer_soft = BlackjackEngine.hand_value(self.dealer_cards)
-        # V18 dealer point marker: white before dealer play, gold while the dealer
-        # is drawing/standing, and light red immediately if the dealer busts.
-        if self.dealer_phase_active:
-            dealer_badge_fill = '#f2b0b0' if dealer_total > 21 else '#f3cf55'
-        else:
-            dealer_badge_fill = '#ffffff'
-        self.canvas.create_polygon(
-            *pts, fill=dealer_badge_fill, outline='',
-            tags=('hand_label','dealer_total_badge'))
-        dealer_blackjack = BlackjackEngine.is_blackjack(self.dealer_cards)
-        dealer_soft_stand = bool(
-            dealer_soft and len(self.dealer_cards) >= 2 and 17 <= dealer_total <= 21
-        )
-        self.canvas.create_text(
-            (x0+x1)/2-5, mid_y,
-            text=self._hand_total_badge_text(
-                self.dealer_cards, blackjack=dealer_blackjack,
-                soft_stand=dealer_soft_stand),
-            font=(self.cn_font,17,'bold'),fill='#000000',
-            tags=('hand_label','dealer_total_badge'))
+        if not self.dealer_cards:
+            return
+        card_x,card_y = self._dealer_card_target(len(self.dealer_cards)-1)
+        tip_x,y = card_x+self.CARD_WIDTH+6,card_y+self.CARD_HEIGHT/2
+        box_left,box_right = tip_x+10,tip_x+62
+        total, soft = BlackjackEngine.hand_value(self.dealer_cards)
+        natural = BlackjackEngine.is_blackjack(self.dealer_cards)
+        fill = '#000000' if natural else self._dealer_badge_fill()
+        self.canvas.create_polygon(tip_x,y,box_left,y-18,box_right,y-18,
+                                   box_right,y+18,box_left,y+18,
+                                   fill=fill, outline='', tags=('hand_label', 'dealer_total_badge'))
+        self.canvas.create_text((box_left+box_right)/2, y,
+            text=self._hand_total_badge_text(self.dealer_cards,
+                blackjack=natural,
+                soft_stand=soft and len(self.dealer_cards)>=2 and 17<=total<=21),
+            font=(self.cn_font, 12, 'bold'), fill='#FFFFFF' if natural else '#111111',
+            tags=('hand_label', 'dealer_total_badge'))
+
 
     def _draw_amount_chip(self, cx, cy, amount, label='', behind=False):
-        r = 20
-        fill = '#5b2f79' if behind else '#202020'
-        outline = '#e8d15b' if not behind else '#d4a8ef'
-        self.canvas.create_oval(cx-r,cy-r,cx+r,cy+r,fill=fill,outline=outline,width=3,
-                                tags=('hand_wager',))
-        self.canvas.create_oval(cx-r+5,cy-r+5,cx+r-5,cy+r-5,fill=fill,outline='#eee3d6',width=1,
-                                tags=('hand_wager',))
-        if amount >= 1_000_000:
-            txt = f'{amount/1_000_000:g}M'
-        elif amount >= 1000:
-            txt = f'{amount/1000:g}K'
-        else:
-            txt = f'{amount:g}'
-        self.canvas.create_text(cx,cy-5,text=txt,font=(self.cn_font,7,'bold'),fill='white',tags=('hand_wager',))
+        self._draw_baccarat_chip(cx, cy, amount, tags=('hand_wager',),
+                                 force_color='#5b2f79' if behind else None)
         if label:
-            self.canvas.create_text(cx,cy+8,text=label,font=(self.cn_font,6,'bold'),fill='#ffe898',tags=('hand_wager',))
+            self.canvas.create_text(cx,cy+self.WAGER_CHIP_RADIUS+9,text=label,
+                font=(self.cn_font,-12,'bold'),fill='#ffe898',tags=('hand_wager',))
 
     def render_cards(self):
-        self.canvas.delete('dealt_card'); self.canvas.delete('hand_label')
-        self.canvas.delete('hand_zone'); self.canvas.delete('hand_wager')
-
-        for i, card in enumerate(self.dealer_cards):
-            x,y=self._dealer_card_target(i); self._render_card(card,x,y,tags=('dealt_card','dealer_dealt_card'))
-        if self.dealer_cards: self._draw_dealer_total_badge()
-        self.canvas.itemconfigure(self.dealer_total_text, text='')
-
-        centers=self._hand_centers(); n=max(1,len(self.hands)); boundaries=[]
-        for i,cx in enumerate(centers):
-            left=22 if i==0 else (centers[i-1]+cx)/2+4
-            right=1128 if i==n-1 else (cx+centers[i+1])/2-4
-            boundaries.append((left,right))
-        self.hand_zone_bounds=[]
-        for idx,hand in enumerate(self.hands):
-            left,right=boundaries[idx]; self.hand_zone_bounds.append((left,230,right,414))
-            active=self.round_active and idx==self.active_hand_index and hand['status']=='active'
-            # V12: do not use "当前手牌" text and never recolour a lane/background.
-            # Split lanes keep only a neutral outline so each card fan still has
-            # an obvious centred cell.  The pointed total badge is the state marker.
-            if len(self.hands) > 1:
-                self.canvas.create_rectangle(left,230,right,414,fill='',outline='#58758c',
-                                             width=1,tags=('hand_zone','player_hand_overlay'))
-            for j,card in enumerate(hand['cards']):
-                x,y=self._player_card_target(idx,j)
-                self._render_card(
-                    card, x, y,
-                    tags=('dealt_card', 'player_dealt_card', f'player_card_{idx}_{j}'))
-            self._draw_hand_total_badge(idx,left,right,active=active)
+        for tag in ('dealt_card', 'hand_label', 'hand_zone', 'hand_wager',
+                    'split_lane_animation'):
+            self.canvas.delete(tag)
+        for index, card in enumerate(self.dealer_cards):
+            self._render_card(card, *self._dealer_card_target(index),
+                              tags=('dealt_card', 'dealer_dealt_card'))
+        self._draw_dealer_total_badge()
+        geometry = self._seat_hand_geometry()
+        self.hand_zone_bounds = []
+        for index, hand in enumerate(self.hands):
+            left, right, cx, order, n = geometry[index]
+            self.hand_zone_bounds.append((left, 256, right, 534))
+            for j, card in enumerate(hand['cards']):
+                self._render_card(card, *self._player_card_target(index, j),
+                    tags=('dealt_card', 'player_dealt_card', f'player_card_{index}_{j}'),
+                    rotation=90 if hand.get('double_card_index')==j else 0)
+            self._draw_hand_total_badge(index, left, right)
         self._draw_main_hand_wagers()
-        for tag in ('dealt_card','hand_wager','hand_label'):
-            self.canvas.tag_raise(tag)
         self._render_insurance_chip()
+        self._raise_visible_bottom_controls(self.round_active)
+        self._raise_wager_chips()
 
-    def _render_card(self, card, x, y, tags=('dealt_card',)):
-        if card in self.external_card_images:
-            self.canvas.create_image(x, y, image=self.external_card_images[card],
-                                     anchor='nw', tags=tags)
-            return
-        suit, rank = card
-        fg = '#c22631' if suit in ('Diamond', 'Heart') else '#111111'
-        symbol = {'Club': '♣', 'Diamond': '♦', 'Heart': '♥', 'Spade': '♠'}.get(suit, suit[:1])
-        self.canvas.create_rectangle(x, y, x + 100, y + 140,
-                                     fill='#f4efe4', outline='#d7cbb9', width=2,
-                                     tags=tags)
-        self.canvas.create_text(x + 50, y + 70, text=f'{rank}\n{symbol}',
-                                font=('Arial', 22, 'bold'), fill=fg,
-                                justify='center', tags=tags)
+
+    def _render_card(self, card, x, y, tags=('dealt_card',), rotation=0):
+        photo = self._oriented_card_photo(card, rotation)
+        if photo is not None:
+            return self.canvas.create_image(x,y,image=photo,anchor='nw',tags=tags)
+        width,height = self._card_dimensions(rotation)
+        suit,rank = card
+        fg = '#c22631' if suit in ('Diamond','Heart') else '#111111'
+        symbol = {'Club':'♣','Diamond':'♦','Heart':'♥','Spade':'♠'}.get(suit,suit[:1])
+        self.canvas.create_rectangle(x,y,x+width,y+height,
+            fill='#f4efe4',outline='#d7cbb9',width=2,tags=tags)
+        self.canvas.create_text(x+width/2,y+height/2,text=f'{rank}\n{symbol}',
+            font=('Arial',18,'bold'),fill=fg,justify='center',angle=(-rotation)%360,tags=tags)
+
 
     # --------------------------------------------------------------- round setup
     def handle_enter(self, _event=None):
@@ -2435,11 +2106,13 @@ class BubbleBlackjackGame(tk.Frame):
         return 'break'
 
     def new_hand(self, cards=None, base_bet=0.0, contains_original=False,
-                 from_split=False, split_aces=False, needs_split_draw=False):
+                 from_split=False, split_aces=False, needs_split_draw=False, seat='Player1'):
         return {
+            'seat': seat,
             'cards': list(cards or []),
             'base_bet': float(base_bet),
             'double_added': 0.0,
+            'double_card_index': None,
             'contains_original': bool(contains_original),
             'from_split': bool(from_split),
             'split_aces': bool(split_aces),
@@ -2447,6 +2120,7 @@ class BubbleBlackjackGame(tk.Frame):
             'status': 'active',
             'result': '',
             'cashout_credit': 0.0,
+            'cashout_visual_stage': None,
             # Component-level settlement state is needed for ENHC/OBO.  In a
             # dealer Blackjack, the Original Bet may lose while a double chip
             # on that same hand is refunded.
@@ -2456,115 +2130,151 @@ class BubbleBlackjackGame(tk.Frame):
             'settlement_return': 0.0,
         }
 
+
     @staticmethod
     def hand_stake(hand):
         return float(hand.get('base_bet', 0.0)) + float(hand.get('double_added', 0.0))
 
     def deal_cards(self):
-        if (not self.accept_bets or self.round_active or self.animation_running
-                or self.settlement_running or self.bet_chip_animation_count > 0):
+        if not self._can_change_bets() or self.bet_chip_animation_count:
             return
-        if self.current_bet + 1e-9 < self.MIN_BET:
-            messagebox.showwarning('最低下注', f'最低下注为 {self.format_money(self.MIN_BET)}。',
-                                   parent=self.winfo_toplevel()); return
+        if not any(self.current_bets.values()):
+            messagebox.showwarning('最低下注', '请先放置主注。', parent=self.winfo_toplevel())
+            return
+        for seat in self.SEATS:
+            main = self.current_bets[seat]
+            if main and not self.MIN_BET<=main<=self.MAX_MAIN_BET:
+                messagebox.showwarning('最低下注',
+                    f'{self.SEAT_NAMES[seat]}主注最低为 {self.format_money(self.MIN_BET)}。',
+                    parent=self.winfo_toplevel())
+                return
         if self.engine.remaining_cards() < 30:
-            messagebox.showerror('自动洗牌机', '目前可用牌不足 30 张，请稍后再试。',
-                                 parent=self.winfo_toplevel()); return
+            messagebox.showerror('自动洗牌机', '目前可用牌不足 30 张，请稍后再试。', parent=self.winfo_toplevel())
+            return
         try:
             self.engine.start_round()
         except (CSMError, OSError, RuntimeError) as exc:
-            messagebox.showerror('自动洗牌机', f'无法开始牌局：{exc}',
-                                 parent=self.winfo_toplevel()); return
-
-        # Lock betting immediately, but DO NOT move current_bet into round state
-        # yet.  This keeps the MAIN chip continuously visible while the entire
-        # station animates to its in-round geometry (fixes the old brief vanish).
-        self.accept_bets=False; self.animation_running=True
-        self._set_button(self.deal_button, False)
-        self.canvas.itemconfigure(self.phase_text,text=self.PHASE_PLAYING)
+            messagebox.showerror('自动洗牌机', f'无法开始牌局：{exc}', parent=self.winfo_toplevel())
+            return
+        # A side-only family is inactive; refund its side wagers before committing.
+        for seat in self.SEATS:
+            if not self.current_bets[seat]:
+                for kind in self.SIDE_BET_KEYS:
+                    key = (seat, kind)
+                    self.balance += self.current_side_bets[key]
+                    self.current_side_bets[key] = 0.0
+        self.save_balance()
+        self.accept_bets, self.animation_running = False, True
         self.update_display()
-        # Bottom strip switches immediately when Enter/click is pressed, even
-        # while the 0.20 s table animation is still running.
-        self._set_round_control_visibility(True)
-        for button in self.action_buttons.values():
-            self._set_button(button, False)
-        self._raise_visible_bottom_controls(True)
-
-        def after_old_cards():
-            self._animate_betting_station(True, on_complete=self._begin_round_after_bet_layout)
         if self.canvas.find_withtag('dealt_card'):
-            self._animate_previous_round_cards_out(after_old_cards)
+            self._animate_previous_round_cards_out(self._begin_round_after_bet_layout)
         else:
-            after_old_cards()
+            self._begin_round_after_bet_layout()
+
 
     def _begin_round_after_bet_layout(self):
-        self.round_active=True
-        self.last_bet=self.current_bet; self.last_side_bets=dict(self.current_side_bets)
-        self.round_original_bet=self.current_bet; self.round_side_bets=dict(self.current_side_bets)
-        self.current_bet=0.0; self.current_side_bets={key:0.0 for key in self.SIDE_BET_KEYS}
-        self.insurance_bet=0.0; self.insurance_result=''; self.insurance_return_amount=0.0
-        self.insurance_chip_visible=False; self.flash_insurance_rule=False; self.ace_decision_mode=None
-        self.double_choice_mode=False
-        self.split_actions=0; self.dealer_cards=[]; self.round_deal_sequence=[]; self.round_discarded_cards=[]
-        self.side_bet_results={}
-        self.side_bet_return_amounts={}; self.side_bet_hit_odds={}; self.side_bet_hit_labels={}
-        self.side_bet_early_collected=set()
-        self.flash_winning_side_bets=set(); self.flash_main_bet=False; self.flash_main_push_only=False
-        self.flash_winning_hand_indices=set(); self.settlement_running=False; self.settlement_flash_step=0
-        self.dealer_phase_active=False
-        self.flash_mode=None
-        self.hands=[self.new_hand(base_bet=self.round_original_bet,contains_original=True)]
-        self.active_hand_index=0; self.last_result_lines=[]
-        self.canvas.itemconfigure(self.phase_text,text=self.PHASE_PLAYING)
-        self._set_round_control_visibility(True)
-        # Render the MAIN wager at the exact moved chip position BEFORE removing
-        # the old destination chip, so there is no one-frame disappearance.
-        self.render_cards(); self.update_display(); self._raise_visible_bottom_controls(True)
-
-        sequence=('P','D','P')
-        def deal_step(index=0):
-            if index>=len(sequence):
-                self.animation_running=False; self.render_cards(); self._after_initial_deal(); return
-            who=sequence[index]
-            if who=='P':
-                self._deal_player_card_animated(0,on_complete=lambda:self._queue(80,deal_step,index+1))
+        self.round_active = True
+        self.last_bets = dict(self.current_bets)
+        self.last_side_bets = dict(self.current_side_bets)
+        self.round_original_bets = dict(self.current_bets)
+        self.round_side_bets = dict(self.current_side_bets)
+        self.current_bets = {seat: 0.0 for seat in self.SEATS}
+        self.current_side_bets = self._empty_side_bets()
+        self._sync_main_totals()
+        self.insurance_bet = self.insurance_return_amount = 0.0
+        self.insurance_result = ''
+        self.insurance_chip_visible = self.flash_insurance_rule = False
+        self.insurance_resolved = False
+        self.seat_insurance = {seat: dict(bet=0.0, returned=0.0, visible=False) for seat in self.SEATS}
+        self.ace_decision_mode = self.ace_decision_seat = None
+        self.ace_decision_queue = []
+        self.split_actions = 0
+        self.split_actions_by_seat = {seat: 0 for seat in self.SEATS}
+        self.dealer_cards, self.round_deal_sequence = [], []
+        self.round_discarded_cards = []
+        self.double_choice_mode = False
+        self.seat_deal_sequences = {seat: [] for seat in self.SEATS}
+        self.round_initial_cards = {}
+        self.side_bet_results, self.side_bet_return_amounts = {}, {}
+        self.side_bet_hit_odds, self.side_bet_hit_labels = {}, {}
+        self.side_bet_early_collected, self.flash_winning_side_bets = set(), set()
+        self.flash_main_bet = self.flash_main_push_only = False
+        self.flash_winning_hand_indices = set()
+        self.settlement_running, self.dealer_phase_active = False, False
+        self.settlement_flash_step, self.flash_mode = 0, None
+        self.last_result_lines = []
+        self.pending_profit_chips = set()
+        self.settlement_visual_stage = None
+        self._opening_wager_animation = True
+        self.hands = [self.new_hand(base_bet=self.round_original_bets[seat],
+            contains_original=True, seat=seat) for seat in self.SEATS if self.round_original_bets[seat]>0]
+        self.active_hand_index = 0
+        self.render_cards()
+        self.update_display()
+        # Each active family receives its first card, then the shared dealer upcard,
+        # then each family's second card. ENHC remains one exposed dealer card.
+        sequence = list(range(len(self.hands)))+['D']+list(range(len(self.hands)))
+        def step(index=0):
+            if index == len(sequence):
+                self.animation_running = False
+                self._after_initial_deal()
+                return
+            callback = lambda: self._queue(80, step, index+1)
+            if sequence[index] == 'D':
+                self._deal_dealer_card_animated(callback)
             else:
-                self._deal_dealer_card_animated(on_complete=lambda:self._queue(80,deal_step,index+1))
-        deal_step(0)
+                self._deal_player_card_animated(sequence[index], callback)
+        self._animate_starting_wagers(step)
+
 
     def _after_initial_deal(self):
+        self.round_initial_cards = {hand['seat']: list(hand['cards']) for hand in self.hands}
         self._settle_initial_side_bets()
-        hand=self.hands[0]; upcard=self.dealer_cards[0]
-        player_bj=BlackjackEngine.is_blackjack(hand['cards']); dealer_ace=upcard[1]=='A'
-        if dealer_ace:
-            self._show_ace_decision('even_money' if player_bj else 'insurance')
-            self.update_display(); return
-        if player_bj:
-            hand['status']='blackjack'; self.render_cards(); self.update_display()
-            self._queue(350,self._start_dealer_turn); return
-        self.canvas.itemconfigure(self.phase_text,text=self.PHASE_PLAYING); self.update_display()
+        for hand in self.hands:
+            natural = BlackjackEngine.is_blackjack(hand['cards'])
+            if natural:
+                hand['status'] = 'blackjack'
+            if self.dealer_cards[0][1] == 'A':
+                self.ace_decision_queue.append((hand['seat'], 'even_money' if natural else 'insurance'))
+        self.render_cards()
+        self._next_ace_decision()
+
 
     def _deal_player_card_animated(self, hand_index, on_complete=None):
-        if not (0 <= hand_index < len(self.hands)):
-            if callable(on_complete): on_complete()
-            return
-        hand=self.hands[hand_index]
-        card=self.draw_round_card(); card_index=len(hand['cards']); hand['cards'].append(card)
-        tx,ty=self._player_card_target(hand_index,card_index)
+        hand = self.hands[hand_index]
+        card = self.draw_round_card()
+        card_index = len(hand['cards'])
+        hand['cards'].append(card)
+        self.seat_deal_sequences[hand['seat']].append(card)
+        tx, ty = self._player_card_target(hand_index, card_index)
         def done():
             self.canvas.delete('round_animation_card')
-            self._maybe_settle_crazy7(); self.render_cards(); self.update_display()
-            if callable(on_complete): on_complete()
-        self._animate_card_from_shoe(card,tx,ty,on_complete=done,flip=True,tag='round_animation_card')
+            self._maybe_settle_crazy7()
+            self.render_cards()
+            self.update_display()
+            if callable(on_complete):
+                on_complete()
+        self._animate_card_from_shoe(card, tx, ty, on_complete=done, tag='round_animation_card',
+            rotation=90 if hand.get('double_card_index')==card_index else 0)
+
 
     def _deal_dealer_card_animated(self, on_complete=None):
-        card=self.draw_round_card(); card_index=len(self.dealer_cards); self.dealer_cards.append(card)
-        tx,ty=self._dealer_card_target(card_index)
+        card = self.draw_round_card()
+        index = len(self.dealer_cards)
+        self.dealer_cards.append(card)
+        for seat in self.SEATS:
+            if self.round_original_bets[seat]>0:
+                self.seat_deal_sequences[seat].append(card)
+        tx, ty = self._dealer_card_target(index)
         def done():
             self.canvas.delete('round_animation_card')
-            self._maybe_settle_crazy7(); self.render_cards(); self.update_display()
-            if callable(on_complete): on_complete()
-        self._animate_card_from_shoe(card,tx,ty,on_complete=done,flip=True,tag='round_animation_card')
+            self._maybe_settle_crazy7()
+            self.render_cards()
+            self.update_display()
+            if callable(on_complete):
+                on_complete()
+        self._animate_card_from_shoe(card, tx, ty, on_complete=done, tag='round_animation_card')
+
 
     def _prepare_active_split_hand(self, on_ready=None):
         hand=self.active_hand()
@@ -2607,13 +2317,15 @@ class BubbleBlackjackGame(tk.Frame):
         )
 
     def can_split(self, hand):
-        if not hand or hand['status'] != 'active' or len(hand['cards']) != 2:
+        if not hand or hand['status']!='active' or len(hand['cards'])!=2:
             return False
-        if len(self.hands) >= self.MAX_HANDS or self.split_actions >= self.MAX_SPLIT_ACTIONS:
+        seat = hand['seat']
+        count = sum(h['seat']==seat for h in self.hands)
+        if count>=self.MAX_HANDS or self.split_actions_by_seat[seat]>=self.MAX_SPLIT_ACTIONS:
             return False
-        if self.balance + 1e-9 < hand['base_bet']:
-            return False
-        return BlackjackEngine.split_value(hand['cards'][0]) == BlackjackEngine.split_value(hand['cards'][1])
+        return bool(self.balance+1e-9>=hand['base_bet'] and
+            BlackjackEngine.split_value(hand['cards'][0])==BlackjackEngine.split_value(hand['cards'][1]))
+
 
     def can_surrender(self, hand):
         if not hand or hand['status'] != 'active' or not hand['cards']:
@@ -2649,62 +2361,51 @@ class BubbleBlackjackGame(tk.Frame):
         self._advance_hand()
 
     def double(self):
-        hand=self.active_hand()
-        if not self.can_double(hand) or self.animation_running: return
-        self.double_choice_mode=True
-        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_DOUBLE)
+        hand = self.active_hand()
+        if (not self.can_double(hand) or self.animation_running or self.settlement_running
+                or self.ace_decision_mode or self.double_choice_mode):
+            return
+        self.double_choice_mode = True
         self.update_display()
-        self._set_round_control_visibility(True)
-        self._raise_visible_bottom_controls(True)
 
     def _cancel_double_choice(self):
         if not self.double_choice_mode or self.animation_running:
             return
-        self.double_choice_mode=False
-        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_PLAYING)
+        self.double_choice_mode = False
         self.update_display()
-        self._set_round_control_visibility(True)
-        self._raise_visible_bottom_controls(True)
 
     def _resolve_double_choice(self, multiplier):
-        hand=self.active_hand()
-        multiplier=int(multiplier)
-        if (not self.double_choice_mode or multiplier not in (2,3,4)
-                or not self.can_double(hand) or self.animation_running):
+        hand = self.active_hand()
+        if (not self.double_choice_mode or multiplier not in (2, 3, 4)
+                or not self.can_double(hand) or self.animation_running
+                or self.settlement_running or self.ace_decision_mode):
             return
-        add=hand['base_bet']*(multiplier-1)
-        if self.balance+1e-9 < add:
+        added = hand['base_bet'] * (multiplier - 1)
+        if self.balance + 1e-9 < added:
             return
+        self.double_choice_mode = False
+        self.animation_running = True
+        # Keep Classic's sideways final card and lock all actions during dealing.
+        hand['double_card_index'] = len(hand['cards'])
+        self.balance -= added
+        hand['double_added'] += added
+        self.save_balance()
+        self.render_cards()
+        self.update_display()
 
-        # Lock every player decision immediately after the multiplier is chosen;
-        # no button may stay actionable during the wager/card animation.
-        self.double_choice_mode=False
-        self.animation_running=True
-        for button in (*self.action_buttons.values(), *self.double_choice_buttons.values()):
-            self._set_button(button, False)
-        self._raise_visible_bottom_controls(True)
-        self.canvas.itemconfigure(self.phase_text, text=self.PHASE_PLAYING)
-        self.balance-=add; hand['double_added']+=add; self.save_balance()
-        self.render_cards(); self.update_display()
         def after():
-            total,_=BlackjackEngine.hand_value(hand['cards'])
-            hand['status']='bust' if total>21 else 'stood'
-            hand['result']=f'{multiplier}X加倍爆牌' if total>21 else f'{multiplier}X加倍停牌'
-            self.animation_running=False; self.render_cards(); self.update_display()
-            self._queue(250,self._advance_hand)
-        self._deal_player_card_animated(self.active_hand_index,on_complete=after)
+            total, _ = BlackjackEngine.hand_value(hand['cards'])
+            hand['status'] = 'bust' if total > 21 else 'stood'
+            hand['result'] = f'{multiplier}X加倍爆牌' if total > 21 else f'{multiplier}X加倍停牌'
+            self.animation_running = False
+            self.render_cards()
+            self.update_display()
+            self._queue(250, self._advance_hand)
+
+        self._deal_player_card_animated(self.active_hand_index, on_complete=after)
 
 
-    def _split_target_boundaries(self, count):
-        """Return lane bounds for a prospective 1..4-hand player layout."""
-        centers = self._hand_centers(count)
-        n = len(centers)
-        result = []
-        for i, cx in enumerate(centers):
-            left = 22.0 if i == 0 else (centers[i - 1] + cx) / 2.0 + 4.0
-            right = 1128.0 if i == n - 1 else (cx + centers[i + 1]) / 2.0 - 4.0
-            result.append((left, 230.0, right, 414.0))
-        return result
+
 
     def _move_canvas_tag(self, tag, dx, dy):
         """Move every canvas item carrying *tag*; works for image and fallback cards."""
@@ -2714,20 +2415,10 @@ class BubbleBlackjackGame(tk.Frame):
             pass
 
     def _project_player_card_positions(self, hands_snapshot, count=None):
-        """Top-left positions for every visible card under an arbitrary hand layout."""
-        hand_count = max(1, min(self.MAX_HANDS, int(count if count is not None else len(hands_snapshot) or 1)))
-        centers = self._hand_centers(hand_count)
-        overlap = self._hand_overlap(hand_count)
-        positions = {}
-        for idx, hand in enumerate(hands_snapshot[:hand_count]):
-            cards = list(hand.get('cards', []))
-            if not cards:
-                continue
-            total_w = 100.0 + max(0, len(cards) - 1) * overlap
-            start_x = centers[idx] - total_w / 2.0
-            for card_index in range(len(cards)):
-                positions[(idx, card_index)] = (start_x + card_index * overlap, 252.0)
-        return positions
+        geometry = self._seat_hand_geometry(hands_snapshot)
+        return {(index, j): self._player_card_position(hand, geometry[index], j)
+                for index, hand in enumerate(hands_snapshot) for j in range(len(hand['cards']))}
+
 
     def _animate_canvas_positions(self, start_positions, end_positions,
                                   duration_ms=200, easing='smooth',
@@ -2768,188 +2459,76 @@ class BubbleBlackjackGame(tk.Frame):
         self._queue(frame_ms, frame, 1)
 
     def _finish_split_without_animation(self, hand_index, left, right):
-        """Safety fallback used only when the expected rendered card tags are absent."""
         self.canvas.delete('split_lane_animation')
-        self.hands[hand_index] = left
-        self.hands.insert(hand_index + 1, right)
+        self.canvas.delete('split_wager_animation')
+        if self.hands[hand_index] is not left:
+            self.hands[hand_index] = left
+            self.hands.insert(hand_index+1, right)
         self.animation_running = False
         self.render_cards()
         self.update_display()
         self._prepare_active_split_hand()
 
+
     def _animate_split_sequence(self, hand_index, left, right):
-        """Elegant split animation that also reflows every existing hand.
-
-        The animation is designed to remain readable no matter which active hand
-        is split, and it scales up through the full split limit.
-        """
-        old_hands = [dict(hand, cards=list(hand.get('cards', []))) for hand in self.hands]
-        preview_hands = (
-            old_hands[:hand_index]
-            + [dict(left, cards=list(left.get('cards', []))), dict(right, cards=list(right.get('cards', [])))]
-            + old_hands[hand_index + 1:]
-        )
-        old_count = max(1, len(old_hands))
-        new_count = max(1, len(preview_hands))
-        first_tag = f'player_card_{hand_index}_0'
-        second_tag = f'player_card_{hand_index}_1'
-
-        if (not self.canvas.find_withtag(first_tag)
-                or not self.canvas.find_withtag(second_tag)):
-            self._finish_split_without_animation(hand_index, left, right)
-            return
-
+        self.canvas.delete('split_lane_animation')
+        old = self.hands
+        preview = old[:hand_index]+[left, right]+old[hand_index+1:]
+        starts = self._project_player_card_positions(old)
+        ends = self._project_player_card_positions(preview)
+        start_tags, end_tags = {}, {}
+        for (index, j), position in starts.items():
+            target = (index, j) if index<hand_index else ((index+1, j) if index>hand_index
+                else (hand_index, 0) if j==0 else (hand_index+1, 0))
+            tag = f'player_card_{index}_{j}'
+            if self.canvas.find_withtag(tag):
+                start_tags[tag], end_tags[tag] = position, ends[target]
+        old_wagers = self._main_split_wager_layout(hands_snapshot=old)
+        new_wagers = self._main_split_wager_layout(hands_snapshot=preview)
+        self.canvas.delete('hand_wager')
+        for index,hand in enumerate(old):
+            target = index if index<=hand_index else index+1
+            for component, amount in (('base',hand['base_bet']),('double',hand['double_added'])):
+                if amount<=0:
+                    continue
+                tag = f'split_wager_move_{index}_{component}'
+                self._draw_baccarat_chip(*old_wagers[index][component], amount,
+                    tags=('hand_wager','split_wager_animation',tag),radius=self.WAGER_CHIP_RADIUS)
+                start_tags[tag] = old_wagers[index][component]
+                end_tags[tag] = new_wagers[target][component]
+        new_tag = 'split_wager_new'
+        start = self._selected_chip_origin()
+        self._draw_baccarat_chip(*start, right['base_bet'],
+            tags=('hand_wager','split_wager_animation',new_tag),radius=self.WAGER_CHIP_RADIUS)
+        start_tags[new_tag],end_tags[new_tag] = start,new_wagers[hand_index+1]['base']
+        # Commit both reserved wagers before animation so closing midway refunds
+        # the newly added stake as well as the original hand's stake.
+        self.hands = preview
         self.canvas.delete('hand_label')
         self.canvas.delete('hand_zone')
-        self.canvas.delete('split_lane_animation')
-        self.canvas.tag_raise('dealt_card')
+        self._animate_canvas_positions(start_tags, end_tags, duration_ms=280,
+            arc_lifts={f'player_card_{hand_index}_0': 12, f'player_card_{hand_index}_1': 22},
+            on_complete=lambda: self._finish_split_without_animation(hand_index, left, right))
 
-        old_positions = self._project_player_card_positions(old_hands, old_count)
-        final_positions = self._project_player_card_positions(preview_hands, new_count)
-
-        if (hand_index, 0) not in old_positions or (hand_index, 1) not in old_positions:
-            self._finish_split_without_animation(hand_index, left, right)
-            return
-
-        old_centers = self._hand_centers(old_count)
-        current_cx = old_centers[min(hand_index, len(old_centers) - 1)]
-        old_first = old_positions[(hand_index, 0)]
-        old_second = old_positions[(hand_index, 1)]
-        first_final = final_positions[(hand_index, 0)]
-        second_final = final_positions[(hand_index + 1, 0)]
-
-        focus_overlap = 24
-        focus_width = 100.0 + focus_overlap
-        focus_y = old_first[1] - 14.0
-        focus_first = (current_cx - focus_width / 2.0, focus_y)
-        focus_second = (focus_first[0] + focus_overlap, focus_y)
-
-        split_mid = ((first_final[0] + 50.0) + (second_final[0] + 50.0)) / 2.0
-        travel_overlap = 22
-        travel_width = 100.0 + travel_overlap
-        travel_y = 238.0
-        travel_first = (split_mid - travel_width / 2.0, travel_y)
-        travel_second = (travel_first[0] + travel_overlap, travel_y)
-
-        self.canvas.tag_raise(first_tag)
-        self.canvas.tag_raise(second_tag)
-
-        def stage_two():
-            old_bounds = self._split_target_boundaries(old_count)
-            new_bounds = self._split_target_boundaries(new_count)
-            rects = []
-            start_bounds = []
-            end_bounds = []
-            for new_idx in range(new_count):
-                if new_idx < hand_index:
-                    source = old_bounds[new_idx]
-                elif new_idx in (hand_index, hand_index + 1):
-                    source = old_bounds[hand_index]
-                else:
-                    source = old_bounds[new_idx - 1]
-                rect = self.canvas.create_rectangle(
-                    *source, fill='', outline='#6a89a2', width=1,
-                    dash=(5, 4), tags=('split_lane_animation',))
-                rects.append(rect)
-                start_bounds.append(source)
-                end_bounds.append(new_bounds[new_idx])
-            self.canvas.tag_raise('split_lane_animation')
-            self.canvas.tag_raise(first_tag)
-            self.canvas.tag_raise(second_tag)
-
-            start_map = {
-                first_tag: focus_first,
-                second_tag: focus_second,
-            }
-            end_map = {
-                first_tag: travel_first,
-                second_tag: travel_second,
-            }
-
-            for old_idx, hand in enumerate(old_hands):
-                if old_idx == hand_index:
-                    continue
-                new_idx = old_idx if old_idx < hand_index else old_idx + 1
-                for card_index in range(len(hand.get('cards', []))):
-                    tag = f'player_card_{old_idx}_{card_index}'
-                    start = old_positions.get((old_idx, card_index))
-                    end = final_positions.get((new_idx, card_index))
-                    if start and end and self.canvas.find_withtag(tag):
-                        start_map[tag] = start
-                        end_map[tag] = end
-
-            current = {key: tuple(value) for key, value in start_map.items()}
-            steps = 14
-            frame_ms = 20
-
-            def frame(step=1):
-                ratio = min(1.0, step / float(steps))
-                eased = ratio * ratio * (3.0 - 2.0 * ratio)
-                for key, start in start_map.items():
-                    end = end_map[key]
-                    x = start[0] + (end[0] - start[0]) * eased
-                    y = start[1] + (end[1] - start[1]) * eased
-                    prev_x, prev_y = current[key]
-                    self._move_canvas_tag(key, x - prev_x, y - prev_y)
-                    current[key] = (x, y)
-                for rect, src, dst in zip(rects, start_bounds, end_bounds):
-                    bounds = tuple(src[i] + (dst[i] - src[i]) * eased for i in range(4))
-                    self.canvas.coords(rect, *bounds)
-                if step < steps:
-                    self._queue(frame_ms, frame, step + 1)
-                else:
-                    self._animate_canvas_positions(
-                        {first_tag: travel_first, second_tag: travel_second},
-                        {first_tag: first_final, second_tag: second_final},
-                        duration_ms=360, easing='out',
-                        arc_lifts={first_tag: 10.0, second_tag: 18.0},
-                        on_complete=stage_three_done)
-
-            self._queue(frame_ms, frame, 1)
-
-        def stage_three_done():
-            self.canvas.delete('split_lane_animation')
-            self.hands = preview_hands
-            self.animation_running = False
-            self.render_cards()
-            self.update_display()
-            self._prepare_active_split_hand()
-
-        self._animate_canvas_positions(
-            {first_tag: old_first, second_tag: old_second},
-            {first_tag: focus_first, second_tag: focus_second},
-            duration_ms=160, easing='smooth',
-            arc_lifts={first_tag: 4.0, second_tag: 4.0},
-            on_complete=stage_two)
 
     def split(self):
         hand = self.active_hand()
-        if not self.can_split(hand) or self.animation_running:
+        if not self.can_split(hand) or self.animation_running or self.ace_decision_mode:
             return
-
         self.animation_running = True
-        for button in self.action_buttons.values():
-            self._set_button(button, False)
-        self._raise_visible_bottom_controls(True)
-
-        add = hand['base_bet']
-        self.balance -= add
+        self.balance -= hand['base_bet']
         self.split_actions += 1
+        self.split_actions_by_seat[hand['seat']] += 1
         self.save_balance()
-
-        first, second = hand['cards'][0], hand['cards'][1]
-        is_aces = first[1] == 'A' and second[1] == 'A'
-        left = self.new_hand(
-            cards=[first], base_bet=hand['base_bet'],
-            contains_original=hand.get('contains_original', False),
-            from_split=True, split_aces=is_aces, needs_split_draw=True)
-        right = self.new_hand(
-            cards=[second], base_bet=hand['base_bet'],
-            contains_original=False, from_split=True,
-            split_aces=is_aces, needs_split_draw=True)
-
+        first, second = hand['cards']
+        is_aces = first[1]==second[1]=='A'
+        left = self.new_hand([first], hand['base_bet'], hand['contains_original'],
+            from_split=True, split_aces=is_aces, needs_split_draw=True, seat=hand['seat'])
+        right = self.new_hand([second], hand['base_bet'], False,
+            from_split=True, split_aces=is_aces, needs_split_draw=True, seat=hand['seat'])
         self.update_display()
         self._animate_split_sequence(self.active_hand_index, left, right)
+
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -3033,33 +2612,75 @@ class BubbleBlackjackGame(tk.Frame):
         return max(0.0,min(1.0,stand_win)), 0.0
 
     def surrender_offer(self, hand):
-        """Return the live cash-out offer using an infinite-deck Hit/Stand model.
-
-        No real shoe composition or remaining-card count is consulted.  V16
-        doubles the previous offer: 2 × outright win probability × current-hand stake.
-        """
+        """Return 90% of the current valuation, rounded to cents."""
         if not self.can_surrender(hand) or not self.dealer_cards:
             return 0.0,0.0,1.0,0.0
         ptotal,psoft=BlackjackEngine.hand_value(hand['cards'])
         dtotal,dsoft=self._upcard_state(self.dealer_cards[0])
         win,bust=self._infinite_optimal_hit_stand(ptotal,psoft,dtotal,dsoft)
-        credit=self.hand_stake(hand)*win*2.0
+        credit = round((self.hand_stake(hand)*win*2.0) * self.CASHOUT_FACTOR, 2)
         return credit,win,bust,0.0
 
+
     def instant_surrender(self):
-        hand=self.active_hand()
-        if not self.can_surrender(hand) or self.animation_running: return
-        credit,win_prob,bust_prob,_=self.surrender_offer(hand)
-        self.balance+=credit; hand['status']='surrendered'; hand['cashout_credit']=credit
-        hand['result']=f'即时兑现 {self.format_money(credit)}'
-        hand['settlement']='cashout'
-        hand['base_settlement']='cashout'
-        hand['double_settlement']='cashout' if float(hand.get('double_added',0.0))>0 else None
-        hand['settlement_return']=credit
+        hand = self.active_hand()
+        if (not self.can_surrender(hand) or self.animation_running
+                or self.settlement_running or self.ace_decision_mode):
+            return
+        hand_index = self.active_hand_index
+        credit, win_prob, _bust_prob, _ = self.surrender_offer(hand)
+        layout = self._main_split_wager_layout()[hand_index]
+        payout_position = (layout['base'][0]-self.CHIP_PITCH, layout['base'][1])
+        wagers = [(*layout[component], float(stake), self.WAGER_CHIP_RADIUS)
+                  for component, stake in (('base', hand['base_bet']),
+                                           ('double', hand['double_added'])) if stake > 0]
+        payout = [(*payout_position, credit, self.WAGER_CHIP_RADIUS)] if credit > 0 else []
+        # Credit once, before animations, so leaving the game cannot lose or
+        # refund an already resolved cash-out payment.
+        self.balance += credit
+        hand.update(status='surrendered', cashout_credit=credit,
+            result=f'即时兑现 {self.format_money(credit)}', settlement='cashout',
+            base_settlement='cashout',
+            double_settlement='cashout' if hand['double_added'] > 0 else None,
+            settlement_return=credit, cashout_visual_stage='paying')
+        self.animation_running = True
         self.save_balance()
         self.last_result_lines.append(
-            f'手{self.active_hand_index+1} 即时兑现：获胜概率 {win_prob:.2%}，兑现金额 {self.format_money(credit)}')
-        self.render_cards(); self.update_display(); self._advance_hand()
+            f'手{hand_index+1} 即时兑现：获胜概率 {win_prob:.2%}，兑现金额 {self.format_money(credit)}')
+        self.render_cards()
+        self.update_display()
+
+        def finished():
+            hand['cashout_visual_stage'] = 'returned'
+            self.animation_running = False
+            self.render_cards()
+            self.update_display()
+            self._advance_hand()
+
+        def return_payment():
+            hand['cashout_visual_stage'] = 'returning'
+            self.render_cards()
+            self.update_display()
+            self._animate_settlement_chips(payout, (575.0, 674.0), 200,
+                f'cashout_return_fly_{hand_index}', finished)
+
+        def collect_wagers():
+            hand['cashout_visual_stage'] = 'collecting'
+            self.render_cards()
+            self.update_display()
+            self._animate_settlement_chips(wagers, lambda sx, sy: (sx, -35.0), 300,
+                f'cashout_collect_fly_{hand_index}', return_payment)
+
+        def paid():
+            hand['cashout_visual_stage'] = 'display'
+            self.render_cards()
+            self.update_display()
+            self._queue(300, collect_wagers)
+
+        sources = [(575.0, 43.0, credit, self.WAGER_CHIP_RADIUS)] if credit > 0 else []
+        self._animate_settlement_chips(sources, payout_position, 440,
+            f'cashout_payment_fly_{hand_index}', paid)
+
 
     @staticmethod
     def _same_color(card_a, card_b):
@@ -3127,9 +2748,11 @@ class BubbleBlackjackGame(tk.Frame):
             self.balance += credit
             self.side_bet_return_amounts[key] = credit
             self.side_bet_results[key] = f'{label} {odds:g}:1 +{self.format_money(credit - stake)}'
+            self._animate_side_bet_profit(key)
         else:
             self.side_bet_return_amounts[key] = 0.0
             self.side_bet_results[key] = f'{label} {odds:g}:1'
+
 
     @staticmethod
     def _open_card_luck_result(player_cards, dealer_upcard):
@@ -3160,166 +2783,21 @@ class BubbleBlackjackGame(tk.Frame):
         return (None, '未中')
 
     def _settle_initial_side_bets(self):
-        if not self.hands or len(self.hands[0]['cards']) < 2 or not self.dealer_cards:
-            return
-        p0, p1 = self.hands[0]['cards'][:2]
-        dealer = self.dealer_cards[0]
+        for seat in self.round_initial_cards:
+            self._settle_initial_side_bets_for_seat(seat)
 
-        # Perfect Pair: always evaluate so a hit flashes even with zero stake.
-        odds = None
-        label = '完美对子'
-        if p0[1] == p1[1]:
-            if p0[0] == p1[0]:
-                odds, label = 21, '同花对子'
-            elif self._same_color(p0, p1):
-                odds, label = 10, '同色对子'
-            else:
-                odds, label = 5, '杂色对子'
-        self._credit_side_bet('Perfect Pair', odds, label)
-
-        trio = [p0, p1, dealer]
-        suits_same = len({card[0] for card in trio}) == 1
-        ranks_same = len({card[1] for card in trio}) == 1
-        straight = self._is_three_card_straight(trio)
-
-        # 21+3: suited trips > straight flush > trips > straight > flush.
-        if suits_same and ranks_same:
-            result = (90, '三张同花同点')
-        elif suits_same and straight:
-            result = (35, '同花顺')
-        elif ranks_same:
-            result = (25, '三条')
-        elif straight:
-            result = (10, '顺子')
-        elif suits_same:
-            result = (4, '同花')
-        else:
-            result = (None, '未中')
-        self._credit_side_bet('21+3', *result)
-
-        # 明牌运气: dealer upcard 2-7 gates the player's two-card tier.
-        self._credit_side_bet(
-            'Open Card Luck', *self._open_card_luck_result([p0, p1], dealer))
-
-        # Hot 21. Exact three 7s have priority. Ace may count as 1 or 11.
-        all_sevens = all(card[1] == '7' for card in trio)
-        totals = self._three_card_totals(trio)
-        if all_sevens and suits_same:
-            result = (400, '同花三7')
-        elif all_sevens:
-            result = (80, '三7')
-        elif 21 in totals and suits_same:
-            result = (20, '同花21点')
-        elif 21 in totals:
-            result = (4, '21点')
-        elif 20 in totals:
-            result = (2, '20点')
-        elif 19 in totals:
-            result = (1, '19点')
-        else:
-            result = (None, '未中')
-        self._credit_side_bet('Hot 21', *result)
-
-        # V19: if Crazy 7 was already known to lose from target card 0, its
-        # collection was intentionally deferred until this same post-deal stage
-        # where the other resolved losing side bets are collected.
-        if self.side_bet_results.get('Crazy 7') == '输':
-            self._collect_losing_side_bet_upward('Crazy 7')
-
-        self.save_balance()
 
     def _maybe_settle_crazy7(self):
-        """Synchronise Crazy 7 progressively from round cards 0 -> 2 -> 3.
+        for seat in self.SEATS:
+            if self.round_original_bets[seat]>0:
+                self._maybe_settle_crazy7_for_seat(seat)
 
-        Card 0 decides whether the bet is already dead.  If it is a 7, show the
-        currently secured 4:1 tier while waiting for card 2.  If card 2 is not a
-        7, 4:1 is final; if card 2 is a 7, show the secured 18:1/100:1 tier while
-        waiting for card 3.  Card 3 then performs the final odds synchronisation:
-        another 7 upgrades to 325:1/1500:1, otherwise the card-2 tier remains.
-        Provisional tiers only update the pointed odds marker; money is credited
-        exactly once when the tier becomes final.
-        """
-        key = 'Crazy 7'
-        if key in self.side_bet_results:
-            return
-        seq = self.round_deal_sequence
-        if not seq:
-            return
-
-        c0 = seq[0]
-        if c0[1] != '7':
-            self.side_bet_hit_odds.pop(key, None)
-            self.side_bet_hit_labels.pop(key, None)
-            # V19: record the loss immediately for logic purposes, but do NOT
-            # collect the Crazy 7 chip while the opening cards are still flying.
-            # It joins the other resolved losing side bets after the initial deal.
-            self._credit_side_bet(key, None, '第0张非7', collect_loss=False)
-            self.save_balance()
-            return
-
-        # Card 0 is a 7: 4:1 is already secured, but it is provisional until
-        # target card 2 is known.
-        self.side_bet_hit_odds[key] = 4.0
-        self.side_bet_hit_labels[key] = '第一目标7'
-        if len(seq) < 3:
-            return
-
-        c2 = seq[2]
-        if c2[1] != '7':
-            self._credit_side_bet(key, 4, '第一目标7')
-            self.save_balance()
-            return
-
-        # Cards 0 and 2 are both 7.  The secured tier is 18:1, or 100:1 when
-        # those two target cards share a suit.  Keep it provisional until card 3.
-        if c0[0] == c2[0]:
-            provisional_odds, provisional_label = 100.0, '前两目标同花7'
-        else:
-            provisional_odds, provisional_label = 18.0, '前两目标7'
-        self.side_bet_hit_odds[key] = provisional_odds
-        self.side_bet_hit_labels[key] = provisional_label
-        if len(seq) < 4:
-            return
-
-        c3 = seq[3]
-        if c3[1] == '7':
-            if c0[0] == c2[0] == c3[0]:
-                result = (1500, '目标三张同花7')
-            else:
-                result = (325, '目标三张7')
-        else:
-            result = (provisional_odds, provisional_label)
-
-        # Final card is known: overwrite the provisional marker with the final
-        # correct tier, then settle/credit exactly once.
-        self.side_bet_hit_odds.pop(key, None)
-        self.side_bet_hit_labels.pop(key, None)
-        self._credit_side_bet(key, *result)
-        self.save_balance()
 
     def _settle_bust_side_bet(self):
-        key = 'Bust!'
-        if key in self.side_bet_results:
-            return
-        total, _ = BlackjackEngine.hand_value(self.dealer_cards)
-        if total <= 21:
-            self._credit_side_bet(key, None, '庄家未爆')
-        else:
-            count = len(self.dealer_cards)
-            if count >= 8:
-                odds = 200
-            elif count == 7:
-                odds = 80
-            elif count == 6:
-                odds = 40
-            elif count == 5:
-                odds = 7.5
-            elif count == 4:
-                odds = 1.5
-            else:
-                odds = 1
-            self._credit_side_bet(key, odds, f'庄家{count}张爆牌')
-        self.save_balance()
+        for seat in self.SEATS:
+            if self.round_original_bets[seat]>0:
+                self._settle_bust_side_bet_for_seat(seat)
+
 
     # -------------------------------------------------------------- dealer phase
     def _advance_hand(self):
@@ -3332,7 +2810,8 @@ class BubbleBlackjackGame(tk.Frame):
         self._start_dealer_turn()
 
     def _has_bust_wager(self):
-        return float(self.round_side_bets.get('Bust!', 0.0)) > 0.0
+        return any(self.round_side_bets.get((seat, 'Bust!'), 0.0)>0 for seat in self.SEATS)
+
 
     def _all_hands_bust_or_surrendered(self):
         if not self.hands:
@@ -3346,6 +2825,7 @@ class BubbleBlackjackGame(tk.Frame):
             return False
         return True
 
+
     def _single_natural_blackjack(self):
         if len(self.hands) != 1:
             return False
@@ -3355,6 +2835,8 @@ class BubbleBlackjackGame(tk.Frame):
             and BlackjackEngine.is_blackjack(hand.get('cards', ()))
             and hand.get('status') in ('blackjack', 'active')
         )
+
+
 
     def _finish_even_money_without_dealer_card(self):
         if not self.round_active or self._has_bust_wager():
@@ -3398,7 +2880,8 @@ class BubbleBlackjackGame(tk.Frame):
                 lines.append(f'手{idx + 1}：爆牌')
 
         self.last_result_lines.extend(lines)
-        self._finish_round(dealer_bj=dealer_bj, phase_text='本局结算完成')
+        self._finish_round(dealer_bj=dealer_bj)
+
 
     def _start_dealer_turn(self):
         if not self.round_active or self.animation_running: return
@@ -3410,10 +2893,14 @@ class BubbleBlackjackGame(tk.Frame):
 
         # V18 fast paths apply only when Bust! was NOT wagered.
         if not bust_wager:
+            if len(self.hands) == 1 and self.hands[0].get('status') == 'even_money':
+                self.animation_running = True
+                self.render_cards(); self.update_display()
+                self._queue(250, self._finish_even_money_without_dealer_card)
+                return
             if all_dead and self.insurance_bet <= 0.0:
                 # All hands are already lost/cashed out: no hole card is needed.
                 self.animation_running = True
-                self.canvas.itemconfigure(self.phase_text, text=self.PHASE_SETTLING)
                 self.render_cards(); self.update_display()
                 self._queue(220, self._resolve_normal_round)
                 return
@@ -3421,14 +2908,12 @@ class BubbleBlackjackGame(tk.Frame):
             if natural and up_rank not in ('A', '10', 'J', 'Q', 'K'):
                 # Player natural versus dealer 2-9 wins immediately at 3:2.
                 self.animation_running = True
-                self.canvas.itemconfigure(self.phase_text, text=self.PHASE_SETTLING)
                 self.render_cards(); self.update_display()
                 self._queue(220, self._resolve_normal_round)
                 return
 
         self.dealer_phase_active=True
         self.animation_running=True
-        self.canvas.itemconfigure(self.phase_text,text=self.PHASE_PLAYING)
         # All player processing is complete: player pointed totals return to white.
         # During dealer play the dealer's pointed total is gold, or light red on bust.
         self.render_cards(); self.update_display()
@@ -3452,10 +2937,10 @@ class BubbleBlackjackGame(tk.Frame):
                 self._queue(260,self._dealer_draw_until_done)
         self._deal_dealer_card_animated(on_complete=after_second)
 
+
     def _dealer_draw_until_done(self):
         total,_soft=BlackjackEngine.hand_value(self.dealer_cards)
         if total < 17:
-            self.canvas.itemconfigure(self.phase_text,text=self.PHASE_PLAYING)
             self._deal_dealer_card_animated(on_complete=lambda:self._queue(180,self._dealer_draw_until_done))
             return
         self._queue(260,self._resolve_normal_round)
@@ -3528,6 +3013,7 @@ class BubbleBlackjackGame(tk.Frame):
 
         self.last_result_lines.extend(lines)
         self._finish_round(dealer_bj=dealer_bj)
+
 
     def _resolve_normal_round(self):
         self._maybe_settle_crazy7()
@@ -3619,38 +3105,58 @@ class BubbleBlackjackGame(tk.Frame):
         )
         returned_total += sum(
             max(0.0, float(self.side_bet_return_amounts.get(key, 0.0)))
-            for key in self.SIDE_BET_KEYS
+            for key in self.side_bet_return_amounts
         )
         returned_total += max(0.0, float(self.insurance_return_amount))
         return returned_total
 
-    def _finish_round(self, dealer_bj=False, phase_text=None):
-        """Prepare component flashes; insurance win flashes the complete rule strip."""
-        # V19: do not clear dealer_phase_active here.  A dealer that actually
-        # reached its stand/bust result keeps the point badge gold/red through
-        # settlement instead of reverting to white.  _reset_after_round clears
-        # the phase state after the final card image has already been preserved.
-        self.animation_running=False; self.save_balance()
+
+    def _finish_round(self, dealer_bj=False):
+        # Payouts are already credited by the original game evaluators. These
+        # motions only display principal and profit; they never change balance.
+        for seat in self.SEATS:
+            key = (seat,'Crazy 7')
+            if self.round_original_bets[seat]>0 and key not in self.side_bet_results:
+                self._credit_side_bet(key,self.side_bet_hit_odds.get(key),
+                    self.side_bet_hit_labels.get(key,'未中'))
+        self.insurance_resolved = True
+        for info in self.seat_insurance.values():
+            info['returned'] = info['bet']*(1+self.INSURANCE_PROFIT) if dealer_bj else 0.0
+        self.animation_running = False
+        self.save_balance()
         self.last_win_amount = self._calculate_last_win_amount()
         self.show_last_win = True
-        self.canvas.itemconfigure(self.phase_text,text=self.PHASE_SETTLING)
-        # V10: every winning side-bet condition flashes, even with no wager.
-        self.flash_winning_side_bets=set(self.side_bet_hit_odds)
-        self.flash_winning_hand_indices={i for i,h in enumerate(self.hands) if float(h.get('settlement_return',0.0))>0.0}
-        returned_hands=[h for h in self.hands if float(h.get('settlement_return',0.0))>0.0]
-        self.flash_main_bet=bool(returned_hands)
-        # A pure PUSH main-game return uses a shallow-blue flash.  If any returned
-        # hand is a true win/cashout/refund, white keeps precedence for the whole MAIN.
-        self.flash_main_push_only=bool(returned_hands) and all(h.get('settlement')=='push' for h in returned_hands)
-        self.flash_insurance_rule=bool(dealer_bj and self.insurance_bet>0 and self.insurance_return_amount>0)
-        self.settlement_running=True; self.settlement_flash_step=0; self.flash_mode='original'
-        # Re-render first so losing stationary chips are removed.  Matching clones
-        # then fly upward for 0.30 s exactly as the first flash begins.
-        self.render_cards(); self.update_display()
-        def start_flash():
-            self._animate_losing_chips_out()
-            self.run_settlement_flash()
-        self._queue(80,start_flash)
+        self.settlement_running = True
+        self.settlement_visual_stage = 'paying'
+        self.flash_mode = None
+        self.flash_winning_side_bets = set()
+        self.flash_winning_hand_indices = set()
+        self.flash_main_bet = self.flash_main_push_only = self.flash_insurance_rule = False
+        self.canvas.delete('win_flash_area')
+        profits = [row for row in self._settlement_chip_rows()
+                   if row['role']=='profit' and row['key'][0]!='side']
+        self.pending_profit_chips.update(row['key'] for row in profits)
+        self.render_cards()
+        self.update_display()
+        self._animate_losing_chips_out()
+        def display_outcome():
+            self.settlement_visual_stage = 'display'
+            self._render_settlement_chips()
+            self._queue(1800,self._finish_flash_with_chip_return)
+        if not profits:
+            self._queue(440 if self.pending_profit_chips else 300,display_outcome)
+            return
+        pending = [len(profits)]
+        def arrived(row):
+            self.pending_profit_chips.discard(row['key'])
+            self._render_settlement_chips()
+            pending[0] -= 1
+            if not pending[0]:
+                display_outcome()
+        for index,row in enumerate(profits):
+            self._animate_settlement_chips([(575,43,row['amount'],row['radius'])],
+                row['pos'],440,f'settlement_profit_fly_{index}',lambda r=row:arrived(r))
+
 
     def _reset_after_round(self):
         if self._closing: return
@@ -3667,8 +3173,10 @@ class BubbleBlackjackGame(tk.Frame):
         self.canvas.delete('hand_wager'); self.canvas.delete('insurance_chip')
         self._set_rules_strip_visible(False)
 
+        self.settlement_visual_stage=None; self.pending_profit_chips=set()
+        self._opening_wager_animation=False
         self.round_active=False; self.round_original_bet=0.0
-        self.round_side_bets={key:0.0 for key in self.SIDE_BET_KEYS}
+        self.round_side_bets=self._empty_side_bets()
         self.side_bet_results={}; self.side_bet_return_amounts={}
         self.side_bet_hit_odds={}; self.side_bet_hit_labels={}
         self.side_bet_early_collected=set()
@@ -3677,18 +3185,27 @@ class BubbleBlackjackGame(tk.Frame):
         self.settlement_running=False; self.settlement_flash_step=0; self.flash_mode=None
         self.dealer_phase_active=False
         self.round_deal_sequence=[]; self.round_discarded_cards=[]
+        self.double_choice_mode=False
         self.insurance_bet=0.0; self.insurance_result=''
         self.insurance_return_amount=0.0; self.insurance_chip_visible=False; self.ace_decision_mode=None
-        self.double_choice_mode=False
         self.hands=[]; self.dealer_cards=[]; self.active_hand_index=0; self.split_actions=0
+        self.round_original_bets={seat:0.0 for seat in self.SEATS}
+        self.split_actions_by_seat={seat:0 for seat in self.SEATS}
+        self.seat_deal_sequences={seat:[] for seat in self.SEATS}
+        self.round_initial_cards={}
+        self.seat_insurance={seat:dict(bet=0.0,returned=0.0,visible=False) for seat in self.SEATS}
+        self.insurance_resolved=False
+        self.ace_decision_seat=None; self.ace_decision_queue=[]
+        self._sync_main_totals()
 
         def after_layout():
             self._set_round_control_visibility(False); self.canvas.itemconfigure('chip_selector',state='normal')
             self._raise_visible_bottom_controls(False); self.select_chip(self.selected_chip)
             self.save_runtime_store(burn_complete=True)
-            self.accept_bets=True; self.canvas.itemconfigure(self.phase_text,text=self.PHASE_BETTING)
+            self.accept_bets=True
             self.update_display(); self._set_round_control_visibility(False); self._raise_visible_bottom_controls(False)
         self._animate_betting_station(False,on_complete=after_layout)
+
 
     def _hand_short_status(self, hand):
         mapping = {
@@ -3699,576 +3216,854 @@ class BubbleBlackjackGame(tk.Frame):
         return mapping.get(hand.get('status'), '')
 
     def update_display(self):
-        if self._closing: return
-        self.canvas.itemconfigure(self.balance_text,text=f'余额: ${int(self.balance):,}')
+        if self._closing:
+            return
+        self._update_main_spot_visibility()
+        self.canvas.itemconfigure(self.balance_text, text=f'余额: ${self.balance:,.2f}')
         if self.show_last_win:
-            self.canvas.itemconfigure(
-                self.total_bet_text,
-                text=f'上局获胜: {self.format_money(self.last_win_amount)}')
-        elif self.round_active:
-            round_bet=(sum(self.hand_stake(h) for h in self.hands)
-                       + self.insurance_bet + sum(self.round_side_bets.values()))
-            self.canvas.itemconfigure(
-                self.total_bet_text,
-                text=f'本局下注: {self.format_money(round_bet)}')
+            text = f'上局返还: {self.format_money(self.last_win_amount)}'
         else:
-            pending=self.current_bet+sum(self.current_side_bets.values())
-            self.canvas.itemconfigure(
-                self.total_bet_text,
-                text=f'本局下注: {self.format_money(pending)}')
-        self.update_bet_chips(); self._render_insurance_chip()
+            total = (sum(self.hand_stake(h) for h in self.hands)+self.insurance_bet+
+                     sum(self.round_side_bets.values())) if self.round_active else (
+                         sum(self.current_bets.values())+sum(self.current_side_bets.values()))
+            text = f'本局下注: ${float(total):,.0f}'
+        self.canvas.itemconfigure(self.total_bet_text, text=text)
+        self.update_bet_chips()
+        self._render_insurance_chip()
         self._draw_side_bet_progress_badges()
-
-        can_bet=(self.accept_bets and not self.round_active and not self.animation_running and not self.settlement_running)
-        pending_any=self.current_bet>0 or any(v>0 for v in self.current_side_bets.values())
-        prev_any=self.last_bet>0 or any(v>0 for v in self.last_side_bets.values())
-        no_chip_flying=self.bet_chip_animation_count==0
-        self._set_button(self.clear_button,can_bet and pending_any and no_chip_flying)
-        self._set_button(self.repeat_button,can_bet and prev_any and no_chip_flying)
-        self._set_button(self.deal_button,can_bet and no_chip_flying and self.current_bet>=self.MIN_BET)
-
-        if self.ace_decision_mode=='insurance':
-            self._set_button(self.decision_buttons.get('accept'),
-                             self.balance+1e-9>=self.round_original_bet/2.0,'购买保险')
-            self._set_button(self.decision_buttons.get('decline'),True,'不购买')
-        elif self.ace_decision_mode=='even_money':
-            self._set_button(self.decision_buttons.get('accept'),True,'立刻获胜')
-            self._set_button(self.decision_buttons.get('decline'),True,'赌！')
-
-        hand=self.active_hand()
-        if self.double_choice_mode and hand:
-            for multiplier in (2,3,4):
-                required=hand['base_bet']*(multiplier-1)
-                self._set_button(
-                    self.double_choice_buttons.get(f'{multiplier}x'),
-                    self.balance+1e-9>=required,
-                    f'{multiplier}X')
-            self._set_button(self.double_choice_buttons.get('back'),True,'返回')
-
+        betting = self._can_change_bets() and self.bet_chip_animation_count==0
+        pending = self.current_bet>0 or any(self.current_side_bets.values())
+        previous = self.last_bet>0 or any(self.last_side_bets.values())
+        self._set_button(self.clear_button, betting and pending)
+        self._set_button(self.repeat_button, betting and previous)
+        self._set_button(self.deal_button, betting and any(self.current_bets.values()))
         self._set_round_control_visibility(self.round_active)
-        active=bool(self.round_active and not self.animation_running and not self.settlement_running
-                    and not self.ace_decision_mode and not self.double_choice_mode
-                    and hand and hand['status']=='active'
-                    and not hand.get('needs_split_draw',False))
-        self._set_button(self.action_buttons.get('hit'),active and self.can_hit(hand),'要牌')
-        self._set_button(self.action_buttons.get('stand'),active,'停牌')
-        self._set_button(self.action_buttons.get('double'),active and self.can_double(hand),'加倍')
-        self._set_button(self.action_buttons.get('split'),active and self.can_split(hand),'分牌')
-        surrender_enabled=active and self.can_surrender(hand); cashout_text='兑现金额\n$0.00'
-        if surrender_enabled:
-            credit,win_prob,_bust,_=self.surrender_offer(hand); cashout_text=f'兑现金额\n{self.format_money(credit)}'
-        self._set_button(self.action_buttons.get('surrender'),surrender_enabled,cashout_text)
-        for _key,spot in self.bet_spots.items():
-            self.canvas.itemconfigure(spot['rect'],fill=spot['normal_fill'])
+        hand = self.active_hand()
+        active = bool(hand and hand['status']=='active' and not hand['needs_split_draw'] and
+            not self.animation_running and not self.settlement_running
+            and not self.ace_decision_mode and not self.double_choice_mode)
+        for seat in self.SEATS:
+            own_turn = active and hand['seat']==seat
+            for action, allowed, label in (
+                ('hit', own_turn and self.can_hit(hand), '要牌'),
+                ('stand', own_turn, '停牌'),
+                ('double', own_turn and self.can_double(hand), '加倍'),
+                ('split', own_turn and self.can_split(hand), '分牌')):
+                self._set_button(self.action_buttons[(seat, action)], allowed, label)
+            cashout = own_turn and self.can_surrender(hand)
+            label = '兑现金额\n$0.00'
+            if cashout:
+                label = f'兑现金额\n{self.format_money(self.surrender_offer(hand)[0])}'
+            self._set_button(self.action_buttons[(seat, 'surrender')], cashout, label)
+            deciding = self.ace_decision_mode and self.ace_decision_seat==seat and not self.animation_running
+            is_even = self.ace_decision_mode=='even_money'
+            affordable = self.balance+1e-9>=self.round_original_bets[seat]/2
+            self._set_button(self.decision_buttons[(seat, 'accept')], deciding and (is_even or affordable),
+                             '立刻获胜' if is_even else '购买保险')
+            self._set_button(self.decision_buttons[(seat, 'decline')], bool(deciding), '赌！' if is_even else '不购买')
+            highlighted = bool(own_turn or deciding)
+            self.canvas.itemconfigure(self.seat_title_items[seat], fill='#F6D675' if highlighted else '#F2E6C9')
+        choosing_double = bool(self.round_active and self.double_choice_mode
+            and hand and not self.animation_running and not self.settlement_running
+            and not self.ace_decision_mode and self.can_double(hand))
+        for multiplier in (2, 3, 4):
+            added = hand['base_bet'] * (multiplier - 1) if hand else 0.0
+            self._set_button(self.double_choice_buttons[multiplier],
+                choosing_double and self.balance + 1e-9 >= added,
+                f'{multiplier}X加倍\n追加 {self.format_money(added)}')
+        self._set_button(self.double_choice_buttons['cancel'], choosing_double, '返回')
+        for spot in self.bet_spots.values():
+            self.canvas.itemconfigure(spot['rect'], fill=spot['normal_fill'])
+        self._raise_wager_chips()
+
 
     def show_game_instructions(self):
+
+        """Show the game manual in the shared card-based rules window."""
+
+        import os
+
+        import tkinter.font as tkfont
+
+        from PIL import Image, ImageTk
+
+
+
         parent = self.winfo_toplevel()
 
-        # 防止重复打开多个说明窗口。
-        existing = getattr(self, '_instruction_window', None)
-        if existing is not None:
+        current = getattr(self, '_game_instruction_dialog', None)
+
+        if current is not None:
+
             try:
-                if existing.winfo_exists():
-                    existing.lift()
-                    existing.focus_force()
+
+                if current.winfo_exists():
+
+                    current.lift()
+
+                    current.focus_force()
+
                     return
+
             except tk.TclError:
+
                 pass
 
+
+
         dialog = tk.Toplevel(parent)
-        self._instruction_window = dialog
+
+        self._game_instruction_dialog = dialog
+
         dialog.title('倍注黑杰克 · 游戏说明')
-        dialog.configure(bg='#0f1311')
+
+        dialog.configure(bg='#faf5e8')
+
         dialog.resizable(False, False)
+
         dialog.transient(parent)
 
-        # 1000 x 650，正中当前游戏窗口。
-        win_w, win_h = 1000, 650
+
+
+        width, height = 1000, 670
+
         parent.update_idletasks()
-        pw = max(1, parent.winfo_width())
-        ph = max(1, parent.winfo_height())
-        px = parent.winfo_rootx()
-        py = parent.winfo_rooty()
-        pos_x = px + (pw - win_w) // 2
-        pos_y = py + (ph - win_h) // 2
-        dialog.geometry(f'{win_w}x{win_h}+{pos_x}+{pos_y}')
-        dialog.minsize(win_w, win_h)
-        dialog.maxsize(win_w, win_h)
+
+        px, py = parent.winfo_rootx(), parent.winfo_rooty()
+
+        pw, ph = max(1, parent.winfo_width()), max(1, parent.winfo_height())
+
+        dialog.geometry(f'{width}x{height}+{px + (pw-width)//2}+{py + (ph-height)//2}')
+
+
+
+        manual_pages = [
+            (
+                '玩法',
+                '了解游戏目标，以及一局从下注到结算的完整顺序。',
+                [
+                    [
+                        '游戏目标',
+                        '',
+                        [
+                            ('本局目标', '尽量让手牌接近 21 点而不爆牌，并按本变体规则击败庄家。'),
+                        ],
+                        [],
+                    ],
+                    [
+                        '一局如何进行',
+                        '',
+                        [
+                            ('玩家下注', '设置主注和可选边注，开始一局。'),
+                            ('玩家决策', '一手起局，最多分牌3次（共4手）。\n分牌后从左到右操作；两张牌可选2X/3X/4X加倍。'),
+                            ('庄家开牌', '庄家依本游戏的停牌规则补牌并亮出结果。'),
+                            ('结算', '比较点数并按本游戏的主注、保险及边注规则结算。'),
+                        ],
+                        [],
+                    ],
+                    [
+                        '游戏玩法与连续洗牌说明',
+                        '8副牌 · 发牌时移除9与10 · ENHC / OBO · S17',
+                        [
+                            ('核心牌组规则：移除9和10', '本游戏不会向玩家或庄家发出点数牌9和点数牌10。\n牌靴每次抽到这两个牌面时，会立刻将该牌放进废牌区，并继续抽取，直到把其后第一张非9、非10的牌发出。\n只有牌面为9和10的牌被移除；\nJ、Q、K仍然保留，并继续按10点计算。'),
+                            ('基本目标', '尽量让手牌接近21点而不爆牌，并击败庄家。\n庄家硬17、软17均停牌（S17）。\n普通获胜1:1；\n未分牌的两张天然黑杰克按3:2支付。'),
+                            ('欧洲无底牌 ENHC + OBO', '庄家起手只拿一张明牌，庄家回合才拿第二张。\n若庄家最终为Blackjack，额外分牌/加倍本金按OBO退回，只有Original Bet承担庄家Blackjack的损失。'),
+                            ('分牌 / 加倍', '同点数价值的两张牌可分牌，最多分牌3次（共4手）；\n允许分牌后加倍（DAS）。\n任意非分A手只要仍为两张牌即可选择加倍；\n点击后可选2X、3X或4X总倍数，分别追加当前手原注的1、2或3倍，只再拿一张牌后自动停牌。\n可按“返回”取消选择。'),
+                            ('分A规则', 'A-A可分牌。\n分A后当前手只补一张；\n若补到A并且仍未达到最多4手限制，可继续分A；\n否则该手自动停牌。'),
+                            ('庄家A与保险', '庄家明牌A时可购买保险，保险金额为Original Bet的一半，中奖利润2:1。\n玩家天然Blackjack遇庄家A时，可选择“立刻获胜”按1:1锁定，或选择“赌！”。'),
+                            ('9与10进入废牌区', '玩家或庄家取牌时，如抽到点数牌9或点数牌10，该牌立即进入废牌区；\n本次实际拿到的是它后方第一张非9、非10的牌。\nJ、Q、K不受影响。'),
+                            ('牌张回收', '每局结束后，已发出的牌进入弃牌区，由连续洗牌机按规则重新混入牌仓。'),
+                            ('无需换靴', '不使用剩余牌阈值、切牌或烧牌流程；\n下一局直接由连续洗牌机供牌。'),
+                            ('即时兑现', '即时兑现不读取真实牌靴；\n使用已移除9与10的无限牌组模型，仅比较Hit/Stand路线。\n显示金额 = 90% ×（2 × 当前估算获胜概率 × 当前手本金）。'),
+                        ],
+                        [],
+                    ],
+                    [
+                        '玩家决策按钮',
+                        '',
+                        [
+                            ('要牌  HIT', '再要一张牌；\n爆牌后当前手立即结束。'),
+                            ('停牌  STAND', '结束当前手并进入下一手或庄家回合。'),
+                            ('加倍  DOUBLE', '两张牌可选2X/3X/4X；\n可返回，只拿一张后自动停牌。'),
+                            ('分牌  SPLIT', '同点值两张牌可分牌；\n最多分牌3次（共4手），允许DAS。'),
+                            ('兑现金额  CASH OUT', '符合条件时按当前胜率模型显示即时兑现金额。'),
+                            ('庄家明牌A的决策', '正常询问：购买保险 / 不购买\n玩家黑杰克：立刻获胜 / 赌！'),
+                        ],
+                        [],
+                    ],
+                ],
+            ),
+            (
+                '下注 & 限红',
+                '各项目限红如下。',
+                [
+                    [
+                        '下注项目',
+                        '',
+                        [],
+                        [
+                            (
+                                '下注项目与限红',
+                                ['项目', '限红'],
+                                [
+                                    ['主注', '$100–$500,000'],
+                                    ['完美对子', '每项最高$100,000'],
+                                    ['21+3', '每项最高$100,000'],
+                                    ['明牌运气', '每项最高$100,000'],
+                                    ['疯狂7', '每项最高$100,000'],
+                                    ['热辣21', '每项最高$100,000'],
+                                    ['爆牌！', '每项最高$100,000'],
+                                ],
+                            ),
+                        ],
+                    ],
+                ],
+            ),
+            (
+                '获胜条件 & 赔率',
+                '按下列表格核对各项判定条件、胜负结果及赔率。',
+                [
+                    [
+                        '比牌规则',
+                        '',
+                        [],
+                        [
+                            (
+                                '比牌与及格线',
+                                ['判断', '规则'],
+                                [
+                                    ['牌值', 'A 可计 1 或 11；\nJ、Q、K 计 10；\n总点数超过 21 为爆牌。'],
+                                    ['比大小', '玩家与庄家均未爆牌时，点数更接近 21 者胜。'],
+                                    ['同点数', '视作平局；\n天然黑杰克及变体的特殊情况按主注结算表。'],
+                                ],
+                            ),
+                        ],
+                    ],
+                    [
+                        '主注与保险赔付',
+                        '赔率表示利润赔率；\n正常中奖同时返还下注本金',
+                        [],
+                        [
+                            (
+                                '主注 / 保险',
+                                ['条件', '赔率'],
+                                [
+                                    ['普通主注获胜', '1:1'],
+                                    ['玩家天然Blackjack（未分牌两张21）', '3:2'],
+                                    ['分牌后两张牌组成21点', '1:1'],
+                                    ['玩家Blackjack + 庄家A选择“立刻获胜”', '1:1'],
+                                    ['保险中奖（庄家Blackjack）', '2:1'],
+                                    ['庄家Blackjack：Original Bet', '输'],
+                                    ['庄家Blackjack：额外分牌/加倍本金', 'OBO退回'],
+                                    ['同点数 / 双方普通同分', 'Push退回'],
+                                ],
+                            ),
+                        ],
+                    ],
+                    [
+                        '边注赔付表',
+                        '六个边注 · 按利润赔率结算',
+                        [],
+                        [
+                            (
+                                '完美对子',
+                                ['牌型 / 条件', '赔率 / 说明'],
+                                [
+                                    ['同花色同点对子', '21:1'],
+                                    ['同颜色同点对子', '10:1'],
+                                    ['杂色同点对子', '5:1'],
+                                ],
+                            ),
+                            (
+                                '21+3',
+                                ['牌型 / 条件', '赔率 / 说明'],
+                                [
+                                    ['三张同花同点', '90:1'],
+                                    ['同花顺', '35:1'],
+                                    ['三条', '25:1'],
+                                    ['顺子', '10:1'],
+                                    ['同花', '4:1'],
+                                ],
+                            ),
+                            (
+                                '明牌运气',
+                                ['牌型 / 条件', '赔率 / 说明'],
+                                [
+                                    ['庄2–7 + 玩家黑桃J/黑桃A', '70:1'],
+                                    ['庄2–7 + 玩家Blackjack', '7:1'],
+                                    ['庄2–7 + 玩家9–11点', '3:1'],
+                                    ['庄2–7 + 玩家18–20点', '3:1'],
+                                ],
+                            ),
+                            (
+                                '疯狂7',
+                                ['牌型 / 条件', '赔率 / 说明'],
+                                [
+                                    ['目标三张同花7', '1500:1'],
+                                    ['目标三张7', '325:1'],
+                                    ['前两目标同花7', '100:1'],
+                                    ['前两目标7', '18:1'],
+                                    ['第一目标7（第0张）', '4:1'],
+                                ],
+                            ),
+                            (
+                                '热辣21',
+                                ['牌型 / 条件', '赔率 / 说明'],
+                                [
+                                    ['三张7同花', '400:1'],
+                                    ['三张7', '80:1'],
+                                    ['三张牌同花且等于21', '20:1'],
+                                    ['三张牌等于21', '4:1'],
+                                    ['三张牌等于20', '2:1'],
+                                    ['三张牌等于19', '1:1'],
+                                ],
+                            ),
+                            (
+                                '爆牌!',
+                                ['牌型 / 条件', '赔率 / 说明'],
+                                [
+                                    ['庄家8张或以上爆牌', '200:1'],
+                                    ['庄家7张爆牌', '80:1'],
+                                    ['庄家6张爆牌', '40:1'],
+                                    ['庄家5张爆牌', '7.5:1'],
+                                    ['庄家4张爆牌', '1.5:1'],
+                                    ['庄家3张爆牌', '1:1'],
+                                ],
+                            ),
+                        ],
+                    ],
+                ],
+            ),
+            (
+                '牌型等级表',
+                '牌型由强到弱排列；\n同级牌型继续比较相关点数。',
+                [
+                    [
+                        '点数与牌例',
+                        '下方图片展示牌型示例；\n同一牌型也可能由其他牌面组成。',
+                        [],
+                        [
+                            (
+                                '判定与牌例',
+                                ['等级', '牌型', '牌例'],
+                                [
+                                    [
+                                        '1',
+                                        '天然黑杰克',
+                                        (
+                                            '__CARD_IMAGES__',
+                                            (
+                                                ('♠', 'A'),
+                                                ('♥', 'K'),
+                                            ),
+                                        ),
+                                    ],
+                                    [
+                                        '2',
+                                        '普通 21 点',
+                                        (
+                                            '__CARD_IMAGES__',
+                                            (
+                                                ('♠', '7'),
+                                                ('♥', '7'),
+                                                ('♦', '7'),
+                                            ),
+                                        ),
+                                    ],
+                                    [
+                                        '3',
+                                        '20 点',
+                                        (
+                                            '__CARD_IMAGES__',
+                                            (
+                                                ('♠', 'K'),
+                                                ('♥', 'Q'),
+                                            ),
+                                        ),
+                                    ],
+                                    [
+                                        '4',
+                                        '爆牌',
+                                        (
+                                            '__CARD_IMAGES__',
+                                            (
+                                                ('♠', 'K'),
+                                                ('♥', 'Q'),
+                                                ('♦', '2'),
+                                            ),
+                                        ),
+                                    ],
+                                ],
+                            ),
+                        ],
+                    ],
+                    [
+                        '同牌型如何分胜负',
+                        '',
+                        [
+                            ('比较方法', 'A 可计 1 或 11，J、Q、K 计 10；\n本变体牌组和保险赔率见对应说明。'),
+                        ],
+                        [],
+                    ],
+                ],
+            ),
+            (
+                '特别事项',
+                '补充说明特殊牌、模式差异和金额结算方式。',
+                [
+                    [
+                        '游戏玩法与连续洗牌说明',
+                        '8副牌 · 发牌时移除9与10 · ENHC / OBO · S17',
+                        [
+                            ('连续洗牌机', '使用8副52张牌，共416张；\n所有牌局均由CSM_Shuffler连续洗牌机发牌。'),
+                        ],
+                        [],
+                    ],
+                    [
+                        '重要提示',
+                        '',
+                        [
+                            ('21+3顺子', '顺子识别逻辑保持经典牌序不变：A可作低牌或高牌；\nA-2-3、J-Q-K、Q-K-A均可判断为顺子。\n移除9与10不会让牌序自动跨越，因此7-8-J和8-J-Q都不算顺子。'),
+                            ('疯狂7取牌位置', '疯狂7按本局实际发牌序列的指定目标牌逐步锁定赔率：第一目标为7先保证4:1；\n后续目标7可升级到18/100，再升级到325/1500。\n废弃的9与10不计入发牌序列。'),
+                            ('分牌行动顺序', '分牌后先给当前第一手补一张并完成该手全部行动；\n只有第一手结束后，才激活下一手并补该手的第一张分牌牌。'),
+                            ('即时兑现模型', '兑现金额为模型估值，不会偷看或消耗真实牌靴中的下一张牌；\n实际牌局牌序保持不变。'),
+                        ],
+                        [],
+                    ],
+                ],
+            ),
+        ]
+
+
+
+        BG = '#faf5e8'
+
+        HEADER = '#f1e7cd'
+
+        SIDEBAR = '#f2e8d0'
+
+        PANEL = '#fffdf7'
+
+        PANEL_2 = '#f5ecd6'
+
+        BORDER = '#c9b88a'
+
+        GOLD = '#a8842c'
+
+        GOLD_BAR = '#e7d36c'
+
+        TEXT = '#3a2f1e'
+
+        MUTED = '#7a6a50'
 
         font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
 
-        BG = '#0f1311'
-        HEADER = '#151b18'
-        PANEL = '#18201c'
-        PANEL_2 = '#202923'
-        BORDER = '#43534a'
-        GOLD = '#e7d36c'
-        TEXT = '#f4f4ee'
-        MUTED = '#c1cbc6'
-        GREEN = '#0b5f4c'
-        GREEN_2 = '#164f47'
-        RED = '#8c3f43'
-        BLUE = '#315b72'
-        ORANGE = '#a56d2c'
-        PURPLE = '#70439a'
-        CASH = '#7c3b40'
-        BLACK = '#111111'
-        WHITE = '#ffffff'
 
-        FONT_SMALL = 14
-        FONT_NORMAL = 15
-        FONT_MEDIUM = 16
-        FONT_LARGE = 18
-        FONT_TITLE = 20
 
-        # ================================================================
-        # 顶部标题栏
-        # ================================================================
-        header = tk.Frame(dialog, bg=HEADER, height=82)
+        header = tk.Frame(dialog, bg=HEADER, height=76)
+
         header.pack(fill=tk.X, side=tk.TOP)
+
         header.pack_propagate(False)
 
-        tk.Label(
-            header, text='倍注黑杰克  POWER BLACKJACK',
-            font=(font_name, FONT_TITLE, 'bold'), fg=GOLD, bg=HEADER
-        ).place(x=24, y=10)
-        tk.Label(
-            header, text='玩法 · 连续洗牌 · 决策按钮 · 下注区域 · 赔付表',
-            font=(font_name, FONT_SMALL), fg=MUTED, bg=HEADER
-        ).place(x=25, y=48)
+        tk.Label(header, text='倍注黑杰克 · 游戏说明', font=(font_name, 20, 'bold'),
 
-        close_btn = tk.Button(
-            header, text='关闭  ESC', command=dialog.destroy,
-            font=(font_name, FONT_SMALL, 'bold'),
-            bg='#2a332e', fg=TEXT,
-            activebackground='#3a463f', activeforeground=WHITE,
-            relief=tk.FLAT, bd=0, cursor='hand2')
-        close_btn.place(x=850, y=20, width=120, height=42)
-        tk.Frame(dialog, bg=GOLD, height=3).pack(fill=tk.X, side=tk.TOP)
+                 fg=GOLD, bg=HEADER, anchor='w', wraplength=795,
 
-        # ================================================================
-        # Scroll Canvas
-        # ================================================================
-        scroll_host = tk.Frame(dialog, bg=BG)
-        scroll_host.pack(fill=tk.BOTH, expand=True)
-        canvas = tk.Canvas(
-            scroll_host, bg=BG, highlightthickness=0, bd=0,
-            yscrollincrement=40)
-        scrollbar = tk.Scrollbar(
-            scroll_host, orient=tk.VERTICAL, command=canvas.yview,
-            bg='#263029', troughcolor='#111512', activebackground=GOLD,
-            relief=tk.FLAT, bd=0, width=14)
+                 justify=tk.LEFT).place(x=24, y=6, width=795, height=41)
+
+        tk.Label(header, text='玩法 · 下注 · 获胜条件 · 牌型 · 特别事项',
+
+                 font=(font_name, 14), fg=MUTED, bg=HEADER, anchor='w').place(x=26, y=46)
+
+
+
+        def close_dialog():
+
+            try:
+
+                self._game_instruction_dialog = None
+
+            except Exception:
+
+                pass
+
+            try:
+
+                dialog.destroy()
+
+            except tk.TclError:
+
+                pass
+
+
+
+        tk.Button(header, text='关闭  ESC', command=close_dialog,
+
+                  font=(font_name, 14, 'bold'), bg='#e8dcc0', fg=TEXT,
+
+                  activebackground='#d9c895', relief=tk.FLAT, bd=0,
+
+                  cursor='hand2').place(x=850, y=17, width=120, height=42)
+
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X, side=tk.TOP)
+
+
+
+        body = tk.Frame(dialog, bg=BG)
+
+        body.pack(fill=tk.BOTH, expand=True)
+
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=205)
+
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+
+        sidebar.pack_propagate(False)
+
+        tk.Label(sidebar, text='说明目录', font=(font_name, 16, 'bold'),
+
+                 fg=GOLD, bg=SIDEBAR, anchor='w').pack(fill=tk.X, padx=18, pady=(17, 10))
+
+
+
+        scroll_host = tk.Frame(body, bg=BG)
+
+        scroll_host.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        canvas = tk.Canvas(scroll_host, bg=BG, highlightthickness=0, bd=0, yscrollincrement=36)
+
+        scrollbar = tk.Scrollbar(scroll_host, orient=tk.VERTICAL, command=canvas.yview,
+
+                                 bg='#ded3b7', troughcolor=BG, activebackground=GOLD_BAR,
+
+                                 relief=tk.FLAT, bd=0, width=13)
+
         canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True,
-                    padx=(12, 0), pady=(10, 10))
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y,
-                       padx=(0, 9), pady=(10, 10))
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=10)
 
         content = tk.Frame(canvas, bg=BG)
+
         content_window = canvas.create_window((0, 0), window=content, anchor='nw')
 
-        def _sync_scrollregion(_event=None):
+
+
+        def sync_scrollregion(_event=None):
+
             canvas.configure(scrollregion=canvas.bbox('all'))
 
-        def _fit_content_width(event):
+
+
+        def fit_content_width(event):
+
             canvas.itemconfigure(content_window, width=event.width)
 
-        content.bind('<Configure>', _sync_scrollregion)
-        canvas.bind('<Configure>', _fit_content_width)
 
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), 'units')
+
+        content.bind('<Configure>', sync_scrollregion)
+
+        canvas.bind('<Configure>', fit_content_width)
+
+
+
+        def add_rule(parent_frame, title, detail):
+
+            row = tk.Frame(parent_frame, bg=PANEL)
+
+            row.pack(fill=tk.X, padx=16, pady=5)
+
+            tk.Frame(row, bg=GOLD_BAR, width=5).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 11))
+
+            text_box = tk.Frame(row, bg=PANEL)
+
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+            if title:
+                tk.Label(text_box, text=title, font=(font_name, 15, 'bold'),
+
+                         fg=TEXT, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                         wraplength=650).pack(fill=tk.X)
+
+            if detail:
+
+                tk.Label(text_box, text=detail, font=(font_name, 14),
+
+                         fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                         wraplength=650).pack(fill=tk.X, pady=(3, 0))
+
+
+
+        def add_table(parent_frame, title, headers, rows):
+
+            block = tk.Frame(parent_frame, bg=PANEL_2,
+
+                             highlightbackground=BORDER, highlightthickness=1, bd=0)
+
+            block.pack(fill=tk.X, padx=16, pady=8)
+
+            if title:
+                tk.Label(block, text=title, font=(font_name, 14, 'bold'),
+
+                         fg=TEXT, bg=GOLD_BAR, anchor='w', justify=tk.LEFT,
+
+                         wraplength=675, padx=11, pady=7).pack(fill=tk.X)
+
+            grid = tk.Frame(block, bg=PANEL_2)
+
+            grid.pack(fill=tk.X)
+
+            count = max([len(headers)] + [len(row) for row in rows]) if rows else len(headers)
+
+            table_font = tkfont.Font(family=font_name, size=14)
+
+            minimums = []
+
+            preferences = []
+
+            for col in range(count):
+
+                picture_width = max((len(row[col][1]) * 74 + 6
+
+                                     for row in rows if col < len(row)
+
+                                     and isinstance(row[col], (tuple, list))
+
+                                     and len(row[col]) == 2 and row[col][0] == '__CARD_IMAGES__'),
+
+                                    default=0)
+
+                minimums.append(max(62, picture_width))
+
+                text_width = max((table_font.measure(str(row[col]))
+
+                                  for row in ([headers] if headers else []) + rows
+
+                                  if col < len(row) and isinstance(row[col], str)), default=0)
+
+                preferences.append(1 if picture_width else max(50, min(text_width, 260)))
+
+            available = 700
+
+            remaining = max(0, available - sum(minimums))
+
+            total_preference = sum(preferences) or 1
+
+            column_widths = [minimums[col] + remaining * preferences[col] // total_preference
+
+                             for col in range(count)]
+
+            if column_widths:
+
+                column_widths[-1] += available - sum(column_widths)
+
+            for col, width in enumerate(column_widths):
+
+                grid.grid_columnconfigure(col, minsize=width)
+
+            matrix = ([headers] if headers else []) + rows
+
+            for r, row in enumerate(matrix):
+
+                for c in range(count):
+
+                    value = row[c] if c < len(row) else ''
+
+                    head = bool(headers) and r == 0
+
+                    bg = GOLD_BAR if head else (PANEL if r % 2 else '#fbf6e9')
+
+                    fg = TEXT if head else MUTED
+
+                    if isinstance(value, (tuple, list)) and len(value) == 2 and value[0] == '__CARD_IMAGES__':
+
+                        image_cell = tk.Frame(grid, bg=bg, borderwidth=1, relief=tk.SOLID)
+
+                        image_cell.grid(row=r, column=c, sticky='nsew')
+
+                        game_dir = os.path.dirname(os.path.abspath(__file__))
+
+                        search_roots = (game_dir, os.path.dirname(game_dir),
+
+                                        os.path.dirname(os.path.dirname(game_dir)))
+
+                        card_dir = next((os.path.join(root, 'A_Tools', 'Card', 'Poker2')
+
+                                         for root in search_roots
+
+                                         if os.path.isdir(os.path.join(root, 'A_Tools', 'Card', 'Poker2'))),
+
+                                        os.path.join(search_roots[1], 'A_Tools', 'Card', 'Poker2'))
+
+                        suits = {'♠': 'Spade', '♥': 'Heart', '♦': 'Diamond', '♣': 'Club'}
+
+                        for suit, rank in value[1]:
+
+                            filename = 'JOKER-A.png' if suit == 'JOKER' else f'{suits.get(suit, suit)}{rank}.png'
+
+                            path = os.path.join(card_dir, filename)
+
+                            try:
+
+                                with Image.open(path) as source_image:
+
+                                    card_width = 70
+
+                                    card_height = max(1, round(source_image.height * card_width / source_image.width))
+
+                                    small_image = source_image.resize((card_width, card_height), Image.LANCZOS)
+
+                                photo = ImageTk.PhotoImage(small_image)
+
+                                image_label = tk.Label(image_cell, image=photo, bg=bg, bd=0)
+
+                                image_label.image = photo
+
+                                image_label.pack(side=tk.LEFT, padx=2, pady=3)
+
+                            except Exception:
+
+                                # Keep the example cell image-only if an asset is unavailable.
+
+                                tk.Label(image_cell, text='', bg='#fffdf7', width=3, height=2,
+
+                                         borderwidth=1, relief=tk.SOLID).pack(side=tk.LEFT, padx=2, pady=3)
+
+                    else:
+
+                        tk.Message(grid, text=value, font=(font_name, 14, 'bold' if head else 'normal'),
+
+                                   fg=fg, bg=bg, anchor='w', justify=tk.LEFT,
+
+                                   width=max(42, column_widths[c] - 16),
+
+                                   padx=7, pady=5, borderwidth=1,
+
+                                   relief=tk.SOLID).grid(row=r, column=c, sticky='nsew')
+
+
+
+        def render_page(index):
+
+            for child in content.winfo_children():
+
+                child.destroy()
+
+            for idx, button in enumerate(nav_buttons):
+
+                button.configure(bg='#e6d9b9' if idx == index else SIDEBAR,
+
+                                 fg=GOLD if idx == index else MUTED)
+
+            page_title, subtitle, cards = manual_pages[index]
+
+            top = tk.Frame(content, bg=BG)
+
+            top.pack(fill=tk.X, padx=14, pady=(7, 2))
+
+            tk.Label(top, text=page_title, font=(font_name, 20, 'bold'),
+
+                     fg=GOLD, bg=BG, anchor='w', justify=tk.LEFT,
+
+                     wraplength=690).pack(fill=tk.X)
+
+            if subtitle:
+
+                tk.Label(top, text=subtitle, font=(font_name, 14),
+
+                         fg=MUTED, bg=BG, anchor='w', justify=tk.LEFT,
+
+                         wraplength=690).pack(fill=tk.X, pady=(3, 0))
+
+            for card_title, card_subtitle, rules, tables in cards:
+
+                card = tk.Frame(content, bg=PANEL, highlightbackground=BORDER,
+
+                                highlightcolor=BORDER, highlightthickness=1, bd=0)
+
+                card.pack(fill=tk.X, padx=10, pady=7)
+
+                head = tk.Frame(card, bg=PANEL)
+
+                head.pack(fill=tk.X, padx=16, pady=(12, 5))
+
+                tk.Label(head, text=card_title, font=(font_name, 16, 'bold'),
+
+                         fg=GOLD, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                         wraplength=680).pack(fill=tk.X)
+
+                if card_subtitle:
+
+                    tk.Label(head, text=card_subtitle, font=(font_name, 14),
+
+                             fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                             wraplength=680).pack(fill=tk.X)
+
+                for rule_title, detail in rules:
+
+                    add_rule(card, rule_title, detail)
+
+                for table_title, table_headers, rows in tables:
+
+                    add_table(card, table_title, table_headers, rows)
+
+                tk.Frame(card, bg=PANEL, height=6).pack(fill=tk.X)
+
+            content.update_idletasks()
+
+            canvas.configure(scrollregion=canvas.bbox('all'))
+
+            canvas.yview_moveto(0)
+
+
+
+        nav_buttons = []
+
+        for index, (page_title, _subtitle, _cards) in enumerate(manual_pages):
+
+            button = tk.Button(sidebar, text=page_title, command=lambda i=index: render_page(i),
+
+                               font=(font_name, 14), fg=MUTED, bg=SIDEBAR,
+
+                               activebackground='#e8d49a', activeforeground=GOLD,
+
+                               relief=tk.FLAT, bd=0, anchor='w', padx=18, pady=10,
+
+                               cursor='hand2')
+
+            button.pack(fill=tk.X)
+
+            nav_buttons.append(button)
+
+
+
+        def on_mousewheel(event):
+
+            canvas.yview_scroll(int(-event.delta / 120), 'units')
+
             return 'break'
 
-        dialog.bind('<MouseWheel>', _on_mousewheel)
+
+
+        dialog.bind('<MouseWheel>', on_mousewheel)
+
         dialog.bind('<Button-4>', lambda _e: (canvas.yview_scroll(-1, 'units'), 'break')[1])
+
         dialog.bind('<Button-5>', lambda _e: (canvas.yview_scroll(1, 'units'), 'break')[1])
 
-        # ================================================================
-        # Helpers
-        # ================================================================
-        def make_card(title, subtitle=None, pady=(8, 8)):
-            card = tk.Frame(
-                content, bg=PANEL,
-                highlightbackground=BORDER, highlightcolor=BORDER,
-                highlightthickness=1, bd=0)
-            card.pack(fill=tk.X, padx=10, pady=pady)
-            head = tk.Frame(card, bg=PANEL)
-            head.pack(fill=tk.X, padx=18, pady=(15, 10))
-            tk.Label(
-                head, text=title, font=(font_name, FONT_LARGE, 'bold'),
-                fg=GOLD, bg=PANEL, anchor='w').pack(side=tk.LEFT)
-            if subtitle:
-                tk.Label(
-                    head, text=subtitle, font=(font_name, FONT_SMALL),
-                    fg=MUTED, bg=PANEL, anchor='e').pack(side=tk.RIGHT)
-            return card
+        dialog.bind('<Escape>', lambda _e: close_dialog())
 
-        def add_rule(parent_frame, title, body, accent=GOLD):
-            row = tk.Frame(parent_frame, bg=PANEL)
-            row.pack(fill=tk.X, padx=18, pady=6)
-            tk.Frame(row, bg=accent, width=5).pack(
-                side=tk.LEFT, fill=tk.Y, padx=(0, 12))
-            text_box = tk.Frame(row, bg=PANEL)
-            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            tk.Label(
-                text_box, text=title,
-                font=(font_name, FONT_MEDIUM, 'bold'),
-                fg=TEXT, bg=PANEL, anchor='w').pack(fill=tk.X)
-            tk.Label(
-                text_box, text=body,
-                font=(font_name, FONT_SMALL), fg=MUTED, bg=PANEL,
-                anchor='w', justify=tk.LEFT, wraplength=850
-            ).pack(fill=tk.X, pady=(4, 0))
+        dialog.protocol('WM_DELETE_WINDOW', close_dialog)
 
-        def table_block(parent_frame, title, rows):
-            block = tk.Frame(
-                parent_frame, bg=PANEL_2,
-                highlightbackground='#354139', highlightthickness=1, bd=0)
-            tk.Label(
-                block, text=title,
-                font=(font_name, FONT_MEDIUM, 'bold'),
-                fg=BLACK, bg=GOLD, anchor='w', padx=12, pady=8
-            ).pack(fill=tk.X)
-            grid = tk.Frame(block, bg=PANEL_2)
-            grid.pack(fill=tk.BOTH, expand=True)
-            grid.grid_columnconfigure(0, weight=1)
-            grid.grid_columnconfigure(1, minsize=120)
-            for i, (condition, payout) in enumerate(rows):
-                row_bg = '#1b241f' if i % 2 == 0 else '#202923'
-                tk.Label(
-                    grid, text=condition, font=(font_name, FONT_SMALL),
-                    fg=TEXT, bg=row_bg, anchor='w', padx=12, pady=7
-                ).grid(row=i, column=0, sticky='nsew', padx=(0, 1), pady=(0, 1))
-                tk.Label(
-                    grid, text=payout, font=(font_name, FONT_SMALL, 'bold'),
-                    fg=GOLD, bg=row_bg, anchor='center', padx=8, pady=7
-                ).grid(row=i, column=1, sticky='nsew', pady=(0, 1))
-            return block
+        if nav_buttons:
 
-        # ================================================================
-        # 01 游戏玩法 / 切牌
-        # ================================================================
-        rules_card = make_card(
-            '01  游戏玩法与连续洗牌说明',
-            '8副牌 · 发牌时移除9与10 · ENHC / OBO · S17')
-        columns = tk.Frame(rules_card, bg=PANEL)
-        columns.pack(fill=tk.X, padx=6, pady=(0, 14))
-        left_rules = tk.Frame(columns, bg=PANEL)
-        right_rules = tk.Frame(columns, bg=PANEL)
-        left_rules.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 7))
-        right_rules.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(7, 0))
+            render_page(0)
 
-        add_rule(
-            left_rules, '核心牌组规则：移除9和10',
-            '本游戏不会向玩家或庄家发出点数牌9和点数牌10。牌靴每次抽到这两个牌面时，'
-            '会立刻将该牌放进废牌区，并继续抽取，直到把其后第一张非9、非10的牌发出。'
-            '只有牌面为9和10的牌被移除；J、Q、K仍然保留，并继续按10点计算。',
-            accent='#d94a4e')
-        add_rule(
-            left_rules, '基本目标',
-            '尽量让手牌接近21点而不爆牌，并击败庄家。庄家硬17、软17均停牌（S17）。'
-            '普通获胜1:1；未分牌的两张天然黑杰克按3:2支付。')
-        add_rule(
-            left_rules, '欧洲无底牌 ENHC + OBO',
-            '庄家起手只拿一张明牌，庄家回合才拿第二张。若庄家最终为Blackjack，'
-            '额外分牌/加倍本金按OBO退回，只有Original Bet承担庄家Blackjack的损失。')
-        add_rule(
-            left_rules, '分牌 / 加倍',
-            '同点数价值的两张牌可分牌，最多分牌3次（共4手）；允许分牌后加倍（DAS）。'
-            '任意非分A手只要仍为两张牌即可选择加倍；点击后可选2X、3X或4X总倍数，'
-            '分别追加当前手原注的1、2或3倍，只再拿一张牌后自动停牌。可按“返回”取消选择。')
-        add_rule(
-            left_rules, '分A规则',
-            'A-A可分牌。分A后当前手只补一张；若补到A并且仍未达到最多4手限制，可继续分A；'
-            '否则该手自动停牌。')
-        add_rule(
-            left_rules, '庄家A与保险',
-            '庄家明牌A时可购买保险，保险金额为Original Bet的一半，中奖利润2:1。'
-            '玩家天然Blackjack遇庄家A时，可选择“立刻获胜”按1:1锁定，或选择“赌！”。')
-
-        add_rule(
-            right_rules, '① 连续洗牌机',
-            '使用8副52张牌，共416张；所有牌局均由CSM_Shuffler连续洗牌机发牌。',
-            accent='#7cc8aa')
-        add_rule(
-            right_rules, '② 9与10进入废牌区',
-            '玩家或庄家取牌时，如抽到点数牌9或点数牌10，该牌立即进入废牌区；'
-            '本次实际拿到的是它后方第一张非9、非10的牌。J、Q、K不受影响。',
-            accent='#7cc8aa')
-        add_rule(
-            right_rules, '③ 牌张回收',
-            '每局结束后，已发出的牌进入弃牌区，由连续洗牌机按规则重新混入牌仓。',
-            accent='#7cc8aa')
-        add_rule(
-            right_rules, '④ 无需换靴',
-            '不使用剩余牌阈值、切牌或烧牌流程；下一局直接由连续洗牌机供牌。',
-            accent='#7cc8aa')
-        add_rule(
-            right_rules, '⑤ 即时兑现',
-            '即时兑现不读取真实牌靴；使用已移除9与10的无限牌组模型，仅比较Hit/Stand路线。'
-            '显示金额 = 2 × 当前估算获胜概率 × 当前手本金。',
-            accent='#7cc8aa')
-
-        # ================================================================
-        # 02 玩家决策按钮
-        # ================================================================
-        button_card = make_card(
-            '02  玩家决策按钮',
-            '所有示意图均由Canvas即时绘制')
-        button_cv = tk.Canvas(
-            button_card, width=930, height=380,
-            bg=PANEL, highlightthickness=0)
-        button_cv.pack(fill=tk.X, padx=16, pady=(0, 16))
-
-        def draw_small_card(cv, x, y, rank='A', suit='♠', red=False):
-            cv.create_rectangle(
-                x, y, x + 40, y + 55, fill='#f5f0e5',
-                outline='#d7cbb9', width=2)
-            cv.create_text(
-                x + 11, y + 13, text=rank,
-                font=('Arial', FONT_SMALL, 'bold'),
-                fill='#b92f3b' if red else BLACK)
-            cv.create_text(
-                x + 20, y + 36, text=suit,
-                font=('Arial', FONT_SMALL, 'bold'),
-                fill='#b92f3b' if red else BLACK)
-
-        def action_icon(cv, kind, x, y, color):
-            if kind == 'hit':
-                draw_small_card(cv, x, y + 5, '7', '♣')
-                draw_small_card(cv, x + 18, y, '4', '♥', True)
-                cv.create_oval(x + 50, y + 29, x + 76, y + 55, fill=GOLD, outline='')
-                cv.create_text(x + 63, y + 42, text='+',
-                               font=('Arial', FONT_LARGE, 'bold'), fill=BLACK)
-            elif kind == 'stand':
-                cv.create_rectangle(x + 10, y + 5, x + 69, y + 56,
-                                    fill='#f1ede4', outline='#d6cab7', width=2)
-                cv.create_text(x + 39, y + 31, text='STOP',
-                               font=('Arial', FONT_SMALL, 'bold'), fill=RED)
-            elif kind == 'double':
-                cv.create_oval(x + 5, y + 15, x + 50, y + 60,
-                               fill=color, outline='#f3df9a', width=2)
-                cv.create_oval(x + 34, y + 3, x + 79, y + 48,
-                               fill=color, outline='#f3df9a', width=2)
-                cv.create_text(x + 42, y + 32, text='2×',
-                               font=('Arial', FONT_SMALL, 'bold'), fill=WHITE)
-            elif kind == 'split':
-                draw_small_card(cv, x + 2, y + 3, '8', '♠')
-                draw_small_card(cv, x + 44, y + 3, '8', '♦', True)
-            elif kind == 'cashout':
-                cv.create_oval(x + 10, y + 8, x + 65, y + 63,
-                               fill='#d4b64a', outline='#fff0a0', width=2)
-                cv.create_text(x + 37, y + 35, text='$',
-                               font=('Arial', FONT_TITLE, 'bold'), fill=BLACK)
-            elif kind == 'ace':
-                draw_small_card(cv, x + 2, y + 5, 'A', '♠')
-                cv.create_rectangle(x + 50, y + 6, x + 88, y + 29,
-                                    fill=ORANGE, outline='')
-                cv.create_rectangle(x + 50, y + 38, x + 88, y + 61,
-                                    fill=BLUE, outline='')
-                cv.create_text(x + 69, y + 17, text='YES',
-                               font=('Arial', FONT_SMALL, 'bold'), fill=WHITE)
-                cv.create_text(x + 69, y + 49, text='NO',
-                               font=('Arial', FONT_SMALL, 'bold'), fill=WHITE)
-
-        def draw_action_tile(x, y, title, detail, color, kind):
-            w, h = 440, 108
-            button_cv.create_rectangle(
-                x + 3, y + 4, x + w + 3, y + h + 4,
-                fill='#090c0a', outline='')
-            button_cv.create_rectangle(
-                x, y, x + w, y + h,
-                fill=PANEL_2, outline='#46554d', width=1)
-            button_cv.create_rectangle(
-                x + 12, y + 13, x + 112, y + 94,
-                fill=color, outline='#d8d0bd', width=1)
-            action_icon(button_cv, kind, x + 20, y + 21, color)
-            button_cv.create_text(
-                x + 130, y + 27, text=title, anchor='w',
-                font=(font_name, FONT_MEDIUM, 'bold'), fill=TEXT)
-            button_cv.create_text(
-                x + 130, y + 61, text=detail, anchor='w', width=290,
-                font=(font_name, FONT_SMALL), fill=MUTED)
-
-        draw_action_tile(10, 10, '要牌  HIT',
-                         '再要一张牌；爆牌后当前手立即结束。', BLUE, 'hit')
-        draw_action_tile(470, 10, '停牌  STAND',
-                         '结束当前手并进入下一手或庄家回合。', '#5b4938', 'stand')
-        draw_action_tile(10, 128, '加倍  DOUBLE',
-                         '两张牌可选2X/3X/4X；可返回，只拿一张后自动停牌。', ORANGE, 'double')
-        draw_action_tile(470, 128, '分牌  SPLIT',
-                         '同点值两张牌可分牌；最多分牌3次（共4手），允许DAS。', PURPLE, 'split')
-        draw_action_tile(10, 246, '兑现金额  CASH OUT',
-                         '符合条件时按当前胜率模型显示即时兑现金额。', CASH, 'cashout')
-        draw_action_tile(470, 246, '庄家明牌A的决策',
-                         '正常询问：购买保险 / 不购买\n玩家黑杰克：立刻获胜 / 赌！', '#4e4030', 'ace')
-
-        # ================================================================
-        # 03 下注区域 / 限红
-        # ================================================================
-        bet_card = make_card(
-            '03  下注区域与限红',
-            '主注 MAX $500K · 每个边注 MAX $100K')
-        bet_cv = tk.Canvas(
-            bet_card, width=930, height=310,
-            bg=PANEL, highlightthickness=0)
-        bet_cv.pack(fill=tk.X, padx=16, pady=(0, 15))
-        bet_cv.create_rectangle(
-            8, 8, 922, 302, fill='#103f36', outline='#4f6f64', width=2)
-        bet_cv.create_text(
-            30, 30, anchor='w', text='可下注区域示意',
-            font=(font_name, FONT_MEDIUM, 'bold'), fill=TEXT)
-        bet_cv.create_text(
-            900, 30, anchor='e', text='主注最低 $100',
-            font=(font_name, FONT_SMALL), fill='#bcd2c8')
-        bet_cv.create_oval(
-            335, 70, 595, 240, fill=GREEN, outline='#9de46f', width=4)
-        bet_cv.create_text(
-            465, 125, text='主注\nBLACKJACK',
-            font=(font_name, FONT_LARGE, 'bold'), fill=WHITE, justify=tk.CENTER)
-        bet_cv.create_text(
-            465, 195, text='MAX $500K',
-            font=(font_name, FONT_MEDIUM, 'bold'), fill=GOLD)
-
-        side_spots = [
-            (40, 74, 225, 140, '完美对子'),
-            (40, 172, 225, 238, '21+3'),
-            (240, 224, 405, 288, '明牌运气'),
-            (525, 224, 690, 288, '疯狂7'),
-            (705, 172, 890, 238, '热辣21'),
-            (705, 74, 890, 140, '爆牌!'),
-        ]
-        for x0, y0, x1, y1, label in side_spots:
-            bet_cv.create_oval(
-                x0, y0, x1, y1, fill=GREEN_2,
-                outline='#9de46f', width=3)
-            bet_cv.create_text(
-                (x0 + x1) / 2, (y0 + y1) / 2 - 10,
-                text=label, font=(font_name, FONT_SMALL, 'bold'), fill=WHITE)
-            bet_cv.create_text(
-                (x0 + x1) / 2, (y0 + y1) / 2 + 15,
-                text='MAX $100K', font=(font_name, FONT_SMALL), fill=GOLD)
-
-        tk.Label(
-            bet_card,
-            text='主注最低 $100、最高 $500,000；六个边注各自最高 $100,000。右键可清除对应下注。',
-            font=(font_name, FONT_SMALL), fg=MUTED, bg=PANEL,
-            anchor='w', justify=tk.LEFT, wraplength=920
-        ).pack(fill=tk.X, padx=20, pady=(0, 16))
-
-        # ================================================================
-        # 04 主注赔付
-        # ================================================================
-        payout_card = make_card(
-            '04  主注与保险赔付',
-            '赔率表示利润赔率；正常中奖同时返还下注本金')
-        main_table = table_block(
-            payout_card, '主注 / 保险', [
-                ('普通主注获胜', '1:1'),
-                ('玩家天然Blackjack（未分牌两张21）', '3:2'),
-                ('分牌后两张牌组成21点', '1:1'),
-                ('玩家Blackjack + 庄家A选择“立刻获胜”', '1:1'),
-                ('保险中奖（庄家Blackjack）', '2:1'),
-                ('庄家Blackjack：Original Bet', '输'),
-                ('庄家Blackjack：额外分牌/加倍本金', 'OBO退回'),
-                ('同点数 / 双方普通同分', 'Push退回'),
-            ])
-        main_table.pack(fill=tk.X, padx=18, pady=(0, 16))
-
-        # ================================================================
-        # 05 边注赔付
-        # ================================================================
-        side_card = make_card('05  边注赔付表', '六个边注 · 按利润赔率结算')
-        side_grid = tk.Frame(side_card, bg=PANEL)
-        side_grid.pack(fill=tk.X, padx=18, pady=(0, 16))
-        side_grid.grid_columnconfigure(0, weight=1, uniform='payout')
-        side_grid.grid_columnconfigure(1, weight=1, uniform='payout')
-
-        tables = [
-            ('完美对子', [
-                ('同花色同点对子', '21:1'),
-                ('同颜色同点对子', '10:1'),
-                ('杂色同点对子', '5:1'),
-            ]),
-            ('21+3', [
-                ('三张同花同点', '90:1'),
-                ('同花顺', '35:1'),
-                ('三条', '25:1'),
-                ('顺子', '10:1'),
-                ('同花', '4:1'),
-            ]),
-            ('明牌运气', [
-                ('庄2–7 + 玩家黑桃J/黑桃A', '70:1'),
-                ('庄2–7 + 玩家Blackjack', '7:1'),
-                ('庄2–7 + 玩家9–11点', '3:1'),
-                ('庄2–7 + 玩家18–20点', '3:1'),
-            ]),
-            ('疯狂7', [
-                ('目标三张同花7', '1500:1'),
-                ('目标三张7', '325:1'),
-                ('前两目标同花7', '100:1'),
-                ('前两目标7', '18:1'),
-                ('第一目标7（第0张）', '4:1'),
-            ]),
-            ('热辣21', [
-                ('三张7同花', '400:1'),
-                ('三张7', '80:1'),
-                ('三张牌同花且等于21', '20:1'),
-                ('三张牌等于21', '4:1'),
-                ('三张牌等于20', '2:1'),
-                ('三张牌等于19', '1:1'),
-            ]),
-            ('爆牌!', [
-                ('庄家8张或以上爆牌', '200:1'),
-                ('庄家7张爆牌', '80:1'),
-                ('庄家6张爆牌', '40:1'),
-                ('庄家5张爆牌', '7.5:1'),
-                ('庄家4张爆牌', '1.5:1'),
-                ('庄家3张爆牌', '1:1'),
-            ]),
-        ]
-        for idx, (title, rows) in enumerate(tables):
-            block = table_block(side_grid, title, rows)
-            row_index = idx // 2
-            column_index = idx % 2
-            block.grid(
-                row=row_index, column=column_index, sticky='nsew',
-                padx=(0, 7) if column_index == 0 else (7, 0), pady=7)
-
-        # ================================================================
-        # 06 重要提示
-        # ================================================================
-        notes_card = make_card('06  重要提示', pady=(8, 18))
-        add_rule(
-            notes_card, '21+3顺子',
-            '顺子识别逻辑保持经典牌序不变：A可作低牌或高牌；A-2-3、J-Q-K、Q-K-A'
-            '均可判断为顺子。移除9与10不会让牌序自动跨越，因此7-8-J和8-J-Q都不算顺子。')
-        add_rule(
-            notes_card, '疯狂7取牌位置',
-            '疯狂7按本局实际发牌序列的指定目标牌逐步锁定赔率：第一目标为7先保证4:1；'
-            '后续目标7可升级到18/100，再升级到325/1500。废弃的9与10不计入发牌序列。')
-        add_rule(
-            notes_card, '分牌行动顺序',
-            '分牌后先给当前第一手补一张并完成该手全部行动；只有第一手结束后，'
-            '才激活下一手并补该手的第一张分牌牌。')
-        add_rule(
-            notes_card, '即时兑现模型',
-            '兑现金额为模型估值，不会偷看或消耗真实牌靴中的下一张牌；实际牌局牌序保持不变。')
-
-        def _close_instruction():
-            try:
-                self._instruction_window = None
-            except Exception:
-                pass
-            try:
-                dialog.destroy()
-            except tk.TclError:
-                pass
-
-        close_btn.configure(command=_close_instruction)
-        dialog.protocol('WM_DELETE_WINDOW', _close_instruction)
-        dialog.bind('<Escape>', lambda _e: _close_instruction())
         dialog.after(30, dialog.focus_force)
 
     def _queue(self, delay_ms, func, *args):
@@ -4368,13 +4163,14 @@ class BubbleBlackjackGame(tk.Frame):
         if not self.round_active:
             self.balance += self.current_bet + sum(self.current_side_bets.values())
             self.current_bet = 0.0
-            self.current_side_bets = {key: 0.0 for key in self.SIDE_BET_KEYS}
+            self.current_bets = {seat:0.0 for seat in self.SEATS}
+            self.current_side_bets = self._empty_side_bets()
         else:
             unresolved = 0.0
             for hand in self.hands:
-                if hand.get('status') not in ('surrendered', 'even_money'):
+                if hand.get('settlement') is None:
                     unresolved += self.hand_stake(hand)
-            unresolved += self.insurance_bet
+            unresolved += 0.0 if self.insurance_resolved else self.insurance_bet
             for key, stake in self.round_side_bets.items():
                 if key not in self.side_bet_results:
                     unresolved += float(stake)
@@ -4405,6 +4201,498 @@ class BubbleBlackjackGame(tk.Frame):
         self._restore_host_bindings()
         if callable(self.on_back):
             self.on_back(self.final_balance)
+
+
+    def _empty_side_bets(self):
+        return {(seat, key): 0.0 for seat in self.SEATS for key in self.SIDE_BET_KEYS}
+
+
+    def _sync_main_totals(self):
+        self.current_bet = sum(self.current_bets.values())
+        self.last_bet = sum(self.last_bets.values())
+        self.round_original_bet = sum(self.round_original_bets.values())
+
+
+    def _raise_wager_chips(self):
+        """Keep every displayed wager above cards, labels, and table controls."""
+        self.canvas.tag_raise('wager_chip')
+
+
+    @staticmethod
+    def _shade_color(color, factor):
+        rgb = [max(0, min(255, round(int(color[i:i+2], 16)*factor))) for i in (1, 3, 5)]
+        return '#' + ''.join(f'{value:02x}' for value in rgb)
+
+
+    def _update_main_spot_visibility_original(self):
+        playing = bool(self.round_active or self.settlement_running or
+                       (self.animation_running and not self.accept_bets))
+        for seat in self.SEATS:
+            self.canvas.itemconfigure(self.bet_spots[(seat,'MAIN')]['rect'],
+                state='hidden' if playing else 'normal')
+
+    def _update_main_spot_visibility(self):
+        self._update_main_spot_visibility_original()
+        for spot in self.bet_spots.values():
+            if spot.get('shape') == 'oval' and spot.get('surface_tag'):
+                state = self.canvas.itemcget(spot['rect'], 'state')
+                self.canvas.itemconfigure(spot['surface_tag'], state=state)
+                self.canvas.itemconfigure(spot['title_tag'], state=state)
+        self._raise_wager_chips()
+
+
+    def _can_change_bets(self):
+        return bool(self.accept_bets and not self.round_active and not self.animation_running
+                    and not self.settlement_running)
+
+
+    def _place_seat_bet(self, seat, kind):
+        key = (seat, kind)
+        if key not in self.bet_spots or not self._can_change_bets():
+            return
+        current = self.current_bets[seat] if kind=='MAIN' else self.current_side_bets[key]
+        maximum = self.MAX_MAIN_BET if kind=='MAIN' else self.MAX_SIDE_BET
+        amount = min(self.selected_chip, max(0.0, maximum-current))
+        if amount <= 0:
+            return
+        if self.balance+1e-9 < amount:
+            messagebox.showwarning('余额不足', '余额不足以放置该筹码。', parent=self.winfo_toplevel())
+            return
+        self.balance -= amount
+        if kind == 'MAIN':
+            self.current_bets[seat] += amount
+        else:
+            self.current_side_bets[key] += amount
+        self._sync_main_totals()
+        self.show_last_win = False
+        self.pending_bet_animation[key] += amount
+        self.bet_chip_animation_count += 1
+        self.update_display()
+        self._animate_selected_chip_to_spot(key,
+            lambda: self._finish_bet_chip_animation(key, amount), amount=amount)
+
+
+    def _clear_seat_bet(self, seat, kind):
+        if not self._can_change_bets() or self.bet_chip_animation_count:
+            return
+        keys = [(seat, k) for k in self.SIDE_BET_KEYS] if kind=='MAIN' else [(seat, kind)]
+        refund = self.current_bets[seat] if kind=='MAIN' else 0.0
+        if kind == 'MAIN':
+            self.current_bets[seat] = 0.0
+            self.pending_bet_animation[(seat, 'MAIN')] = 0.0
+        for key in keys:
+            refund += self.current_side_bets[key]
+            self.current_side_bets[key] = self.pending_bet_animation[key] = 0.0
+        self.balance += refund
+        self._sync_main_totals()
+        self.update_display()
+        self.save_balance()
+
+
+    def _seat_hand_geometry(self, snapshot=None):
+        hands = self.hands if snapshot is None else snapshot
+        result = {}
+        for seat, (x0, x1) in self.SEAT_BOUNDS.items():
+            indices = [i for i, h in enumerate(hands) if h['seat']==seat]
+            n = max(1, len(indices))
+            lane_width = (x1-x0-24)/n
+            for order, index in enumerate(indices):
+                left = x0+12+order*lane_width
+                right = left+lane_width
+                result[index] = (left, right, (left+right)/2, order, n)
+        return result
+
+
+    def _player_card_position(self, hand, geometry, card_index):
+        left, right, cx, _order, _n = geometry
+        # The first card clears the enlarged MAIN chip.
+        # Reserve fan space once; later cards never move cards already dealt.
+        main_chip_x, origin_y = self.bet_spots[(hand['seat'],'MAIN')]['chip_pos']
+        main_chip_y = origin_y-self.MAIN_WAGER_LIFT
+        first_x = (main_chip_x if _n==1 else cx)-self.CARD_WIDTH/2
+        first_y = main_chip_y-self.CARD_HEIGHT-self.WAGER_CHIP_RADIUS-self.CARD_WAGER_GAP
+        fan_step = min(44.0, max(0.0, (right-8-first_x-self.CARD_WIDTH)/3))
+        index = max(0, int(card_index))
+        # Keep the normal horizontal step for every card. Cards 5-7 turn
+        # downward; card 8 onward turns upward again, 24px per new card.
+        x = first_x+fan_step*index
+        if index<=3:
+            y = first_y-24.0*index
+        elif index<=6:
+            y = first_y-72.0+24.0*(index-3)
+        else:
+            y = first_y-24.0*(index-6)
+        if hand.get('double_card_index')==index:
+            # Keep the card's centre when its dimensions change to 112 x 80.
+            x -= (self.CARD_HEIGHT-self.CARD_WIDTH)/2
+            y += (self.CARD_HEIGHT-self.CARD_WIDTH)/2
+            x += 15
+            y -= 15
+        return x,y
+
+
+    def _outcome_chip_rows(self, key, stake, returned, position, radius, tags,
+                           profit_position=None):
+        stake = max(0.0,float(stake))
+        principal = stake if returned is None else min(stake,max(0.0,float(returned)))
+        profit = 0.0 if returned is None else max(0.0,round(float(returned)-stake,2))
+        rows = []
+        if principal>0:
+            rows.append(dict(key=(*key,'principal'),role='principal',amount=principal,
+                pos=position,radius=radius,tags=(*tags,'principal_chip')))
+        if profit>0:
+            # All winnings sit to the left of their original wager at the same y.
+            dx = -(2*radius+self.CHIP_GAP)
+            rows.append(dict(key=(*key,'profit'),role='profit',amount=profit,
+                pos=(position[0]+dx,position[1]) if profit_position is None else profit_position,
+                radius=radius,
+                tags=(*tags,'profit_chip')))
+        return rows
+
+
+    def _draw_outcome_rows(self, rows):
+        if self.settlement_visual_stage=='returning':
+            return
+        for row in sorted(rows,key=lambda row:row['role']!='principal'):
+            if row['key'] not in self.pending_profit_chips:
+                self._draw_baccarat_chip(*row['pos'],row['amount'],
+                    tags=row['tags'],radius=row['radius'])
+
+
+    def _main_wager_rows(self):
+        if not self.round_active or self._opening_wager_animation:
+            return []
+        rows = []
+        layout = self._main_split_wager_layout()
+        for index,hand in enumerate(self.hands):
+            base_x, base_y = layout[index]['base']
+            cashout_stage = hand.get('cashout_visual_stage')
+            if cashout_stage is not None:
+                # The whole cash-out payment lands in the winnings area first.
+                # Original stakes remain until that payment has arrived.
+                tags = ('hand_wager', f'hand_wager_{index}')
+                if cashout_stage in ('paying', 'display'):
+                    for component, stake in (('base', hand['base_bet']),
+                                             ('double', hand['double_added'])):
+                        rows.extend(self._outcome_chip_rows(
+                            ('main', index, component), stake, None,
+                            layout[index][component], self.WAGER_CHIP_RADIUS,
+                            (*tags, f'{component}_wager', f'hand_{index}_{component}_chip')))
+                credit = float(hand.get('cashout_credit', 0.0))
+                if cashout_stage in ('display', 'collecting') and credit > 0:
+                    rows.append(dict(key=('main', index, 'cashout', 'payout'),
+                        role='cashout', amount=credit, pos=(base_x-self.CHIP_PITCH, base_y),
+                        radius=self.WAGER_CHIP_RADIUS, tags=(*tags, 'cashout_wager', f'hand_{index}_cashout_chip')))
+                # Collected cash-outs stay out of the later round settlement.
+                continue
+            for component,stake in (('base',hand['base_bet']),('double',hand['double_added'])):
+                returned = self._component_return_amount(hand,component) if self.settlement_running else None
+                # Left to right: Double profit, base profit, base stake, Double stake.
+                # Each 60px chip is separated from its neighbour by 4px.
+                profit_position = (base_x-((2*self.CHIP_PITCH) if component=='double' else self.CHIP_PITCH),base_y)
+                rows.extend(self._outcome_chip_rows(('main',index,component),stake,returned,
+                    layout[index][component],self.WAGER_CHIP_RADIUS,
+                    ('hand_wager',f'hand_wager_{index}',f'{component}_wager',
+                     f'hand_{index}_{component}_chip'),profit_position=profit_position))
+        return rows
+
+
+    def _animate_starting_wagers(self, on_complete):
+        starts,ends = {},{}
+        self._opening_wager_animation = True
+        layout = self._main_split_wager_layout()
+        for index,hand in enumerate(self.hands):
+            tag = f'opening_wager_{index}'
+            start = self.bet_spots[(hand['seat'],'MAIN')]['chip_pos']
+            self._draw_baccarat_chip(*start,hand['base_bet'],
+                tags=('opening_wager',tag),radius=self.WAGER_CHIP_RADIUS)
+            # Lift the principal chip 60px from its betting spot. The first card
+            # is positioned above this landing point with a 10px overlap.
+            starts[tag],ends[tag] = start,layout[index]['base']
+        def landed():
+            self.canvas.delete('opening_wager')
+            self._opening_wager_animation = False
+            self.render_cards()
+            self.update_display()
+            on_complete()
+        self._animate_canvas_positions(starts,ends,duration_ms=220,on_complete=landed)
+
+
+    def _animate_side_bet_profit(self, key):
+        stake = self.round_side_bets.get(key,0.0)
+        rows = self._outcome_chip_rows(('side',*key),stake,
+            self.side_bet_return_amounts.get(key,0.0),self.bet_spots[key]['chip_pos'],self.WAGER_CHIP_RADIUS,())
+        for row in rows:
+            if row['role']=='profit':
+                self.pending_profit_chips.add(row['key'])
+                def arrived(k=row['key']):
+                    self.pending_profit_chips.discard(k)
+                    self.update_bet_chips()
+                self._animate_settlement_chips([(575,43,row['amount'],self.WAGER_CHIP_RADIUS)],row['pos'],440,
+                    f'side_profit_fly_{self.SIDE_BET_KEYS.index(key[1])}',arrived)
+
+
+    def _dealer_badge_fill(self):
+        if not self.dealer_cards:
+            return '#ffffff'
+        total,_soft = BlackjackEngine.hand_value(self.dealer_cards)
+        if total>21:
+            return '#e34848'
+        if self.settlement_running:
+            results = [h.get('settlement') for h in self.hands
+                       if h.get('status') not in ('surrendered','even_money')]
+            if results and all(result=='push' for result in results):
+                return '#b9dcff'
+            if results and all(result=='lose' for result in results):
+                return '#b9efb4'
+            if results and all(result=='win' for result in results):
+                return '#e34848'
+            return '#f2b0b0'
+        if self.dealer_phase_active and len(self.dealer_cards)>=2 and total>=17:
+            return '#f2b0b0'
+        return '#ffffff'
+
+
+    def _card_dimensions(self, rotation=0):
+        return ((self.CARD_HEIGHT,self.CARD_WIDTH) if rotation%180
+                else (self.CARD_WIDTH,self.CARD_HEIGHT))
+
+
+    def _oriented_card_pil(self, card, rotation=0, use_back=False):
+        if Image is None:
+            return None
+        base = self.external_back_pil if use_back else self.external_card_pil.get(tuple(card))
+        if base is None:
+            base = self._make_fallback_card_pil(card, not use_back)
+        return base.rotate(-rotation, expand=True) if rotation else base
+
+
+    def _oriented_card_photo(self, card, rotation=0, use_back=False):
+        if not rotation:
+            return self.external_back_image if use_back else self._face_photo(card)
+        if Image is None or ImageTk is None:
+            return None
+        if not hasattr(self, '_rotated_card_photos'):
+            self._rotated_card_photos = {}
+        key = ('back' if use_back else tuple(card),rotation)
+        if key not in self._rotated_card_photos:
+            base = self._oriented_card_pil(card, rotation, use_back)
+            self._rotated_card_photos[key] = ImageTk.PhotoImage(base, master=self)
+        return self._rotated_card_photos[key]
+
+
+    def _invoke_seat_action(self, seat, command):
+        hand = self.active_hand()
+        if (hand and hand['seat']==seat and not self.ace_decision_mode and not self.double_choice_mode
+                and not self.animation_running and not self.settlement_running):
+            command()
+
+
+    def _next_ace_decision(self):
+        if self.ace_decision_queue:
+            seat, mode = self.ace_decision_queue.pop(0)
+            self.ace_decision_seat = seat
+            self._show_ace_decision(mode)
+            self.update_display()
+        else:
+            self.ace_decision_mode = self.ace_decision_seat = None
+            self.active_hand_index = -1
+            self.update_display()
+            self._advance_hand()
+
+
+    def _draw_side_odds(self, tag):
+        self.canvas.delete(tag)  # payout tiers stay in the ledger, without table labels
+
+
+    def _settlement_chip_rows(self):
+        rows = self._main_wager_rows()
+        for key,stake in self.round_side_bets.items():
+            if stake>0:
+                spot = self.bet_spots[key]
+                rows.extend(self._outcome_chip_rows(('side',*key),stake,
+                    self.side_bet_return_amounts.get(key,0.0),spot['chip_pos'],self.WAGER_CHIP_RADIUS,
+                    ('bet_chip_dynamic',spot['tag'])))
+        for seat,info in self.seat_insurance.items():
+            if info['bet']>0:
+                rows.extend(self._outcome_chip_rows(('insurance',seat),info['bet'],
+                    info['returned'],self.insurance_positions[seat],self.INSURANCE_CHIP_RADIUS,('insurance_chip',)))
+        return rows
+
+
+    def _render_settlement_chips(self):
+        self.update_bet_chips()
+        self.canvas.delete('hand_wager')
+        self._draw_main_hand_wagers()
+        self._render_insurance_chip()
+        self._raise_wager_chips()
+
+
+    def _settle_initial_side_bets_for_seat(self, seat):
+        if len(self.round_initial_cards.get(seat, [])) < 2 or not self.dealer_cards:
+            return
+        p0, p1 = self.round_initial_cards[seat][:2]
+        dealer = self.dealer_cards[0]
+
+        # Perfect Pair: always evaluate so a hit flashes even with zero stake.
+        odds = None
+        label = '完美对子'
+        if p0[1] == p1[1]:
+            if p0[0] == p1[0]:
+                odds, label = 21, '同花对子'
+            elif self._same_color(p0, p1):
+                odds, label = 10, '同色对子'
+            else:
+                odds, label = 5, '杂色对子'
+        self._credit_side_bet((seat, 'Perfect Pair'), odds, label)
+
+        trio = [p0, p1, dealer]
+        suits_same = len({card[0] for card in trio}) == 1
+        ranks_same = len({card[1] for card in trio}) == 1
+        straight = self._is_three_card_straight(trio)
+
+        # 21+3: suited trips > straight flush > trips > straight > flush.
+        if suits_same and ranks_same:
+            result = (90, '三张同花同点')
+        elif suits_same and straight:
+            result = (35, '同花顺')
+        elif ranks_same:
+            result = (25, '三条')
+        elif straight:
+            result = (10, '顺子')
+        elif suits_same:
+            result = (4, '同花')
+        else:
+            result = (None, '未中')
+        self._credit_side_bet((seat, '21+3'), *result)
+
+        # 明牌运气: dealer upcard 2-7 gates the player's two-card tier.
+        self._credit_side_bet(
+            (seat, 'Open Card Luck'), *self._open_card_luck_result([p0, p1], dealer))
+
+        # Hot 21. Exact three 7s have priority. Ace may count as 1 or 11.
+        all_sevens = all(card[1] == '7' for card in trio)
+        totals = self._three_card_totals(trio)
+        if all_sevens and suits_same:
+            result = (400, '同花三7')
+        elif all_sevens:
+            result = (80, '三7')
+        elif 21 in totals and suits_same:
+            result = (20, '同花21点')
+        elif 21 in totals:
+            result = (4, '21点')
+        elif 20 in totals:
+            result = (2, '20点')
+        elif 19 in totals:
+            result = (1, '19点')
+        else:
+            result = (None, '未中')
+        self._credit_side_bet((seat, 'Hot 21'), *result)
+
+        # V19: if Crazy 7 was already known to lose from target card 0, its
+        # collection was intentionally deferred until this same post-deal stage
+        # where the other resolved losing side bets are collected.
+        if self.side_bet_results.get((seat, 'Crazy 7')) == '输':
+            self._collect_losing_side_bet_upward((seat, 'Crazy 7'))
+
+        self.save_balance()
+
+
+    def _maybe_settle_crazy7_for_seat(self, seat):
+        """Synchronise Crazy 7 progressively from round cards 0 -> 2 -> 3.
+
+        Card 0 decides whether the bet is already dead.  If it is a 7, show the
+        currently secured 4:1 tier while waiting for card 2.  If card 2 is not a
+        7, 4:1 is final; if card 2 is a 7, show the secured 18:1/100:1 tier while
+        waiting for card 3.  Card 3 then performs the final odds synchronisation:
+        another 7 upgrades to 325:1/1500:1, otherwise the card-2 tier remains.
+        Provisional tiers only update the pointed odds marker; money is credited
+        exactly once when the tier becomes final.
+        """
+        key = (seat, 'Crazy 7')
+        if key in self.side_bet_results:
+            return
+        seq = self.seat_deal_sequences[seat]
+        if not seq:
+            return
+
+        c0 = seq[0]
+        if c0[1] != '7':
+            self.side_bet_hit_odds.pop(key, None)
+            self.side_bet_hit_labels.pop(key, None)
+            # V19: record the loss immediately for logic purposes, but do NOT
+            # collect the Crazy 7 chip while the opening cards are still flying.
+            # It joins the other resolved losing side bets after the initial deal.
+            self._credit_side_bet(key, None, '第0张非7', collect_loss=False)
+            self.save_balance()
+            return
+
+        # Card 0 is a 7: 4:1 is already secured, but it is provisional until
+        # target card 2 is known.
+        self.side_bet_hit_odds[key] = 4.0
+        self.side_bet_hit_labels[key] = '第一目标7'
+        if len(seq) < 3:
+            return
+
+        c2 = seq[2]
+        if c2[1] != '7':
+            self._credit_side_bet(key, 4, '第一目标7')
+            self.save_balance()
+            return
+
+        # Cards 0 and 2 are both 7.  The secured tier is 18:1, or 100:1 when
+        # those two target cards share a suit.  Keep it provisional until card 3.
+        if c0[0] == c2[0]:
+            provisional_odds, provisional_label = 100.0, '前两目标同花7'
+        else:
+            provisional_odds, provisional_label = 18.0, '前两目标7'
+        self.side_bet_hit_odds[key] = provisional_odds
+        self.side_bet_hit_labels[key] = provisional_label
+        if len(seq) < 4:
+            return
+
+        c3 = seq[3]
+        if c3[1] == '7':
+            if c0[0] == c2[0] == c3[0]:
+                result = (1500, '目标三张同花7')
+            else:
+                result = (325, '目标三张7')
+        else:
+            result = (provisional_odds, provisional_label)
+
+        # Final card is known: overwrite the provisional marker with the final
+        # correct tier, then settle/credit exactly once.
+        self.side_bet_hit_odds.pop(key, None)
+        self.side_bet_hit_labels.pop(key, None)
+        self._credit_side_bet(key, *result)
+        self.save_balance()
+
+
+    def _settle_bust_side_bet_for_seat(self, seat):
+        key = (seat, 'Bust!')
+        if key in self.side_bet_results:
+            return
+        total, _ = BlackjackEngine.hand_value(self.dealer_cards)
+        if total <= 21:
+            self._credit_side_bet(key, None, '庄家未爆')
+        else:
+            count = len(self.dealer_cards)
+            if count >= 8:
+                odds = 200
+            elif count == 7:
+                odds = 80
+            elif count == 6:
+                odds = 40
+            elif count == 5:
+                odds = 7.5
+            elif count == 4:
+                odds = 1.5
+            else:
+                odds = 1
+            self._credit_side_bet(key, odds, f'庄家{count}张爆牌')
+        self.save_balance()
+
+
 
 
 # Compatibility wrapper similar to BaccaratGame.

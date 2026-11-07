@@ -1,10 +1,9 @@
 {
   "version": 2,
-  "variant": "Double_Up_Blackjack",
   "shoe": {
     "mode": "CSM",
     "decks": 8,
     "chambers": 15,
-    "game_id": "Double_Up_Blackjack:root01:9b42370f149b4fb2a33a1c60a908a3dc"
+    "game_id": "Double_Up_Blackjack:local:406c633c15ac46a094472c9ee0973e2e"
   }
 }

@@ -9,7 +9,6 @@ from A_Tools.Account import install_secure_json as _install_secure_json
 _install_secure_json()
 del _install_secure_json, _account_root, _AccountPath, _account_sys
 
-import importlib
 import json
 import os
 import tkinter as tk
@@ -122,36 +121,54 @@ def _ui_colour(master: tk.Misc, colour: str) -> str:
     return resolver(colour) if callable(resolver) else colour
 
 
+def load_game_module(module_name: str):
+    """按需使用明确的 import，让打包工具能发现菜单中的全部游戏。"""
+    if module_name == 'Lotto.Banknote_Detection':
+        from Lotto import Banknote_Detection as module
+    elif module_name == 'Lotto.Golfs':
+        from Lotto import Golfs as module
+    elif module_name == 'Lotto.Pass_3_Level':
+        from Lotto import Pass_3_Level as module
+    elif module_name == 'Lotto.Stacked':
+        from Lotto import Stacked as module
+    elif module_name == 'Lotto.Num':
+        from Lotto import Num as module
+    else:
+        raise ImportError(f"尚未登记游戏模块：{module_name}")
+    return module
+
+
+
 LOTTO_GAMES = [
     {
         "name": "验钞机",
         "subtitle": "1 元 / 特易中奖",
         "prize": "大奖 1,000",
-        "module": "Lotto.Banknote_Detection_gui",
+        "module": "Lotto.Banknote_Detection",
     },
     {
         "name": "高尔夫球",
         "subtitle": "每局 1 元",
         "prize": "大奖 10,000",
-        "module": "Lotto.golfs_gui",
+        "module": "Lotto.Golfs",
     },
     {
         "name": "过三关",
         "subtitle": "每局 1 元",
         "prize": "大奖 10,000",
-        "module": "Lotto.pass_3_level_gui",
+        "module": "Lotto.Pass_3_Level",
     },
     {
         "name": "叠叠乐",
         "subtitle": "每局 5 元",
         "prize": "大奖 50,000",
-        "module": "Lotto.stacked",
+        "module": "Lotto.Stacked",
     },
     {
         "name": "100X 现金大挑战",
         "subtitle": "每局 5 元",
         "prize": "大奖 50,000",
-        "module": "Lotto.num_gui",
+        "module": "Lotto.Num",
     },
 ]
 
@@ -467,7 +484,7 @@ class LottoPage(tk.Frame):
 
     def launch_game(self, display_name: str, module_name: str) -> None:
         try:
-            module = importlib.import_module(module_name)
+            module = load_game_module(module_name)
             game_main = getattr(module, "main", None)
             if not callable(game_main):
                 raise AttributeError(f"{module_name} 没有可调用的 main()")

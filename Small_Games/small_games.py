@@ -9,7 +9,6 @@ from A_Tools.Account import install_secure_json as _install_secure_json
 _install_secure_json()
 del _install_secure_json, _account_root, _AccountPath, _account_sys
 
-import importlib
 import json
 import os
 import re
@@ -193,6 +192,52 @@ def _ui_colour(master: tk.Misc, colour: str) -> str:
     return resolver(colour) if callable(resolver) else colour
 
 
+def load_game_module(module_name: str):
+    """按需使用明确的 import，让打包工具能发现菜单中的全部游戏。"""
+    if module_name == 'Small_Games.Chicken_Crossing':
+        from Small_Games import Chicken_Crossing as module
+    elif module_name == 'Small_Games.Penalty':
+        from Small_Games import Penalty as module
+    elif module_name == 'Small_Games.Tower':
+        from Small_Games import Tower as module
+    elif module_name == 'Small_Games.Rocket':
+        from Small_Games import Rocket as module
+    elif module_name == 'Small_Games.Minus':
+        from Small_Games import Minus as module
+    elif module_name == 'Small_Games.Plinko':
+        from Small_Games import Plinko as module
+    elif module_name == 'Small_Games.Lucky_Number':
+        from Small_Games import Lucky_Number as module
+    elif module_name == 'Small_Games.Guess_Colour':
+        from Small_Games import Guess_Colour as module
+    elif module_name == 'Small_Games.Thimbles':
+        from Small_Games import Thimbles as module
+    elif module_name == 'Small_Games.Guess_Number':
+        from Small_Games import Guess_Number as module
+    elif module_name == 'Small_Games.Keno':
+        from Small_Games import Keno as module
+    elif module_name == 'Small_Games.Bingo':
+        from Small_Games import Bingo as module
+    elif module_name == 'Small_Games.Whack_A_Mole':
+        from Small_Games import Whack_A_Mole as module
+    elif module_name == 'Small_Games.Rock_Paper_Scissors':
+        from Small_Games import Rock_Paper_Scissors as module
+    elif module_name == 'Small_Games.Pocket_Rain':
+        from Small_Games import Pocket_Rain as module
+    elif module_name == 'Small_Games.Football_Match':
+        from Small_Games import Football_Match as module
+    elif module_name == 'Small_Games.Stock_Market':
+        from Small_Games import Stock_Market as module
+    elif module_name == 'Small_Games.Shoot_Poker':
+        from Small_Games import Shoot_Poker as module
+    elif module_name == 'Small_Games.Deal_Or_No_Deal':
+        from Small_Games import Deal_Or_No_Deal as module
+    else:
+        raise ImportError(f"尚未登记游戏模块：{module_name}")
+    return module
+
+
+
 # 所有小游戏统一使用单 Tk 窗口嵌入模式。
 # EMBEDDED_GAME_MODULES 会在 GAME_SECTIONS 定义后自动生成，避免新增游戏时
 # 忘记同步嵌入名单。
@@ -228,14 +273,13 @@ GAME_SECTIONS = {
 # 除个别尚未兼容单 Tk 嵌入的旧游戏外，其余菜单游戏均采用 EmbeddedGamePage。
 # Shoot_Poker 目前明确回退到旧版独立子进程启动。
 LEGACY_PROCESS_MODULES = {
-    "Small_Games.Shoot_Poker",
 }
 
 EMBEDDED_GAME_MODULES = {
     module_name
     for games in GAME_SECTIONS.values()
     for _display_name, module_name, maintenance in games
-    if module_name and not maintenance and module_name not in LEGACY_PROCESS_MODULES
+    if module_name and not maintenance and module_name
 }
 
 # Shoot_Poker 内嵌版入口代码暂时保留，未来其 main() 完成 EmbeddedGamePage
@@ -328,7 +372,7 @@ def child_run(module_name: str, result_file: str, balance_text: str, username: s
         balance = float(balance_text)
         result["balance"] = balance
 
-        module = importlib.import_module(module_name)
+        module = load_game_module(module_name)
         game_main = getattr(module, "main", None)
         if not callable(game_main):
             raise AttributeError(f"{module_name} 没有可调用的 main(balance, user)")
@@ -1374,7 +1418,7 @@ class SmallGamesPage(tk.Frame):
     ) -> None:
         """在 index.py 的同一个根窗口内打开小游戏。"""
         try:
-            module = importlib.import_module(module_name)
+            module = load_game_module(module_name)
             game_main = getattr(module, "main", None)
             if not callable(game_main):
                 raise AttributeError(f"{module_name} 没有可调用的 main()")

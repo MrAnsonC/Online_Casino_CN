@@ -9,10 +9,8 @@ from A_Tools.Account import install_secure_json as _install_secure_json
 _install_secure_json()
 del _install_secure_json, _account_root, _AccountPath, _account_sys
 
-import importlib
 import json
 import os
-import subprocess
 import sys
 import tkinter as tk
 from datetime import datetime
@@ -26,7 +24,7 @@ except ImportError:
 from typing import Callable, Optional
 
 
-CASINO_GAMES_VERSION = "V26"
+CASINO_GAMES_VERSION = "V27"
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(THIS_DIR)
@@ -44,6 +42,11 @@ _TRANSLATION_ROWS = [
     ('请选择游戏', 'Choose a game', '請選擇遊戲', 'Kōwhiria he kēmu', 'Elektu ludon'),
     ('游戏运行中…', 'Game running…', '遊戲執行中…', 'Kei te haere te kēmu…', 'Ludo funkcias…'),
     ('扑克', 'Poker', '撲克', 'Poker', 'Pokero'),
+    ('全部', 'All', '全部', 'Katoa', 'Ĉiuj'),
+    ('三张牌', 'Three Card', '三張牌', 'Kāri Toru', 'Tri Kartoj'),
+    ('德州/奥马哈', 'Texas/Omaha', '德州/奧馬哈', 'Texas/Omaha', 'Texas/Omaha'),
+    ('梭哈', 'Stud', '梭哈', 'Stud', 'Stud'),
+    ('其他', 'Other', '其他', 'Ētahi atu', 'Aliaj'),
     ('百家乐', 'Baccarat', '百家樂', 'Baccarat', 'Bakarao'),
     ('黑杰克', 'Blackjack', '黑傑克', 'Blackjack', 'Nigra Joĉjo'),
     ('骰子', 'Dice', '骰子', 'Mataono', 'Ĵetkuboj'),
@@ -58,6 +61,9 @@ _TRANSLATION_ROWS = [
     ('三张牌扑克', 'Three Card Poker', '三張牌撲克', 'Poker Kāri Toru', 'Trikarta Pokero'),
     ('三公', 'San Gong', '三公', 'San Gong', 'San Gong'),
     ('视频扑克', 'Video Poker', '視訊撲克', 'Poker Ataata', 'Videopokero'),
+    ('高低', 'HiLo', '高低', 'HiLo', 'HiLo'),
+    ('高低Mojo', 'HiLo Mojo', '高低Mojo', 'HiLo Mojo', 'HiLo Mojo'),
+    ('霓虹扑克', 'Side Bet City', '霓虹撲克', 'Poka Haukura', 'Neona Pokero'),
     ('加勒比梭哈扑克', 'Caribbean Stud Poker', '加勒比梭哈撲克', 'Poker Stud Karapīpiana', 'Karibia Stud-Pokero'),
     ('月亮梭哈扑克', 'Lunar Stud Poker', '月亮梭哈撲克', 'Poker Stud Marama', 'Luna Stud-Pokero'),
     ('四张牌扑克', 'Four Card Poker', '四張牌撲克', 'Poker Kāri Whā', 'Kvarkarta Pokero'),
@@ -66,8 +72,8 @@ _TRANSLATION_ROWS = [
     ('密西西比梭哈扑克', 'Mississippi Stud Poker', '密西西比梭哈撲克', 'Poker Stud Misisipi', 'Misisipa Stud-Pokero'),
     ('纵横交叉扑克', 'Criss Cross Poker', '縱橫交叉撲克', 'Poker Whakawhiti', 'Kruc-Pokero'),
     ('任逍遥扑克', 'Let It Ride Poker', '任逍遙撲克', 'Poker Let It Ride', 'Let It Ride-Pokero'),
-    ('单挑扑克', "Heads Up Hold'em", '單挑撲克', "Hold'em Kanohi-ki-te-kanohi", "Duopa Hold'em"),
     ('迷你终极德州扑克', "Mini Ultimate Texas Hold'em", '迷你終極德州撲克', "Texas Hold'em Whakamutunga Iti", "Mini Ultimate Texas Hold'em"),
+    ('德州奖金扑克', "Texas Hold'em Bonus Poker", '德州獎金撲克', "Texas Hold'em Bonus Poker", "Texas Hold'em Bonus Poker"),
     ('终极德州扑克', "Ultimate Texas Hold'em", '終極德州撲克', "Texas Hold'em Whakamutunga", "Ultimate Texas Hold'em"),
     ('终极奥马哈扑克', 'Ultimate Omaha', '終極奧馬哈撲克', 'Omaha Whakamutunga', 'Ultimate Omaha'),
     ('内外注', 'In or Out', '內外注', 'Ki Roto, Ki Waho rānei', 'Ene aŭ Ekstere'),
@@ -76,15 +82,20 @@ _TRANSLATION_ROWS = [
     ('终极三张牌扑克', 'Ultimate Three Card Poker', '終極三張牌撲克', 'Poker Kāri Toru Whakamutunga', 'Ultimate Trikarta Pokero'),
     ('赌场战争', 'Casino War', '賭場戰爭', 'Pakanga Whare Petipeti', 'Kazina Milito'),
     ('我爱同花', 'I Love Suits', '我愛同花', 'E Aroha Ana Au ki ngā Momo Kāri', 'Mi Amas Samkolorojn'),
+    ('最高13', 'Supreme13', '最高13', 'Supreme13', 'Supreme13'),
+    ('Po-Kar-Dette', 'Po-Kar-Dette', 'Po-Kar-Dette', 'Po-Kar-Dette', 'Po-Kar-Dette'),
     ('特殊百家乐', 'Special Baccarat', '特殊百家樂', 'Baccarat Motuhake', 'Speciala Bakarao'),
     ('龙虎斗', 'Dragon Tiger', '龍虎鬥', 'Tarakona me te Taika', 'Drako kaj Tigro'),
     ('龙虎凤', 'Dragon Tiger Phoenix', '龍虎鳳', 'Tarakona, Taika me te Manu Ahi', 'Drako Tigro Fenikso'),
     ('简单黑杰克', 'Easy Blackjack', '簡單黑傑克', 'Blackjack Māmā', 'Facila Nigra Joĉjo'),
     ('经典黑杰克', 'Classic Blackjack', '經典黑傑克', 'Blackjack Tauhira', 'Klasika Nigra Joĉjo'),
+    ('暗牌提示黑杰克', 'Blackjack Under Down', '暗牌提示黑傑克', 'Blackjack Tohu Kāri Huna', 'Nigra Joĉjo kun Kaŝkartaj Indikoj'),
     ('双副牌黑杰克', 'Double Deck Blackjack', '雙副牌黑傑克', 'Blackjack Pūkei Takirua', 'Du-Ferdeka Nigra Joĉjo'),
     ('永6 黑杰克', 'Always 6 Blackjack', '永6 黑傑克', 'Blackjack Ono Tonu', 'Ĉiam-6 Nigra Joĉjo'),
     ('西班牙式黑杰克', 'Spanish Blackjack', '西班牙式黑傑克', 'Blackjack Pāniora', 'Hispana Nigra Joĉjo'),
-    ('双向黑杰克', 'Breakout Blackjack', '雙向黑傑克', 'Blackjack Breakout', 'Breakout Nigra Joĉjo'),
+    ('有趣的黑杰克', 'Blackjack Fun Fun', '有趣的黑傑克', 'Blackjack Ngahau', 'Amuza Nigra Joĉjo'),
+    ('双向黑杰克', 'Premiere Blackjack', '雙向黑傑克', 'Blackjack Tuatahi', 'Premiero Nigra Joĉjo'),
+    ('交换黑杰克', 'Blackjack Switch', '交換黑傑克', 'Blackjack Whakawhiti', 'Interŝanĝa Nigra Joĉjo'),
     ('免费黑杰克', 'Free Blackjack', '免費黑傑克', 'Blackjack Koreutu', 'Senpaga Nigra Joĉjo'),
     ('免牌加倍黑杰克', 'No Card Double Blackjack', '免牌加倍黑傑克', 'Blackjack Whakarua Kāri-Kore', 'Senkarta Duobla Blackjack'),
     ('倍注黑杰克', 'Power Blackjack', '倍注黑傑克', 'Blackjack Mana', 'Potenca Nigra Joĉjo'),
@@ -102,6 +113,8 @@ _TRANSLATION_ROWS = [
     ('美式轮盘', 'American Roulette', '美式輪盤', 'Roulette Amerikana', 'Usona Ruleto'),
     ('欧式轮盘', 'European Roulette', '歐式輪盤', 'Roulette Ūropi', 'Eŭropa Ruleto'),
     ('大六之轮', 'Big Six Wheel', '大六之輪', 'Wīra Ono Nui', 'Granda Ses-Rado'),
+    ('美式落球轮盘', 'Plinko American', '美式落球輪盤', 'Plinko Amerikana', 'Usona Plinko'),
+    ('欧式落球轮盘', 'Plinko European', '歐式落球輪盤', 'Plinko Ūropi', 'Eŭropa Plinko'),
     ('温州牌九', 'Wenzhou Pai Gow', '溫州牌九', 'Pai Gow Wenzhou', 'Wenzhou Pai Gow'),
     ('经典牌九', 'Classic Pai Gow', '經典牌九', 'Pai Gow Tauhira', 'Klasika Pai Gow'),
     ('经典翻摊', 'Classic Fan Tan', '經典翻攤', 'Fan Tan Tauhira', 'Klasika Fan Tan'),
@@ -125,7 +138,7 @@ for _source, _en, _zh_tw, _mi, _eo in _TRANSLATION_ROWS:
     for _code, _text in zip(("en", "zh_TW", "mi", "eo"), (_en, _zh_tw, _mi, _eo)):
         _TRANSLATIONS[_code][_source] = _text
 
-_GAME_NAMES = ('百家乐', '黑杰克', '骰子', '对决', '轮盘赌', '地区特色', '中国', '菲律宾', '颜色骰子', '乒乓落球', '红白落球', '三张牌扑克', '三公', '视频扑克', '加勒比梭哈扑克', '月亮梭哈扑克', '四张牌扑克', '赌场扑克', 'DJ Wild梭哈扑克', '密西西比梭哈扑克', '纵横交叉扑克', '任逍遥扑克', '单挑扑克', '迷你终极德州扑克', '终极德州扑克', '终极奥马哈扑克', '内外注', '牌九扑克', '王牌五张扑克', '终极三张牌扑克', '赌场战争', '我爱同花', '特殊百家乐', '龙虎斗', '龙虎凤', '简单黑杰克', '经典黑杰克', '双副牌黑杰克', '永6 黑杰克', '西班牙式黑杰克', '双向黑杰克', '免费黑杰克', '免牌加倍黑杰克', '倍注黑杰克', '无限加倍黑杰克', '豪赢黑杰克', '闪电黑杰克', '投注叠堆黑杰克', '骰宝', '超级骰宝', '花旗骰', '骰子百家乐', '德州扑克双人对决', '梭哈扑克双人对决', '德州扑克彩票购买', '美式轮盘', '欧式轮盘', '大六之轮', '温州牌九', '经典牌九', '经典翻摊', '越南色碟')
+_GAME_NAMES = ('百家乐', '黑杰克', '骰子', '对决', '轮盘赌', '地区特色', '中国', '菲律宾', '颜色骰子', '乒乓落球', '红白落球', '三张牌扑克', '三公', '视频扑克', '高低', '高低Mojo', '加勒比梭哈扑克', '月亮梭哈扑克', '四张牌扑克', '赌场扑克', 'DJ Wild梭哈扑克', '密西西比梭哈扑克', '纵横交叉扑克', '任逍遥扑克', '迷你终极德州扑克', '德州奖金扑克', '终极德州扑克', '终极奥马哈扑克', '内外注', '牌九扑克', '王牌五张扑克', '终极三张牌扑克', '赌场战争', '我爱同花', '特殊百家乐', '龙虎斗', '龙虎凤', '简单黑杰克', '经典黑杰克', '暗牌提示黑杰克', '双副牌黑杰克', '永6 黑杰克', '西班牙式黑杰克', '有趣的黑杰克', '双向黑杰克', '交换黑杰克', '免费黑杰克', '免牌加倍黑杰克', '倍注黑杰克', '无限加倍黑杰克', '豪赢黑杰克', '闪电黑杰克', '投注叠堆黑杰克', '骰宝', '超级骰宝', '花旗骰', '骰子百家乐', '德州扑克双人对决', '梭哈扑克双人对决', '德州扑克彩票购买', '美式轮盘', '欧式轮盘', '大六之轮', '美式落球轮盘', '欧式落球轮盘', '温州牌九', '经典牌九', '经典翻摊', '越南色碟', '最高13', 'Po-Kar-Dette')
 _DYNAMIC_PHRASES = {'en': {'已启动：': 'Started: ',
         '已结束，余额已更新': ' finished; balance updated',
         '已关闭': ' closed',
@@ -236,118 +249,196 @@ def _ui_colour(master: tk.Misc, colour: str) -> str:
     return resolver(colour) if callable(resolver) else colour
 
 
-EMBEDDED_GAME_MODULES = {
-    "Casino_Games.Mississippi_Stud_Poker",
-    "Casino_Games.Criss_Cross_Poker",
-    "Casino_Games.Three_Card_Poker",
-    "Casino_Games.Ultimate_Omaha_Holdem",
-    "Casino_Games.Mini_Ultimate_Texas_Holdem",
-    "Casino_Games.Ultimate_Texas_Holdem",
-    "Casino_Games.Ultimate_Three_Card_Poker",
-    "Casino_Games.Video_Poker",
-    "Casino_Games.Wild_Five_Card_Poker",
-    "Casino_Games.Caribbean_Stud_Poker",
-    "Casino_Games.Casino_Holdem",
-    "Casino_Games.Casino_War",
-    "Casino_Games.DJ_Wild",
-    "Casino_Games.Four_Card_Poker",
-    "Casino_Games.Heads_Up_Holdem",
-    "Casino_Games.I_Love_Flush",
-    "Casino_Games.In_Or_Out",
-    "Casino_Games.Let_It_Ride",
-    "Casino_Games.Lunar_Poker",
-    "Casino_Games.Auto_Texas_Holdem",
-    "Casino_Games.Auto_Stud_Poker",
-    "Casino_Games.Craps",
-    "Casino_Games.Sicbo",
-    "Casino_Games.Sicbo_Super",
-    "Casino_Games.Baccarat",
-    "Casino_Games.Baccarat_Special",
-    "Casino_Games.Dragon_Tiger",
-    "Casino_Games.Blackjack_Easy",
-    "Casino_Games.Blackjack_Classic",
-    "Casino_Games.Blackjack_Spanish",
-    "Casino_Games.Blackjack_Double",
-    "Casino_Games.Blackjack_Free_Double",
-    "Casino_Games.Blackjack_Breakout",
-    "Casino_Games.Pai_Gow_Poker",
-    "Casino_Games.Texas_Holdem_Ticket",
-    "Casino_Games.Blackjack_Double_Up",
-    "Casino_Games.Blackjack_Double_Deck",
-    "Casino_Games.Wenzhou_Pai_Gow",
-    "Casino_Games.Classic_Pai_Gow",
-    "Casino_Games.Classic_Fan_Tan",
-    "Casino_Games.Blackjack_Lightning",
-    "Casino_Games.Blackjack_Easy",
-    "Casino_Games.Sangong",
-    "Casino_Games.Big_Six_Wheel",
-    "Casino_Games.Roulette_American",
-    "Casino_Games.Roulette_Europe",
-    "Casino_Games.Blackjack_Always6",
-    "Casino_Games.Blackjack_Power",
-    "Casino_Games.Blackjack_Bet_Stacker",
-    "Casino_Games.Color_Sicbo",
-    "Casino_Games.Hulog_Bola",
-    "Casino_Games.Pula_Puti",
-    "Casino_Games.Xóc_Dĩa",
-}
+def load_game_module(module_name: str):
+    """按需使用明确的 import，让打包工具能发现菜单中的全部游戏。"""
+    if module_name == 'Casino_Games.Three_Card_Poker':
+        from Casino_Games import Three_Card_Poker as module
+    elif module_name == 'Casino_Games.Ultimate_Three_Card_Poker':
+        from Casino_Games import Ultimate_Three_Card_Poker as module
+    elif module_name == 'Casino_Games.Mini_Ultimate_Texas_Holdem':
+        from Casino_Games import Mini_Ultimate_Texas_Holdem as module
+    elif module_name == 'Casino_Games.Sangong':
+        from Casino_Games import Sangong as module
+    elif module_name == 'Casino_Games.Texas_Holdem_Bonus_Poker':
+        from Casino_Games import Texas_Holdem_Bonus_Poker as module
+    elif module_name == 'Casino_Games.Ultimate_Texas_Holdem':
+        from Casino_Games import Ultimate_Texas_Holdem as module
+    elif module_name == 'Casino_Games.Ultimate_Omaha_Holdem':
+        from Casino_Games import Ultimate_Omaha_Holdem as module
+    elif module_name == 'Casino_Games.Casino_Holdem':
+        from Casino_Games import Casino_Holdem as module
+    elif module_name == 'Casino_Games.Caribbean_Stud_Poker':
+        from Casino_Games import Caribbean_Stud_Poker as module
+    elif module_name == 'Casino_Games.Lunar_Poker':
+        from Casino_Games import Lunar_Poker as module
+    elif module_name == 'Casino_Games.DJ_Wild':
+        from Casino_Games import DJ_Wild as module
+    elif module_name == 'Casino_Games.Mississippi_Stud_Poker':
+        from Casino_Games import Mississippi_Stud_Poker as module
+    elif module_name == 'Casino_Games.Let_It_Ride':
+        from Casino_Games import Let_It_Ride as module
+    elif module_name == 'Casino_Games.Wild_Five_Card_Poker':
+        from Casino_Games import Wild_Five_Card_Poker as module
+    elif module_name == 'Casino_Games.Four_Card_Poker':
+        from Casino_Games import Four_Card_Poker as module
+    elif module_name == 'Casino_Games.I_Love_Flush':
+        from Casino_Games import I_Love_Flush as module
+    elif module_name == 'Casino_Games.Criss_Cross_Poker':
+        from Casino_Games import Criss_Cross_Poker as module
+    elif module_name == 'Casino_Games.Video_Poker':
+        from Casino_Games import Video_Poker as module
+    elif module_name == 'Casino_Games.HiLo':
+        from Casino_Games import HiLo as module
+    elif module_name == 'Casino_Games.HiLo_Mojo':
+        from Casino_Games import HiLo_Mojo as module
+    elif module_name == 'Casino_Games.Side_Bet_City':
+        from Casino_Games import Side_Bet_City as module
+    elif module_name == 'Casino_Games.In_Or_Out':
+        from Casino_Games import In_Or_Out as module
+    elif module_name == 'Casino_Games.Pai_Gow_Poker':
+        from Casino_Games import Pai_Gow_Poker as module
+    elif module_name == 'Casino_Games.Casino_War':
+        from Casino_Games import Casino_War as module
+    elif module_name == 'Casino_Games.Supreme13':
+        from Casino_Games import Supreme13 as module
+    elif module_name == 'Casino_Games.Po_Kar_Dette':
+        from Casino_Games import Po_Kar_Dette as module
+    elif module_name == 'Casino_Games.Baccarat':
+        from Casino_Games import Baccarat as module
+    elif module_name == 'Casino_Games.Dragon_Tiger':
+        from Casino_Games import Dragon_Tiger as module
+    elif module_name == 'Casino_Games.Dragon_Tiger_Phoenix':
+        from Casino_Games import Dragon_Tiger_Phoenix as module
+    elif module_name == 'Casino_Games.Blackjack_Easy':
+        from Casino_Games import Blackjack_Easy as module
+    elif module_name == 'Casino_Games.Blackjack_Classic':
+        from Casino_Games import Blackjack_Classic as module
+    elif module_name == 'Casino_Games.Blackjack_Under_Down':
+        from Casino_Games import Blackjack_Under_Down as module
+    elif module_name == 'Casino_Games.Blackjack_Double_Deck':
+        from Casino_Games import Blackjack_Double_Deck as module
+    elif module_name == 'Casino_Games.Blackjack_Always6':
+        from Casino_Games import Blackjack_Always6 as module
+    elif module_name == 'Casino_Games.Blackjack_Spanish':
+        from Casino_Games import Blackjack_Spanish as module 
+    elif module_name == 'Casino_Games.Blackjack_Fun_Fun':
+        from Casino_Games import Blackjack_Fun_Fun as module
+    elif module_name == 'Casino_Games.Blackjack_Premiere':
+        from Casino_Games import Blackjack_Premiere as module
+    elif module_name == 'Casino_Games.Blackjack_Switch':
+        from Casino_Games import Blackjack_Switch as module
+    elif module_name == 'Casino_Games.Blackjack_Free_Double':
+        from Casino_Games import Blackjack_Free_Double as module
+    elif module_name == 'Casino_Games.Blackjack_Double_Up':
+        from Casino_Games import Blackjack_Double_Up as module
+    elif module_name == 'Casino_Games.Blackjack_Power':
+        from Casino_Games import Blackjack_Power as module
+    elif module_name == 'Casino_Games.Blackjack_Double':
+        from Casino_Games import Blackjack_Double as module
+    elif module_name == 'Casino_Games.Blackjack_Multiply':
+        from Casino_Games import Blackjack_Multiply as module
+    elif module_name == 'Casino_Games.Blackjack_Lightning':
+        from Casino_Games import Blackjack_Lightning as module
+    elif module_name == 'Casino_Games.Blackjack_Bet_Stacker':
+        from Casino_Games import Blackjack_Bet_Stacker as module
+    elif module_name == 'Casino_Games.Sicbo':
+        from Casino_Games import Sicbo as module
+    elif module_name == 'Casino_Games.Sicbo_Super':
+        from Casino_Games import Sicbo_Super as module
+    elif module_name == 'Casino_Games.Craps':
+        from Casino_Games import Craps as module
+    elif module_name == 'Casino_Games.BacBo':
+        from Casino_Games import BacBo as module
+    elif module_name == 'Casino_Games.Auto_Texas_Holdem':
+        from Casino_Games import Auto_Texas_Holdem as module
+    elif module_name == 'Casino_Games.Auto_Stud_Poker':
+        from Casino_Games import Auto_Stud_Poker as module
+    elif module_name == 'Casino_Games.Texas_Holdem_Ticket':
+        from Casino_Games import Texas_Holdem_Ticket as module
+    elif module_name == 'Casino_Games.Roulette_American':
+        from Casino_Games import Roulette_American as module
+    elif module_name == 'Casino_Games.Roulette_Europe':
+        from Casino_Games import Roulette_Europe as module
+    elif module_name == 'Casino_Games.Big_Six_Wheel':
+        from Casino_Games import Big_Six_Wheel as module
+    elif module_name == 'Casino_Games.Plinko_American':
+        from Casino_Games import Plinko_American as module
+    elif module_name == 'Casino_Games.Plinko_European':
+        from Casino_Games import Plinko_European as module
+    elif module_name == 'Casino_Games.Wenzhou_Pai_Gow':
+        from Casino_Games import Wenzhou_Pai_Gow as module
+    elif module_name == 'Casino_Games.Classic_Pai_Gow':
+        from Casino_Games import Classic_Pai_Gow as module
+    elif module_name == 'Casino_Games.Classic_Fan_Tan':
+        from Casino_Games import Classic_Fan_Tan as module
+    elif module_name == 'Casino_Games.Color_Sicbo':
+        from Casino_Games import Color_Sicbo as module
+    elif module_name == 'Casino_Games.Hulog_Bola':
+        from Casino_Games import Hulog_Bola as module
+    elif module_name == 'Casino_Games.Pula_Puti':
+        from Casino_Games import Pula_Puti as module
+    elif module_name == 'Casino_Games.Xóc_Dĩa':
+        from Casino_Games import Xóc_Dĩa as module
+    else:
+        raise ImportError(f"尚未登记游戏模块：{module_name}")
+    return module
 
 
-# Embedded blackjack pages that use the shared Tk root.  For these games the
-# window-manager X button is a page-level Back action to casino_games.
-CLOSE_RETURNS_TO_CASINO_MODULES = {
-    "Casino_Games.Blackjack_Easy",
-    "Casino_Games.Blackjack_Classic",
-    "Casino_Games.Blackjack_Spanish",
-    "Casino_Games.Blackjack_Double",
-    "Casino_Games.Blackjack_Free_Double",
-    "Casino_Games.Blackjack_Breakout",
-    "Casino_Games.Blackjack_Double_Up",
-    "Casino_Games.Blackjack_Double_Deck",
-    "Casino_Games.Blackjack_Lightning",
-    "Casino_Games.Blackjack_Always6",
-    "Casino_Games.Blackjack_Power",
-    "Casino_Games.Blackjack_Bet_Stacker",
-}
 
 GAME_SECTIONS = {
     "扑克": [
+        # 三张牌与迷你玩法。
         ("三张牌扑克", "Casino_Games.Three_Card_Poker", False),
-        ("三公", "Casino_Games.Sangong", False),
-        ("视频扑克", "Casino_Games.Video_Poker", False),
-        ("加勒比梭哈扑克", "Casino_Games.Caribbean_Stud_Poker", False),
-        ("月亮梭哈扑克", "Casino_Games.Lunar_Poker", False),
-        ("四张牌扑克", "Casino_Games.Four_Card_Poker", False),
-        ("赌场扑克", "Casino_Games.Casino_Holdem", False),
-        ("DJ Wild梭哈扑克", "Casino_Games.DJ_Wild", False),
-        ("密西西比梭哈扑克", "Casino_Games.Mississippi_Stud_Poker", False),
-        ("纵横交叉扑克", "Casino_Games.Criss_Cross_Poker", False),
-        ("任逍遥扑克", "Casino_Games.Let_It_Ride", False),
-        ("单挑扑克", "Casino_Games.Heads_Up_Holdem", False),
+        ("终极三张牌扑克", "Casino_Games.Ultimate_Three_Card_Poker", False),
         ("迷你终极德州扑克", "Casino_Games.Mini_Ultimate_Texas_Holdem", False),
+        ("三公", "Casino_Games.Sangong", False),
+
+        # 德州 / 奥马哈系列。
+        ("德州奖金扑克", "Casino_Games.Texas_Holdem_Bonus_Poker", False),
         ("终极德州扑克", "Casino_Games.Ultimate_Texas_Holdem", False),
         ("终极奥马哈扑克", "Casino_Games.Ultimate_Omaha_Holdem", False),
-        ("内外注", "Casino_Games.In_Or_Out", False),
-        ("牌九扑克", "Casino_Games.Pai_Gow_Poker", False),
+        ("赌场扑克", "Casino_Games.Casino_Holdem", False),
+
+        # 梭哈系列。
+        ("加勒比梭哈扑克", "Casino_Games.Caribbean_Stud_Poker", False),
+        ("月亮梭哈扑克", "Casino_Games.Lunar_Poker", False),
+        ("DJ Wild梭哈扑克", "Casino_Games.DJ_Wild", False),
+        ("密西西比梭哈扑克", "Casino_Games.Mississippi_Stud_Poker", False),
+        ("任逍遥扑克", "Casino_Games.Let_It_Ride", False),
         ("王牌五张扑克", "Casino_Games.Wild_Five_Card_Poker", False),
-        ("终极三张牌扑克", "Casino_Games.Ultimate_Three_Card_Poker", False),
-        ("赌场战争", "Casino_Games.Casino_War", False),
+
+        # 其他玩法按相近类型排列，供“全部”和“其他”共同使用。
+        ("四张牌扑克", "Casino_Games.Four_Card_Poker", False),
         ("我爱同花", "Casino_Games.I_Love_Flush", False),
+        ("纵横交叉扑克", "Casino_Games.Criss_Cross_Poker", False),
+
+        ("视频扑克", "Casino_Games.Video_Poker", False),
+        ("高低", "Casino_Games.HiLo", False),
+        ("高低Mojo", "Casino_Games.HiLo_Mojo", False),
+        ("霓虹扑克", "Casino_Games.Side_Bet_City", False),
+        ("内外注", "Casino_Games.In_Or_Out", False),
+
+        ("牌九扑克", "Casino_Games.Pai_Gow_Poker", False),
+        ("赌场战争", "Casino_Games.Casino_War", False),
+        ("最高13", "Casino_Games.Supreme13", False),
+        ("Po-Kar-Dette", "Casino_Games.Po_Kar_Dette", False),
     ],
     "百家乐": [
         ("百家乐", "Casino_Games.Baccarat", False),
-        ("特殊百家乐", "Casino_Games.Baccarat_Special", False),
         ("龙虎斗", "Casino_Games.Dragon_Tiger", False),
         ("龙虎凤", "Casino_Games.Dragon_Tiger_Phoenix", False),
     ],
     "黑杰克": [
         ("简单黑杰克", "Casino_Games.Blackjack_Easy", False),
         ("经典黑杰克", "Casino_Games.Blackjack_Classic", False),
+        ("暗牌提示黑杰克", "Casino_Games.Blackjack_Under_Down", False),
         ("双副牌黑杰克", "Casino_Games.Blackjack_Double_Deck", False),
 
         ("永6 黑杰克", "Casino_Games.Blackjack_Always6", False),
         ("西班牙式黑杰克", "Casino_Games.Blackjack_Spanish", False),
-        ("双向黑杰克", "Casino_Games.Blackjack_Breakout", False),
+        ("有趣的黑杰克", "Casino_Games.Blackjack_Fun_Fun", False),
+        ("双向黑杰克", "Casino_Games.Blackjack_Premiere", False),
+        ("交换黑杰克", "Casino_Games.Blackjack_Switch", False),
 
         ("免费黑杰克", "Casino_Games.Blackjack_Free_Double", False),
         ("免牌加倍黑杰克", "Casino_Games.Blackjack_Double_Up", False),
@@ -374,6 +465,8 @@ GAME_SECTIONS = {
         ("美式轮盘", "Casino_Games.Roulette_American", False),
         ("欧式轮盘", "Casino_Games.Roulette_Europe", False),
         ("大六之轮", "Casino_Games.Big_Six_Wheel", False),
+        ("美式落球轮盘", "Casino_Games.Plinko_American", False),
+        ("欧式落球轮盘", "Casino_Games.Plinko_European", False),
     ],
     "地区特色": [],
 }
@@ -393,6 +486,37 @@ REGION_SECTIONS = {
         ("越南色碟", "Casino_Games.Xóc_Dĩa", False),
     ],
 }
+
+
+_POKER_SERIES_MODULES = {
+    "三张牌": (
+        "Three_Card_Poker", "Ultimate_Three_Card_Poker",
+        "Mini_Ultimate_Texas_Holdem", "Sangong",
+    ),
+    "德州/奥马哈": (
+        "Texas_Holdem_Bonus_Poker", "Ultimate_Texas_Holdem", "Ultimate_Omaha_Holdem",
+        "Casino_Holdem",
+    ),
+    "梭哈": (
+        "Caribbean_Stud_Poker", "Lunar_Poker", "DJ_Wild",
+        "Mississippi_Stud_Poker", "Let_It_Ride", "Wild_Five_Card_Poker",
+    ),
+}
+# 系列可以交叉，并各自保留指定顺序；“全部”使用总列表的顺序。
+_POKER_GAMES_BY_MODULE = {
+    game[1].rsplit(".", 1)[-1]: game for game in GAME_SECTIONS["扑克"]
+}
+POKER_SECTIONS = {"全部": GAME_SECTIONS["扑克"]}
+POKER_SECTIONS.update({
+    series: [_POKER_GAMES_BY_MODULE[module] for module in modules]
+    for series, modules in _POKER_SERIES_MODULES.items()
+})
+# “其他”自动收纳未归入三个系列的游戏，并沿用总列表的顺序。
+_CLASSIFIED_POKER_MODULES = set().union(*_POKER_SERIES_MODULES.values())
+POKER_SECTIONS["其他"] = [
+    game for game in GAME_SECTIONS["扑克"]
+    if game[1].rsplit(".", 1)[-1] not in _CLASSIFIED_POKER_MODULES
+]
 
 
 def load_users() -> list:
@@ -455,54 +579,6 @@ def toggle_favorite(username: str, display_name: str, module_name: str) -> tuple
         save_users(users)
         return active, message
     return False, "找不到玩家资料，无法储存收藏。"
-
-
-def read_balance(username: str, fallback: float = 0.0) -> float:
-    for user in load_users():
-        if user.get("user_name") == username:
-            try:
-                return float(user.get("cash", fallback))
-            except (TypeError, ValueError):
-                return fallback
-    return fallback
-
-
-def child_run(module_name: str, result_file: str, balance_text: str, username: str) -> int:
-    """在全新的 Python 进程内运行一个旧式游戏模块。"""
-    result = {
-        "ok": False,
-        "balance": 0.0,
-        "error": "",
-    }
-
-    try:
-        balance = float(balance_text)
-        result["balance"] = balance
-
-        module = importlib.import_module(module_name)
-        game_main = getattr(module, "main", None)
-        if not callable(game_main):
-            raise AttributeError(f"{module_name} 没有可调用的 main(balance, user)")
-
-        returned_balance = game_main(balance, username)
-        if returned_balance is None:
-            # 某些游戏直接写 A_Tools/Account/saving_data.json，不返回余额。
-            returned_balance = read_balance(username, balance)
-
-        result["balance"] = float(returned_balance)
-        result["ok"] = True
-        update_balance(username, result["balance"])
-
-    except BaseException as exc:
-        result["error"] = f"{type(exc).__name__}: {exc}"
-
-    try:
-        with open(result_file, "w", encoding="utf-8") as file:
-            json.dump(result, file, ensure_ascii=False, indent=2)
-    except OSError:
-        pass
-
-    return 0 if result["ok"] else 1
 
 
 def add_paper_art_ribbon(parent: tk.Misc, background: str) -> tk.Canvas:
@@ -581,13 +657,10 @@ class CasinoGamesPage(tk.Frame):
         )
 
         self.current_category = "扑克"
-        self.process: Optional[subprocess.Popen] = None
-        self.result_file: Optional[str] = None
-        self.running_game_name = ""
-
+        self.current_poker_series = "全部"
+        self.poker_buttons: dict = {}
         self.current_region = "中国"
         self.region_buttons: dict = {}
-        self._region_tabs_visible = False
 
         self.balance_var = tk.StringVar()
         self.status_var = tk.StringVar(value=self._tr("请选择游戏"))
@@ -702,10 +775,16 @@ class CasinoGamesPage(tk.Frame):
             bg=self.BG,
             fg=self.TEXT,
         )
-        self.category_title.pack(anchor="w", pady=(0, 14))        
+        self.category_title.pack(anchor="w", pady=(0, 14))
 
+        self.poker_tabs_frame = tk.Frame(content, bg=self.BG)
+        self.poker_buttons = self._build_game_tabs(
+            self.poker_tabs_frame, POKER_SECTIONS, self._show_poker_games
+        )
         self.region_tabs_frame = tk.Frame(content, bg=self.BG)
-        self._build_region_tabs()
+        self.region_buttons = self._build_game_tabs(
+            self.region_tabs_frame, REGION_SECTIONS, self._show_region_games
+        )
 
         # 游戏列表使用 Canvas 承载，以便在当前分类内容过多时滚动。
         # 滚动条默认隐藏，只有当前分类的内容超过可视区域时才显示。
@@ -774,51 +853,47 @@ class CasinoGamesPage(tk.Frame):
             fg=self.MUTED,
         ).pack(side="left", padx=20)
 
-        self.running_label = tk.Label(
-            bottom,
-            text="",
-            font=("Microsoft YaHei UI", 10, "bold"),
-            bg=self.PANEL,
-            fg=self.GOLD,
-        )
-        self.running_label.pack(side="right", padx=20)
-
-    def _build_region_tabs(self) -> None:
-        """为“地区特色”分类建立中国 / 菲律宾 / 越南三个子页面按钮。"""
-        for widget in self.region_tabs_frame.winfo_children():
-            widget.destroy()
-
-        self.region_buttons = {}
-        for region in REGION_SECTIONS:
+    def _build_game_tabs(
+        self, frame: tk.Frame, sections: dict, callback: Callable[[str], None]
+    ) -> dict:
+        """为扑克系列和地区特色建立相同样式的子分类按钮。"""
+        buttons = {}
+        for column, name in enumerate(sections):
+            frame.grid_columnconfigure(column, weight=1, uniform="tabs")
             button = tk.Button(
-                self.region_tabs_frame,
-                text=self._tr(region),
-                command=lambda name=region: self._show_region_games(name),
+                frame,
+                text=self._tr(name),
+                command=lambda selected=name: callback(selected),
                 font=("Microsoft YaHei UI", 12, "bold"),
                 bg=self.PANEL_2,
                 fg=self.TEXT,
                 activebackground=self.HOVER,
                 activeforeground=self.GOLD,
                 relief="flat",
-                padx=26,
+                padx=12,
                 pady=9,
                 cursor="hand2",
+                wraplength=120,
             )
-            button.pack(side="left", padx=(0, 10))
-            self.region_buttons[region] = button
+            button.grid(row=0, column=column, sticky="ew", padx=(0, 8))
+            buttons[name] = button
+        return buttons
+
+    def _show_section_games(self, selected: str, sections: dict, buttons: dict) -> None:
+        for name, button in buttons.items():
+            button.config(
+                bg=self.PANEL_2 if name == selected else self.PANEL,
+                fg=self.GOLD if name == selected else self.TEXT,
+            )
+        self._render_games(sections[selected])
+
+    def _show_poker_games(self, series: str) -> None:
+        self.current_poker_series = series
+        self._show_section_games(series, POKER_SECTIONS, self.poker_buttons)
 
     def _show_region_games(self, region: str) -> None:
-        """切换地区特色内的中国 / 菲律宾 / 越南子页面。"""
-        if self.process is not None:
-            return
         self.current_region = region
-        for name, button in self.region_buttons.items():
-            selected = name == region
-            button.config(
-                bg=self.PANEL_2 if selected else self.PANEL,
-                fg=self.GOLD if selected else self.TEXT,
-            )
-        self._render_games(REGION_SECTIONS[region])
+        self._show_section_games(region, REGION_SECTIONS, self.region_buttons)
 
     def _on_games_frame_configure(self, event=None) -> None:
         """更新当前分类的实际滚动范围。"""
@@ -1149,9 +1224,6 @@ class CasinoGamesPage(tk.Frame):
             self._set_cursor_for_widget_tree(child, cursor)
 
     def show_category(self, category: str) -> None:
-        if self.process is not None:
-            return
-
         self.current_category = category
         self.category_title.config(text=self._tr(category))
 
@@ -1162,19 +1234,19 @@ class CasinoGamesPage(tk.Frame):
                 fg=self.GOLD if selected else self.TEXT,
             )
 
-        if category == "地区特色":
-            # 显示中国 / 菲律宾 / 越南三个按钮（放在游戏网格上方）
-            if not self._region_tabs_visible:
-                self.region_tabs_frame.pack(
-                    fill="x", pady=(0, 12), before=self.games_container
-                )
-                self._region_tabs_visible = True
+        self.poker_tabs_frame.pack_forget()
+        self.region_tabs_frame.pack_forget()
+        if category == "扑克":
+            self.poker_tabs_frame.pack(
+                fill="x", pady=(0, 12), before=self.games_container
+            )
+            self._show_poker_games(self.current_poker_series)
+        elif category == "地区特色":
+            self.region_tabs_frame.pack(
+                fill="x", pady=(0, 12), before=self.games_container
+            )
             self._show_region_games(self.current_region)
         else:
-            # 隐藏地区按钮，按常规分类渲染游戏
-            if self._region_tabs_visible:
-                self.region_tabs_frame.pack_forget()
-                self._region_tabs_visible = False
             self._render_games(GAME_SECTIONS[category])
 
     def _render_games(self, games: list) -> None:
@@ -1364,15 +1436,6 @@ class CasinoGamesPage(tk.Frame):
         # 所有卡片创建完成后，只按当前分类重新计算滚动条。
         self._schedule_scrollbar_update()
 
-    def _replace_root_page(self, page: tk.Widget) -> None:
-        """使用 index.py 的 replace_page() 在同一个 Tk 窗口内切换页面。"""
-        replace_page = getattr(self.master, "replace_page", None)
-        if not callable(replace_page):
-            raise RuntimeError(
-                "父窗口没有 replace_page(page) 方法，无法切换页面。"
-            )
-        replace_page(page)
-
     def launch_embedded_game(
         self,
         display_name: str,
@@ -1380,12 +1443,16 @@ class CasinoGamesPage(tk.Frame):
     ) -> None:
         """在 index.py 的同一个根窗口内打开已转换为 Frame 的游戏。"""
         try:
-            module = importlib.import_module(module_name)
+            master = self.master
+            replace_page = getattr(master, "replace_page", None)
+            if not callable(replace_page):
+                raise RuntimeError("父窗口没有 replace_page(page) 方法，无法切换页面。")
+
+            module = load_game_module(module_name)
             game_main = getattr(module, "main", None)
             if not callable(game_main):
                 raise AttributeError(f"{module_name} 没有可调用的 main()")
 
-            master = self.master
             username = self.username
             parent_back = self.on_back
             balance_callback = self.on_balance_change
@@ -1393,18 +1460,43 @@ class CasinoGamesPage(tk.Frame):
             preferences_callback = self.on_preferences
             category = self.current_category
             region = self.current_region
+            poker_series = self.current_poker_series
+            latest_balance = self.balance
+            game_page = None
 
             returned_to_casino = False
+            is_blackjack = module_name.rsplit(".", 1)[-1].startswith("Blackjack_")
+            window = master.winfo_toplevel()
+            previous_close_command = window.protocol("WM_DELETE_WINDOW")
+            game_close_command = None
 
-            def return_to_casino(final_balance: float) -> None:
+            def track_game_balance(new_balance: float) -> None:
+                nonlocal latest_balance
+                latest_balance = float(new_balance)
+                if callable(balance_callback):
+                    balance_callback(latest_balance)
+
+            def return_to_casino(final_balance: Optional[float] = None) -> None:
                 # 同一个关闭动作只允许执行一次，避免 WM_DELETE_WINDOW、Escape
                 # 或游戏内部返回按钮在同一时刻重复触发 replace_page()。
                 nonlocal returned_to_casino
                 if returned_to_casino:
                     return
-                returned_to_casino = True
 
-                new_balance = float(final_balance)
+                # 黑杰克的窗口关闭入口可能不传余额；优先读取游戏当前余额，
+                # 没有可用值时使用最后一次余额回调，兼容体验账号。
+                if final_balance is None:
+                    final_balance = getattr(game_page, "balance", latest_balance)
+                    try:
+                        if isinstance(final_balance, tk.Variable):
+                            final_balance = final_balance.get()
+                        new_balance = float(final_balance)
+                    except (TypeError, ValueError, tk.TclError):
+                        new_balance = latest_balance
+                else:
+                    new_balance = float(final_balance)
+
+                returned_to_casino = True
                 update_balance(username, new_balance)
 
                 if callable(balance_callback):
@@ -1420,11 +1512,11 @@ class CasinoGamesPage(tk.Frame):
                     language=language,
                 )
                 new_page.current_region = region
-                if new_page.current_category != category:
-                    new_page.show_category(category)
-                replace_page = getattr(master, "replace_page", None)
-                if not callable(replace_page):
-                    raise RuntimeError("父窗口没有 replace_page(page) 方法。")
+                new_page.current_poker_series = poker_series
+                new_page.show_category(category)
+                if game_close_command is not None:
+                    window.protocol("WM_DELETE_WINDOW", previous_close_command)
+                    window.deletecommand(game_close_command)
                 replace_page(new_page)
 
             game_kwargs = {
@@ -1432,13 +1524,8 @@ class CasinoGamesPage(tk.Frame):
                 "balance": self.balance,
                 "user": username,
                 "on_back": return_to_casino,
-                "on_balance_change": balance_callback,
+                "on_balance_change": track_game_balance,
             }
-
-            # 这些 Blackjack 模块从 casino_games 进入时，右上角 X
-            # 被解释为“返回赌场游戏中心”，而不是关闭整个 Tk 根窗口。
-            if module_name in CLOSE_RETURNS_TO_CASINO_MODULES:
-                game_kwargs["close_returns_to_parent"] = True
 
             game_page = game_main(**game_kwargs)
 
@@ -1447,21 +1534,14 @@ class CasinoGamesPage(tk.Frame):
                     f"{module_name}.main() 必须返回一个 Tkinter Widget/Frame。"
                 )
 
-            self._replace_root_page(game_page)
-
-            # Install the shared-root close protocol only AFTER replace_page().
-            # This prevents index.py from overwriting WM_DELETE_WINDOW during the swap.
-            if module_name in CLOSE_RETURNS_TO_CASINO_MODULES:
-                install_close = getattr(game_page, "_install_embedded_close_handler", None)
-                if callable(install_close):
-                    install_close()
-
-                    # Re-assert once when Tk becomes idle.  This catches hosts that
-                    # defer their own window-protocol setup until after replace_page().
-                    try:
-                        master.after_idle(lambda: install_close(force=True))
-                    except tk.TclError:
-                        pass
+            if is_blackjack:
+                # 让父窗口的页面关闭入口与游戏返回按钮使用同一个回调。
+                game_page.on_close = return_to_casino
+            replace_page(game_page)
+            if is_blackjack:
+                # 某些黑杰克仍注册了旧的根窗口关闭动作；覆盖为返回原 parent。
+                window.protocol("WM_DELETE_WINDOW", return_to_casino)
+                game_close_command = window.protocol("WM_DELETE_WINDOW")
 
         except Exception as exc:
             messagebox.showerror(
@@ -1492,158 +1572,10 @@ class CasinoGamesPage(tk.Frame):
             )
             return
 
-        # 已转换为 tk.Frame 的游戏直接在 index.py 当前窗口中打开。
-        if module_name in EMBEDDED_GAME_MODULES:
-            self.launch_embedded_game(display_name, module_name)
-            return
-
-        # 其他尚未转换的旧游戏继续使用原来的独立子进程方式。
-        if self.process is not None:
-            return
-
-        import tempfile
-
-        handle, result_file = tempfile.mkstemp(prefix="casino_result_", suffix=".json")
-        os.close(handle)
-        try:
-            os.remove(result_file)
-        except OSError:
-            pass
-
-        command = [
-            sys.executable,
-            os.path.abspath(__file__),
-            "--child",
-            module_name,
-            result_file,
-            str(self.balance),
-            self.username,
-        ]
-
-        try:
-            creationflags = 0
-            if os.name == "nt":
-                # 不额外弹出黑色命令行窗口。
-                creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-            self.process = subprocess.Popen(
-                command,
-                cwd=PROJECT_DIR,
-                creationflags=creationflags,
-            )
-        except OSError as exc:
-            messagebox.showerror(self._tr("启动失败"), self._tr(str(exc)), parent=self)
-            self.process = None
-            return
-
-        self.result_file = result_file
-        self.running_game_name = display_name
-        self.status_var.set(self._tr(f"已启动：{display_name}"))
-        self.running_label.config(text=self._tr("游戏运行中…"))
-        self._set_controls_enabled(False)
-
-        # 主窗口保留在同一进程，但暂时最小化，子游戏完全独立。
-        self.winfo_toplevel().iconify()
-        self.after(300, self._poll_game_process)
-
-    def _poll_game_process(self) -> None:
-        if self.process is None:
-            return
-
-        if self.process.poll() is None:
-            self.after(300, self._poll_game_process)
-            return
-
-        self.winfo_toplevel().deiconify()
-        self.winfo_toplevel().lift()
-
-        result = None
-        if self.result_file and os.path.exists(self.result_file):
-            try:
-                with open(self.result_file, "r", encoding="utf-8") as file:
-                    result = json.load(file)
-            except (OSError, json.JSONDecodeError):
-                result = None
-
-        if self.result_file:
-            try:
-                os.remove(self.result_file)
-            except OSError:
-                pass
-
-        old_name = self.running_game_name
-        self.process = None
-        self.result_file = None
-        self.running_game_name = ""
-        self.running_label.config(text="")
-        self._set_controls_enabled(True)
-
-        if result and result.get("ok"):
-            try:
-                self.balance = float(result["balance"])
-            except (TypeError, ValueError, KeyError):
-                self.balance = read_balance(self.username, self.balance)
-            update_balance(self.username, self.balance)
-            self._refresh_balance_label()
-            if self.on_balance_change:
-                self.on_balance_change(self.balance)
-            self.status_var.set(self._tr(f"{old_name} 已结束，余额已更新"))
-        else:
-            # 即使游戏异常退出，也重新读取存档，避免丢失已写入的余额。
-            self.balance = read_balance(self.username, self.balance)
-            self._refresh_balance_label()
-            if self.on_balance_change:
-                self.on_balance_change(self.balance)
-
-            error = ""
-            if isinstance(result, dict):
-                error = str(result.get("error", ""))
-            self.status_var.set(self._tr(f"{old_name} 已关闭"))
-            if error:
-                messagebox.showerror(
-                    self._tr("游戏运行出错"),
-                    self._tr('{name} 未正常结束：\n\n{error}').format(name=self._tr(old_name), error=error),
-                    parent=self,
-                )
-
-    def _set_controls_enabled(self, enabled: bool) -> None:
-        state = "normal" if enabled else "disabled"
-
-        for button in self.category_buttons.values():
-            button.config(state=state)
-
-        for card_info in self.game_cards:
-            card = card_info["card"]
-            maintenance = card_info["maintenance"]
-
-            if maintenance:
-                continue
-
-            cursor = "hand2" if enabled else "arrow"
-            try:
-                card.config(cursor=cursor)
-            except tk.TclError:
-                continue
-
-            for child in card.winfo_children():
-                try:
-                    child.config(cursor=cursor)
-                except tk.TclError:
-                    pass
-                for grandchild in child.winfo_children():
-                    try:
-                        grandchild.config(cursor=cursor)
-                    except tk.TclError:
-                        pass
+        # 全部游戏都支持 parent/on_back 接口，统一在当前窗口中打开。
+        self.launch_embedded_game(display_name, module_name)
 
     def back_to_main(self) -> None:
-        if self.process is not None:
-            messagebox.showwarning(
-                self._tr("游戏运行中"),
-                self._tr("请先关闭当前运行中的游戏。"),
-                parent=self,
-            )
-            return
         self.on_back(self.balance)
 
     on_close = back_to_main
@@ -1675,16 +1607,6 @@ def main(
 
 
 if __name__ == "__main__":
-    if len(sys.argv) >= 6 and sys.argv[1] == "--child":
-        raise SystemExit(
-            child_run(
-                module_name=sys.argv[2],
-                result_file=sys.argv[3],
-                balance_text=sys.argv[4],
-                username=sys.argv[5],
-            )
-        )
-
     root = tk.Tk()
     root.withdraw()
     messagebox.showinfo(

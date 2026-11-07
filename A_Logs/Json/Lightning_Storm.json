@@ -1,0 +1,1046 @@
+{
+    "Total": 139,
+    "Cash": 79,
+    "Number": 60,
+    "Special": 0,
+    "Record1": {
+        "01_Data": {
+            "result": "9",
+            "color": "number"
+        },
+        "02_Data": {
+            "result": "11",
+            "color": "number"
+        },
+        "03_Data": {
+            "result": "12",
+            "color": "number"
+        },
+        "04_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "05_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "06_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "07_Data": {
+            "result": "5",
+            "color": "number"
+        },
+        "08_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "09_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "10_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "11_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "12_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "13_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "14_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "15_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "16_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "17_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "18_Data": {
+            "result": "18",
+            "color": "number"
+        },
+        "19_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "20_Data": {
+            "result": "18",
+            "color": "number"
+        },
+        "21_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "22_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "23_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "24_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "25_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "26_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "27_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "28_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "29_Data": {
+            "result": "14",
+            "color": "number"
+        },
+        "30_Data": {
+            "result": "6",
+            "color": "number"
+        },
+        "31_Data": {
+            "result": "9",
+            "color": "number"
+        },
+        "32_Data": {
+            "result": "8",
+            "color": "number"
+        },
+        "33_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "34_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "35_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "36_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "37_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "38_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "39_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "40_Data": {
+            "result": "13",
+            "color": "number"
+        },
+        "41_Data": {
+            "result": "5",
+            "color": "number"
+        },
+        "42_Data": {
+            "result": "14",
+            "color": "number"
+        },
+        "43_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "44_Data": {
+            "result": "9",
+            "color": "number"
+        },
+        "45_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "46_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "47_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "48_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "49_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "50_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "51_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "52_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "53_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "54_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "55_Data": {
+            "result": "14",
+            "color": "number"
+        },
+        "56_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "57_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "58_Data": {
+            "result": "3",
+            "color": "number"
+        },
+        "59_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "60_Data": {
+            "result": "15",
+            "color": "number"
+        },
+        "61_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "62_Data": {
+            "result": "18",
+            "color": "number"
+        },
+        "63_Data": {
+            "result": "5",
+            "color": "number"
+        },
+        "64_Data": {
+            "result": "4",
+            "color": "number"
+        },
+        "65_Data": {
+            "result": "15",
+            "color": "number"
+        },
+        "66_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "67_Data": {
+            "result": "2",
+            "color": "number"
+        },
+        "68_Data": {
+            "result": "8",
+            "color": "number"
+        },
+        "69_Data": {
+            "result": "2",
+            "color": "number"
+        },
+        "70_Data": {
+            "result": "20",
+            "color": "number"
+        },
+        "71_Data": {
+            "result": "9",
+            "color": "number"
+        },
+        "72_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "73_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "74_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "75_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "76_Data": {
+            "result": "3",
+            "color": "number"
+        },
+        "77_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "78_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "79_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "80_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "81_Data": {
+            "result": "10",
+            "color": "number"
+        },
+        "82_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "83_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "84_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "85_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "86_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "87_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "88_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "89_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "90_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "91_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "92_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "93_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "94_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "95_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "96_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "97_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "98_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "99_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "100_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "101_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "102_Data": {
+            "result": "14",
+            "color": "number"
+        },
+        "103_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "104_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "105_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "106_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "107_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "108_Data": {
+            "result": "19",
+            "color": "number"
+        },
+        "109_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "110_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "111_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "112_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "113_Data": {
+            "result": "15",
+            "color": "number"
+        },
+        "114_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "115_Data": {
+            "result": "19",
+            "color": "number"
+        },
+        "116_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "117_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "118_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "119_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "120_Data": {
+            "result": "19",
+            "color": "number"
+        }
+    },
+    "Record2": {
+        "01_Data": {
+            "result": "9",
+            "color": "number"
+        },
+        "02_Data": {
+            "result": "11",
+            "color": "number"
+        },
+        "03_Data": {
+            "result": "12",
+            "color": "number"
+        },
+        "04_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "05_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "06_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "07_Data": {
+            "result": "5",
+            "color": "number"
+        },
+        "08_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "09_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "10_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "11_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "12_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "13_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "14_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "15_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "16_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "17_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "18_Data": {
+            "result": "18",
+            "color": "number"
+        },
+        "19_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "20_Data": {
+            "result": "18",
+            "color": "number"
+        },
+        "21_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "22_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "23_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "24_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "25_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "26_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "27_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "28_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "29_Data": {
+            "result": "14",
+            "color": "number"
+        },
+        "30_Data": {
+            "result": "6",
+            "color": "number"
+        },
+        "31_Data": {
+            "result": "9",
+            "color": "number"
+        },
+        "32_Data": {
+            "result": "8",
+            "color": "number"
+        },
+        "33_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "34_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "35_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "36_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "37_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "38_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "39_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "40_Data": {
+            "result": "13",
+            "color": "number"
+        },
+        "41_Data": {
+            "result": "5",
+            "color": "number"
+        },
+        "42_Data": {
+            "result": "14",
+            "color": "number"
+        },
+        "43_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "44_Data": {
+            "result": "9",
+            "color": "number"
+        },
+        "45_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "46_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "47_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "48_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "49_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "50_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "51_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "52_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "53_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "54_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "55_Data": {
+            "result": "14",
+            "color": "number"
+        },
+        "56_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "57_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "58_Data": {
+            "result": "3",
+            "color": "number"
+        },
+        "59_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "60_Data": {
+            "result": "15",
+            "color": "number"
+        },
+        "61_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "62_Data": {
+            "result": "18",
+            "color": "number"
+        },
+        "63_Data": {
+            "result": "5",
+            "color": "number"
+        },
+        "64_Data": {
+            "result": "4",
+            "color": "number"
+        },
+        "65_Data": {
+            "result": "15",
+            "color": "number"
+        },
+        "66_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "67_Data": {
+            "result": "2",
+            "color": "number"
+        },
+        "68_Data": {
+            "result": "8",
+            "color": "number"
+        },
+        "69_Data": {
+            "result": "2",
+            "color": "number"
+        },
+        "70_Data": {
+            "result": "20",
+            "color": "number"
+        },
+        "71_Data": {
+            "result": "9",
+            "color": "number"
+        },
+        "72_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "73_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "74_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "75_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "76_Data": {
+            "result": "3",
+            "color": "number"
+        },
+        "77_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "78_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "79_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "80_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "81_Data": {
+            "result": "10",
+            "color": "number"
+        },
+        "82_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "83_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "84_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "85_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "86_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "87_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "88_Data": {
+            "result": "1",
+            "color": "number"
+        },
+        "89_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "90_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "91_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "92_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "93_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "94_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "95_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "96_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "97_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "98_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "99_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "100_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "101_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "102_Data": {
+            "result": "14",
+            "color": "number"
+        },
+        "103_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "104_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "105_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "106_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "107_Data": {
+            "result": "16",
+            "color": "number"
+        },
+        "108_Data": {
+            "result": "19",
+            "color": "number"
+        },
+        "109_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "110_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "111_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "112_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "113_Data": {
+            "result": "15",
+            "color": "number"
+        },
+        "114_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "115_Data": {
+            "result": "19",
+            "color": "number"
+        },
+        "116_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "117_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "118_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "119_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "120_Data": {
+            "result": "19",
+            "color": "number"
+        },
+        "121_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "122_Data": {
+            "result": "12",
+            "color": "number"
+        },
+        "123_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "124_Data": {
+            "result": "18",
+            "color": "number"
+        },
+        "125_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "126_Data": {
+            "result": "7",
+            "color": "number"
+        },
+        "127_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "128_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "129_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "130_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "131_Data": {
+            "result": "11",
+            "color": "number"
+        },
+        "132_Data": {
+            "result": "13",
+            "color": "number"
+        },
+        "133_Data": {
+            "result": "17",
+            "color": "number"
+        },
+        "134_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "135_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "136_Data": {
+            "result": "💵",
+            "color": "cash"
+        },
+        "137_Data": {
+            "result": "4",
+            "color": "number"
+        },
+        "138_Data": {
+            "result": "5",
+            "color": "number"
+        },
+        "139_Data": {
+            "result": "1",
+            "color": "number"
+        }
+    }
+}

@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "shoe": {
+    "mode": "CSM",
+    "decks": 8,
+    "chambers": 15,
+    "game_id": "FunFunBlackjack:local:dc6e7ccefe2b4ec78e119cc3ee43895d"
+  }
+}

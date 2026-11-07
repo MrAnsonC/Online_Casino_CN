@@ -1431,87 +1431,280 @@ class ClassicFanTanGUI(tk.Frame):
         # not permanent green/red borders. Push never flashes.
 
     def show_detailed_rules(self):
-        """Open a concise, current description of this implementation."""
-        win = tk.Toplevel(self)
-        win.title('经典番摊 — 游戏说明')
-        win.geometry('900x700+120+30')
-        win.resizable(False, False)
-        win.configure(bg='#efe7d4')
+        """按原版卡片式布局显示本游戏的图解说明。"""
+        import tkinter as tk
+        import tkinter.font as tkfont
+        import math
 
-        frame = tk.Frame(win, bg='#efe7d4')
-        frame.pack(fill='both', expand=True, padx=10, pady=10)
-        scrollbar = tk.Scrollbar(frame)
-        scrollbar.pack(side='right', fill='y')
-        text = tk.Text(
-            frame, wrap='word', yscrollcommand=scrollbar.set,
-            font=('Microsoft YaHei', 11), bg='#fffaf0', fg='#22180f',
-            padx=18, pady=16, spacing1=2, spacing3=6,
-        )
-        text.pack(side='left', fill='both', expand=True)
-        scrollbar.config(command=text.yview)
+        owner = self if isinstance(self, tk.Misc) else self.root
+        parent = owner.winfo_toplevel()
+        current = getattr(self, '_game_instruction_dialog', None)
+        if current is not None:
+            try:
+                if current.winfo_exists():
+                    current.lift()
+                    current.focus_force()
+                    return
+            except tk.TclError:
+                pass
+        dialog = tk.Toplevel(parent)
+        self._game_instruction_dialog = dialog
+        dialog.title('经典番摊 · 完整图解玩法')
+        dialog.configure(bg='#faf5e8')
+        dialog.resizable(False, False)
+        dialog.transient(parent)
+        width, height = 1000, 670
+        parent.update_idletasks()
+        px, py = parent.winfo_rootx(), parent.winfo_rooty()
+        pw, ph = max(1, parent.winfo_width()), max(1, parent.winfo_height())
+        dialog.geometry(f'{width}x{height}+{max(0, px + (pw-width)//2)}+{max(0, py + (ph-height)//2)}')
 
-        rules = """
-    经典番摊 — 游戏说明
-    ========================================
+        manual_pages = [('玩法',
+          '开摊后用碗内白钮数量除以 4 的余数判定 1–4。',
+          [('结果如何产生',
+            '',
+            [('白钮与盖碗', '每局铺 400 颗白钮；碗移动并停稳后，固定碗内白钮。\n碗外白钮推出后，数钮动画每次移走 4 颗。'),
+             ('余数', '碗内白钮总数除以 4：余数 1／2／3 对应同号；整除对应 4。\n本局结果由实际碗内数量决定。')],
+            []),
+           ('一局流程', '', [('下注与开摊', '碗停稳后选择筹码下注；待碗外白钮推出，按“开摊”或 Enter 数钮。\n结算后按“再来一局”或 Enter。')], []),
+           ('四颗一组的数钮示意', '', [], [])]),
+         ('简易版',
+          '简易版共八类下注区。\n以下赔率为净赢赔率。',
+          [('指定号码与两侧',
+            '',
+            [],
+            [('下注条件',
+              ['下注', '中奖结果', '净赢赔率'],
+              [['1 / 2 / 3 / 4', '押中所选余数', '2.85:1'],
+               ['小 / 大', '1、2 / 3、4', '0.95:1'],
+               ['单 / 双', '1、3 / 2、4', '0.95:1']])]),
+           ('限额', '', [('简易版', '每格最低 $10、最高 $50,000；全台下注上限 $200,000。')], [])]),
+         ('原版',
+          '保留番、小大单双，并增加念、角、三门。',
+          [('原版下注',
+            '',
+            [],
+            [('条件与赔率',
+              ['项目', '获胜 / 和局条件', '净赢赔率'],
+              [['番 1–4', '押中指定号码', '2.85:1'],
+               ['念 a 念 b', '开 a 赢；开 b 退本金', '1.90:1'],
+               ['角 a-b', '两个标示号码任一开出', '0.95:1'],
+               ['三门 a-b-c', '三个标示号码任一开出', '0.316667:1'],
+               ['小 / 大 / 单 / 双', '按简易版条件', '0.95:1']])]),
+           ('限额',
+            '',
+            [('原版', '每格最低 $10；念、角、三门及小大单双最高 $10,000；番 1–4 最高 $50,000；全台最高 $300,000。')],
+            [])]),
+         ('操作 & 结算',
+          '中奖、和局与未中奖分别处理。',
+          [('桌面操作',
+            '',
+            [('筹码与撤销', '选筹码后左键点击下注格。\n右键清空该格；“清除”撤回本局全部下注；“重复上局下注”按版式和余额恢复。\n已有下注时不能切换简易版／原版。')],
+            []),
+           ('金额与历史',
+            '',
+            [('返还', '中奖返还本金加净赢金额；“念”中的和局仅退本金，输注不返还。\n最近 20 局按新到旧显示；历史比例可选 50／100／250／500／1000 局。')],
+            [])]),
+         ('结算示例',
+          '返还包含本金；净盈亏须扣除全部下注。',
+          [('金额计算',
+            '',
+            [('番与念',
+              '番 1 下注 $10，开 1 时返还 $38.50。\n'
+              '“1 念 2”下注 $10：开 1 返还 $29；开 2 退回 $10。\n'
+              '“1 念 2”遇到 3 或 4，不返还。'),
+             ('和局显示',
+              '“念”的和局只退本金，不进行中奖闪烁。\n'
+              '“上局获胜”显示实际返还，包含中奖本金、奖金及和局退回。\n'
+              '三门按净赢赔率 0.316667:1 计算，金额四舍五入到分。')],
+            [])])]
 
-    一、本局结果怎样产生
-    • 每局先在浅蓝色开摊区生成 400 颗白钮。
-    • 白钮直径 12px；初始摆放允许轻微重叠，但两颗白钮最多重叠其直径的 25%。
-    • 直径 100px 的碗落下后，会作数次短距离移动；碗真正停下后才固定碗内白钮。
-    • 本局结果不是另外抽取：程序直接计算“实际碗内白钮数量 ÷ 4”的余数。
-    • 余数 1 / 2 / 3 对应结果 1 / 2 / 3；能被 4 整除时，结果为 4。
+        illustration_cards = {'四颗一组的数钮示意': 'beads'}
 
-    二、一局的完整流程
-    1. 铺钮：400 颗白钮随机放入浅蓝色区域。
-    2. 盖碗：碗落下并随机移动，停止后固定碗内范围。
-    3. 开放下注：玩家可以下注；与此同时，碗外白钮会整体向右推出，并避开碗。
-    4. 开摊：碗外白钮全部推出后，按【开摊】或 Enter。
-    5. 数钮：竹棒从指定侧最外围开始，每次处理 4 颗。竹棒先靠近，接触前白钮不动；接触后才推动白钮，并保持移动中的白钮不重叠。
-    6. 最后余下 1–4 颗后确定结果并结算。
-    7. 结算完成后，可按【再来一局】或 Enter 开始下一局。
+        BG = '#faf5e8'
+        HEADER = '#f1e7cd'
+        SIDEBAR = '#f2e8d0'
+        PANEL = '#fffdf7'
+        PANEL_2 = '#f5ecd6'
+        BORDER = '#c9b88a'
+        GOLD = '#a8842c'
+        GOLD_BAR = '#e7d36c'
+        TEXT = '#3a2f1e'
+        MUTED = '#7a6a50'
+        font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
+        header = tk.Frame(dialog, bg=HEADER, height=76)
+        header.pack(fill=tk.X, side=tk.TOP)
+        header.pack_propagate(False)
+        tk.Label(header, text='经典番摊 · 完整图解玩法', font=(font_name, 20, 'bold'),
+                 fg=GOLD, bg=HEADER, anchor='w', wraplength=795,
+                 justify=tk.LEFT).place(x=24, y=6, width=795, height=41)
+        tk.Label(header, text='玩法 · 下注 · 派奖 · 图解 · 结算示例',
+                 font=(font_name, 14), fg=MUTED, bg=HEADER, anchor='w').place(x=26, y=46)
+        def close_dialog():
+            try:
+                self._game_instruction_dialog = None
+            except Exception:
+                pass
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
+        tk.Button(header, text='关闭  ESC', command=close_dialog,
+                  font=(font_name, 14, 'bold'), bg='#e8dcc0', fg=TEXT,
+                  activebackground='#d9c895', relief=tk.FLAT, bd=0,
+                  cursor='hand2').place(x=850, y=17, width=120, height=42)
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X, side=tk.TOP)
+        body = tk.Frame(dialog, bg=BG)
+        body.pack(fill=tk.BOTH, expand=True)
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=205)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+        tk.Label(sidebar, text='说明目录', font=(font_name, 16, 'bold'),
+                 fg=GOLD, bg=SIDEBAR, anchor='w').pack(fill=tk.X, padx=18, pady=(17, 10))
+        scroll_host = tk.Frame(body, bg=BG)
+        scroll_host.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(scroll_host, bg=BG, highlightthickness=0, bd=0, yscrollincrement=36)
+        scrollbar = tk.Scrollbar(scroll_host, orient=tk.VERTICAL, command=canvas.yview,
+                                 bg='#ded3b7', troughcolor=BG, activebackground=GOLD_BAR,
+                                 relief=tk.FLAT, bd=0, width=13)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=10)
+        content = tk.Frame(canvas, bg=BG)
+        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
+        def sync_scrollregion(_event=None):
+            canvas.configure(scrollregion=canvas.bbox('all'))
+        def fit_content_width(event):
+            canvas.itemconfigure(content_window, width=event.width)
+        content.bind('<Configure>', sync_scrollregion)
+        canvas.bind('<Configure>', fit_content_width)
+        def add_rule(parent_frame, title, detail):
+            row = tk.Frame(parent_frame, bg=PANEL)
+            row.pack(fill=tk.X, padx=16, pady=5)
+            tk.Frame(row, bg=GOLD_BAR, width=5).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 11))
+            text_box = tk.Frame(row, bg=PANEL)
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(text_box, text=title, font=(font_name, 15, 'bold'),
+                     fg=TEXT, bg=PANEL, anchor='w', justify=tk.LEFT,
+                     wraplength=650).pack(fill=tk.X)
+            if detail:
+                tk.Label(text_box, text=detail, font=(font_name, 14),
+                         fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+                         wraplength=650).pack(fill=tk.X, pady=(3, 0))
+        def add_table(parent_frame, title, headers, rows):
+            block = tk.Frame(parent_frame, bg=PANEL_2,
+                             highlightbackground=BORDER, highlightthickness=1, bd=0)
+            block.pack(fill=tk.X, padx=16, pady=8)
+            tk.Label(block, text=title, font=(font_name, 14, 'bold'),
+                     fg=TEXT, bg=GOLD_BAR, anchor='w', justify=tk.LEFT,
+                     wraplength=675, padx=11, pady=7).pack(fill=tk.X)
+            grid = tk.Frame(block, bg=PANEL_2)
+            grid.pack(fill=tk.X)
+            count = max([len(headers)] + [len(row) for row in rows]) if rows else len(headers)
+            table_font = tkfont.Font(family=font_name, size=14)
+            matrix = ([headers] if headers else []) + rows
+            minimums = [62] * count
+            preferences = []
+            for col in range(count):
+                text_width = max((table_font.measure(line)
+                                  for row in matrix if col < len(row)
+                                  for line in str(row[col]).split('\n')), default=0)
+                preferences.append(max(50, min(text_width, 260)))
+            available = 700
+            remaining = max(0, available - sum(minimums))
+            total_preference = sum(preferences) or 1
+            column_widths = [minimums[col] + remaining * preferences[col] // total_preference
+                             for col in range(count)]
+            if column_widths:
+                column_widths[-1] += available - sum(column_widths)
+            for col, width in enumerate(column_widths):
+                grid.grid_columnconfigure(col, minsize=width)
+            for r, row in enumerate(matrix):
+                for c in range(count):
+                    value = row[c] if c < len(row) else ''
+                    head = bool(headers) and r == 0
+                    bg = GOLD_BAR if head else (PANEL if r % 2 else '#fbf6e9')
+                    fg = TEXT if head else MUTED
+                    tk.Message(grid, text=value, font=(font_name, 14, 'bold' if head else 'normal'),
+                               fg=fg, bg=bg, anchor='w', justify=tk.LEFT,
+                               width=max(42, column_widths[c] - 16),
+                               padx=7, pady=5, borderwidth=1,
+                               relief=tk.SOLID).grid(row=r, column=c, sticky='nsew')
+        def draw_illustration(parent_frame, kind):
+            c = tk.Canvas(parent_frame, width=700, height=230,
+                          bg=PANEL, highlightthickness=0)
+            c.pack(padx=16, pady=(5, 10))
+            for group, count in enumerate((4, 4, 4, 2)):
+                x = 32+group*164
+                c.create_rectangle(x, 42, x+138, 138, fill=PANEL_2, outline=BORDER)
+                for index in range(count):
+                    px, py = x+48+(index % 2)*42, 70+(index//2)*38
+                    c.create_oval(px-12, py-12, px+12, py+12,
+                                  fill='#fffdf7', outline=GOLD, width=2)
+                c.create_text(x+69, 162, text='每组 4 颗' if group < 3 else '余下 2 颗',
+                              fill=GOLD, font=(font_name, 14, 'bold'))
+            c.create_text(32, 202, text='示例：14 ÷ 4 余 2 → 本局结果为 2。整除时，结果为 4。',
+                          anchor='w', fill=TEXT, font=(font_name, 14))
 
-    三、怎样下注
-    • 先在右侧选择筹码，再左键点击下注格。
-    • 可以同时在多个下注格下注。
-    • 筹码会从筹码区飞到下注区域的中心。
-    • 右键点击某下注格：清除该格全部下注并退回余额。
-    • 【清除】：清除本局全部下注。
-    • 【重复上局下注】：按上局下注内容重新下注；余额或版式不允许的部分不会强行下注。
-    • 有下注时不可切换“简易版 / 原版”；全部清除后可再次切换。
-
-    四、简易版下注
-    • 1 / 2 / 3 / 4：押中指定余数，净赢赔率 2.85 : 1。
-    • 小：结果 1 或 2，净赢赔率 0.95 : 1。
-    • 大：结果 3 或 4，净赢赔率 0.95 : 1。
-    • 单：结果 1 或 3，净赢赔率 0.95 : 1。
-    • 双：结果 2 或 4，净赢赔率 0.95 : 1。
-    • 限额：每格最低 $10；每格最高 $50,000；全台最高 $200,000。
-
-    五、原版下注
-    • 番 1 / 2 / 3 / 4：规则与简易版相同。
-    • 念（例如“1念2”）：开前一个号码为赢；开后一个号码为和，只退本金；其他结果输。
-    • 角：标示的两个号码任一开出即赢，净赢赔率 0.95 : 1。
-    • 三门：标示的三个号码任一开出即赢，净赢赔率 0.316667 : 1。
-    • 原版中央仍保留 小 / 大 / 单 / 双。
-    • 限额：偏格最高 $10,000；主格最高 $50,000；全台最高 $300,000。
-
-    六、结算画面
-    • 客观上获胜的下注区域会白色闪烁；即使该格没有下注，也会显示本局哪些区域获胜。
-    • 赢注：返还本金 + 净赢金额。
-    • 和注：不作获胜闪烁，只退回本金。
-    • 输注：不返还筹码。
-    • “上局获胜”显示的是实际返还金额，包含获胜下注的本金及赢利，也包含和注退回的本金。
-
-    七、历史统计
-    • 最近结果显示最近 20 局；最左边是最新一局，越往右越旧。
-    • “历史开出比例”可选择最近 50 / 100 / 250 / 500 / 1000 局。
-    • 单 / 双、小 / 大、1 / 2 / 3 / 4 三组比例都会按当前所选历史范围重新计算。
-    • 1 / 2 / 3 / 4 的彩色比例图内部只显示百分比；对应号码显示在比例图上方。
-    • 如果现有历史少于所选数量，就使用当前已有的全部历史记录。
-    • 统计不会改变下一局结果；下一局仍由新的白钮位置与碗最终位置决定。
-    """
-        text.insert('1.0', rules.strip())
-        text.config(state='disabled')
+        def render_page(index):
+            for child in content.winfo_children():
+                child.destroy()
+            for idx, button in enumerate(nav_buttons):
+                button.configure(bg='#e6d9b9' if idx == index else SIDEBAR,
+                                 fg=GOLD if idx == index else MUTED)
+            page_title, subtitle, cards = manual_pages[index]
+            top = tk.Frame(content, bg=BG)
+            top.pack(fill=tk.X, padx=14, pady=(7, 2))
+            tk.Label(top, text=page_title, font=(font_name, 20, 'bold'),
+                     fg=GOLD, bg=BG, anchor='w', justify=tk.LEFT,
+                     wraplength=690).pack(fill=tk.X)
+            if subtitle:
+                tk.Label(top, text=subtitle, font=(font_name, 14),
+                         fg=MUTED, bg=BG, anchor='w', justify=tk.LEFT,
+                         wraplength=690).pack(fill=tk.X, pady=(3, 0))
+            for card_title, card_subtitle, rules, tables in cards:
+                card = tk.Frame(content, bg=PANEL, highlightbackground=BORDER,
+                                highlightcolor=BORDER, highlightthickness=1, bd=0)
+                card.pack(fill=tk.X, padx=10, pady=7)
+                head = tk.Frame(card, bg=PANEL)
+                head.pack(fill=tk.X, padx=16, pady=(12, 5))
+                tk.Label(head, text=card_title, font=(font_name, 16, 'bold'),
+                         fg=GOLD, bg=PANEL, anchor='w', justify=tk.LEFT,
+                         wraplength=680).pack(fill=tk.X)
+                if card_subtitle:
+                    tk.Label(head, text=card_subtitle, font=(font_name, 14),
+                             fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+                             wraplength=680).pack(fill=tk.X)
+                if card_title in illustration_cards:
+                    draw_illustration(card, illustration_cards[card_title])
+                for rule_title, detail in rules:
+                    add_rule(card, rule_title, detail)
+                for table_title, table_headers, rows in tables:
+                    add_table(card, table_title, table_headers, rows)
+                tk.Frame(card, bg=PANEL, height=6).pack(fill=tk.X)
+            content.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox('all'))
+            canvas.yview_moveto(0)
+        nav_buttons = []
+        for index, (page_title, _subtitle, _cards) in enumerate(manual_pages):
+            button = tk.Button(sidebar, text=page_title, command=lambda i=index: render_page(i),
+                               font=(font_name, 14), fg=MUTED, bg=SIDEBAR,
+                               activebackground='#e8d49a', activeforeground=GOLD,
+                               relief=tk.FLAT, bd=0, anchor='w', padx=18, pady=10,
+                               cursor='hand2')
+            button.pack(fill=tk.X)
+            nav_buttons.append(button)
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-event.delta / 120), 'units')
+            return 'break'
+        dialog.bind('<MouseWheel>', on_mousewheel)
+        dialog.bind('<Button-4>', lambda _e: (canvas.yview_scroll(-1, 'units'), 'break')[1])
+        dialog.bind('<Button-5>', lambda _e: (canvas.yview_scroll(1, 'units'), 'break')[1])
+        dialog.bind('<Escape>', lambda _e: close_dialog())
+        dialog.protocol('WM_DELETE_WINDOW', close_dialog)
+        if nav_buttons:
+            render_page(0)
+        dialog.after(30, dialog.focus_force)
 
     def _persist_balance(self):
         self.balance = self._round_money(self.balance)

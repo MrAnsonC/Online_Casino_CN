@@ -5,95 +5,31 @@
     "deck": [
       [
         "Diamond",
-        "10"
-      ],
-      [
-        "Club",
-        "5"
-      ],
-      [
-        "Club",
         "A"
       ],
       [
-        "Diamond",
-        "3"
-      ],
-      [
-        "Club",
-        "8"
-      ],
-      [
-        "Club",
-        "3"
-      ],
-      [
         "Heart",
-        "7"
-      ],
-      [
-        "Spade",
         "5"
       ],
       [
+        "Diamond",
+        "Q"
+      ],
+      [
+        "Heart",
+        "4"
+      ],
+      [
         "Spade",
+        "3"
+      ],
+      [
+        "Diamond",
         "J"
       ],
       [
-        "Club",
-        "8"
-      ],
-      [
-        "Club",
-        "10"
-      ],
-      [
-        "Heart",
-        "Q"
-      ],
-      [
         "Diamond",
-        "7"
-      ],
-      [
-        "Club",
-        "A"
-      ],
-      [
-        "Spade",
-        "4"
-      ],
-      [
-        "Club",
-        "4"
-      ],
-      [
-        "Diamond",
-        "6"
-      ],
-      [
-        "Diamond",
-        "Q"
-      ],
-      [
-        "Spade",
-        "A"
-      ],
-      [
-        "Club",
-        "5"
-      ],
-      [
-        "Diamond",
-        "9"
-      ],
-      [
-        "Heart",
-        "9"
-      ],
-      [
-        "Spade",
-        "6"
+        "K"
       ],
       [
         "Heart",
@@ -101,238 +37,34 @@
       ],
       [
         "Spade",
-        "3"
-      ],
-      [
-        "Heart",
-        "A"
-      ],
-      [
-        "Club",
-        "9"
-      ],
-      [
-        "Heart",
-        "J"
-      ],
-      [
-        "Spade",
-        "9"
-      ],
-      [
-        "Heart",
-        "9"
-      ],
-      [
-        "Spade",
-        "5"
-      ],
-      [
-        "Diamond",
-        "2"
-      ],
-      [
-        "Spade",
-        "4"
-      ],
-      [
-        "Heart",
-        "2"
-      ],
-      [
-        "Spade",
-        "7"
-      ],
-      [
-        "Heart",
-        "7"
-      ],
-      [
-        "Diamond",
-        "A"
-      ],
-      [
-        "Club",
-        "J"
-      ],
-      [
-        "Diamond",
-        "5"
-      ],
-      [
-        "Spade",
-        "K"
-      ],
-      [
-        "Club",
-        "7"
-      ],
-      [
-        "Heart",
-        "K"
-      ],
-      [
-        "Club",
-        "6"
-      ],
-      [
-        "Diamond",
-        "A"
-      ],
-      [
-        "Spade",
-        "J"
-      ],
-      [
-        "Diamond",
-        "5"
-      ],
-      [
-        "Heart",
-        "K"
-      ],
-      [
-        "Diamond",
-        "2"
-      ],
-      [
-        "Heart",
-        "5"
-      ],
-      [
-        "Spade",
-        "9"
-      ],
-      [
-        "Club",
-        "9"
-      ],
-      [
-        "Heart",
-        "J"
-      ],
-      [
-        "Heart",
-        "Q"
-      ],
-      [
-        "Spade",
-        "6"
-      ],
-      [
-        "Diamond",
-        "9"
-      ],
-      [
-        "Heart",
         "5"
       ],
       [
         "Club",
-        "Q"
-      ],
-      [
-        "Diamond",
-        "6"
+        "9"
       ],
       [
         "Spade",
         "Q"
-      ],
-      [
-        "Club",
-        "Q"
-      ],
-      [
-        "Spade",
-        "A"
       ],
       [
         "Club",
         "2"
       ],
       [
-        "Heart",
-        "4"
-      ],
-      [
-        "Heart",
-        "6"
-      ],
-      [
-        "Spade",
-        "Q"
-      ],
-      [
-        "Diamond",
-        "J"
-      ],
-      [
-        "Heart",
-        "6"
-      ],
-      [
         "Club",
-        "K"
-      ],
-      [
-        "Spade",
-        "K"
-      ],
-      [
-        "Diamond",
-        "10"
-      ],
-      [
-        "Diamond",
         "8"
       ],
       [
-        "Heart",
-        "10"
+        "Spade",
+        "A"
       ],
       [
         "Diamond",
-        "Q"
+        "5"
       ],
       [
         "Club",
-        "6"
-      ],
-      [
-        "Club",
-        "J"
-      ],
-      [
-        "Spade",
-        "3"
-      ],
-      [
-        "Spade",
-        "7"
-      ],
-      [
-        "Spade",
-        "10"
-      ],
-      [
-        "Heart",
-        "4"
-      ],
-      [
-        "Diamond",
-        "3"
-      ],
-      [
-        "Diamond",
-        "K"
-      ],
-      [
-        "Diamond",
-        "K"
-      ],
-      [
-        "Spade",
         "2"
       ],
       [
@@ -340,28 +72,72 @@
         "8"
       ],
       [
+        "Heart",
+        "A"
+      ],
+      [
+        "Club",
+        "K"
+      ],
+      [
         "Diamond",
-        "7"
+        "4"
+      ],
+      [
+        "Club",
+        "8"
+      ],
+      [
+        "Diamond",
+        "10"
       ],
       [
         "Heart",
-        "10"
-      ],
-      [
-        "Spade",
-        "8"
-      ],
-      [
-        "Club",
         "7"
       ],
       [
-        "Club",
-        "10"
+        "Spade",
+        "4"
+      ],
+      [
+        "Heart",
+        "9"
+      ],
+      [
+        "Heart",
+        "7"
+      ],
+      [
+        "Spade",
+        "J"
       ],
       [
         "Spade",
         "8"
+      ],
+      [
+        "Diamond",
+        "9"
+      ],
+      [
+        "Spade",
+        "6"
+      ],
+      [
+        "Club",
+        "4"
+      ],
+      [
+        "Diamond",
+        "8"
+      ],
+      [
+        "Spade",
+        "8"
+      ],
+      [
+        "Spade",
+        "2"
       ],
       [
         "Club",
@@ -373,42 +149,18 @@
       ],
       [
         "Spade",
-        "2"
-      ],
-      [
-        "Diamond",
-        "4"
-      ],
-      [
-        "Heart",
-        "3"
-      ],
-      [
-        "Club",
-        "2"
-      ],
-      [
-        "Heart",
-        "8"
-      ],
-      [
-        "Heart",
-        "A"
-      ],
-      [
-        "Club",
-        "4"
-      ],
-      [
-        "Diamond",
-        "J"
-      ],
-      [
-        "Club",
-        "3"
+        "K"
       ],
       [
         "Spade",
+        "10"
+      ],
+      [
+        "Diamond",
+        "5"
+      ],
+      [
+        "Heart",
         "10"
       ],
       [
@@ -417,11 +169,259 @@
       ],
       [
         "Diamond",
+        "K"
+      ],
+      [
+        "Heart",
+        "K"
+      ],
+      [
+        "Spade",
+        "9"
+      ],
+      [
+        "Club",
+        "5"
+      ],
+      [
+        "Diamond",
+        "2"
+      ],
+      [
+        "Club",
+        "9"
+      ],
+      [
+        "Club",
+        "Q"
+      ],
+      [
+        "Heart",
+        "3"
+      ],
+      [
+        "Diamond",
+        "6"
+      ],
+      [
+        "Spade",
+        "6"
+      ],
+      [
+        "Club",
+        "6"
+      ],
+      [
+        "Club",
+        "J"
+      ],
+      [
+        "Club",
+        "J"
+      ],
+      [
+        "Heart",
         "4"
+      ],
+      [
+        "Diamond",
+        "3"
+      ],
+      [
+        "Club",
+        "6"
+      ],
+      [
+        "Spade",
+        "J"
+      ],
+      [
+        "Spade",
+        "Q"
+      ],
+      [
+        "Club",
+        "Q"
+      ],
+      [
+        "Spade",
+        "4"
+      ],
+      [
+        "Heart",
+        "8"
+      ],
+      [
+        "Diamond",
+        "9"
+      ],
+      [
+        "Heart",
+        "2"
+      ],
+      [
+        "Spade",
+        "A"
+      ],
+      [
+        "Heart",
+        "9"
+      ],
+      [
+        "Spade",
+        "7"
+      ],
+      [
+        "Diamond",
+        "A"
+      ],
+      [
+        "Diamond",
+        "3"
+      ],
+      [
+        "Heart",
+        "6"
+      ],
+      [
+        "Club",
+        "4"
+      ],
+      [
+        "Club",
+        "7"
+      ],
+      [
+        "Diamond",
+        "4"
+      ],
+      [
+        "Heart",
+        "J"
+      ],
+      [
+        "Heart",
+        "A"
+      ],
+      [
+        "Heart",
+        "Q"
+      ],
+      [
+        "Diamond",
+        "J"
+      ],
+      [
+        "Spade",
+        "3"
+      ],
+      [
+        "Spade",
+        "7"
+      ],
+      [
+        "Diamond",
+        "2"
+      ],
+      [
+        "Diamond",
+        "7"
+      ],
+      [
+        "Spade",
+        "10"
+      ],
+      [
+        "Club",
+        "3"
+      ],
+      [
+        "Club",
+        "10"
+      ],
+      [
+        "Club",
+        "7"
+      ],
+      [
+        "Spade",
+        "K"
+      ],
+      [
+        "Club",
+        "A"
+      ],
+      [
+        "Spade",
+        "5"
+      ],
+      [
+        "Spade",
+        "9"
+      ],
+      [
+        "Heart",
+        "10"
+      ],
+      [
+        "Heart",
+        "K"
+      ],
+      [
+        "Club",
+        "10"
+      ],
+      [
+        "Diamond",
+        "Q"
+      ],
+      [
+        "Heart",
+        "J"
+      ],
+      [
+        "Spade",
+        "2"
+      ],
+      [
+        "Diamond",
+        "7"
+      ],
+      [
+        "Heart",
+        "Q"
+      ],
+      [
+        "Club",
+        "3"
+      ],
+      [
+        "Diamond",
+        "10"
+      ],
+      [
+        "Heart",
+        "5"
+      ],
+      [
+        "Heart",
+        "6"
+      ],
+      [
+        "Club",
+        "5"
+      ],
+      [
+        "Diamond",
+        "6"
+      ],
+      [
+        "Club",
+        "A"
       ]
     ],
-    "current_index": 22,
-    "shuffle_threshold": 41,
-    "shuffle_count": 6
+    "current_index": 46,
+    "shuffle_threshold": 46,
+    "shuffle_count": 9
   }
 }

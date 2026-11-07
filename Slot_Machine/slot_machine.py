@@ -9,7 +9,6 @@ from A_Tools.Account import install_secure_json as _install_secure_json
 _install_secure_json()
 del _install_secure_json, _account_root, _AccountPath, _account_sys
 
-import importlib
 import json
 import os
 import re
@@ -178,6 +177,43 @@ def _ui_colour(master: tk.Misc, colour: str) -> str:
     return resolver(colour) if callable(resolver) else colour
 
 
+# 兼容改名前的收藏记录；实际导入一律使用新的模块名称。
+GAME_MODULE_ALIASES = {
+    'Slot_Machine.21_Bell_Slot_Machine': 'Slot_Machine.Bell21_Slot_Machine',
+    'Slot_Machine.Cash_Machine®': 'Slot_Machine.Cash_Machine',
+    'Slot_Machine.Double_Diamond_Machine®': 'Slot_Machine.Double_Diamond_Machine',
+    'Slot_Machine.Top_Dollar_Machine®': 'Slot_Machine.Top_Dollar_Machine',
+}
+
+
+def normalise_game_module(module_name: str) -> str:
+    name = str(module_name).strip()
+    return GAME_MODULE_ALIASES.get(name, name)
+
+
+def load_game_module(module_name: str):
+    """按需使用明确的 import，让打包工具能发现菜单中的全部游戏。"""
+    module_name = normalise_game_module(module_name)
+    if module_name == 'Slot_Machine.Number_Slot_Machine':
+        from Slot_Machine import Number_Slot_Machine as module
+    elif module_name == 'Slot_Machine.Poker_Slot_Machine':
+        from Slot_Machine import Poker_Slot_Machine as module
+    elif module_name == 'Slot_Machine.Bell21_Slot_Machine':
+        from Slot_Machine import Bell21_Slot_Machine as module
+    elif module_name == 'Slot_Machine.Blackjack_Slot_Machine':
+        from Slot_Machine import Blackjack_Slot_Machine as module
+    elif module_name == 'Slot_Machine.Cash_Machine':
+        from Slot_Machine import Cash_Machine as module
+    elif module_name == 'Slot_Machine.Double_Diamond_Machine':
+        from Slot_Machine import Double_Diamond_Machine as module
+    elif module_name == 'Slot_Machine.Top_Dollar_Machine':
+        from Slot_Machine import Top_Dollar_Machine as module
+    else:
+        raise ImportError(f"尚未登记游戏模块：{module_name}")
+    return module
+
+
+
 # 所有老虎机游戏统一使用单 Tk 窗口嵌入模式。
 # EMBEDDED_GAME_MODULES 会在 GAME_SECTIONS 定义后自动生成，避免新增游戏时
 # 忘记同步嵌入名单。
@@ -185,11 +221,11 @@ GAME_SECTIONS = {
     "老虎机": [
         ("数字老虎机", "Slot_Machine.Number_Slot_Machine", False),
         ("旋转扑克", "Slot_Machine.Poker_Slot_Machine", False),
-        ("21 BELL老虎机", "Slot_Machine.21_Bell_Slot_Machine", False),
+        ("21 BELL老虎机", "Slot_Machine.Bell21_Slot_Machine", False),
         ("21点老虎机", "Slot_Machine.Blackjack_Slot_Machine", False),
-        ("现金老虎机", "Slot_Machine.Cash_Machine®", False),
-        ("双倍钻石老虎机", "Slot_Machine.Double_Diamond_Machine®", False),
-        ("最高奖金老虎机", "Slot_Machine.Top_Dollar_Machine®", False),
+        ("现金老虎机", "Slot_Machine.Cash_Machine", False),
+        ("双倍钻石老虎机", "Slot_Machine.Double_Diamond_Machine", False),
+        ("最高奖金老虎机", "Slot_Machine.Top_Dollar_Machine", False),
     ],
 }
 
@@ -234,25 +270,34 @@ def update_balance(username: str, balance: float) -> None:
 def is_favorite(username: str, module_name: str) -> bool:
     if username == "TEMP_ACCOUNT":
         return False
+    module_name = normalise_game_module(module_name)
     for user in load_users():
         if user.get("user_name") == username:
-            return any(item.get("module") == module_name
-                       for item in user.get("favorites", []) if isinstance(item, dict))
+            return any(
+                normalise_game_module(item.get("module", "")) == module_name
+                for item in user.get("favorites", []) if isinstance(item, dict)
+            )
     return False
 
 
 def toggle_favorite(username: str, display_name: str, module_name: str) -> tuple[bool, str]:
     if username == "TEMP_ACCOUNT":
         return False, "体验账号不会储存收藏。"
+    module_name = normalise_game_module(module_name)
     users = load_users()
     for user in users:
         if user.get("user_name") != username:
             continue
-        favorites = [
-            {"module": str(item.get("module", "")).strip()}
-            for item in user.get("favorites", []) if isinstance(item, dict)
-            and str(item.get("module", "")).strip()
-        ]
+        # 将当前玩家的旧名称统一成新名称，并合并改名前后重复的收藏。
+        favorites = []
+        seen = set()
+        for item in user.get("favorites", []):
+            if not isinstance(item, dict):
+                continue
+            name = normalise_game_module(item.get("module", ""))
+            if name and name not in seen:
+                favorites.append({"module": name})
+                seen.add(name)
         existing = next((item for item in favorites if item.get("module") == module_name), None)
         if existing:
             favorites.remove(existing)
@@ -290,7 +335,7 @@ def child_run(module_name: str, result_file: str, balance_text: str, username: s
         balance = float(balance_text)
         result["balance"] = balance
 
-        module = importlib.import_module(module_name)
+        module = load_game_module(module_name)
         game_main = getattr(module, "main", None)
         if not callable(game_main):
             raise AttributeError(f"{module_name} 没有可调用的 main(balance, user)")
@@ -958,22 +1003,20 @@ class SlotMachinesPage(tk.Frame):
         self._refresh_balance_label()
 
     def _get_game_image_path(self, module_name: Optional[str]) -> Optional[str]:
-        """
-        根据模块名称自动寻找游戏图片。
-
-        例如：
-            Casino_Games.Three_Card_Poker
-        会对应：
-            当前文件目录/Picture/Three_Card_Poker.png
-        """
+        """优先读取新名称的图片，也兼容尚未改名的旧图片。"""
         if not module_name:
             return None
-
-        image_name = module_name.rsplit(".", 1)[-1] + ".png"
-        image_path = os.path.join(THIS_DIR, "Picture", image_name)
-
-        if os.path.isfile(image_path):
-            return image_path
+        canonical_name = normalise_game_module(module_name)
+        candidates = [canonical_name]
+        candidates.extend(
+            old_name for old_name, new_name in GAME_MODULE_ALIASES.items()
+            if new_name == canonical_name
+        )
+        for candidate in candidates:
+            image_name = candidate.rsplit(".", 1)[-1] + ".png"
+            image_path = os.path.join(THIS_DIR, "Picture", image_name)
+            if os.path.isfile(image_path):
+                return image_path
         return None
 
     def _load_game_image(
@@ -1336,7 +1379,7 @@ class SlotMachinesPage(tk.Frame):
     ) -> None:
         """在 index.py 的同一个根窗口内打开老虎机游戏。"""
         try:
-            module = importlib.import_module(module_name)
+            module = load_game_module(module_name)
             game_main = getattr(module, "main", None)
             if not callable(game_main):
                 raise AttributeError(f"{module_name} 没有可调用的 main()")

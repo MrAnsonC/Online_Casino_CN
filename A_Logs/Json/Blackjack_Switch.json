@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "shoe": {
+    "mode": "CSM",
+    "decks": 8,
+    "chambers": 15,
+    "game_id": "SwitchBlackjack:local:a8754d0f5a9c479f9eb0d739a44e647a"
+  }
+}

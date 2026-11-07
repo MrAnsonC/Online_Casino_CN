@@ -1652,19 +1652,35 @@ class RouletteGameGUI(tk.Frame):
         if self.round_state != "betting" or self.betting_view != "racetrack":
             return
         numbers = self._racetrack_numbers(number)
-        amount = self._racetrack_amount(numbers)
-        if amount <= 0:
-            messagebox.showwarning("下注上限", "组合中有号码已达下注上限，请调整邻号或清除该号码下注。")
+        selected_amount = int(self.selected_bet_amount)
+        if selected_amount <= 0:
             return
-        total = amount * len(numbers) * self.bet_multiplier
-        if self.balance < total:
-            messagebox.showwarning("余额不足", f"整组下注需要 ${total:,.0f}，余额不足。")
+        # 计算每个号码实际可增加的金额
+        additions = {}
+        total_base = 0
+        for num in numbers:
+            spot_id = "straight_" + num
+            spot = self._find_spot_by_id(spot_id)
+            if not spot:
+                continue
+            limit = self._bet_limit_for_spot(spot)
+            existing = self.current_bets.get(spot_id, 0)
+            remaining = limit - existing
+            if remaining <= 0:
+                continue
+            add = min(selected_amount, remaining)
+            additions[spot_id] = add
+            total_base += add
+        if total_base <= 0:
+            messagebox.showwarning("下注上限", "组合中所有号码均已达到下注上限。")
             return
-        # Commit the whole group only after all limits and funds are checked.
-        self.balance -= total
-        for selected in numbers:
-            spot_id = "straight_" + selected
-            self.current_bets[spot_id] = self.current_bets.get(spot_id, 0) + amount
+        total_cost = total_base * self.bet_multiplier
+        if self.balance < total_cost:
+            messagebox.showwarning("余额不足", f"整组下注需要 ${total_cost:,.0f}，余额不足。")
+            return
+        self.balance -= total_cost
+        for spot_id, add in additions.items():
+            self.current_bets[spot_id] = self.current_bets.get(spot_id, 0) + add
             self.current_bet_colors[spot_id] = self._chip_fill_color_for_amount(self.current_bets[spot_id])
         self._refresh_balance_display()
         self._refresh_bet_totals()
@@ -4499,626 +4515,563 @@ class RouletteGameGUI(tk.Frame):
             self.root.destroy()
 
     def show_game_instructions(self):
-        """一次展示全部主盘落点、四个跑道区域及邻号说明。"""
+        """参考卡片式说明布局；所有赔率、返还与结算示例均用表格显示。"""
         import tkinter as tk
-        from tkinter import ttk
+        import tkinter.font as tkfont
 
-        old = getattr(self, "_instruction_window", None)
-        if old is not None:
+        current = getattr(self, '_instruction_window', None)
+        if current is not None:
             try:
-                if old.winfo_exists():
-                    old.lift()
-                    old.focus_set()
+                if current.winfo_exists():
+                    current.lift()
+                    current.focus_set()
                     return
             except tk.TclError:
                 pass
 
-        root = self.winfo_toplevel()
-        root.update_idletasks()
+        parent = self.winfo_toplevel()
+        parent.update_idletasks()
+        dialog = tk.Toplevel(parent)
+        self._instruction_window = dialog
+        title = '欧式轮盘 · 完整图解玩法'
+        dialog.title(title)
+        dialog.transient(parent)
+        BG, HEADER, SIDEBAR = '#faf5e8', '#f1e7cd', '#f2e8d0'
+        PANEL, PANEL_2, BORDER = '#fffdf7', '#f5ecd6', '#c9b88a'
+        GOLD, GOLD_BAR, TEXT, MUTED = '#a8842c', '#e7d36c', '#3a2f1e', '#7a6a50'
+        font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
+        dialog.configure(bg=BG)
+        screen_w, screen_h = parent.winfo_screenwidth(), parent.winfo_screenheight()
+        width, height = min(1000, screen_w - 30), min(670, screen_h - 50)
+        x = max(0, min(screen_w - width, parent.winfo_rootx() + (parent.winfo_width() - width) // 2))
+        y = max(0, min(screen_h - height, parent.winfo_rooty() + (parent.winfo_height() - height) // 2))
+        dialog.geometry(f'{width}x{height}+{x}+{y}')
+        dialog.resizable(False, False)
 
-        win = tk.Toplevel(root)
-        self._instruction_window = win
-        win.title("欧式轮盘 · 下注图解")
-        win.transient(root)
-        win.configure(bg="#EDF2F7")
+        # 从实际下注位读取赔率及限额，图解与本游戏可用落点保持一致。
+        type_names = {
+            'straight': '直注', 'split': '分注', 'street': '街注 / 零区三号注',
+            'corner': '角注', 'six_line': '六线注', 'five_number': '五数注',
+            'dozen': '打注', 'column': '列注', 'color': '红 / 黑',
+            'odd_even': '单 / 双', 'high_low': '大 / 小',
+        }
+        groups = [
+            ('直注', {'straight'}, '点击号码格中心，包括0。'),
+            ('分注', {'split'}, '点击两个号码的共用边。\n零区可用组合：0/1、0/2、0/3。'),
+            ('街注与零区三号注', {'street'},
+             '街注覆盖同一竖排的三个号码。\n零区三号注：0/1/2、0/2/3。'),
+            ('角注', {'corner'}, '点击四个相邻号码的交点，一次覆盖四个号码。'),
+            ('六线注', {'six_line'}, '点击两条街的共用端点，一次覆盖六个号码。'),
+            ('打注', {'dozen'}, '第一打：1—12；第二打：13—24；第三打：25—36。'),
+            ('列注', {'column'}, '点击右侧列注格，每格覆盖对应横排的十二个号码。'),
+            ('大小、单双、红黑', {'high_low', 'odd_even', 'color'},
+             '小：1—18；大：19—36。\n六个外围位置均不含0。'),
+        ]
 
-        width = min(1100, root.winfo_screenwidth() - 40)
-        height = min(680, root.winfo_screenheight() - 30)
+        payout_rows, limit_rows = [], []
+        for kind, name in type_names.items():
+            spots = [spot for spot in self.bet_spots if spot['type'] == kind]
+            if not spots:
+                continue
+            spot = spots[0]
+            payout_rows.append([name, str(len(spot['numbers'])),
+                                f"{spot['payout']} : 1", f"实付下注 × {spot['payout'] + 1}"])
+            limit_rows.append([name, f"${self._bet_limit_for_spot(spot):,}",
+                               f"${self._bet_limit_for_spot(spot):,} × 当前倍数"])
+        payout_rows.append(['未命中的下注', '—', '不获奖', '$0（本金不退回）'])
+        zero_index = ROULETTE_SEQUENCE.index('0')
+        neighbors = [ROULETTE_SEQUENCE[(zero_index + offset) % len(ROULETTE_SEQUENCE)]
+                     for offset in range(-2, 3)]
+        neighbor_text = '、'.join(neighbors)
+        straight_return = 25 * (BET_ODDS['straight'] + 1)
 
-        # 根据当前 Tk 窗口的位置和尺寸计算居中坐标。
-        x = root.winfo_rootx() + (root.winfo_width() - width) // 2
-        y = root.winfo_rooty() + (root.winfo_height() - height) // 2
-
-        win.geometry(f"{width}x{height}+{x}+{y}")
-
-        FONT = "Microsoft YaHei UI"
-        INK, MUTED = "#173247", "#526477"
-        BLUE, BORDER = "#B9E1EE", "#0B4A6B"
-        GOLD, GREEN = "#FFE08A", "#24463B"
-        regions = ("voisins", "tiers", "orphelins", "zero")
-
-        def close():
-            if getattr(self, "_instruction_window", None) is win:
+        # 每张卡片依次为：标题、说明、规则、表格、图解类型 / 数据。
+        manual_pages = [
+            ('玩法', '先选择下注位置，再等待滚球停稳，读取本局结果。', [
+                ('一局如何进行', '', [
+                    ('① 选择筹码与倍数',
+                     f'每局有 {self.BETTING_SECONDS} 秒下注时间。\n'
+                     '选择筹码和倍数后，左键点击下注位置；可重复加注或押多个位置。'),
+                    ('② 锁定下注并旋转',
+                     '倒计时结束，或点击“开始游戏”，即锁定下注与倍数。\n'
+                     '旋转期间不能加注、撤注或调整倍数。'),
+                    ('③ 读取结果',
+                     '滚球停稳所在的号码为本局结果。\n'
+                     '所有覆盖该号码的下注分别判定；结算金额见赔付表格。'),
+                ], [], None),
+                ('轮盘与零号', '', [
+                    ('号码构成', '共 37 个号码：0 及 1—36。\n0不属于大小、单双、红黑、打注或列注。'),
+                    ('说明窗口', '打开说明不会自动暂停游戏倒计时。\n需要停留阅读时，请先暂停下注倒计时。'),
+                ], [], None),
+            ]),
+            ('下注图解', '金色空心圆标记该类型的全部合法落点；图解不可下注。', [
+                (name, hint, [], [], ('board', kinds)) for name, kinds, hint in groups
+            ]),
+            ('邻号下注', '邻号依照轮盘顺序排列，并非按数字大小排列。', [
+                ('跑道盘与邻号', f'示例：以 0 为中心，左右各 2 个邻号。\n覆盖 {neighbor_text}。',
+                 [], [], ('track', '0')),
+                ('加注与撤注', '', [
+                    ('邻号数量', '左右各选 0—5 个邻号，连同中心共覆盖 1、3、5、7、9、11 个号码。\n每个号码都是独立直注。'),
+                    ('逐号限额与余额', '每个号码分别按剩余额度加注；已满额号码跳过。\n因此各号实际加注金额可能不同。余额不足以支付整组实际加注时，整组不下注。'),
+                    ('右键清除', '跑道号码上右键只清除该号码的直注，不会清除整组邻号。'),
+                ], [], None),
+                ('邻号结算示例', '以下使用倍数 1，且所有号码均有足够下注额度。', [], [
+                    ('每号下注 $25，左右各 2 个邻号',
+                     ['开奖结果', '总下注', '总返还\n（含中奖本金）', '本局净盈亏'],
+                     [['命中任一覆盖号码', '$125', f'${straight_return:,}', f'+${straight_return - 125:,}'],
+                      ['未命中覆盖号码', '$125', '$0', '−$125']]),
+                ], None),
+            ]),
+            ('赔率 & 限红', '赔付、计算口径及下注限额统一列于下表。', [
+                ('全部下注赔付', '', [], [
+                    ('标准赔付表', ['下注类型', '覆盖\n号码数', '净赢赔率\n（不含本金）', '命中总返还\n（含该注本金）'], payout_rows),
+                    ('结算口径', ['项目', '计算 / 处理方式'], [
+                        ['实付下注', '基础下注金额 × 当前倍数'],
+                        ['单笔中奖返还', '基础下注金额 ×（净赢赔率 + 1）× 当前倍数'],
+                        ['本局总返还', '所有中奖下注返还之和'],
+                        ['本局净盈亏', '本局总返还 − 本局全部实付下注'],
+                        ['界面“本局获胜金额”', '显示本局总返还，包含中奖下注本金。\n并非本局净利润。'],
+                        ['零号开出', '0仅使覆盖该号码的下注中奖。\n外围下注无半退或留注处理。'],
+                        ['下注期撤注', '退回被清除下注的基础金额 × 当前倍数'],
+                    ]),
+                ], None),
+                ('下注限额', '每个下注位独立累计；实际扣款仍受可用余额限制。', [], [
+                    ('单个下注位上限', ['下注类型', '基础金额上限', '实付金额上限'], limit_rows),
+                ], None),
+            ]),
+            ('操作 & 记录', '下注阶段管理筹码，结算阶段查看结果。', [
+                ('常用操作', '', [
+                    ('加注与清除', '主盘左键加注；右键清除所选下注位；“清除下注”清除全部下注。\n接近上限时仅补至该下注位剩余额度。'),
+                    ('主盘 / 跑道切换', '下注阶段且筹码转移动画未进行时可切换；两种视图共享下注。'),
+                    ('调整倍数', '下注阶段可选 1、2、5、10、20、50、100 倍。\n调整后按现有基础下注补扣或退回差额；余额不足时保留原倍数。'),
+                    ('暂停 / 恢复', '仅下注阶段可暂停倒计时；暂停期间仍可调整下注。\n恢复后继续剩余下注时间。'),
+                    ('重复上局下注', '按当前倍数检查余额，计入清除当前下注后可退回的金额。\n检查通过后恢复上局组合。'),
+                    ('结果与历史', '结果展示阶段点击轮盘中心查看本局详情。\n历史记录和统计仅反映已经发生的结果。'),
+                    ('阅读与关闭', '点击左侧目录切换页面；滚轮或右侧滚动条浏览。\n按 Esc 或右上角按钮关闭说明。'),
+                ], [], None),
+            ]),
+            ('结算示例', '示例均使用倍数 1；本局净盈亏须扣除全部下注。', [
+                ('单注与多注', '', [], [
+                    ('直注 1：下注 $25，开出 1', ['总下注', '总返还（含本金）', '净盈亏'],
+                     [['$25', f'${straight_return:,}', f'+${straight_return - 25:,}']]),
+                    ('直注 1 与黑色各下注 $25，开出红色 1', ['下注', '实付金额', '返还（含本金）'],
+                     [['直注 1（命中）', '$25', f'${straight_return:,}'], ['黑色（未命中）', '$25', '$0'],
+                      ['合计', '$50', f'${straight_return:,}']]),
+                    ('多注净盈亏', ['总返还', '总下注', '净盈亏'],
+                     [[f'${straight_return:,}', '$50', f'+${straight_return - 50:,}']]),
+                    ('仅直注 1：下注 $25，开出 2', ['总下注', '总返还', '净盈亏'],
+                     [['$25', '$0', '−$25']]),
+                ], None),
+            ]),
+        ]
+        region_cards = [
+            ('四个区域', '区域按钮把一个单位金额拆分到多个主盘下注位。', [], [], ('track', None)),
+            ('组合操作', '', [
+                ('区域加注', '左键点击区域，以所选筹码为一个单位。\n已有主盘下注与重叠区域共用各下注位限额。'),
+                ('比例与限额', '任何子注剩余额度不足时，按完整组合比例缩小本次单位金额。\n无可用完整单位或余额不足时不下注。'),
+                ('区域撤注', '右键点击区域，只撤销该区域贡献的下注。\n其他区域或直接下注的剩余金额保留。'),
+                ('开局动画', '开局保留当前视图，展示组合筹码拆分到主盘的动画。'),
+            ], [], None),
+        ]
+        for region in RACETRACK_REGION_ORDER:
+            info = FRENCH_BETS[region]
+            legs = self._region_legs(region)
+            units = sum(units for _, units in legs)
+            covered = set().union(*(spot['numbers'] for spot, _ in legs))
+            leg_rows = [[type_names[spot['type']], ' / '.join(sorted(spot['numbers'], key=int)),
+                         str(unit_count), f'${25 * unit_count:,}'] for spot, unit_count in legs]
+            outcomes = {}
+            for number in sorted(covered, key=int):
+                returned = sum(25 * unit_count * (spot['payout'] + 1)
+                               for spot, unit_count in legs if number in spot['numbers'])
+                outcomes.setdefault(returned, []).append(number)
+            return_rows = [['、'.join(numbers), f'${25 * units:,}', f'${returned:,}',
+                            f'{returned - 25 * units:+,}'] for returned, numbers in sorted(outcomes.items())]
+            return_rows.append(['未覆盖号码', f'${25 * units:,}', '$0', f'−{25 * units:,}'])
+            region_cards.append((
+                info['zh'], f"{info['label']}\n{units} 单位 · {len(legs)} 个落点 · 覆盖 {len(covered)} 个号码。\n"
+                '图中筹码为下注金额；每单位 $25，倍数 1。', [], [
+                    ('组合拆分', ['下注类型', '覆盖号码', '单位数', '基础下注'], leg_rows),
+                    ('组合赔付示例', ['开出号码', '总下注', '总返还\n（含中奖本金）', '净盈亏（$）'], return_rows),
+                ], ('region', region)))
+        region_cards.append(('组合结算口径', '', [], [
+            ('同时命中多笔子注', ['情况', '计算 / 处理方式'], [
+                ['区域返还', '先拆为主盘子注，再合计所有中奖子注的返还。'],
+                ['孤儿序列开出 17', '同时命中 14 / 17 与 17 / 20 两笔分注。\n两笔中奖返还均计入总返还。'],
+                ['重叠区域 / 主盘下注', '同一下注位金额合并计算；不额外重复派彩。'],
+                ['实际倍数', '示例的下注、返还及净盈亏均乘以实际倍数。'],
+            ]),
+        ], None))
+        manual_pages.insert(3, ('欧式组合', '四个区域的落点、单位拆分及赔付分别列示。', region_cards))
+        def close_dialog():
+            if getattr(self, '_instruction_window', None) is dialog:
                 self._instruction_window = None
-            win.destroy()
+            dialog.destroy()
 
-        # ==================== 固定标题栏 ====================
-        header = tk.Frame(win, bg="#142D40")
-        header.pack(fill="x")
-
-        title_box = tk.Frame(header, bg="#142D40")
-        title_box.pack(side="left", padx=24, pady=15)
-
-        tk.Label(
-            title_box,
-            text="欧式轮盘  /  下注图解",
-            bg="#142D40",
-            fg="white",
-            font=(FONT, 20, "bold"),
-        ).pack(anchor="w")
-
-        tk.Label(
-            title_box,
-            text="全部落点直接展示 · 向下滚动查看跑道盘",
-            bg="#142D40",
-            fg="#C7D9E8",
-            font=(FONT, 11),
-        ).pack(anchor="w", pady=(5, 0))
-
-        tk.Button(
-            header,
-            text="关闭  Esc",
-            command=close,
-            bg="#29485F",
-            fg="white",
-            activebackground="#3A617C",
-            activeforeground="white",
-            relief="flat",
-            font=(FONT, 11),
-            padx=14,
-            pady=8,
-        ).pack(side="right", padx=24)
-
-        # ==================== 连续滚动页面 ====================
-        host = tk.Frame(win, bg="#EDF2F7")
-        host.pack(fill="both", expand=True)
-
-        cv = tk.Canvas(
-            host,
-            bg="#EDF2F7",
-            highlightthickness=0,
-            yscrollincrement=28,
-        )
-        ys = ttk.Scrollbar(
-            host, orient="vertical", command=cv.yview
-        )
-        xs = ttk.Scrollbar(
-            host, orient="horizontal", command=cv.xview
-        )
-
-        cv.configure(
-            yscrollcommand=ys.set,
-            xscrollcommand=xs.set,
-        )
-        cv.grid(row=0, column=0, sticky="nsew")
-        ys.grid(row=0, column=1, sticky="ns")
-        xs.grid(row=1, column=0, sticky="ew")
-
+        header = tk.Frame(dialog, bg=HEADER)
+        header.pack(fill=tk.X)
+        tk.Button(header, text='关闭  ESC', command=close_dialog,
+                  font=(font_name, 13, 'bold'), bg='#e8dcc0', fg=TEXT,
+                  activebackground=GOLD_BAR, relief=tk.FLAT, bd=0,
+                  padx=14, pady=10, cursor='hand2').pack(side=tk.RIGHT, padx=20)
+        title_box = tk.Frame(header, bg=HEADER)
+        title_box.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=24, pady=10)
+        tk.Label(title_box, text=title, font=(font_name, 20, 'bold'),
+                 fg=GOLD, bg=HEADER, anchor='w').pack(fill=tk.X)
+        tk.Label(title_box, text='玩法 · 下注 · 派奖 · 图解 · 结算示例',
+                 font=(font_name, 12), fg=MUTED, bg=HEADER, anchor='w').pack(fill=tk.X, pady=(4, 0))
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X)
+        body = tk.Frame(dialog, bg=BG)
+        body.pack(fill=tk.BOTH, expand=True)
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=180)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+        tk.Label(sidebar, text='说明目录', font=(font_name, 16, 'bold'),
+                 fg=GOLD, bg=SIDEBAR, anchor='w').pack(fill=tk.X, padx=18, pady=(17, 10))
+        host = tk.Frame(body, bg=BG)
+        host.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(host, bg=BG, highlightthickness=0, yscrollincrement=28)
+        ys = tk.Scrollbar(host, orient=tk.VERTICAL, command=canvas.yview)
+        xs = tk.Scrollbar(host, orient=tk.HORIZONTAL, command=canvas.xview)
+        canvas.configure(yscrollcommand=ys.set, xscrollcommand=xs.set)
+        canvas.grid(row=0, column=0, sticky='nsew')
+        ys.grid(row=0, column=1, sticky='ns')
+        xs.grid(row=1, column=0, sticky='ew')
         host.grid_rowconfigure(0, weight=1)
         host.grid_columnconfigure(0, weight=1)
+        content = tk.Frame(canvas, bg=BG)
+        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
+        content.bind('<Configure>', lambda _e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>', lambda event: canvas.itemconfigure(content_window, width=max(760, event.width)))
 
-        # ==================== 共用绘图工具 ====================
-        def text(
-            x, y, value, size=12, color=INK,
-            bold=False, anchor="nw", wrap=None
-        ):
-            opts = {
-                "text": value,
-                "fill": color,
-                "anchor": anchor,
-                "justify": "center" if anchor == "center" else "left",
-                "font": (FONT, size, "bold" if bold else "normal"),
-            }
-            if wrap:
-                opts["width"] = wrap
-            return cv.create_text(x, y, **opts)
+        def label(parent_frame, value, size=13, bold=False, color=MUTED, bg=PANEL):
+            widget = tk.Label(parent_frame, text=value, font=(font_name, size, 'bold' if bold else 'normal'),
+                              fg=color, bg=bg, anchor='w', justify=tk.LEFT, wraplength=700)
+            widget.pack(fill=tk.X)
+            return widget
 
-        def card(x, y, w, h):
-            cv.create_rectangle(
-                x, y, x + w, y + h,
-                fill="white",
-                outline="#D5DFE8",
-            )
-            cv.create_rectangle(
-                x, y, x + w, y + 4,
-                fill=BORDER,
-                outline="",
-            )
+        def add_rule(parent_frame, heading, detail):
+            row = tk.Frame(parent_frame, bg=PANEL)
+            row.pack(fill=tk.X, padx=16, pady=7)
+            tk.Frame(row, bg=GOLD_BAR, width=5).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 11))
+            box = tk.Frame(row, bg=PANEL)
+            box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            label(box, heading, 14, True, TEXT)
+            label(box, detail)
 
-        def section(y, number, title, subtitle):
-            cv.create_rectangle(
-                24, y, 63, y + 34,
-                fill=BORDER,
-                outline="",
-            )
-            text(
-                43, y + 17, number,
-                13, "white", True, "center",
-            )
-            text(77, y - 1, title, 19, INK, True)
-            text(24, y + 46, subtitle, 12, MUTED)
-            return y + 86
+        def add_table(parent_frame, heading, headers, rows):
+            block = tk.Frame(parent_frame, bg=PANEL_2, highlightbackground=BORDER, highlightthickness=1)
+            block.pack(fill=tk.X, padx=16, pady=8)
+            tk.Label(block, text=heading, font=(font_name, 14, 'bold'),
+                     fg=TEXT, bg=GOLD_BAR, anchor='w', justify=tk.LEFT,
+                     wraplength=670, padx=10, pady=8).pack(fill=tk.X)
+            grid = tk.Frame(block, bg=BORDER)
+            grid.pack(fill=tk.X)
+            matrix = [headers] + rows
+            count = len(headers)
+            table_font = tkfont.Font(family=font_name, size=12)
+            preferences = [max(55, min(260, max(table_font.measure(line)
+                           for row in matrix for line in str(row[col]).split('\n'))))
+                           for col in range(count)]
+            available = 694
+            remainder = available - 70 * count
+            widths = [70 + remainder * value // sum(preferences) for value in preferences]
+            widths[-1] += available - sum(widths)
+            for col, column_width in enumerate(widths):
+                grid.grid_columnconfigure(col, minsize=column_width, weight=1)
+            for r, row in enumerate(matrix):
+                for col, value in enumerate(row):
+                    bg = GOLD_BAR if r == 0 else (PANEL if r % 2 else '#fbf6e9')
+                    tk.Label(grid, text=value, font=(font_name, 12, 'bold' if r == 0 else 'normal'),
+                             fg=TEXT if r == 0 else MUTED, bg=bg, anchor='w', justify=tk.LEFT,
+                             wraplength=widths[col] - 16, padx=7, pady=7,
+                             relief=tk.SOLID, borderwidth=1).grid(row=r, column=col, sticky='nsew')
 
-        outside = {
-            "outside_0": "小",
-            "outside_1": "双",
-            "outside_2": "红",
-            "outside_3": "黑",
-            "outside_4": "单",
-            "outside_5": "大",
-        }
-        dozens = {
-            "dozen_1": "第一打 1—12",
-            "dozen_2": "第二打 13—24",
-            "dozen_3": "第三打 25—36",
-        }
+        def draw_illustration(parent_frame, illustration):
+            kind, data = illustration
+            cv = tk.Canvas(parent_frame, width=704, height=355 if kind != 'track' else 310,
+                           bg=PANEL, highlightthickness=0)
+            cv.pack(padx=12, pady=(5, 10))
+            INK, GREEN, BLUE = TEXT, '#24463B', '#B9E1EE'
+            FONT = font_name
 
-        def table(left, top, marks=(), legs=()):
-            """使用游戏实际投注坐标，绘制全部指定落点。"""
-            scale = 0.95
-            covered = (
-                set().union(*(s["numbers"] for s, _ in legs))
-                if legs else set()
-            )
+            def text(x, y, value, size=12, color=TEXT, bold=False, anchor='nw', wrap=None):
+                return cv.create_text(x, y, text=value, fill=color, anchor=anchor,
+                                      justify='center' if anchor == 'center' else 'left',
+                                      font=(FONT, size, 'bold' if bold else 'normal'), width=wrap or 0)
 
-            for s in self.bet_spots:
-                kind = s["type"]
-                if kind not in {
-                    "straight", "dozen", "column",
-                    "color", "odd_even", "high_low",
-                }:
-                    continue
-
-                x1, y1, x2, y2 = s["bounds"]
-                box = (
-                    left + x1 * scale,
-                    top + y1 * scale,
-                    left + x2 * scale,
-                    top + y2 * scale,
+            outside = dict(zip(('outside_' + str(i) for i in range(6)), ('小', '双', '红', '黑', '单', '大')))
+            dozens = {'dozen_1': '第一打 1—12', 'dozen_2': '第二打 13—24', 'dozen_3': '第三打 25—36'}
+            def table(left, top, marks=(), legs=()):
+                """使用游戏实际投注坐标，绘制全部指定落点。"""
+                scale = 1.3
+                covered = (
+                    set().union(*(s["numbers"] for s, _ in legs))
+                    if legs else set()
                 )
-
-                fill, ink = GREEN, "white"
-
-                if kind == "straight":
-                    label = next(iter(s["numbers"]))
-                    if label == "0":
+    
+                for s in self.bet_spots:
+                    kind = s["type"]
+                    if kind not in {
+                        "straight", "dozen", "column",
+                        "color", "odd_even", "high_low",
+                    }:
+                        continue
+    
+                    x1, y1, x2, y2 = s["bounds"]
+                    box = (
+                        left + x1 * scale,
+                        top + y1 * scale,
+                        left + x2 * scale,
+                        top + y2 * scale,
+                    )
+    
+                    fill, ink = GREEN, "white"
+    
+                    if kind == "straight":
+                        label = next(iter(s["numbers"]))
+                        if label == "0":
+                            fill = "#096B57"
+                        elif int(label) in RED_NUMBERS:
+                            fill = "#B43B44"
+                        else:
+                            fill = "#17211C"
+    
+                        if label in covered:
+                            fill, ink = BLUE, "#102A38"
+    
+                    elif kind == "dozen":
+                        label = dozens[s["id"]]
+    
+                    elif kind == "column":
+                        label = "列注"
+    
+                    else:
+                        label = outside[s["id"]]
+                        if s["id"] == "outside_2":
+                            fill = "#B43B44"
+                        elif s["id"] == "outside_3":
+                            fill = "#17211C"
+    
+                    cv.create_rectangle(
+                        *box,
+                        fill=fill,
+                        outline="#92AA9F",
+                        width=1,
+                    )
+                    text(
+                        (box[0] + box[2]) / 2,
+                        (box[1] + box[3]) / 2,
+                        label,
+                        10 if kind == "dozen" else 11,
+                        ink,
+                        True,
+                        "center",
+                    )
+    
+                # 空心圆保留原有文字位置。
+                # 此类型的所有合法落点一次画出。
+                for s in marks:
+                    sx, sy = s["center"]
+                    x = left + sx * scale
+                    y = top + sy * scale
+    
+                    if s["type"] == "straight":
+                        radius = 13
+                    elif s["type"] in {
+                        "dozen", "column", "color",
+                        "odd_even", "high_low",
+                    }:
+                        radius = 17
+                    else:
+                        radius = 6
+    
+                    cv.create_oval(
+                        x - radius, y - radius,
+                        x + radius, y + radius,
+                        fill="",
+                        outline=GOLD_BAR,
+                        width=2,
+                    )
+    
+                # 跑道区域示例：每单位25。
+                for s, units in legs:
+                    sx, sy = s["center"]
+                    x = left + sx * scale
+                    y = top + sy * scale
+    
+                    cv.create_oval(
+                        x - 12, y - 12,
+                        x + 12, y + 12,
+                        fill=GOLD,
+                        outline=INK,
+                        width=1,
+                    )
+                    text(
+                        x, y, str(25 * units),
+                        9, INK, True, "center",
+                    )
+            def track(top, neighbor_center=None, count=2):
+                """保留游戏原有数字顺序、分区边界和跑道几何算法。"""
+                ox, oy, scale = 12, top, 1.3
+    
+                def coords(points):
+                    return [
+                        value
+                        for x, yy in points
+                        for value in (
+                            ox + x * scale,
+                            oy + yy * scale,
+                        )
+                    ]
+    
+                for i, number in enumerate(RACETRACK_SEQUENCE):
+                    fractions = [
+                        (i + j / 6) / len(RACETRACK_SEQUENCE)
+                        for j in range(7)
+                    ]
+                    points = [
+                        self._racetrack_point(t, RACETRACK_OUTER_R)
+                        for t in fractions
+                    ]
+                    points += [
+                        self._racetrack_point(t, RACETRACK_INNER_R)
+                        for t in reversed(fractions)
+                    ]
+    
+                    if number == "0":
                         fill = "#096B57"
-                    elif int(label) in RED_NUMBERS:
+                    elif int(number) in RED_NUMBERS:
                         fill = "#B43B44"
                     else:
                         fill = "#17211C"
-
-                    if label in covered:
-                        fill, ink = BLUE, "#102A38"
-
-                elif kind == "dozen":
-                    label = dozens[s["id"]]
-
-                elif kind == "column":
-                    label = "2:1"
-
-                else:
-                    label = outside[s["id"]]
-                    if s["id"] == "outside_2":
-                        fill = "#B43B44"
-                    elif s["id"] == "outside_3":
-                        fill = "#17211C"
-
-                cv.create_rectangle(
-                    *box,
-                    fill=fill,
-                    outline="#92AA9F",
-                    width=1,
-                )
-                text(
-                    (box[0] + box[2]) / 2,
-                    (box[1] + box[3]) / 2,
-                    label,
-                    10 if kind == "dozen" else 11,
-                    ink,
-                    True,
-                    "center",
-                )
-
-            # 空心圆保留原有文字位置。
-            # 此类型的所有合法落点一次画出。
-            for s in marks:
-                sx, sy = s["center"]
-                x = left + sx * scale
-                y = top + sy * scale
-
-                if s["type"] == "straight":
-                    radius = 13
-                elif s["type"] in {
-                    "dozen", "column", "color",
-                    "odd_even", "high_low",
-                }:
-                    radius = 17
-                else:
-                    radius = 6
-
-                cv.create_oval(
-                    x - radius, y - radius,
-                    x + radius, y + radius,
-                    fill="",
-                    outline=GOLD,
-                    width=2,
-                )
-
-            # 跑道区域示例：每单位25。
-            for s, units in legs:
-                sx, sy = s["center"]
-                x = left + sx * scale
-                y = top + sy * scale
-
-                cv.create_oval(
-                    x - 12, y - 12,
-                    x + 12, y + 12,
-                    fill=GOLD,
-                    outline=INK,
-                    width=1,
-                )
-                text(
-                    x, y, str(25 * units),
-                    9, INK, True, "center",
-                )
-
-        # ==================== 01 主盘全部落点 ====================
-        groups = [
-            (
-                "直注", {"straight"}, "35:1",
-                "每个号码格中心，包括0。",
-            ),
-            (
-                "分注", {"split"}, "17:1",
-                "两个相邻号码的共用边，包括零区分注。",
-            ),
-            (
-                "街注与零区三号注", {"street"}, "11:1",
-                "12条街注，以及0/1/2、0/2/3两个三号注。",
-            ),
-            (
-                "角注", {"corner"}, "8:1",
-                "四个号码的交点；一次覆盖四个号码。",
-            ),
-            (
-                "六线注", {"six_line"}, "5:1",
-                "两条街的共用端点；一次覆盖六个号码。",
-            ),
-            (
-                "打注", {"dozen"}, "2:1",
-                "第一打1—12；第二打13—24；第三打25—36。",
-            ),
-            (
-                "列注", {"column"}, "2:1",
-                "右侧三个位置，每个位置覆盖对应一列的12个号码。",
-            ),
-            (
-                "大小、单双、红黑",
-                {"high_low", "odd_even", "color"},
-                "1:1",
-                "小1—18，大19—36；六个外围位置均不含0。",
-            ),
-        ]
-
-        total = sum(
-            1 for s in self.bet_spots
-            if any(s["type"] in group[1] for group in groups)
-        )
-
-        y = section(
-            24,
-            "01",
-            "主投注盘 · 全部下注位置",
-            f"共 {total} 个合法落点。金色空心圆就是下注中心；"
-            "下列8张图同时展示，无须切换。",
-        )
-
-        for i, (name, kinds, odds, hint) in enumerate(groups):
-            x = 24 + (i % 2) * 536
-            top = y + (i // 2) * 386
-            marks = [
-                s for s in self.bet_spots
-                if s["type"] in kinds
-            ]
-
-            card(x, top, 516, 366)
-
-            text(x + 18, top + 20, name, 15, INK, True)
-            text(
-                x + 18, top + 53,
-                f"{len(marks)}个落点   ·   净赢赔率 {odds}",
-                11, MUTED,
-            )
-
-            table(x + 12, top + 76, marks=marks)
-
-            text(
-                x + 18, top + 323,
-                hint, 11, MUTED, wrap=478,
-            )
-
-        y += 4 * 386 + 4
-
-        # ==================== 跑道共用绘图 ====================
-        def track(top, neighbor_center=None, count=2):
-            """保留游戏原有数字顺序、分区边界和跑道几何算法。"""
-            ox, oy, scale = 66, top, 1.9
-
-            def coords(points):
-                return [
-                    value
-                    for x, yy in points
-                    for value in (
-                        ox + x * scale,
+    
+                    ink, edge = "white", "#92AA9F"
+    
+                    if neighbor_center is not None:
+                        distance = self._racetrack_distance(
+                            number, neighbor_center
+                        )
+                        if distance <= count:
+                            fills = RACETRACK_NEIGHBOR_HOVER_FILLS
+                            fill = fills[
+                                min(distance, len(fills) - 1)
+                            ]
+                            ink, edge = "#102A38", BORDER
+    
+                    cv.create_polygon(
+                        *coords(points),
+                        fill=fill,
+                        outline=edge,
+                        width=2,
+                    )
+    
+                    xx, yy = self._racetrack_point(
+                        (i + 0.5) / len(RACETRACK_SEQUENCE),
+                        73,
+                    )
+                    text(
+                        ox + xx * scale,
                         oy + yy * scale,
+                        number,
+                        11, ink, True, "center",
                     )
-                ]
-
-            for i, number in enumerate(RACETRACK_SEQUENCE):
-                fractions = [
-                    (i + j / 6) / len(RACETRACK_SEQUENCE)
-                    for j in range(7)
-                ]
-                points = [
-                    self._racetrack_point(t, RACETRACK_OUTER_R)
-                    for t in fractions
-                ]
-                points += [
-                    self._racetrack_point(t, RACETRACK_INNER_R)
-                    for t in reversed(fractions)
-                ]
-
-                if number == "0":
-                    fill = "#096B57"
-                elif int(number) in RED_NUMBERS:
-                    fill = "#B43B44"
-                else:
-                    fill = "#17211C"
-
-                ink, edge = "white", "#92AA9F"
-
-                if neighbor_center is not None:
-                    distance = self._racetrack_distance(
-                        number, neighbor_center
+    
+                # 先画底色，再画文字。
+                for region in RACETRACK_REGION_ORDER:
+                    cv.create_polygon(
+                        *coords(self._region_polygon(region)),
+                        fill=RACETRACK_REGION_COLORS[region][0],
+                        outline="#92AA9F",
+                        width=2,
                     )
-                    if distance <= count:
-                        fills = RACETRACK_NEIGHBOR_HOVER_FILLS
-                        fill = fills[
-                            min(distance, len(fills) - 1)
-                        ]
-                        ink, edge = "#102A38", BORDER
-
-                cv.create_polygon(
-                    *coords(points),
-                    fill=fill,
-                    outline=edge,
-                    width=2,
-                )
-
-                xx, yy = self._racetrack_point(
-                    (i + 0.5) / len(RACETRACK_SEQUENCE),
-                    73,
-                )
-                text(
-                    ox + xx * scale,
-                    oy + yy * scale,
-                    number,
-                    14, ink, True, "center",
-                )
-
-            # 先画底色，再画文字。
-            for region in RACETRACK_REGION_ORDER:
-                cv.create_polygon(
-                    *coords(self._region_polygon(region)),
-                    fill=RACETRACK_REGION_COLORS[region][0],
-                    outline="#92AA9F",
-                    width=2,
-                )
-
-            for region in RACETRACK_REGION_ORDER:
-                cx, cy = self._region_center(region)
-                dx, dy = {
-                    "tiers": (-6, 9),
-                    "voisins": (-8, -8),
-                }.get(region, (0, 0))
-
-                xx = ox + (cx + dx) * scale
-                yy = oy + (cy + dy) * scale
-
-                text(
-                    xx, yy - 15,
-                    FRENCH_BETS[region]["label"],
-                    13, "white", True, "center",
-                )
-                text(
-                    xx, yy + 17,
-                    FRENCH_BETS[region]["zh"],
-                    13, "white", True, "center",
-                )
-
-        # ==================== 02 四个区域全部展开 ====================
-        y = section(
-            y,
-            "02",
-            "跑道盘 · 四个区域全部展开",
-            "下图展示区域边界；随后四张图分别列出各组合"
-            "在主投注盘上的全部筹码落点。",
-        )
-
-        card(24, y, 1052, 426)
-        track(y + 10)
-        y += 448
-
-        for i, region in enumerate(regions):
-            x = 24 + (i % 2) * 536
-            top = y + (i // 2) * 442
-
-            legs = self._region_legs(region)
-            units = sum(n for _, n in legs)
-            covered = set().union(
-                *(s["numbers"] for s, _ in legs)
-            )
-
-            # 同一号码命中多笔子注时，合并计算返还。
-            returns = sorted({
-                sum(
-                    25 * n * (s["payout"] + 1)
-                    for s, n in legs
-                    if number in s["numbers"]
-                )
-                for number in covered
-            })
-
-            card(x, top, 516, 422)
-
-            text(
-                x + 18, top + 20,
-                FRENCH_BETS[region]["zh"],
-                16, INK, True,
-            )
-            text(
-                x + 18, top + 52,
-                FRENCH_BETS[region]["label"],
-                11, MUTED,
-            )
-            text(
-                x + 18, top + 79,
-                f"{units}单位 · {len(legs)}个落点 · "
-                f"覆盖{len(covered)}个号码",
-                11, BORDER, True,
-            )
-
-            table(x + 12, top + 102, legs=legs)
-
-            text(
-                x + 18, top + 353,
-                f"每单位25：总下注 ${25 * units}；筹码数字为金额。",
-                11, MUTED,
-            )
-            text(
-                x + 18, top + 382,
-                "命中返还："
-                + " / ".join(f"${value}" for value in returns)
-                + "（含中奖本金）",
-                11, INK,
-            )
-
-        y += 2 * 442 + 4
-
-        # ==================== 03 邻号说明 ====================
-        y = section(
-            y,
-            "03",
-            "邻号下注 · 按轮盘顺序覆盖",
-            "跑道上的37个号码都可作为中心。中心加左右各0—5个邻号，"
-            "分别形成1、3、5、7、9、11个直注。",
-        )
-
-        card(24, y, 1052, 482)
-        text(
-            44, y + 20,
-            "示例：以0为中心，左右各2个邻号",
-            15, INK, True,
-        )
-
-        track(y + 55, neighbor_center="0", count=2)
-
-        text(
-            44, y + 448,
-            "覆盖3、26、0、32、15；每号25，总下注125。"
-            "命中任一号返还900，本局净赢775。",
-            11, MUTED,
-        )
-        y += 506
-
-        # ==================== 04 操作与赔付 ====================
-        y = section(
-            y,
-            "04",
-            "下注与赔付须知",
-            "图解仅用于说明，打开此窗口不会改变你的下注或余额。",
-        )
-
-        notes = [
-            (
-                "标准赔率",
-                "赔率均为净赢赔率。"
-                "中奖返还＝中奖子注金额×（赔率＋1）×倍数；"
-                "本局净额＝全部返还－全部下注。",
-            ),
-            (
-                "组合赔付",
-                "区域下注拆成主盘子注后分别结算。"
-                "孤儿序列开出17会同时命中两笔分注；"
-                "未覆盖号码的返还为0。",
-            ),
-            (
-                "下注限额",
-                "区域下注超过上限时，按完整组合比例补至可用上限；"
-                "已有主盘下注及重叠区域共用限额。",
-            ),
-            (
-                "筹码与动画",
-                "区域筹码先放在区域中心。"
-                "开局保留当前视图，以0.75秒完成主盘筹码拆分定位；"
-                "中奖区域同步闪烁。",
-            ),
-            (
-                "零与倒计时",
-                "0不属于大小、单双、红黑、打注或列注。"
-                "说明窗口不会暂停倒计时，需要时请先暂停游戏。",
-            ),
-        ]
-
-        for title, body in notes:
-            card(24, y, 1052, 102)
-            text(44, y + 18, title, 14, INK, True)
-            text(
-                44, y + 49,
-                body, 12, MUTED, wrap=1008,
-            )
-            y += 116
-
-        text(
-            24, y + 4,
-            "金额示例统一使用倍数1；实际游戏按当前倍数结算。",
-            11, MUTED,
-        )
-
-        cv.configure(scrollregion=(0, 0, 1100, y + 60))
-
-        # ==================== 滚轮与关闭 ====================
-        def wheel(event):
-            if getattr(event, "num", None) in (4, 5):
-                steps = -3 if event.num == 4 else 3
+    
+                for region in RACETRACK_REGION_ORDER:
+                    cx, cy = self._region_center(region)
+                    dx, dy = {
+                        "tiers": (-6, 9),
+                        "voisins": (-8, -8),
+                    }.get(region, (0, 0))
+    
+                    xx = ox + (cx + dx) * scale
+                    yy = oy + (cy + dy) * scale
+    
+                    text(
+                        xx, yy - 15,
+                        FRENCH_BETS[region]["title"],
+                        10, "white", True, "center",
+                    )
+                    text(
+                        xx, yy + 17,
+                        FRENCH_BETS[region]["zh"],
+                        10, "white", True, "center",
+                    )
+            if kind == 'track':
+                track(4, neighbor_center=data)
+            elif kind == 'board':
+                table(12, 8, marks=[s for s in self.bet_spots if s['type'] in data])
             else:
-                delta = getattr(event, "delta", 0)
-                if not delta:
-                    return
-                steps = max(1, int(abs(delta) / 120))
-                if delta > 0:
-                    steps = -steps
+                table(12, 8, legs=self._region_legs(data))
 
-            cv.yview_scroll(steps, "units")
-            return "break"
+        def render_page(index):
+            for child in content.winfo_children():
+                child.destroy()
+            for idx, button in enumerate(nav_buttons):
+                button.configure(bg='#e6d9b9' if idx == index else SIDEBAR,
+                                 fg=GOLD if idx == index else MUTED)
+            page_title, subtitle, cards = manual_pages[index]
+            top = tk.Frame(content, bg=BG)
+            top.pack(fill=tk.X, padx=18, pady=(16, 7))
+            label(top, page_title, 20, True, GOLD, BG)
+            label(top, subtitle, bg=BG)
+            for card_title, card_subtitle, rules, tables, illustration in cards:
+                card = tk.Frame(content, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
+                card.pack(fill=tk.X, padx=10, pady=7)
+                head = tk.Frame(card, bg=PANEL)
+                head.pack(fill=tk.X, padx=16, pady=(12, 6))
+                label(head, card_title, 16, True, GOLD)
+                if card_subtitle:
+                    label(head, card_subtitle)
+                if illustration:
+                    draw_illustration(card, illustration)
+                for heading, detail in rules:
+                    add_rule(card, heading, detail)
+                for heading, headers, rows in tables:
+                    add_table(card, heading, headers, rows)
+                tk.Frame(card, bg=PANEL, height=8).pack(fill=tk.X)
+            content.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox('all'))
+            canvas.yview_moveto(0)
+            canvas.xview_moveto(0)
 
-        win.bind("<MouseWheel>", wheel)
-        win.bind("<Button-4>", wheel)
-        win.bind("<Button-5>", wheel)
-        win.bind("<Escape>", lambda event: close())
-        win.protocol("WM_DELETE_WINDOW", close)
-        win.after_idle(win.focus_set)
+        nav_buttons = []
+        for index, (page_title, _subtitle, _cards) in enumerate(manual_pages):
+            button = tk.Button(sidebar, text=page_title, command=lambda i=index: render_page(i),
+                               font=(font_name, 14), fg=MUTED, bg=SIDEBAR,
+                               activebackground='#e8d49a', activeforeground=GOLD,
+                               relief=tk.FLAT, bd=0, anchor='w', padx=18, pady=10, cursor='hand2')
+            button.pack(fill=tk.X)
+            nav_buttons.append(button)
+
+        def on_mousewheel(event):
+            number = getattr(event, 'num', None)
+            delta = getattr(event, 'delta', 0)
+            if number in (4, 5):
+                steps = -1 if number == 4 else 1
+            elif delta:
+                steps = max(1, int(abs(delta) / 120)) * (-1 if delta > 0 else 1)
+            else:
+                return
+            canvas.yview_scroll(steps, 'units')
+            return 'break'
+
+        dialog.bind('<MouseWheel>', on_mousewheel)
+        dialog.bind('<Button-4>', on_mousewheel)
+        dialog.bind('<Button-5>', on_mousewheel)
+        dialog.bind('<Escape>', lambda _e: close_dialog())
+        dialog.protocol('WM_DELETE_WINDOW', close_dialog)
+        render_page(0)
+        dialog.focus_set()
 
     def start_game(self):
         """强制开始游戏：下注阶段立即旋转，结果阶段跳转到新的一局"""

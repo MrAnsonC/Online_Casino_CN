@@ -9,227 +9,214 @@ from A_Tools.Account import install_secure_json as _install_secure_json
 _install_secure_json()
 del _install_secure_json, _account_root, _AccountPath, _account_sys
 
+from A_Tools.Progressive.secure_json import (
+    DATA_PATH as _progressive_file,
+    install_secure_json as _install_progressive_secure_json,
+)
+_install_progressive_secure_json()
+del _install_progressive_secure_json
+
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from PIL import Image, ImageTk, ImageDraw, ImageFont
 
-# ==================== Progressive 向下翻牌数字 ====================
-class ProgressiveFlipDisplay(tk.Canvas):
-    """金额更新时逐位向下翻牌；每步 600ms 翻动 + 200ms 停留。
+# ==================== Progressive 七段显示器：7 位整数 + 2 位小数 ====================
+class ProgressiveSevenSegmentReadout:
+    """用 Canvas 多边形绘制七段数字，无须安装数码管字体。"""
 
-    每位仅允许 n -> (n + 1) % 10。更新中收到的新金额在下一步
-    接管目标，不中断正在翻动的牌。StringVar 始终保存真实金额。
-    """
-    FLIP_MS = 600
-    HOLD_MS = 200
-    FRAME_MS = 16
-    INTEGER_DIGITS = 6  # 6 位整数 + 2 位小数，共 8 位数字
+    INTEGER_DIGITS = 7
+    SEGMENTS = {
+        '0': 'abcdef', '1': 'bc', '2': 'abdeg', '3': 'abcdg',
+        '4': 'bcfg', '5': 'acdfg', '6': 'acdefg', '7': 'abc',
+        '8': 'abcdefg', '9': 'abcdfg',
+    }
 
-    def __init__(self, master, textvariable, font=('Arial', 20, 'bold'),
-                 bg='#F2E6C9', fg='#A88100', **kwargs):
-        import time as _flip_time
-        import math as _flip_math
-        from tkinter import font as _tk_font
-        self._clock = _flip_time.monotonic
-        self._cos = _flip_math.cos
-        self._pi = _flip_math.pi
-        self._variable = textvariable
-        self._foreground = fg
-        self._job = None
-        self._closed = False
-        self._phase = 'idle'
-        self._progress = 1.0
-        self._glyphs = {}
-        self._photos = []
-        super().__init__(master, bg=bg, highlightthickness=0, bd=0, **kwargs)
-        metrics = _tk_font.Font(root=self, font=font)
-        pixels = max(12, abs(round(metrics.actual('size') * self.winfo_fpixels('1p'))))
-        self._card_width = max(18, metrics.measure('0') + 6)
-        self._card_height = max(28, metrics.metrics('linespace') + 8)
-        self._card_height += self._card_height % 2
-        self._font = None
-        for name in ('arialbd.ttf', 'Arial Bold.ttf', 'DejaVuSans-Bold.ttf',
-                     '/System/Library/Fonts/Supplemental/Arial Bold.ttf'):
-            try:
-                self._font = ImageFont.truetype(name, pixels)
-                break
-            except OSError:
-                pass
-        if self._font is None:
-            try:
-                self._font = ImageFont.load_default(size=pixels)
-            except TypeError:
-                self._font = ImageFont.load_default()
-        self._target = self._format_amount(textvariable.get())
-        self._digits = self._extract(self._target)
-        self._next = self._digits[:]
-        self._layout = self._target
-        self._draw()
-        self._trace = textvariable.trace_add('write', self._changed)
-        self.bind('<Destroy>', self._on_destroy, add='+')
+    def __init__(self, canvas, width, height, fg='#FFE29A'):
+        self.canvas = canvas
+        self.width = float(width)
+        self.height = float(height)
+        self.foreground = fg
+        self.background = '#08150F'
+        self.inactive = '#243025'
+        self.text = None
+        self._tag = 'progressive_seven_segment_' + str(id(self))
+        self._content_tag = self._tag + '_content'
+        self._digit_items = []
+        self._separator_items = []
 
     @classmethod
-    def _format_amount(cls, value):
-        """补足八位数字；货币符号、逗号和小数点不计入位数。
-
-        超出六位整数时保留完整金额，避免截断真实大奖数值。
-        """
+    def format_amount(cls, value):
+        """整数按实际位数居中，不为前置零留空；固定两位小数。"""
         from decimal import Decimal, ROUND_HALF_UP
         amount = Decimal(str(value).replace('$', '').replace(',', '').strip())
+        if not amount.is_finite():
+            raise ValueError('Progressive amount must be finite')
         amount = amount.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-        sign = '-' if amount < 0 else ''
+        sign = '−' if amount < 0 else ''
         integer, fraction = format(abs(amount), '.2f').split('.')
-        integer = integer.zfill(cls.INTEGER_DIGITS)
         groups = [integer[max(0, i-3):i] for i in range(len(integer), 0, -3)]
         return '$' + sign + ','.join(reversed(groups)) + '.' + fraction
 
     @staticmethod
-    def _extract(text):
-        return [int(c) for c in text if c in '0123456789']
+    def _polygons():
+        def horizontal(y):
+            return ((.18, y), (.82, y), (.96, y+.09),
+                    (.82, y+.18), (.18, y+.18), (.04, y+.09))
+
+        def vertical(x, y):
+            return ((x+.09, y), (x+.18, y+.12), (x+.18, y+.68),
+                    (x+.09, y+.80), (x, y+.68), (x, y+.12))
+
+        return dict(a=horizontal(0), b=vertical(.82, .15),
+                    c=vertical(.82, 1.05), d=horizontal(1.82),
+                    e=vertical(0, 1.05), f=vertical(0, .15),
+                    g=horizontal(.91))
+
+    def set_amount(self, value):
+        text = self.format_amount(value)
+        if text == self.text:
+            return
+        previous = self.text
+        self.text = text
+        if previous is None or len(previous) != len(text) or ('−' in previous) != ('−' in text):
+            self._build()
+        else:
+            self._paint_digits()
+
+    def resize(self, width, height):
+        width, height = float(width), float(height)
+        if (width, height) != (self.width, self.height):
+            self.width, self.height = width, height
+            if self.text is not None:
+                self._build()
+
+    def _build(self):
+        c = self.canvas
+        c.delete(self._tag)
+        self._digit_items = []
+        self._separator_items = []
+        c.create_rectangle(0, 0, self.width, self.height,
+                           fill=self.background, outline='#4A5B3C', width=1,
+                           tags=self._tag)
+        padding = min(4.0, self.height / 10.0)
+        # 只计算实际显示的字符；未使用的整数位不会占据宽度。
+        # 每位数字宽度相同；千位用撇形 DP，小数分隔仍用圆点。
+        advances = [1.20 if ch in self.SEGMENTS else .85 if ch == '$' else
+                    .36 if ch in '.,' else .65 for ch in self.text]
+        units = sum(advances) - .20
+        digit_width = min(max(1.0, self.width-2*padding) / units,
+                          max(1.0, self.height-2*padding) * .72)
+        digit_height = min(max(1.0, self.height-2*padding), digit_width / .58)
+        x = (self.width-units*digit_width) / 2.0
+        y = (self.height-digit_height) / 2.0
+        shapes = self._polygons()
+        for char, advance in zip(self.text, advances):
+            if char in self.SEGMENTS:
+                items = {}
+                for segment, points in shapes.items():
+                    coordinates = [v for px, py in points
+                                   for v in (x+px*digit_width, y+py*digit_height/2.0)]
+                    items[segment] = c.create_polygon(
+                        *coordinates, fill=self.inactive, outline='',
+                        tags=(self._tag, self._content_tag, 'progressive_digit'))
+                self._digit_items.append(items)
+            elif char == ',':
+                # 独立于数字单元的撇形千位分隔符，向左下方收尖；不是圆点。
+                mark_x = x + advance*digit_width*.12
+                mark_width = advance*digit_width*.74
+                points = ((.45, .78), (1.0, .80), (.83, .89),
+                          (.09, 1.0), (0, .97), (.41, .86))
+                coordinates = [v for px, py in points
+                               for v in (mark_x+px*mark_width, y+py*digit_height)]
+                item = c.create_polygon(*coordinates, fill=self.foreground, outline='',
+                                        tags=(self._tag, self._content_tag, 'progressive_modified_dp',
+                                              'progressive_thousands_separator'))
+                self._separator_items.append((len(self._digit_items), item))
+            elif char == '.':
+                diameter = max(1.0, digit_width * .18)
+                dot_x = x + (advance*digit_width-diameter)/2.0
+                c.create_oval(dot_x, y+digit_height-diameter,
+                              dot_x+diameter, y+digit_height,
+                              fill=self.foreground, outline='',
+                              tags=(self._tag, self._content_tag, 'progressive_decimal'))
+            elif char == '−':
+                c.create_rectangle(x, y+digit_height*.46,
+                                   x+digit_width*.48, y+digit_height*.54,
+                                   fill=self.foreground, outline='',
+                                   tags=(self._tag, self._content_tag))
+            else:
+                # 货币符号的右边紧邻首位数字，不夹带空槽。
+                c.create_text(x+advance*digit_width-1, y+digit_height*.53,
+                              text='$', anchor='e', fill=self.foreground,
+                              font=('Arial', -max(8, round(digit_height*.78)), 'bold'),
+                              tags=(self._tag, self._content_tag, 'progressive_currency'))
+            x += advance*digit_width
+        self._paint_digits()
+        # 根据实际字体和图形边界，把钱符号及整串金额一起居中。
+        bounds = c.bbox(self._content_tag)
+        if bounds is not None:
+            c.move(self._content_tag, (self.width-bounds[0]-bounds[2])/2.0, 0)
+
+    def _paint_digits(self):
+        digits = (char for char in self.text if char in self.SEGMENTS)
+        for char, items in zip(digits, self._digit_items):
+            active = self.SEGMENTS[char]
+            for segment, item in items.items():
+                self.canvas.itemconfigure(
+                    item, state='normal',
+                    fill=self.foreground if segment in active else self.inactive)
+
+
+class ProgressiveSevenSegmentDisplay(tk.Canvas):
+    """绑定原有 StringVar，金额更新时立即点亮正确的七段数字。"""
+
+    INTEGER_DIGITS = 7
+
+    def __init__(self, master, textvariable, font=('Arial', 20, 'bold'),
+                 bg='#F2E6C9', fg='#A88100', **kwargs):
+        self._variable = textvariable
+        self._closed = False
+        kwargs.setdefault('width', 300)
+        kwargs.setdefault('highlightthickness', 0)
+        kwargs.setdefault('bd', 0)
+        super().__init__(master, bg=bg, **kwargs)
+        size = font[1] if isinstance(font, (tuple, list)) and len(font) > 1 else 20
+        pixels = abs(size) if size < 0 else size*self.winfo_fpixels('1p')
+        if 'height' not in kwargs:
+            self.configure(height=max(28, min(44, round(pixels*1.3))))
+        self._readout = ProgressiveSevenSegmentReadout(
+            self, self.cget('width'), self.cget('height'), fg=fg)
+        self._readout.set_amount(textvariable.get())
+        self._trace = textvariable.trace_add('write', self._changed)
+        self.bind('<Configure>', self._resized, add='+')
+        self.bind('<Destroy>', self._on_destroy, add='+')
+
+    @classmethod
+    def _format_amount(cls, value):
+        return ProgressiveSevenSegmentReadout.format_amount(value)
 
     def _changed(self, *_):
-        if self._closed:
-            return
-        self._target = self._format_amount(self._variable.get())
-        if self._phase == 'idle' and self._job is None:
-            # 合并同一个事件处理函数内的多次金额更新。
-            self._job = self.after_idle(self._begin)
+        if not self._closed:
+            self._readout.set_amount(self._variable.get())
 
-    def _begin(self):
-        self._job = None
-        if self._closed:
-            return
-        goal = self._extract(self._target)
-        width = max(len(goal), len(self._digits))
-        self._digits = [0] * (width - len(self._digits)) + self._digits
-        goal = [0] * (width - len(goal)) + goal
-        if self._digits == goal:
-            self._digits = self._extract(self._target)
-            self._next = self._digits[:]
-            self._layout = self._target
-            self._phase = 'idle'
-            self._draw()
-            return
-        # 按右侧小数位对齐；缩位时保留前导零，全部到位后才收起。
-        raw = ''.join(str(n) for n in goal)
-        if '.' in self._target:
-            decimals = len(self._target.rsplit('.', 1)[1])
-        else:
-            decimals = 0
-        integer = raw[:-decimals] if decimals else raw
-        groups = [integer[max(0, i-3):i] for i in range(len(integer), 0, -3)]
-        grouped = ','.join(reversed(groups))
-        prefix = self._target[:next((i for i, c in enumerate(self._target)
-                                    if c in '0123456789'), len(self._target))]
-        self._layout = prefix + grouped + ('.' + raw[-decimals:] if decimals else '')
-        self._next = [(old + 1) % 10 if old != wanted else old
-                      for old, wanted in zip(self._digits, goal)]
-        self._phase = 'flip'
-        self._started = self._clock()
-        self._tick()
+    def set_amount_immediately(self, value):
+        """大奖扣款时同步显示余额，保留原有派彩动画接口。"""
+        if not self._closed:
+            self._variable.set(value)
 
-    def _tick(self):
-        self._job = None
-        if self._closed:
-            return
-        elapsed = (self._clock() - self._started) * 1000.0
-        self._progress = min(1.0, elapsed / self.FLIP_MS)
-        self._draw()
-        if elapsed >= self.FLIP_MS:
-            self._digits = self._next[:]
-            self._phase = 'hold'
-            self._job = self.after(self.HOLD_MS, self._begin)
-        else:
-            self._job = self.after(min(self.FRAME_MS, max(1, round(self.FLIP_MS - elapsed))),
-                                   self._tick)
-
-    def _rgb(self, color):
-        return tuple(value // 257 for value in self.winfo_rgb(color))
-
-    def _glyph(self, char):
-        if char not in self._glyphs:
-            bg = self._rgb(self.cget('bg'))
-            canvas = Image.new('RGB', (self._card_width, self._card_height), bg)
-            draw = ImageDraw.Draw(canvas)
-            if char in '0123456789':
-                draw.rounded_rectangle((0, 0, self._card_width-1, self._card_height-1), radius=3,
-                                       fill=tuple(min(255, c+8) for c in bg),
-                                       outline=tuple(max(0, c-35) for c in bg))
-            box = draw.textbbox((0, 0), char, font=self._font)
-            # 所有字符共用数字的文字基线；逗号、小数点不能单独垂直居中。
-            digit_box = draw.textbbox((0, 0), '0', font=self._font)
-            text_y = (self._card_height-(digit_box[3]-digit_box[1]))/2-digit_box[1]
-            draw.text(((self._card_width-(box[2]-box[0]))/2-box[0],
-                       text_y),
-                      char, font=self._font, fill=self._rgb(self._foreground))
-            self._glyphs[char] = canvas
-        return self._glyphs[char]
-
-    def _draw(self):
-        self.delete('all')
-        self._photos = []
-        x = 0
-        index = 0
-        half = self._card_height // 2
-        for char in self._layout:
-            if char in '0123456789':
-                old = self._glyph(str(self._digits[index]))
-                new = self._glyph(str(self._next[index]))
-                frame = old.copy()
-                if self._phase == 'flip' and self._digits[index] != self._next[index]:
-                    p = self._progress
-                    # 新牌上半部在后，旧牌下半部在后；翻片绕中轴向下。
-                    frame.paste(new.crop((0, 0, self._card_width, half)), (0, 0))
-                    if p < 0.5:
-                        height = max(1, round(half * self._cos(self._pi * p)))
-                        flap = old.crop((0, 0, self._card_width, half))
-                        frame.paste(flap.resize((self._card_width, height), Image.Resampling.LANCZOS),
-                                    (0, half-height))
-                    else:
-                        height = max(1, round(half * -self._cos(self._pi * p)))
-                        flap = new.crop((0, half, self._card_width, self._card_height))
-                        frame.paste(flap.resize((self._card_width, height), Image.Resampling.LANCZOS),
-                                    (0, half))
-                ImageDraw.Draw(frame).line((1, half, self._card_width-2, half),
-                                           fill=self._rgb(self.cget('bg')))
-                index += 1
-                advance = self._card_width + 2
-            else:
-                frame = self._glyph(char)
-                advance = self._card_width if char == '$' else max(6, self._card_width // 2)
-                frame = frame.crop(((self._card_width-advance)//2, 0,
-                                    (self._card_width-advance)//2+advance, self._card_height))
-            photo = ImageTk.PhotoImage(frame, master=self)
-            self._photos.append(photo)
-            self.create_image(x, 0, image=photo, anchor='nw')
-            x += advance
-        super().configure(width=max(1, x), height=self._card_height)
-
-    def configure(self, cnf=None, **kwargs):
-        result = super().configure(cnf, **kwargs)
-        if hasattr(self, '_layout') and ('bg' in kwargs or 'background' in kwargs or
-                isinstance(cnf, dict) and ('bg' in cnf or 'background' in cnf)):
-            self._glyphs.clear()
-            self._draw()
-        return result
-
-    config = configure
+    def _resized(self, event):
+        if event.widget is self and not self._closed:
+            self._readout.resize(event.width, event.height)
 
     def _on_destroy(self, event):
         if event.widget is not self or self._closed:
             return
         self._closed = True
-        if self._job is not None:
-            try:
-                self.after_cancel(self._job)
-            except tk.TclError:
-                pass
-            self._job = None
         try:
             self._variable.trace_remove('write', self._trace)
         except tk.TclError:
             pass
-# ==================== Progressive 翻牌控件结束 ====================
+# ==================== Progressive 七段显示器结束 ====================
 
 
 import random
@@ -238,6 +225,7 @@ import os
 from collections import Counter
 from itertools import combinations
 import math
+import hashlib
 import secrets
 import subprocess, sys
 import time
@@ -325,7 +313,7 @@ def update_balance_in_json(username, new_balance):
 # =========================================================
 
 def load_jackpot():
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
+    path = str(_progressive_file)
     default_progressive = 271288.59
     if not os.path.exists(path):
         return True, default_progressive
@@ -340,7 +328,7 @@ def load_jackpot():
     return True, default_progressive
 
 def save_progressive(jackpot):
-    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
+    path = str(_progressive_file)
     data = []
     if os.path.exists(path):
         try:
@@ -521,7 +509,7 @@ class CHEGame:
         self.card_sequence = self.deck.card_sequence
     
     def dealer_qualifies(self, dealer_eval):
-        """检查庄家是否合格（至少有一对4或更好）"""
+        """检查庄家是否及格（至少有一对4或更好）"""
         if dealer_eval[0] > 1:
             return True
         elif dealer_eval[0] == 1:
@@ -649,1434 +637,2171 @@ def save_che_history(deck, player_cards, dealer_cards, community_cards, result_i
 # 主GUI类（CHEGUI）—— 基于UTH UI改造
 # =========================================================
 
+class CHETableGame:
+    """Casino Hold’em rules on the shared two-hand Ultimate table UI."""
+    SEATS = ('Player1', 'Player2')
+    MIN_PROGRESSIVE = 271288.59
+
+    def __init__(self):
+        self.progressive_amount = load_jackpot()[1]
+        self.reset_game()
+
+    @staticmethod
+    def empty_bet():
+        return dict(ante=0.0, aa=0.0, jackpot=0.0, call=0.0)
+
+    def reset_game(self):
+        self.deck = None
+        self.hands = {s: [] for s in self.SEATS}
+        self.dealer_hand, self.public_cards, self.deal_sequence = [], [], []
+        self.bets = {s: self.empty_bet() for s in self.SEATS}
+        self.decisions = {s: 'inactive' for s in self.SEATS}
+        self.stage, self.street = 'betting', 'pre_flop'
+        self.settlement = None
+        self.refunded_bets = {}
+
+    def start_round(self, bets, balance, high_bet_mode=False):
+        if self.stage != 'betting':
+            raise ValueError('本局尚未结束。')
+        minimum, maximum, side_max = (100, 50000, 12500) if high_bet_mode else (10, 10000, 2500)
+        prepared, refunded = {}, {}
+        for seat in self.SEATS:
+            b = {k: float(bets[seat].get(k, 0)) for k in self.empty_bet()}
+            if any(not math.isfinite(v) or v < 0 for v in b.values()):
+                raise ValueError('下注金额必须是有限的非负数。')
+            if not b['ante']:
+                if any(b.values()):
+                    refunded[seat] = dict(b)
+                prepared[seat] = self.empty_bet()
+                continue
+            if not minimum <= b['ante'] <= maximum:
+                raise ValueError(f'每手前注须为 ${minimum:,} 至 ${maximum:,}。')
+            if b['aa'] > side_max:
+                raise ValueError('AA+边注超出限额。')
+            if b['jackpot'] not in (0, 2.5):
+                raise ValueError('累进大奖每手固定 $2.50。')
+            if b['call'] not in (0, b['ante']*2):
+                raise ValueError('开牌前盲加注必须为前注的两倍。')
+            prepared[seat] = b
+        if not any(b['ante'] for b in prepared.values()):
+            raise ValueError('请至少为一手牌下前注。')
+        charged = round(sum(sum(b.values()) for b in prepared.values()), 2)
+        if not math.isfinite(balance) or charged > balance:
+            raise ValueError('余额不足以支付下注。')
+        deck = Deck()
+        active = tuple(s for s in self.SEATS if prepared[s]['ante'])
+        sequence = [('Public', i) for i in range(5)]
+        sequence += [(side, i) for i in range(2) for side in (*active, 'Dealer')]
+        hands, dealer, public = {s: [] for s in self.SEATS}, [], []
+        for side, _index in sequence:
+            card = deck.deal(1)[0]
+            (public if side == 'Public' else dealer if side == 'Dealer' else hands[side]).append(card)
+        self.deck, self.hands, self.dealer_hand, self.public_cards = deck, hands, dealer, public
+        self.deal_sequence, self.bets, self.refunded_bets = sequence, prepared, refunded
+        self.decisions = {s: 'call' if prepared[s]['call'] else 'pending' if prepared[s]['ante'] else 'inactive' for s in self.SEATS}
+        self.street, self.stage = 'flop', 'dealing'
+        # 保留 Casino 原文件的奖池贡献时点和比例。
+        contribution = sum((b['ante']+b['aa']+b['call'])*.01 + (2.21 if b['jackpot'] else 0)
+                           for b in prepared.values())
+        self.progressive_amount = round(self.progressive_amount+contribution, 2)
+        return charged
+
+    def decide(self, seat, action, balance, multiplier=0):
+        if self.stage != 'decision' or self.decisions.get(seat) != 'pending':
+            raise ValueError('这手牌当前不能操作。')
+        if action == 'fold':
+            self.decisions[seat] = 'fold'
+            return 0.0
+        if action != 'call' or multiplier != 2:
+            raise ValueError('Casino Hold’em 只能选择两倍加注或弃牌。')
+        cost = round(self.bets[seat]['ante']*2, 2)
+        if not math.isfinite(balance) or cost > balance:
+            raise ValueError('余额不足以支付两倍加注。')
+        self.bets[seat]['call'] = cost
+        self.decisions[seat] = 'call'
+        self.progressive_amount = round(self.progressive_amount+cost*.01, 2)
+        return cost
+
+    def pool(self, side):
+        return (self.dealer_hand if side == 'Dealer' else self.hands[side]) + self.public_cards
+
+    def dealer_qualifies(self):
+        dealer_eval, _ = find_best_5(self.pool('Dealer'))
+        return CHEGame.dealer_qualifies(self, dealer_eval)
+
+    def settle(self):
+        if self.settlement is not None:
+            return self.settlement
+        if self.stage != 'showdown' or 'pending' in self.decisions.values():
+            raise ValueError('所有已下注手牌须先完成决定。')
+        dealer_eval, _ = find_best_5(self.pool('Dealer'))
+        qualified = self.dealer_qualifies()
+        outcomes, returned = {}, 0.0
+        pool = self.progressive_amount
+        for seat in self.SEATS:
+            if self.decisions[seat] == 'inactive':
+                continue
+            b = self.bets[seat]
+            player_eval, _ = find_best_5(self.pool(seat))
+            rank = player_eval[0]
+            details = dict(ante=0.0, call=0.0, aa=0.0, bonus=0.0)
+            folded = self.decisions[seat] == 'fold'
+            winner = 'fold' if folded else 'player' if player_eval > dealer_eval else 'push' if player_eval == dealer_eval else 'dealer'
+            if not folded:
+                if not qualified or winner == 'player':
+                    details['ante'] = b['ante']*(1+ANTE_PAYOUT.get(rank, 1))
+                elif winner == 'push':
+                    details['ante'] = b['ante']
+                details['call'] = b['call'] if not qualified or winner == 'push' else b['call']*2 if winner == 'player' else 0.0
+            # AA+ 和累进大奖只看两张手牌 + 前三张公共牌，弃牌照常结算。
+            flop_eval, _ = find_best_5(self.hands[seat]+self.public_cards[:3])
+            flop_rank, tie_break = flop_eval
+            odds = 7 if flop_rank == 1 and tie_break[0] == 14 else AA_PAYOUT.get(flop_rank)
+            if odds is not None:
+                details['aa'] = b['aa']*(1+odds)
+            if b['jackpot']:
+                award = pool if flop_rank == 9 else pool*.1 if flop_rank == 8 else {7: 1250, 6: 375, 5: 250}.get(flop_rank, 0)
+                details['bonus'] = round(award, 2)
+                if award:
+                    pool = max(self.MIN_PROGRESSIVE, round(pool-details['bonus'], 2))
+            # 原文件非弃牌结算时还会贡献一次；此次只移植 UI，保留该行为。
+            if not folded:
+                pool += (b['ante']+b['aa']+b['call'])*.01
+                if b['jackpot']:
+                    pool += 2.21
+                pool = max(self.MIN_PROGRESSIVE, pool)
+            hand_return = round(sum(details.values()), 2)
+            outcomes[seat] = dict(details=details, returned=hand_return, winner=winner,
+                                  player_rank=rank, dealer_rank=dealer_eval[0])
+            returned += hand_return
+        self.progressive_amount = round(pool, 2)
+        self.settlement = dict(hands=outcomes, returned=round(returned, 2))
+        return self.settlement
+
 class CHEGUI(tk.Frame):
+    WIDTH, HEIGHT = 1150, 750
+    CARD_WIDTH, CARD_HEIGHT = 80, 112
+    DEAL_CARD_MS = 224 / .85
+    DEAL_MOVE_MS = (128 / .75) / .85
+    BET_CHIP_RADIUS = 16 * 4 / 3
+    HOUSE_CHIP_POS = (575, 43)
+    TABLE_GREEN = '#4b1e22'
+    PROGRESSIVE_LAMP_WIDTH = 122.0 * .8
+    ZONE_COLORS = {'Player1':'#2A5541','Player2':'#204536'}
+    SEAT_NAMES = {'Player1': '玩家1', 'Player2': '玩家2', 'Dealer': '庄家手牌'}
+
+    HAND_BADGE_RADIUS = 8
+    HAND_BADGE_COLORS = {'Player1':'#91E6C4','Player2':'#F4D27B','Dealer':'#D64545'}
+
     def __init__(self, parent, initial_balance, username, on_back=None, on_balance_change=None):
-        super().__init__(parent, bg=ROOT_BG)
-        self.on_back = on_back
-        self.on_balance_change = on_balance_change
-        self.configure(bg=ROOT_BG)
-        
-        self.username = username
-        self.balance = initial_balance
-        self.game = CHEGame()
-        self.card_images = {}
-        self.animation_queue = []
-        self.animation_in_progress = False
-        self.card_positions = {}
-        self.active_card_labels = []
-        self.selected_chip = None
-        self.chip_buttons = []
-        self.last_win = 0
-        self.auto_reset_timer = None
-        self.buttons_disabled = False
-        self.win_details = {
-            "ante": 0,
-            "aa": 0,
-            "call": 0,
-            "jackpot": 0
-        }
-        self.bet_widgets = {}
-        self.last_jackpot_selection = False
-        
-        # 存储上一次游戏的下注信息（用于重复下注）
-        self.last_game_bet = None
-        
+        super().__init__(parent, bg=ROOT_BG, width=self.WIDTH, height=self.HEIGHT)
+        self.pack_propagate(False)
+        self.username, self.balance = username, float(initial_balance)
+        self.on_back, self.on_balance_change = on_back, on_balance_change
+        self.game = CHETableGame()
+        self.bets = {s: self.game.empty_bet() for s in self.game.SEATS}
+        self.last_bet = None
+        self.last_win = 0.0
+        self.high_bet_mode = False
+        self.selected_chip = 10.0
+        self._jobs = set()
+        self._closing = False
+        self._credited = False
+        self._return_persisted = False
+        self._crediting = False
+        self._restart_job = None
+        self._restart_deadline = None
+        self._side_resolved = set()
+        self._motion_count = 0
+        self._chip_serial = 0
+        self._decision_busy = False
+        self._settlement_started = False
+        self._showdown_started = False
+        self.visual_chips = {}
+        self.lamps = {}
+        self.last_round_snapshot = None
+        self._history_available = False
+        self._notice_level = 0.0
+        self._notice_target = False
+        self._notice_job = None
+        self._notice_item = None
+        self._notice_source = None
+        self._notice_photo = None
+        self._blind_seats = set()
+        self._sorted_sides = set()
+        self._face_photos, self._pil_cards, self._flip_photos = {}, {}, {}
+        self.card_items, self.bet_spots, self.action_buttons = {}, {}, {}
         self._load_assets()
         self._create_widgets()
+        self._refresh()
+        self.bind('<Configure>', self._center_table, add='+')
+        self.bind('<Destroy>', self._on_destroy, add='+')
 
-    # ---------- 规则说明 ----------
-    def show_game_instructions(self):
-        win = tk.Toplevel(self)
-        win.title("游戏规则")
-        win.geometry("800x650")
-        win.resizable(False, False)
-        win.configure(bg='#F0F0F0')
-        main_frame = tk.Frame(win, bg='#F0F0F0')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        scrollbar = ttk.Scrollbar(main_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        canvas = tk.Canvas(main_frame, bg='#F0F0F0', yscrollcommand=scrollbar.set)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=canvas.yview)
-        content_frame = tk.Frame(canvas, bg='#F0F0F0')
-        canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
-        rules_text = """
-        赌场扑克 游戏规则
+    @property
+    def game_in_progress(self):
+        return self.game.stage != 'betting' or self._motion_count > 0
 
-        1. 游戏开始前下注:
-           - 底注: 基础下注
-           - AA+: 可选副注
-           - 累进大奖: 可选参与($2.5)
+    def _schedule(self, delay, callback, *args):
+        def run():
+            self._jobs.discard(job)
+            if not self._closing:
+                callback(*args)
+        job = self.after(delay, run)
+        self._jobs.add(job)
+        return job
 
-        2. 游戏流程:
-           a. 翻牌前:
-               - 发玩家2张牌，庄家2张牌，公共牌3张（翻牌）
-               - 查看手牌后选择:
-                 * 弃牌: 输掉底注（AA+和累进大奖仍可能赢）
-                 * 加注: 下注底注的2倍
-
-           b. 翻牌圈:
-               - 如果加注，发出最后2张公共牌（转牌和河牌）
-               - 摊牌比较手牌
-
-        3. 庄家资格:
-           - 庄家必须至少有一对4或更好的牌才能参与比较
-           - 如果庄家不合格，玩家赢得底注，加注退还
-
-        4. 结算规则:
-           - 底注:
-             * 庄家不合格: 无条件获胜，按玩家牌型赔率支付
-             * 玩家赢: 按玩家牌型赔率支付
-             * 平局: 退还
-             * 玩家输: 输掉
-
-           - 加注:
-             * 玩家赢: 支付1:1
-             * 庄家不合格: 退还
-             * 平局: 退还
-             * 其他情况: 输掉
-
-           - AA+边注:
-             * 根据玩家最终手牌支付（见赔率表）
-        """
-        rules_label = tk.Label(
-            content_frame, 
-            text=rules_text,
-            font=('微软雅黑', 11),
-            bg='#F0F0F0',
-            justify=tk.LEFT,
-            padx=10,
-            pady=10
-        )
-        rules_label.pack(fill=tk.X, padx=10, pady=5)
-        tk.Label(
-            content_frame, 
-            text="赔率表",
-            font=('微软雅黑', 12, 'bold'),
-            bg='#F0F0F0'
-        ).pack(fill=tk.X, padx=10, pady=(20, 5), anchor='w')
-        odds_frame = tk.Frame(content_frame, bg='#F0F0F0')
-        odds_frame.pack(fill=tk.X, padx=20, pady=5)
-        headers = ["牌型", "底注赔率", "AA+赔率", "累进大奖"]
-        odds_data = [
-            ("皇家同花顺", "100:1", "100:1", "100%"),
-            ("同花顺", "49:1", "50:1", "10%"),
-            ("四条", "17:1", "40:1", "$1,250"),
-            ("葫芦", "3:1", "30:1", "$375"),
-            ("同花", "2:1", "20:1", "$250"),
-            ("顺子", "1:1", "10:1", "-"),
-            ("三条", "1:1", "8:1", "-"),
-            ("两对", "1:1", "7:1", "-"),
-            ("对子A", "1:1", "7:1", "-"),
-            ("其他牌型", "1:1", "-", "-"),
-        ]
-        for col, h in enumerate(headers):
-            tk.Label(
-                odds_frame,
-                text=h,
-                font=('微软雅黑', 10, 'bold'),
-                bg='#4B8BBE',
-                fg='white',
-                padx=10, pady=5,
-                anchor='center',
-                justify='center'
-            ).grid(row=0, column=col, sticky='nsew', padx=1, pady=1)
-        for r, row_data in enumerate(odds_data, start=1):
-            bg = '#E0E0E0' if r % 2 == 0 else '#F0F0F0'
-            for c, txt in enumerate(row_data):
-                tk.Label(
-                    odds_frame,
-                    text=txt,
-                    font=('微软雅黑', 10),
-                    bg=bg,
-                    padx=10, pady=5,
-                    anchor='center',
-                    justify='center'
-                ).grid(row=r, column=c, sticky='nsew', padx=1, pady=1)
-        for c in range(len(headers)):
-            odds_frame.columnconfigure(c, weight=1)
-        for r in range(len(odds_data) + 1):
-            odds_frame.rowconfigure(r, weight=1)
-        notes = """
-        注: 
-        * 玩家的牌和头3张公共牌组成牌型才获胜
-        * 对子A指一对A
-        """
-        notes_label = tk.Label(
-            content_frame, 
-            text=notes,
-            font=('微软雅黑', 10),
-            bg='#F0F0F0',
-            justify=tk.LEFT,
-            padx=10,
-            pady=10
-        )
-        notes_label.pack(fill=tk.X, padx=10, pady=5)
-        content_frame.update_idletasks()
-        canvas.config(scrollregion=canvas.bbox("all"))
-        close_btn = ttk.Button(win, text="关闭", command=win.destroy)
-        close_btn.pack(pady=10)
-        win.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
-
-    def on_close(self):
-        timer = getattr(self, "auto_reset_timer", None)
-        if timer:
+    def _cancel_jobs(self):
+        for job in tuple(self._jobs):
             try:
-                self.after_cancel(timer)
+                self.after_cancel(job)
             except tk.TclError:
                 pass
-        try:
-            update_balance_in_json(self.username, self.balance)
-        except Exception:
-            pass
-        if callable(self.on_balance_change):
-            self.on_balance_change(float(self.balance))
-        if callable(self.on_back):
-            self.on_back(float(self.balance))
+        self._jobs.clear()
 
+    def _on_destroy(self, event):
+        if event.widget is self:
+            self._closing = True
+            self._cancel_jobs()
+            self._unbind_enter()
 
-    # ---------- 加载扑克牌图片（轮流使用 Poker1/Poker2） ----------
+    def _unbind_enter(self):
+        binding=getattr(self,'_enter_binding',None)
+        if binding:
+            try:
+                self.winfo_toplevel().unbind('<Return>',binding)
+            except tk.TclError:
+                pass
+            self._enter_binding=None
+
     def _load_assets(self):
-        card_size = (100, 140)
-        parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        if not hasattr(self, 'current_poker_folder'):
-            self.current_poker_folder = random.choice(['Poker1', 'Poker2'])
-        else:
-            self.current_poker_folder = 'Poker2' if self.current_poker_folder == 'Poker1' else 'Poker1'
-        card_dir = os.path.join(parent_dir, 'A_Tools', 'Card', self.current_poker_folder)
-        suit_mapping = {
-            '♠': 'Spade',
-            '♥': 'Heart',
-            '♦': 'Diamond',
-            '♣': 'Club'
-        }
+        size = (self.CARD_WIDTH, self.CARD_HEIGHT)
+        self.current_poker_folder = ('Poker2' if self.current_poker_folder=='Poker1' else 'Poker1') if hasattr(self,'current_poker_folder') else random.choice(['Poker1','Poker2'])
+        folder = self.current_poker_folder
         self.original_images = {}
-        back_path = os.path.join(card_dir, 'Background.png')
+        base = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'A_Tools', 'Card', folder)
+        suits = {'♠':'Spade', '♥':'Heart', '♦':'Diamond', '♣':'Club'}
         try:
-            back_img_orig = Image.open(back_path)
-            self.original_images["back"] = back_img_orig
-            back_img = back_img_orig.resize(card_size)
-            self.back_image = ImageTk.PhotoImage(back_img)
-        except Exception as e:
-            print(f"Error loading back image: {e}")
-            img_orig = Image.new('RGB', card_size, 'black')
-            self.original_images["back"] = img_orig
-            self.back_image = ImageTk.PhotoImage(img_orig)
-        for suit in SUITS:
-            for rank in RANKS:
-                suit_name = suit_mapping.get(suit, suit)
-                filename = f"{suit_name}{rank}.png"
-                path = os.path.join(card_dir, filename)
-                try:
-                    if os.path.exists(path):
-                        img = Image.open(path)
-                        self.original_images[(suit, rank)] = img
-                        img_resized = img.resize(card_size)
-                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_resized)
-                    else:
-                        img_orig = Image.new('RGB', card_size, 'blue')
-                        draw = ImageDraw.Draw(img_orig)
-                        text = f"{rank}{suit}"
-                        try:
-                            font = ImageFont.truetype("arial.ttf", 20)
-                        except:
-                            font = ImageFont.load_default()
-                        text_bbox = draw.textbbox((0, 0), text, font=font)
-                        text_width, text_height = text_bbox[2], text_bbox[3]
-                        x = (card_size[0] - text_width) / 2
-                        y = (card_size[1] - text_height) / 2
-                        draw.text((x, y), text, fill="white", font=font)
-                        self.original_images[(suit, rank)] = img_orig
-                        self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
-                except Exception as e:
-                    print(f"Error loading card image {path}: {e}")
-                    img_orig = Image.new('RGB', card_size, 'red')
-                    draw = ImageDraw.Draw(img_orig)
-                    text = "Error"
+            font = ImageFont.truetype('DejaVuSans-Bold.ttf', 23)
+        except OSError:
+            font = ImageFont.load_default()
+        for key in ['back'] + [(s, r) for s in SUITS for r in RANKS]:
+            filename = 'Background.png' if key == 'back' else f'{suits[key[0]]}{key[1]}.png'
+            try:
+                with Image.open(os.path.join(base, filename)) as source:
+                    original = source.convert('RGBA')  # 保留 PNG 的 alpha，禁止转 RGB/铺白底。
+                    self.original_images[key] = original.copy()
+                    im = original.resize(size, Image.Resampling.LANCZOS)
+            except (OSError, ValueError):
+                im = Image.new('RGBA', size, (0,0,0,0))
+                draw = ImageDraw.Draw(im)
+                draw.rounded_rectangle((1,1,size[0]-2,size[1]-2), radius=6,
+                    fill=DARK_BLUE if key=='back' else '#fffaf0',outline=GOLD,width=2)
+                if key == 'back':
+                    for y in range(12, 104, 12):
+                        draw.line((10,y,70,y), fill=GOLD)
+                else:
+                    suit, rank = key
+                    text = rank + suit
                     try:
-                        font = ImageFont.truetype("arial.ttf", 20)
-                    except:
-                        font = ImageFont.load_default()
-                    text_bbox = draw.textbbox((0, 0), text, font=font)
-                    text_width, text_height = text_bbox[2], text_bbox[3]
-                    x = (card_size[0] - text_width) / 2
-                    y = (card_size[1] - text_height) / 2
-                    draw.text((x, y), text, fill="white", font=font)
-                    self.original_images[(suit, rank)] = img_orig
-                    self.card_images[(suit, rank)] = ImageTk.PhotoImage(img_orig)
+                        draw.text((7,10), text, font=font, fill=RED if suit in '♥♦' else BLACK)
+                        draw.text((14,62), suit, font=font, fill=RED if suit in '♥♦' else BLACK)
+                    except UnicodeEncodeError:
+                        draw.text((7,10), rank+suits[suit][0], font=font, fill=BLACK)
+            self.original_images.setdefault(key,im.copy())
+            self._pil_cards[key] = im
+            self._face_photos[key] = ImageTk.PhotoImage(im, master=self)
+        self._public_photos = {key:ImageTk.PhotoImage(im.resize(self.card_size('Public'),Image.Resampling.LANCZOS),master=self) for key,im in self._pil_cards.items()}
 
-    # ---------- 筹码相关 ----------
-    def add_chip_to_bet(self, bet_type):
-        if not self.selected_chip:
-            return
-        chip_text = self.selected_chip.replace('$', '')
-        if 'K' in chip_text:
-            chip_value = float(chip_text.replace('K', '')) * 1000
+    def _text(self, x, y, text, size=12, color=TEXT, **kw):
+        return self.canvas.create_text(x, y, text=text, fill=color, font=('Arial', size, 'bold'), **kw)
+
+    def _draw_chips(self):
+        self.canvas.delete('rack')
+        specs=([(100,BLACK),(500,'#FF7DDA'),(1000,TEXT),(5000,RED),(10000,'#00fbff'),(50000,'#00ffae')]
+               if self.high_bet_mode else [(10,'#ffa500'),(25,'#00ff00'),(100,BLACK),(500,'#FF7DDA'),(1000,TEXT),(2500,RED)])
+        self.chip_specs=specs
+        diameter,gap=56,8
+        start=(self.WIDTH-(len(specs)*diameter+(len(specs)-1)*gap))/2
+        for i,(amount,color) in enumerate(specs):
+            x=start+i*(diameter+gap)
+            tag='rack_'+str(i)
+            self.canvas.create_oval(x,646,x+56,702,fill='#182F25',
+                outline=GOLD if amount==self.selected_chip else '#6C7850',width=3,tags=('rack',tag))
+            self.canvas.create_oval(x+5,651,x+51,697,fill=color,outline=PANEL_BG,width=2,tags=('rack',tag))
+            self._text(x+28,674,self._compact(amount),10,TEXT if color in (BLACK,RED) else BLACK,tags=('rack',tag))
+            self.canvas.tag_bind(tag,'<Button-1>',lambda _e,a=amount:self.select_chip(a))
+
+    @staticmethod
+    def _compact(amount):
+        """K/M筹码取两位有效数字并截断；有省略才加+，不改动真实金额。"""
+        from decimal import Decimal, ROUND_DOWN, ROUND_HALF_UP
+        value=Decimal(str(amount)).quantize(Decimal('.01'),rounding=ROUND_HALF_UP)
+        if value==Decimal('2.50'):return '2.50'
+        if abs(value)>=1000000:
+            divisor,suffix=Decimal(1000000),'M'
+        elif abs(value)>=1000:
+            divisor,suffix=Decimal(1000),'K'
         else:
-            chip_value = float(chip_text)
-        if bet_type == "ante":
-            current = float(self.ante_var.get())
-            max_bet = 10000
-            if current >= max_bet:
-                messagebox.showwarning("下注限制", "底注已满，不能再下注！")
-                return
-            if current + chip_value > max_bet:
-                allowed_amount = max_bet - current
-                if allowed_amount > 0:
-                    chip_value = allowed_amount
-                    messagebox.showwarning("下注限制", f"底注已达上限，自动调整为 {int(allowed_amount)}")
-                else:
-                    messagebox.showwarning("下注限制", "底注已满，不能再下注！")
-                    return
-            self.ante_var.set(str(int(current + chip_value)))
-        elif bet_type == "aa":
-            current = float(self.aa_var.get())
-            max_bet = 2500
-            if current >= max_bet:
-                messagebox.showwarning("下注限制", "AA+已满，不能再下注！")
-                return
-            if current + chip_value > max_bet:
-                allowed_amount = max_bet - current
-                if allowed_amount > 0:
-                    chip_value = allowed_amount
-                    messagebox.showwarning("下注限制", f"AA+已达上限，自动调整为 {int(allowed_amount)}")
-                else:
-                    messagebox.showwarning("下注限制", "AA+已满，不能再下注！")
-                    return
-            self.aa_var.set(str(int(current + chip_value)))
-
-    def reset_single_bet(self, bet_type, event):
-        if bet_type == "ante":
-            self.ante_var.set("0")
-        elif bet_type == "aa":
-            self.aa_var.set("0")
-        elif bet_type == "call":
-            self.call_var.set("0")
-        if bet_type in self.bet_widgets:
-            widget = self.bet_widgets[bet_type]
-            original_bg = widget.cget('bg')
-            widget.config(bg='#FFCDD2')
-            self.after(500, lambda: widget.config(bg=original_bg))
-
-    # ---------- 创建主界面 ----------
-    def _create_widgets(self):
-        # 主框架 - 左右布局
-        main_frame = tk.Frame(self, bg=ROOT_BG)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-
-        # 左侧牌桌区域
-        table_canvas = tk.Canvas(main_frame, bg=ROOT_BG, highlightthickness=0)
-        table_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        table_canvas.create_rectangle(0, 0, 725, 720, fill=ROOT_BG, outline=GOLD, width=5)
-
-        # 庄家区域
-        dealer_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        dealer_frame.place(x=190, y=5, width=300, height=210)
-        self.dealer_label = tk.Label(dealer_frame, text="庄家", font=('Arial', 18), bg='#2a4a3c', fg='white')
-        self.dealer_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
-        self.dealer_cards_frame = tk.Frame(dealer_frame, bg='#2a4a3c')
-        self.dealer_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-
-        # 中间提示
-        self.ante_info_label0 = tk.Label(
-            table_canvas, 
-            text="庄家需要对子4或以上才合格", 
-            font=('Arial', 22), 
-            bg=ROOT_BG, 
-            fg='#FFD700'
-        )
-        self.ante_info_label0.update_idletasks()
-        label_width = self.ante_info_label0.winfo_width()
-        table_canvas.update_idletasks()
-        canvas_width = table_canvas.winfo_width()
-        center_x = (canvas_width - label_width) // 2
-        self.ante_info_label0.place(x=center_x + 355, y=215, anchor='n')
-
-        # 公共牌区域
-        community_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        community_frame.place(x=50, y=250, width=600, height=210)
-        community_label = tk.Label(community_frame, text="公共牌", font=('Arial', 18), bg='#2a4a3c', fg='white')
-        community_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
-        self.community_cards_frame = tk.Frame(community_frame, bg='#2a4a3c')
-        self.community_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-
-        # 底部提示
-        self.ante_info_label = tk.Label(
-            table_canvas, 
-            text="庄家不合格时 加注退还 底注按玩家牌型赔付", 
-            font=('Arial', 22), 
-            bg=ROOT_BG, 
-            fg='#FFD700'
-        )
-        self.ante_info_label.update_idletasks()
-        label_width = self.ante_info_label.winfo_width()
-        table_canvas.update_idletasks()
-        canvas_width = table_canvas.winfo_width()
-        center_x = (canvas_width - label_width) // 2
-        self.ante_info_label.place(x=center_x + 355, y=460, anchor='n')
-
-        # 玩家区域
-        player_frame = tk.Frame(table_canvas, bg='#2a4a3c', bd=2, relief=tk.RAISED)
-        player_frame.place(x=190, y=500, width=300, height=210)
-        self.player_label = tk.Label(player_frame, text="玩家", font=('Arial', 18), bg='#2a4a3c', fg='white')
-        self.player_label.pack(side=tk.TOP, anchor='w', padx=10, pady=5)
-        self.player_cards_frame = tk.Frame(player_frame, bg='#2a4a3c')
-        self.player_cards_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-
-        # ---------- 右侧控制面板 ----------
-        right_panel = tk.Frame(main_frame, bg=ROOT_BG, width=400)
-        right_panel.pack(side=tk.RIGHT, fill=tk.Y)
-        right_panel.pack_propagate(False)
-
-        # 信息卡片
-        info_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
-        info_card.pack(fill=tk.X, pady=3)
-        header_info = tk.Frame(info_card, bg=HEADER_BG)
-        header_info.pack(fill=tk.X)
-        body_info = tk.Frame(info_card, bg=PANEL_BG)
-        body_info.pack(fill=tk.X, padx=10, pady=8)
-
-        self.balance_label = tk.Label(body_info, text=f"余额: ${self.balance:,.2f}", font=('Arial', 16, 'bold'), bg=PANEL_BG, fg='black')
-        self.balance_label.pack(side=tk.LEFT)
-
-        self.stage_label = tk.Label(body_info, text="翻牌前", font=('Arial', 16, 'bold'), bg=PANEL_BG, fg='#A88100')
-        self.stage_label.pack(side=tk.RIGHT)
-
-        # 累进大奖卡片
-        progressive_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
-        progressive_card.pack(fill=tk.X, pady=3)
-        header_prog = tk.Frame(progressive_card, bg=HEADER_BG)
-        header_prog.pack(fill=tk.X)
-        tk.Label(header_prog, text="累进大奖", font=('Arial', 13, 'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=4)
-        body_prog = tk.Frame(progressive_card, bg=PANEL_BG)
-        body_prog.pack(fill=tk.X, padx=10, pady=8)
-        self.progressive_amount_var = tk.StringVar()
-        self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
-        self.progressive_display = ProgressiveFlipDisplay(body_prog, textvariable=self.progressive_amount_var,
-                                            font=('Arial', 20, 'bold'), bg=PANEL_BG, fg='#A88100')
-        self.progressive_display.pack(anchor='center')
-
-        # 限红信息卡片
-        limit_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
-        limit_card.pack(fill=tk.X, pady=3)
-        header_limit_bar = tk.Frame(limit_card, bg=HEADER_BG)
-        header_limit_bar.pack(fill=tk.X)
-        tk.Label(header_limit_bar, text="下注上限", font=('Arial', 13, 'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=4)
-        body_limit = tk.Frame(limit_card, bg=PANEL_BG)
-        body_limit.pack(fill=tk.X, padx=10, pady=8)
-
-        table_frame = tk.Frame(body_limit, bg=PANEL_BG, bd=2, relief=tk.SOLID)
-        table_frame.pack(fill=tk.X, padx=0, pady=0)
-
-        titles = ["底注最低", "底注最高", "边注最高"]
-        for col, title in enumerate(titles):
-            lbl = tk.Label(
-                table_frame,
-                text=title,
-                font=('Arial', 11, 'bold'),
-                bg=PANEL_BG,
-                fg='#2A1B08',
-                borderwidth=1,
-                relief=tk.SOLID,
-                padx=5,
-                pady=5
-            )
-            lbl.grid(row=0, column=col, sticky="nsew", padx=0, pady=0)
-
-        values = ["$10", "$10,000", "$2,500"]
-        for col, val in enumerate(values):
-            lbl = tk.Label(
-                table_frame,
-                text=val,
-                font=('Arial', 12, 'bold'),
-                bg=PANEL_BG,
-                fg="#A88100",
-                borderwidth=1,
-                relief=tk.SOLID,
-                padx=5,
-                pady=5
-            )
-            lbl.grid(row=1, column=col, sticky="nsew", padx=0, pady=0)
-
-        for col in range(3):
-            table_frame.columnconfigure(col, weight=1)
-
-        # 合并筹码 + 下注区卡片
-        combined_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
-        combined_card.pack(fill=tk.X, pady=3)
-
-        header_combined = tk.Frame(combined_card, bg=HEADER_BG)
-        header_combined.pack(fill=tk.X)
-        tk.Label(header_combined, text="筹码与下注", font=('Arial', 13, 'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=4)
-
-        body_combined = tk.Frame(combined_card, bg=PANEL_BG)
-        body_combined.pack(fill=tk.X, padx=10, pady=8)
-
-        body_combined.columnconfigure(0, weight=1)
-        body_combined.columnconfigure(1, weight=2)
-        body_combined.columnconfigure(2, weight=1)
-
-        # 筹码行
-        chip_row = tk.Frame(body_combined, bg=PANEL_BG)
-        chip_row.grid(row=0, column=0, columnspan=3, pady=(0, 8), sticky='ew')
-        for i in range(6):
-            chip_row.columnconfigure(i, weight=1)
-
-        chip_configs = [
-            ('$10', '#ffa500', 'black'),
-            ("$25", '#00ff00', 'black'),
-            ("$100", '#000000', 'white'),
-            ("$500", "#FF7DDA", 'black'),
-            ("$1K", '#ffffff', 'black'),
-            ("$2.5K", '#ff0000', 'white'),
-        ]
-        self.chip_buttons = []
-        self.chip_texts = {}
-        for i, (text, bg_color, fg_color) in enumerate(chip_configs):
-            cell = tk.Frame(chip_row, bg=PANEL_BG)
-            cell.grid(row=0, column=i, padx=2, pady=2, sticky='nsew')
-            chip_canvas = tk.Canvas(cell, width=50, height=50, bg=PANEL_BG, highlightthickness=0)
-            chip_canvas.pack(anchor='center')
-            chip_canvas.create_oval(2, 2, 49, 49, fill=bg_color, outline='black')
-            chip_canvas.create_text(25.5, 25.5, text=text, fill=fg_color, font=('Arial', 12, 'bold'))
-            chip_canvas.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
-            self.chip_buttons.append(chip_canvas)
-            self.chip_texts[chip_canvas] = text
-        self.select_chip("$10")
-
-        # 累进大奖复选框
-        self.progressive_var = tk.IntVar()
-        self.progressive_cb = tk.Checkbutton(
-            body_combined, text="累进大奖 ($2.50)", variable=self.progressive_var,
-            font=('Arial', 12, "bold"), bg=PANEL_BG, fg='black', selectcolor=PANEL_BG
-        )
-        self.progressive_cb.grid(row=1, column=0, columnspan=3, sticky='w', padx=35, pady=(4, 2))
-
-        # 底注和AA+（同一行）
-        row_ante = tk.Frame(body_combined, bg=PANEL_BG)
-        row_ante.grid(row=2, column=0, columnspan=3, sticky='ew', pady=2)
-        tk.Label(row_ante, text="       底注:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
-        self.ante_var = tk.StringVar(value="0")
-        self.ante_display = tk.Label(row_ante, textvariable=self.ante_var, font=('Arial', 12),
-                                    bg='white', fg='black', width=7, relief=tk.SUNKEN)
-        self.ante_display.pack(side=tk.LEFT, padx=5)
-        self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
-        self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante", e))
-        self.bet_widgets["ante"] = self.ante_display
-
-        tk.Label(row_ante, text="    AA+:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT, padx=(10,0))
-        self.aa_var = tk.StringVar(value="0")
-        self.aa_display = tk.Label(row_ante, textvariable=self.aa_var, font=('Arial', 12),
-                                 bg='white', fg='black', width=7, relief=tk.SUNKEN)
-        self.aa_display.pack(side=tk.LEFT, padx=5)
-        self.aa_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("aa"))
-        self.aa_display.bind("<Button-3>", lambda e: self.reset_single_bet("aa", e))
-        self.bet_widgets["aa"] = self.aa_display
-
-        # 加注（Call）显示只读
-        row_call = tk.Frame(body_combined, bg=PANEL_BG)
-        row_call.grid(row=3, column=0, columnspan=3, sticky='ew', pady=2)
-        tk.Label(row_call, text="       加注:", font=('Arial', 12, "bold"), bg=PANEL_BG).pack(side=tk.LEFT)
-        self.call_var = tk.StringVar(value="0")
-        self.call_display = tk.Label(row_call, textvariable=self.call_var, font=('Arial', 12),
-                                   bg='white', fg='black', width=7, relief=tk.SUNKEN)
-        self.call_display.pack(side=tk.LEFT, padx=5)
-        self.call_display.bind("<Button-3>", lambda e: self.reset_single_bet("call", e))
-        self.bet_widgets["call"] = self.call_display
-
-        # 操作卡片
-        action_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
-        action_card.pack(fill=tk.X, pady=3)
-        header_action = tk.Frame(action_card, bg=HEADER_BG)
-        header_action.pack(fill=tk.X)
-        tk.Label(header_action, text="操作", font=('Arial', 13, 'bold'), bg=HEADER_BG, fg=TITLE_FG).pack(pady=4)
-        body_action = tk.Frame(action_card, bg=PANEL_BG)
-        body_action.pack(fill=tk.X, padx=10, pady=8)
-
-        self.status_label = tk.Label(
-            body_action, text="设置下注金额并开始游戏", font=('Arial', 12, 'bold'),
-            bg=PANEL_BG, fg='#2A1B08', height=1
-        )
-        self.status_label.pack(fill=tk.X, pady=4)
-
-        btn_frame = tk.Frame(body_action, bg=PANEL_BG)
-        btn_frame.pack(fill=tk.X, pady=5)
-        inner_btn_frame = tk.Frame(btn_frame, bg=PANEL_BG)
-        inner_btn_frame.pack(anchor='center')
-
-        self.reset_bets_button = tk.Button(
-            inner_btn_frame, text="重设金额", command=self.reset_bets,
-            font=('Arial', 12, 'bold'), bg='#F44336', fg='white',
-            relief=tk.RAISED, bd=2, cursor="hand2", width=10
-        )
-        self.reset_bets_button.pack(side=tk.LEFT, padx=5)
-
-        self.repeat_bet_button = tk.Button(
-            inner_btn_frame, text="重复上局下注", command=self.repeat_last_bet,
-            font=('Arial', 12, 'bold'), bg='#FFC107', fg='black',
-            relief=tk.RAISED, bd=2, cursor="hand2", width=12,
-            state=tk.DISABLED
-        )
-        self.repeat_bet_button.pack(side=tk.LEFT, padx=5)
-
-        self.start_button = tk.Button(
-            inner_btn_frame, text="开始游戏", command=self.start_game,
-            font=('Arial', 12, 'bold'), bg='#4CAF50', fg='white',
-            relief=tk.RAISED, bd=2, cursor="hand2", width=10
-        )
-        self.start_button.pack(side=tk.LEFT, padx=5)
-
-        self.action_frame = body_action
-
-        # 底部信息卡片
-        info_bottom_card = tk.Frame(right_panel, bg=PANEL_BG, bd=1, relief=tk.SOLID)
-        info_bottom_card.pack(fill=tk.X, pady=3)
-        body_bottom = tk.Frame(info_bottom_card, bg=PANEL_BG)
-        body_bottom.pack(fill=tk.X, padx=10, pady=8)
-
-        self.current_bet_label = tk.Label(
-            body_bottom, text="本局下注: $0.00", font=('Arial', 12), bg=PANEL_BG, fg='black'
-        )
-        self.current_bet_label.pack(anchor='w')
-        row_last = tk.Frame(body_bottom, bg=PANEL_BG)
-        row_last.pack(fill=tk.X, pady=2)
-        self.last_win_label = tk.Label(
-            row_last, text="上局获胜: $0.00", font=('Arial', 12), bg=PANEL_BG, fg='black'
-        )
-        self.last_win_label.pack(side=tk.LEFT)
-        self.info_button = tk.Button(
-            row_last, text="ℹ️", command=self.show_game_instructions,
-            bg='#4B8BBE', fg='white', font=('Arial', 12), width=2, relief=tk.FLAT
-        )
-        self.info_button.pack(side=tk.RIGHT)
-
-        self.action_frame = body_action
-
-    def select_chip(self, chip_text):
-        self.selected_chip = chip_text
-        for chip in self.chip_buttons:
-            chip.delete("highlight")
-            for item_id in chip.find_all():
-                if chip.type(item_id) == 'oval':
-                    x1, y1, x2, y2 = chip.coords(item_id)
-                    chip.create_oval(x1, y1, x2, y2, outline='black', width=2)
-                    break
-        for chip in self.chip_buttons:
-            text_id = None
-            oval_id = None
-            for item_id in chip.find_all():
-                t = chip.type(item_id)
-                if t == 'text':
-                    text_id = item_id
-                elif t == 'oval':
-                    oval_id = item_id
-            if text_id and chip.itemcget(text_id, 'text') == chip_text:
-                x1, y1, x2, y2 = chip.coords(oval_id)
-                chip.create_oval(x1, y1, x2, y2, outline='#2f00ff', width=3, tags="highlight")
-                break
-
-    def update_balance(self):
-        self.balance_label.config(text=f"余额: ${self.balance:,.2f}")
-        if self.username != 'Guest':
-            update_balance_in_json(self.username, self.balance)
-
-    def update_hand_labels(self):
-        community_revealed_count = sum(self.game.cards_revealed["community"])
-        player_eval = self.game.evaluate_current_hand(self.game.player_hole, community_revealed_count)
-        player_hand_name = HAND_RANK_NAMES[player_eval[0]] if player_eval else ""
-        self.player_label.config(text=f"玩家 - {player_hand_name}" if player_hand_name else "玩家")
-        if self.game.stage == "showdown" or self.game.folded or any(self.game.cards_revealed["dealer"]):
-            dealer_eval = self.game.evaluate_current_hand(self.game.dealer_hole, community_revealed_count)
-            dealer_hand_name = HAND_RANK_NAMES[dealer_eval[0]] if dealer_eval else ""
-            self.dealer_label.config(text=f"庄家 - {dealer_hand_name}" if dealer_hand_name else "庄家")
-        else:
-            self.dealer_label.config(text="庄家")
-
-    def disable_action_buttons(self):
-        self.buttons_disabled = True
-        for widget in self.action_frame.winfo_children():
-            if widget.winfo_exists() and isinstance(widget, tk.Button):
-                widget.config(state=tk.DISABLED)
-
-    def enable_action_buttons(self):
-        self.buttons_disabled = False
-        for widget in self.action_frame.winfo_children():
-            if widget.winfo_exists():
-                try:
-                    widget.config(state=tk.NORMAL)
-                except:
-                    pass
-
-    # ---------- 游戏流程 ----------
-    def start_game(self):
-        try:
-            self.ante = int(self.ante_var.get())
-            self.aa = int(self.aa_var.get())
-            self.participate_jackpot = bool(self.progressive_var.get())
-            self.last_jackpot_selection = bool(self.progressive_var.get())
-        except ValueError:
-            messagebox.showerror("错误", "请输入有效的下注金额")
-            return
-
-        if self.ante < 5:
-            messagebox.showerror("错误", "底注至少需要10块")
-            return
-
-        total_bet = self.ante + self.aa
-        if self.participate_jackpot:
-            total_bet += 2.5
-
-        if total_bet > self.balance:
-            messagebox.showerror("错误", "余额不足以支付所有下注！")
-            return
-
-        self.last_game_bet = {
-            'ante': self.ante,
-            'aa': self.aa,
-            'progressive': self.participate_jackpot
-        }
-        self.repeat_bet_button.config(state=tk.NORMAL)
-
-        self.balance -= total_bet
-        self.update_balance()
-        self.current_bet_label.config(text=f"本局下注: ${total_bet:,.2f}")
-
-        ante_aa_bet = self.ante + self.aa
-        rake = ante_aa_bet * 0.01
-        self.game.progressive_amount += rake
-        if self.participate_jackpot:
-            self.game.progressive_amount += 2.21
-        save_progressive(self.game.progressive_amount)
-        self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
-
-        self.game.reset_game()
-        self.game.deal_initial()
-        self.game.ante = self.ante
-        self.game.aa = self.aa
-        self.game.participate_jackpot = self.participate_jackpot
-
-        for widget in self.dealer_cards_frame.winfo_children():
-            widget.destroy()
-        for widget in self.community_cards_frame.winfo_children():
-            widget.destroy()
-        for widget in self.player_cards_frame.winfo_children():
-            widget.destroy()
-
-        self.animation_queue = []
-        self.animation_in_progress = False
-        self.active_card_labels = []
-        self.card_positions = {}
-
-        for i in range(5):
-            card_id = f"community_{i}"
-            self.card_positions[card_id] = {"current": (50, 50), "target": (i * 110, 0)}
-            self.animation_queue.append(card_id)
-        for i in range(2):
-            card_id = f"player_{i}"
-            self.card_positions[card_id] = {"current": (50, 50), "target": (i * 150, 0)}
-            self.animation_queue.append(card_id)
-        for i in range(2):
-            card_id = f"dealer_{i}"
-            self.card_positions[card_id] = {"current": (50, 50), "target": (i * 150, 0)}
-            self.animation_queue.append(card_id)
-
-        self.animate_deal()
-        self.stage_label.config(text="翻牌前")
-
-        self.ante_display.unbind("<Button-1>")
-        self.aa_display.unbind("<Button-1>")
-        self.progressive_cb.config(state=tk.DISABLED)
-        for chip in self.chip_buttons:
-            chip.unbind("<Button-1>")
-        self.reset_bets_button.config(state=tk.DISABLED)
-        self.start_button.config(state=tk.DISABLED)
-
-        for widget in self.action_frame.winfo_children():
-            if widget not in [self.reset_bets_button, self.start_button, self.status_label, self.repeat_bet_button]:
-                widget.destroy()
-
-        self.status_label.config(text="发牌中，请稍后。")
-
-        buttons_container = tk.Frame(self.action_frame, bg=PANEL_BG)
-        buttons_container.pack(pady=5)
-        self.fold_button = tk.Button(
-            buttons_container, text="弃牌", command=self.fold_action,
-            state=tk.DISABLED, font=('Arial', 12, 'bold'), bg='#F44336', fg='white',
-            width=10, relief=tk.RAISED, bd=2
-        )
-        self.fold_button.pack(side=tk.LEFT, padx=5)
-        self.call_button = tk.Button(
-            buttons_container, text="下注2倍", command=self.call_action,
-            state=tk.DISABLED, font=('Arial', 12, 'bold'), bg='#4CAF50', fg='white',
-            width=10, relief=tk.RAISED, bd=2
-        )
-        self.call_button.pack(side=tk.LEFT, padx=5)
-
-    # ---------- 动画（原始速度） ----------
-    def animate_deal(self):
-        if not self.animation_queue:
-            self.animation_in_progress = False
-            self.after(500, self.reveal_player_cards)
-            return
-        self.animation_in_progress = True
-        card_id = self.animation_queue.pop(0)
-        if card_id.startswith("community"):
-            frame = self.community_cards_frame
-            idx = int(card_id.split("_")[1])
-            card = self.game.community_cards[idx] if idx < len(self.game.community_cards) else None
-        elif card_id.startswith("player"):
-            frame = self.player_cards_frame
-            idx = int(card_id.split("_")[1])
-            card = self.game.player_hole[idx] if idx < len(self.game.player_hole) else None
-        elif card_id.startswith("dealer"):
-            frame = self.dealer_cards_frame
-            idx = int(card_id.split("_")[1])
-            card = self.game.dealer_hole[idx] if idx < len(self.game.dealer_hole) else None
-        card_label = tk.Label(frame, image=self.back_image, bg='#2a4a3c')
-        card_label.place(x=self.card_positions[card_id]["current"][0],
-                         y=self.card_positions[card_id]["current"][1] + 20)
-        card_label.card_id = card_id
-        card_label.card = card
-        card_label.is_face_up = False
-        card_label.is_moving = True
-        card_label.target_pos = self.card_positions[card_id]["target"]
-        self.active_card_labels.append(card_label)
-        self.animate_card_move(card_label)
-
-    def animate_card_move(self, card_label):
-        if not hasattr(card_label, "target_pos") or card_label not in self.active_card_labels:
-            return
-        try:
-            current_x, current_y = card_label.winfo_x(), card_label.winfo_y()
-            target_x, target_y = card_label.target_pos
-            dx = target_x - current_x
-            dy = target_y - current_y
-            distance = math.sqrt(dx**2 + dy**2)
-            if distance < 5:
-                card_label.place(x=target_x, y=target_y)
-                card_label.is_moving = False
-                if card_label.target_pos == (50, 50):
-                    if card_label in self.active_card_labels:
-                        self.active_card_labels.remove(card_label)
-                    card_label.destroy()
-                self.after(20, self.animate_deal)
-                return
-            step_x = dx * 0.2
-            step_y = dy * 0.2
-            new_x = current_x + step_x
-            new_y = current_y + step_y
-            card_label.place(x=new_x, y=new_y)
-            self.after(20, lambda: self.animate_card_move(card_label))
-        except tk.TclError:
-            if card_label in self.active_card_labels:
-                self.active_card_labels.remove(card_label)
-            return
-
-    def reveal_player_cards(self):
-        for i, card_label in enumerate(self.player_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flip_card_animation(card_label)
-                self.game.cards_revealed["player"][i] = True
-        self.update_hand_labels()
-        self.after(500, self.reveal_flop)
-
-    def reveal_flop(self):
-        self.flop_revealed = 0
-        for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up and i < 3:
-                self.flip_card_animation(card_label)
-                self.game.cards_revealed["community"][i] = True
-                self.flop_revealed += 1
-        self.update_hand_labels()
-        self.after(1000, self.enable_preflop_buttons)
-
-    def enable_preflop_buttons(self):
-        if hasattr(self, 'fold_button') and self.fold_button.winfo_exists():
-            self.fold_button.config(state=tk.NORMAL)
-        if hasattr(self, 'call_button') and self.call_button.winfo_exists():
-            if self.balance >= self.game.ante * 2:
-                self.call_button.config(state=tk.NORMAL)
-            else:
-                self.call_button.config(state=tk.DISABLED)
-        self.status_label.config(text="做出决策: 弃牌或下注2倍")
-
-    def reveal_turn_river(self):
-        for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up and i >= 3:
-                self.flip_card_animation(card_label)
-                self.game.cards_revealed["community"][i] = True
-
-    def reveal_dealer_cards(self):
-        for i, card_label in enumerate(self.dealer_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flip_card_animation(card_label)
-                self.game.cards_revealed["dealer"][i] = True
-        self.after(700, self.update_hand_labels)
-
-    def flip_card_animation(self, card_label, callback=None):
-        card = card_label.card
-        front_img = self.card_images.get((card.suit, card.rank), self.back_image)
-        self.animate_flip(card_label, front_img, 0)
-
-    def animate_flip(self, card_label, front_img, step):
-        steps = 12
-        orig_w, orig_h = 100, 140
-
-        # 结束条件：恢复正面全尺寸图片
-        if step > steps:
-            card_label.is_face_up = True
-            self.animation_in_progress = False
-            tx, ty = card_label.target_pos if hasattr(card_label, 'target_pos') else (0, 0)
-            card_label.place(x=tx, y=ty, width=orig_w, height=orig_h)
-            card_label.config(image=front_img)
-            return
-
-        # 计算当前帧的宽度比例（前半段背面缩窄，后半段正面展开）
-        half = steps // 2
-        if step <= half:
-            ratio = 1 - (step / float(half))        # 1 → 0
-            use_back = True
-        else:
-            ratio = (step - half) / float(half)     # 0 → 1
-            use_back = False
-
-        w = max(1, int(orig_w * ratio))            # 当前宽度（至少1px）
-
-        # 从缓存的原始图像生成缩放后的 PhotoImage
-        # 注意：front_img 是完整正面图，但我们需要根据 use_back 选择图像源
-        if use_back:
-            # 使用背面图像（从 original_images 中获取“back”）
-            img_key = "back"
-            if img_key in self.original_images:
-                pil_img = self.original_images[img_key].resize((w, orig_h), Image.LANCZOS)
-            else:
-                # 若没有背面原始图，则用当前 back_image 的原始尺寸? 这里直接使用 self.back_image 的原始图像？但 self.back_image 已经是 PhotoImage，无法缩放。
-                # 保险做法：使用已加载的背面 PIL 原图（若存在）
-                pil_img = self.original_images.get("back", Image.new('RGB', (orig_w, orig_h), 'green'))
-                pil_img = pil_img.resize((w, orig_h), Image.LANCZOS)
-        else:
-            # 正面：从 original_images 中获取对应牌的原图（卡牌原图未缩放）
-            # 根据 card_label.card 获取 key
-            card = card_label.card
-            key = (card.suit, card.rank)
-            pil_img = self.original_images.get(key)
-            if pil_img is None:
-                # 容错：用 front_img 的原始图像？但 front_img 是 PhotoImage，无法获取原图。
-                # 这里我们假设 original_images 中一定有该牌，因为 _load_assets 已加载。
-                # 若没有，则生成一个占位图
-                pil_img = Image.new('RGB', (orig_w, orig_h), 'gray')
-            pil_img = pil_img.resize((w, orig_h), Image.LANCZOS)
-
-        # 转换为 PhotoImage 并保存引用防止被垃圾回收
-        scaled_img = ImageTk.PhotoImage(pil_img)
-        if not hasattr(self, '_temp_flip_images'):
-            self._temp_flip_images = {}
-        self._temp_flip_images[card_label] = scaled_img   # 用 card_label 作为 key
-
-        # 更新 Label 显示
-        tx, ty = card_label.target_pos if hasattr(card_label, 'target_pos') else (0, 0)
-        offset = (orig_w - w) // 2      # 水平居中
-        card_label.config(image=scaled_img)
-        card_label.place(x=tx + offset, y=ty, width=w, height=orig_h)
-
-        # 继续下一帧
-        self.after(30, lambda: self.animate_flip(card_label, front_img, step + 1))
-
-    # ---------- 动作 ----------
-    def call_action(self):
-        call_amount = self.game.ante * 2
-        if self.balance < call_amount:
-            messagebox.showerror("错误", "余额不足以支付加注")
-            return
-        self.balance -= call_amount
-        self.update_balance()
-        self.game.call_bet = call_amount
-        self.call_var.set(str(int(call_amount)))
-        self.status_label.config(text=f"加注: ${call_amount}")
-
-        call_rake = call_amount * 0.01
-        self.game.progressive_amount += call_rake
-        save_progressive(self.game.progressive_amount)
-        self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
-
-        self.fold_button.config(state=tk.DISABLED)
-        self.call_button.config(state=tk.DISABLED)
-
-        total_bet = self.ante + self.aa + call_amount
-        if self.participate_jackpot:
-            total_bet += 2.5
-        self.current_bet_label.config(text=f"本局下注: ${total_bet:,.2f}")
-
-        self.after(1000, self.reveal_turn_river)
-        self.game.stage = "showdown"
-        self.after(2000, self.show_showdown)
-
-    def fold_action(self):
-        self.game.folded = True
-        self.status_label.config(text="您已弃牌。游戏结束。")
-
-        for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flip_card_animation(card_label)
-                self.game.cards_revealed["community"][i] = True
-        self.reveal_dealer_cards()
-        self.update_hand_labels()
-
-        self.after(1000, self.settle_side_bets_after_fold)
-
-    def settle_side_bets_after_fold(self):
-        aa_winnings = 0
-        if self.game.aa > 0:
-            aa_cards = self.game.player_hole + self.game.community_cards[:3]
-            aa_eval, _ = find_best_5(aa_cards)
-            aa_winnings = self.calculate_aa_winnings(aa_eval)
-            self.win_details['aa'] = aa_winnings
-            self.aa_var.set(str(int(aa_winnings)))
-            if aa_winnings > 0:
-                self.aa_display.config(bg='gold')
-            elif aa_winnings == self.game.aa:
-                self.aa_display.config(bg='light blue')
-            else:
-                self.aa_display.config(bg='white')
-
-        jackpot_winnings = 0
-        if self.game.participate_jackpot:
-            progressive_cards = self.game.player_hole + self.game.community_cards[:3]
-            pg_eval, _ = find_best_5(progressive_cards)
-            # ========== 修改后的 jackpot_rules ==========
-            jackpot_rules = {
-                9: {"amount": lambda: self.game.progressive_amount, "message": "皇家同花顺! 赢得累进大奖 ${amount:,.2f}!"},
-                8: {"amount": lambda: self.game.progressive_amount * 0.1, "message": "同花顺! 赢得累进大奖 ${amount:,.2f}!"},
-                7: {"amount": 1250, "message": "四条! 赢得累进大奖 $1,250!"},
-                6: {"amount": 375, "message": "葫芦! 赢得累进大奖 $375!"},
-                5: {"amount": 250, "message": "同花! 赢得累进大奖 $250!"}
-            }
-            # ============================================
-            if pg_eval[0] in jackpot_rules:
-                rule = jackpot_rules[pg_eval[0]]
-                if callable(rule["amount"]):
-                    amount = rule["amount"]()
-                else:
-                    amount = rule["amount"]
-                jackpot_winnings = amount
-                self.game.progressive_amount -= amount
-                if self.game.progressive_amount < 271288.59:
-                    self.game.progressive_amount = 271288.59
-                save_progressive(self.game.progressive_amount)
-                self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
-                messagebox.showinfo("恭喜您获得累进大奖！", rule["message"].format(amount=amount))
-                self.progressive_display.config(bg='gold')
-
-        total_winnings = aa_winnings + jackpot_winnings
-        self.last_win = total_winnings
-        self.balance += total_winnings
-        self.update_balance()
-        self.last_win_label.config(text=f"上局获胜: ${total_winnings:,.2f}")
-
-        self.ante_var.set("0")
-        self.call_var.set("0")
-        self.bet_widgets["ante"].config(bg='white')
-        self.bet_widgets["call"].config(bg='white')
-
-        self._save_history(result_info={"fold": True, "total_winnings": total_winnings})
-
-        for widget in self.action_frame.winfo_children():
-            if widget not in [self.reset_bets_button, self.start_button, self.status_label, self.repeat_bet_button]:
-                widget.destroy()
-        restart_btn = tk.Button(
-            self.action_frame, text="再来一局", command=self.reset_game,
-            font=('Arial', 12, 'bold'), bg='#2196F3', fg='white',
-            width=10, relief=tk.RAISED, bd=2
-        )
-        restart_btn.pack(pady=5)
-        restart_btn.bind("<Button-3>", self.show_card_sequence)
-        self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
-
-    def calculate_aa_winnings(self, aa_eval):
-        if self.game.aa <= 0:
-            return 0
-        aa_hand_rank = aa_eval[0]
-        aa_hand_cards = aa_eval[1]
-        is_pair_aces = (aa_hand_rank == 1 and len(aa_hand_cards) > 0 and aa_hand_cards[0] == 14)
-        if is_pair_aces:
-            return self.game.aa * (1 + 7)
-        elif aa_hand_rank in AA_PAYOUT:
-            odds = AA_PAYOUT[aa_hand_rank]
-            return self.game.aa * (1 + odds)
-        else:
-            return 0
-
-    def show_showdown(self):
-        for i, card_label in enumerate(self.community_cards_frame.winfo_children()):
-            if hasattr(card_label, "card") and not card_label.is_face_up:
-                self.flip_card_animation(card_label)
-                self.game.cards_revealed["community"][i] = True
-        self.after(500, self.final_reveal)
-
-    def final_reveal(self):
-        self.reveal_dealer_cards()
-        self.after(2200, self.update_hand_labels)
-
-        player_eval, player_best, dealer_eval, dealer_best = self.game.evaluate_hands()
-        winnings = self.calculate_winnings(player_eval, dealer_eval)
-        self.last_win = winnings
-        self.balance += winnings
-        self.update_balance()
-
-        self.ante_var.set(str(int(self.win_details['ante'])))
-        self.aa_var.set(str(int(self.win_details['aa'])))
-        self.call_var.set(str(int(self.win_details['call'])))
-
-        for bet_type, widget in self.bet_widgets.items():
-            if self.win_details[bet_type] == 0:
-                if bet_type == "ante":
-                    self.ante_var.set("0")
-                elif bet_type == "aa":
-                    self.aa_var.set("0")
-                elif bet_type == "call":
-                    self.call_var.set("0")
-                widget.config(bg='white')
-            else:
-                principal = 0
-                if bet_type == "ante":
-                    principal = self.game.ante
-                elif bet_type == "aa":
-                    principal = self.game.aa
-                elif bet_type == "call":
-                    principal = self.game.call_bet
-                if self.win_details[bet_type] == principal:
-                    widget.config(bg='light blue')
-                else:
-                    widget.config(bg='gold')
-
-        self.status_label.config(text="游戏结束。")
-        self.last_win_label.config(text=f"上局获胜: ${winnings:,.2f}")
-
-        if player_eval > dealer_eval:
-            winner = "player"
-        elif dealer_eval > player_eval:
-            winner = "dealer"
-        else:
-            winner = "push"
-        self._save_history(result_info={"winner": winner, "winnings": winnings})
-
-        for widget in self.action_frame.winfo_children():
-            if widget not in [self.reset_bets_button, self.start_button, self.status_label, self.repeat_bet_button]:
-                widget.destroy()
-        restart_btn = tk.Button(
-            self.action_frame, text="再来一局", command=self.reset_game,
-            font=('Arial', 12, 'bold'), bg='#2196F3', fg='white',
-            width=10, relief=tk.RAISED, bd=2
-        )
-        restart_btn.pack(pady=5)
-        restart_btn.bind("<Button-3>", self.show_card_sequence)
-        self.auto_reset_timer = self.after(30000, lambda: self.reset_game(True))
-
-    def calculate_winnings(self, player_eval, dealer_eval):
-        self.win_details = {
-            "ante": 0,
-            "aa": 0,
-            "call": 0,
-            "jackpot": 0
-        }
-        total_winnings = 0
-
-        dealer_qualified = self.game.dealer_qualifies(dealer_eval)
-
-        # Ante
-        if not dealer_qualified:
-            player_hand_rank = player_eval[0]
-            if player_hand_rank in ANTE_PAYOUT:
-                odds = ANTE_PAYOUT[player_hand_rank]
-                self.win_details['ante'] = self.game.ante * (1 + odds)
-            else:
-                self.win_details['ante'] = self.game.ante * 2
-        elif player_eval > dealer_eval:
-            player_hand_rank = player_eval[0]
-            if player_hand_rank in ANTE_PAYOUT:
-                odds = ANTE_PAYOUT[player_hand_rank]
-                self.win_details['ante'] = self.game.ante * (1 + odds)
-            else:
-                self.win_details['ante'] = self.game.ante * 2
-        elif player_eval == dealer_eval:
-            self.win_details['ante'] = self.game.ante
-        else:
-            self.win_details['ante'] = 0
-        total_winnings += self.win_details['ante']
-
-        # Call bet
-        if not dealer_qualified:
-            self.win_details['call'] = self.game.call_bet
-        elif player_eval > dealer_eval:
-            self.win_details['call'] = self.game.call_bet * 2
-        elif player_eval == dealer_eval:
-            self.win_details['call'] = self.game.call_bet
-        else:
-            self.win_details['call'] = 0
-        total_winnings += self.win_details['call']
-
-        # AA+
-        if self.game.aa > 0:
-            aa_cards = self.game.player_hole + self.game.community_cards[:3]
-            aa_eval, _ = find_best_5(aa_cards)
-            aa_winnings = self.calculate_aa_winnings(aa_eval)
-            self.win_details['aa'] = aa_winnings
-            total_winnings += aa_winnings
-
-        # Jackpot
-        if self.game.participate_jackpot:
-            progressive_cards = self.game.player_hole + self.game.community_cards[:3]
-            pg_eval, _ = find_best_5(progressive_cards)
-            # ========== 修改后的 jackpot_rules ==========
-            jackpot_rules = {
-                9: {"amount": lambda: self.game.progressive_amount, "message": "皇家同花顺! 赢得累进大奖 ${amount:,.2f}!"},
-                8: {"amount": lambda: self.game.progressive_amount * 0.1, "message": "同花顺! 赢得累进大奖 ${amount:,.2f}!"},
-                7: {"amount": 1250, "message": "四条! 赢得累进大奖 $1,250!"},
-                6: {"amount": 375, "message": "葫芦! 赢得累进大奖 $375!"},
-                5: {"amount": 250, "message": "同花! 赢得累进大奖 $250!"}
-            }
-            # ============================================
-            if pg_eval[0] in jackpot_rules:
-                rule = jackpot_rules[pg_eval[0]]
-                if callable(rule["amount"]):
-                    amount = rule["amount"]()
-                else:
-                    amount = rule["amount"]
-                self.win_details['jackpot'] = amount
-                total_winnings += amount
-                self.game.progressive_amount -= amount
-                if self.game.progressive_amount < 271288.59:
-                    self.game.progressive_amount = 271288.59
-                save_progressive(self.game.progressive_amount)
-                self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
-                messagebox.showinfo("恭喜您获得累进大奖！", rule["message"].format(amount=amount))
-                self.progressive_display.config(bg='gold')
-
-        total_bet = self.game.ante + self.game.aa + self.game.call_bet
-        progressive_increase = total_bet * 0.01
-        if self.game.participate_jackpot:
-            progressive_increase += 2.21
-        self.game.progressive_amount += progressive_increase
-        if self.game.progressive_amount < 271288.59:
-            self.game.progressive_amount = 271288.59
-        save_progressive(self.game.progressive_amount)
-        self.progressive_amount_var.set(f"${self.game.progressive_amount:,.2f}")
-
-        return total_winnings
-
-    # ---------- 历史记录 ----------
-    def _save_history(self, result_info=None):
-        try:
-            deck = self.game.deck
-            if deck is None:
-                return
-            save_che_history(
-                deck=deck,
-                player_cards=self.game.player_hole,
-                dealer_cards=self.game.dealer_hole,
-                community_cards=self.game.community_cards,
-                result_info=result_info if result_info else {}
-            )
-        except Exception as e:
-            print(f"保存历史记录时出错: {e}")
-
-    # ---------- 辅助 ----------
-    def repeat_last_bet(self):
-        if self.last_game_bet is None:
-            return
-        self.ante_var.set(str(self.last_game_bet['ante']))
-        self.aa_var.set(str(self.last_game_bet['aa']))
-        self.progressive_var.set(1 if self.last_game_bet['progressive'] else 0)
-        self.status_label.config(text="已重复上局下注")
+            label=format(value,'f')
+            return label.rstrip('0').rstrip('.') if '.' in label else label
+        scaled=value/divisor
+        precision=Decimal(1).scaleb(abs(scaled).adjusted()-1)
+        shown=scaled.quantize(precision,rounding=ROUND_DOWN)
+        label=format(shown,'f')
+        if '.' in label:label=label.rstrip('0').rstrip('.')
+        return label+suffix+('+' if shown!=scaled else '')
+
+    def select_chip(self, amount):
+        if self.game.stage == 'betting':
+            self.selected_chip = amount
+            self._draw_chips()
+
+    def _status(self, message):
+        # 记录阶段供调试，不在筹码下方绘制说明文字。
+        self.current_status=message
 
     def reset_bets(self):
-        self.ante_var.set("0")
-        self.aa_var.set("0")
-        self.call_var.set("0")
-        self.status_label.config(text="已重置所有下注金额")
-        for widget in self.bet_widgets.values():
-            widget.config(bg='white')
-        self.ante_display.config(bg='#FFCDD2')
-        self.aa_display.config(bg='#FFCDD2')
-        self.after(500, lambda: [self.ante_display.config(bg='white'), self.aa_display.config(bg='white')])
+        if self.game.stage=='betting' and not self._motion_count:
+            self._apply_bet_layout({s:self.game.empty_bet() for s in self.game.SEATS})
 
-    def animate_collect_cards(self, auto_reset):
-        self.disable_action_buttons()
-        self.animate_move_cards_out(auto_reset)
+    def apply_last_bet(self):
+        if self.game.stage=='betting' and not self._motion_count and self.last_bet:
+            self._apply_bet_layout(self.last_bet)
 
-    def animate_move_cards_out(self, auto_reset):
-        if not self.active_card_labels:
-            self._do_reset(auto_reset)
+    def toggle_high_bet_limits(self, event=None):
+        if self.game.stage != 'betting' or self._motion_count:
             return
-        for card_label in self.active_card_labels:
-            card_label.target_pos = (1200, card_label.winfo_y())
-        self.animate_card_out_step(auto_reset)
+        if not self.high_bet_mode:
+            password = simpledialog.askstring('高额下注', '请输入密码：', parent=self)
+            if password is None:
+                return
+            if password.strip() != time.strftime('%H%M'):
+                messagebox.showerror('错误','密码错误',parent=self)
+                return
+        self.high_bet_mode = not self.high_bet_mode
+        self.reset_bets()
+        self.last_bet = None
+        self.selected_chip = 100 if self.high_bet_mode else 10
+        self._draw_chips()
+        self._refresh()
 
-    def animate_card_out_step(self, auto_reset):
-        all_done = True
-        for card_label in self.active_card_labels[:]:
-            if not hasattr(card_label, 'target_pos'):
-                continue
-            current_x = card_label.winfo_x()
-            target_x, target_y = card_label.target_pos
-            dx = target_x - current_x
-            if abs(dx) < 5:
-                card_label.place(x=target_x, y=target_y)
-                card_label.destroy()
-                if card_label in self.active_card_labels:
-                    self.active_card_labels.remove(card_label)
-                continue
-            new_x = current_x + dx * 0.2
-            card_label.place(x=new_x)
-            all_done = False
-        if not all_done:
-            self.after(20, lambda: self.animate_card_out_step(auto_reset))
-        else:
-            self._do_reset(auto_reset)
+    def _persist_balance(self):
+        try:
+            if self.username and self.username!='Guest':
+                update_balance_in_json(self.username,self.balance)
+            if callable(self.on_balance_change):
+                self.on_balance_change(float(self.balance))
+        except Exception as exc:
+            messagebox.showerror('余额保存失败',str(exc),parent=self)
+            return False
+        return True
+
+    def start_game(self):
+        if self.game.stage!='betting' or self._motion_count:return
+        try:charged=self.game.start_round(self.bets,self.balance,self.high_bet_mode)
+        except ValueError as exc:
+            messagebox.showwarning('无法开始',str(exc),parent=self);return
+        # 所有状态先锁定，避免 ENTER/快速双击重复扣款。
+        self.game.stage='progressive'
+        self._history_available=False
+        self._close_card_sequence()
+        self._fade_dealer_notice(False)
+        self.balance=round(self.balance-charged,2)
+        self.bets={s:dict(b) for s,b in self.game.bets.items()}
+        self.last_bet={s:dict(b) for s,b in self.bets.items()}
+        self._credited=False;self._return_persisted=False;self._settlement_started=False;self._side_resolved=set()
+        self._cancel_restart_timer()
+        self._blind_seats={s for s in self.game.SEATS if self.game.decisions[s]=='call'}
+        self._revealed_public=0
+        self._sorted_sides=set();self._decision_busy=False;self._showdown_started=False
+        self.canvas.delete('cards');self.card_items.clear();self._flip_photos.clear()
+        self._load_assets()
+        for side,item in self.title_items.items():
+            self.canvas.itemconfigure(item,text='庄家' if side=='Dealer' else self.SEAT_NAMES[side])
+        refunds=[]
+        for seat,refunded in self.game.refunded_bets.items():
+            self._set_lamp_mode(seat,'off')
+            for kind,amount in refunded.items():
+                chip=self.visual_chips.pop((seat,kind,'stake'),None)
+                if chip:
+                    refunds.append(dict(amount=chip['amount'],start=chip['xy'],
+                        target=self._rack_position(),duration=440))
+        # 下注阶段只摆放筹码，尚未扣余额；这里只扣合格手牌，退款不可重复加钱。
+        self.game.stage='refunding' if refunds else 'progressive'
+        self._persist_balance();self._save_progressive_amount();self._refresh()
+        self._run_chip_batch(refunds,self._start_progressive_lamps)
+
+    def _start_progressive_lamps(self):
+        self.game.stage='progressive'
+        participants=[seat for seat in self.game.SEATS if self.bets[seat]['jackpot']]
+        pending=set(participants)
+        def filled(seat):
+            pending.discard(seat)
+            if not pending and self.game.stage=='progressive':
+                self._collect_progressive_and_deal()
+        for seat in self.game.SEATS:
+            if seat in pending:
+                self.lamps[seat]['filled_callback']=lambda s=seat:filled(s)
+                self._set_lamp_mode(seat,'fill')
+            else:self._set_lamp_mode(seat,'off')
+        self._refresh()
+        if not participants:self._schedule(0,self._collect_progressive_and_deal)
+
+    def _deal_next(self, sequence, offset):
+        if offset==len(sequence):
+            # 非预下注手牌按原顺序翻开；预下注手牌留到庄家开牌之后。
+            reveal = [(s,i) for s in self.game.SEATS if self.game.decisions[s]=='pending' for i in range(2)]
+            self._reveal_next(reveal,0,self._after_initial_reveal)
+            return
+        side,index = sequence[offset]
+        x,y = self.card_position(side,index)
+        photo = self._public_photos['back'] if side=='Public' else self._face_photos['back']
+        item = self.canvas.create_image(575,52,image=photo,anchor='nw',tags='cards')
+        self.card_items[(side,index)] = item
+        def move(step=0):
+            p = step/6
+            self.canvas.coords(item,575+(x-575)*p,52+(y-52)*p)
+            if step<6:
+                self._schedule(round(self.DEAL_MOVE_MS*(step+1)/6)-round(self.DEAL_MOVE_MS*step/6),move,step+1)
+            else:
+                self._schedule(round(self.DEAL_CARD_MS)-round(self.DEAL_MOVE_MS),self._deal_next,sequence,offset+1)
+        move()
+
+    def _reveal_next(self, sequence, offset, complete):
+        if offset==len(sequence): complete(); return
+        side,index = sequence[offset]
+        hand = self.game.dealer_hand if side=='Dealer' else self.game.public_cards if side=='Public' else self.game.hands[side]
+        card, item = hand[index], self.card_items[(side,index)]
+        x,y = self.card_position(side,index); w,h = self.card_size(side)
+        def flip(step=0):
+            width = max(1,round(w*abs(1-step/5)))
+            source = self._pil_cards['back' if step<5 else self._card_image_key(card)]
+            photo = ImageTk.PhotoImage(source.resize((width,h),Image.Resampling.LANCZOS),master=self)
+            self._flip_photos[item] = photo
+            self.canvas.itemconfigure(item,image=photo)
+            self.canvas.coords(item,x+(w-width)/2,y)
+            if step<10: self._schedule(32,flip,step+1)
+            else:
+                photos = self._public_photos if side=='Public' else self._face_photos
+                self.canvas.itemconfigure(item,image=photos[self._card_image_key(card)])
+                self._flip_photos.pop(item,None)
+                self._reveal_next(sequence,offset+1,complete)
+        flip()
+
+    def _pay_progressive_awards(self, awards, pool_amount, index=0):
+        if index==len(awards):
+            # 扣款复制完成后，沿用原有奖池补底及本局贡献规则。
+            self.progressive_amount_var.set(f'${self.game.progressive_amount:,.2f}')
+            self._await_next_round()
+            return
+        seat,amount=awards[index]
+        target=self.bet_spots[(seat,'jackpot')]['center']
+        panel=self.progressive_panel
+        origin=(panel.winfo_rootx()-self.canvas.winfo_rootx()+panel.winfo_width()/2,
+                panel.winfo_rooty()-self.canvas.winfo_rooty()+panel.winfo_height()+20)
+        frame_tag='jackpot_award_frame_'+seat
+        # 空框先出现在上方奖池下方，数字填入后才移动整枚筹码。
+        self._draw_chip(frame_tag,amount,*origin,rectangular=True,show_amount=False)
+        self._motion_count+=1
+        def copy_amount():
+            remaining=round(pool_amount-amount,2)
+            self.progressive_display.set_amount_immediately(f'${remaining:,.2f}')
+            display=self.progressive_display
+            start=(display.winfo_rootx()-self.canvas.winfo_rootx()+display.winfo_width()/2,
+                   display.winfo_rooty()-self.canvas.winfo_rooty()+display.winfo_height()/2)
+            number=self._text(*start,self._jackpot_label(amount),11,'#FFF0C3',tags='jackpot_amount_copy')
+            def deliver_chip():
+                self.canvas.delete(number);self.canvas.delete(frame_tag)
+                self._motion_count-=1
+                def arrived():
+                    self._set_visual(seat,'jackpot','bonus',amount,target,True)
+                    self._refresh()
+                    self._schedule(200,self._pay_progressive_awards,awards,remaining,index+1)
+                self._animate_chip(amount,origin,target,arrived,rectangular=True,duration=440)
+            def move(step=0):
+                progress=step/28
+                eased=progress*progress*(3-2*progress)
+                self.canvas.coords(number,start[0]+(origin[0]-start[0])*eased,
+                    start[1]+(origin[1]-start[1])*eased)
+                self.canvas.tag_raise(number)
+                if step<28:
+                    self._schedule(round(440*(step+1)/28)-round(440*step/28),move,step+1)
+                else:
+                    self._schedule(150,deliver_chip)
+            move()
+        # 生成空框 → 奖池扣款 → 复制奖金数字 → 整枚筹码移至中奖灯中心。
+        self._schedule(150,copy_amount)
 
     def reset_game(self, auto_reset=False):
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-            self.auto_reset_timer = None
-        if self.active_card_labels:
-            self.disable_action_buttons()
-            self.animate_collect_cards(auto_reset)
+        # 兼容原入口；通常由全部筹码回到筹码区自动开放下一局。
+        if self.game.stage=='betting':
+            self._fade_dealer_notice(False)
+            self.reset_bets()
+
+    def on_close(self):
+        if self._closing or self._crediting:return
+        settled=self.game.stage in ('settling','await_restart','returning','credit_pending','sweeping')
+        if self.game_in_progress and not settled:
+            messagebox.showinfo('牌局进行中','请先完成已下注手牌的决定和结算。',parent=self)
             return
-        self._do_reset(auto_reset)
-
-    def _do_reset(self, auto_reset=False):
-        self._load_assets()
-        self.game.reset_game()
-        self.stage_label.config(text="翻牌前")
-        self.player_label.config(text="玩家")
-        self.dealer_label.config(text="庄家")
-        self.ante_var.set("0")
-        self.aa_var.set("0")
-        self.call_var.set("0")
-        self.progressive_var.set(1 if self.last_jackpot_selection else 0)
-        for widget in self.bet_widgets.values():
-            widget.config(bg='white')
-        self.progressive_display.config(bg=PANEL_BG)
-
-        self.active_card_labels = []
-        self.ante_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("ante"))
-        self.ante_display.bind("<Button-3>", lambda e: self.reset_single_bet("ante", e))
-        self.aa_display.bind("<Button-1>", lambda e: self.add_chip_to_bet("aa"))
-        self.aa_display.bind("<Button-3>", lambda e: self.reset_single_bet("aa", e))
-        self.progressive_cb.config(state=tk.NORMAL)
-        for chip in self.chip_buttons:
-            text = self.chip_texts[chip]
-            chip.bind("<Button-1>", lambda e, t=text: self.select_chip(t))
-
-        for widget in self.action_frame.winfo_children():
-            if widget != self.status_label:
-                widget.destroy()
-
-        btn_frame = tk.Frame(self.action_frame, bg=PANEL_BG)
-        btn_frame.pack(fill=tk.X, pady=5)
-        inner_btn_frame = tk.Frame(btn_frame, bg=PANEL_BG)
-        inner_btn_frame.pack(anchor='center')
-
-        self.reset_bets_button = tk.Button(
-            inner_btn_frame, text="重设金额", command=self.reset_bets,
-            font=('Arial', 12, 'bold'), bg='#F44336', fg='white',
-            relief=tk.RAISED, bd=2, cursor="hand2", width=10
-        )
-        self.reset_bets_button.pack(side=tk.LEFT, padx=5)
-
-        self.repeat_bet_button = tk.Button(
-            inner_btn_frame, text="重复上局下注", command=self.repeat_last_bet,
-            font=('Arial', 12, 'bold'), bg='#FFC107', fg='black',
-            relief=tk.RAISED, bd=2, cursor="hand2", width=12,
-            state=tk.NORMAL if self.last_game_bet is not None else tk.DISABLED
-        )
-        self.repeat_bet_button.pack(side=tk.LEFT, padx=5)
-
-        self.start_button = tk.Button(
-            inner_btn_frame, text="开始游戏", command=self.start_game,
-            font=('Arial', 12, 'bold'), bg='#4CAF50', fg='white',
-            relief=tk.RAISED, bd=2, cursor="hand2", width=10
-        )
-        self.start_button.pack(side=tk.LEFT, padx=5)
-
-        self.current_bet_label.config(text="本局下注: $0.00")
-        if auto_reset:
-            self.status_label.config(text="30秒已到，自动开始新游戏")
-            self.after(1500, lambda: self.status_label.config(text="设置下注金额并开始游戏"))
+        # 已结算的返还金额必须先保存成功，才允许中断动画并关闭。
+        if settled:
+            if not self._credit_round_return():return
+        elif not self._persist_balance():return
+        self._closing=True
+        self._cancel_restart_timer()
+        self._cancel_jobs()
+        self._unbind_enter()
+        if callable(self.on_back):
+            self.on_back(float(self.balance))
         else:
-            self.status_label.config(text="设置下注金额并开始游戏")
+            self.winfo_toplevel().destroy()
 
-    def show_card_sequence(self, event):
-        if self.auto_reset_timer:
-            self.after_cancel(self.auto_reset_timer)
-            self.auto_reset_timer = None
-        if not hasattr(self.game, 'deck') or not self.game.deck:
-            messagebox.showinfo("提示", "没有牌序信息")
+    def _draw_limit_table(self):
+        # 保留原加勒比的标题 + 三列限红表，改成深绿/金色。
+        c = self.canvas
+        x0,x1,y0 = 30,349,75
+        c.create_rectangle(x0,y0,x1,181,fill=ROOT_BG,outline=GOLD,width=2,tags='limits')
+        c.create_rectangle(x0,y0,x1,y0+29,fill=ROOT_BG,outline=GOLD,tags='limits')
+        self._text((x0+x1)/2,y0+14,'下注上限',13,PANEL_BG,tags='limits')
+        titles = ('前注最低','前注最高','边注最高')
+        self.limit_value_items = []
+        for col,title in enumerate(titles):
+            left=x0+col*(x1-x0)/3
+            right=x0+(col+1)*(x1-x0)/3
+            c.create_rectangle(left,y0+29,right,y0+66,outline='#77906B',tags='limits')
+            c.create_rectangle(left,y0+66,right,181,outline='#77906B',tags='limits')
+            self._text((left+right)/2,y0+47,title,11,PANEL_BG,tags='limits')
+            self.limit_value_items.append(self._text((left+right)/2,y0+86,'',12,GOLD,tags='limits'))
+        c.tag_bind('limits','<Button-1>',self.toggle_high_bet_limits)
+        c.tag_bind('limits','<Enter>',lambda _e:c.configure(cursor='hand2'))
+        c.tag_bind('limits','<Leave>',lambda _e:c.configure(cursor=''))
+
+    def _draw_progressive_panel(self):
+        panel = tk.Frame(self.canvas,bg=ROOT_BG,highlightbackground=GOLD,highlightthickness=2)
+        self.progressive_panel=panel
+        self.canvas.create_window(957,128,window=panel,width=322,height=118)
+        tk.Label(panel,text='累进大奖',font=('Arial',24,'bold'),
+                 bg=ROOT_BG,fg='#F6D675').pack(fill=tk.X)
+        self.progressive_amount_var = tk.StringVar(self,f'${self.game.progressive_amount:,.2f}')
+        self.progressive_display = ProgressiveSevenSegmentDisplay(panel,self.progressive_amount_var,
+            font=('Arial',24,'bold'),bg=ROOT_BG,fg='#FFE29A')
+        self.progressive_display.pack(pady=10)
+
+    def _register_spot(self, seat, kind, cx, cy, border, label, angle=0):
+        c,tag = self.canvas,'spot_'+seat+'_'+kind
+        self._text(cx,cy,label,14,PANEL_BG,angle=angle,tags=tag)
+        self.bet_spots[(seat,kind)] = dict(tag=tag,center=(cx,cy),border=border)
+        c.tag_bind(tag,'<Button-1>',lambda _e,s=seat,k=kind:self.add_chip_to_bet(s,k))
+        c.tag_bind(tag,'<Button-3>',lambda _e,s=seat,k=kind:self.reset_single_bet(s,k))
+        c.tag_bind(tag,'<Enter>',lambda _e:c.configure(cursor='hand2'))
+        c.tag_bind(tag,'<Leave>',lambda _e:c.configure(cursor=''))
+
+    def _draw_bottom_controls(self):
+        c=self.canvas
+        c.create_rectangle(0,625,1150,748,fill=ROOT_BG,outline='#6C7850',width=2,tags='controls')
+        self.balance_item=self._text(10,665,'',18,TEXT,anchor='w',tags='controls')
+        self.total_item=self._text(10,710,'',18,TEXT,anchor='w',tags='controls')
+        self.clear_button=self.create_control_button(278,650,344,704,'清除',self.reset_bets,'#9B403A',font_size=11,draw_shadow=False)
+        self._draw_chips()
+        self.info_button=self.create_control_button(810,650,855,695,'?',self.show_game_instructions,DARK_BLUE,font_size=17,draw_shadow=False)
+        self.repeat_button=self.create_control_button(862,638,1000,708,'重复下注',self.apply_last_bet,'#536A43',font_size=11,draw_shadow=False)
+        self.start_button=self.create_control_button(1012,628,1138,720,'开牌',self.start_game,HEADER_BG,
+            fg=TITLE_FG,font_size=14,subtext='Enter',subtext_font_size=10,draw_shadow=False)
+        self.restart_button=self.create_control_button(862,638,1138,708,'再来一局(30)',self._return_all_chips,
+            HEADER_BG,fg=TITLE_FG,font_size=17,draw_shadow=False)
+        c.tag_bind(self.restart_button,'<Button-3>',self._inspect_completed_round)
+        c.itemconfigure(self.restart_button,state='hidden')
+        # 筹码区下方不放文字，也没有返回按钮。
+        self._enter_binding=self.winfo_toplevel().bind('<Return>',lambda _e:
+            self._return_all_chips() if self.game.stage in ('await_restart','credit_pending') else self.start_game(),add='+')
+
+    @staticmethod
+    def shade_color(color, factor):
+        color = color.lstrip('#')
+        if len(color) != 6:
+            return '#555555'
+        values = [int(color[i:i + 2], 16) for i in (0, 2, 4)]
+        values = [max(0, min(255, int(value * factor))) for value in values]
+        return '#' + ''.join(f'{value:02x}' for value in values)
+
+    def create_control_button(self, x0, y0, x1, y1, text, command, fill,
+                              fg='white', font_size=11, subtext=None,
+                              subtext_font_size=10, draw_shadow=True):
+        tag = f'control_button_{len(self.control_buttons)}'
+        shadow = self.canvas.create_rectangle(x0 + 5, y0 + 6, x1 + 5, y1 + 6,
+                                              fill='#070605', outline='#070605',
+                                              width=1, tags=(tag, 'controls')) if draw_shadow else None
+        rim = self.canvas.create_rectangle(x0, y0, x1, y1,
+                                           fill=self.shade_color(fill, 0.55),
+                                           outline='#b7a58d', width=2,
+                                           tags=(tag, 'controls'))
+        face = self.canvas.create_rectangle(x0 + 4, y0 + 4, x1 - 4, y1 - 4,
+                                            fill=fill,
+                                            outline=self.shade_color(fill, 1.25),
+                                            width=2, tags=(tag, 'controls'))
+        highlight = self.canvas.create_line(x0 + 8, y0 + 8, x1 - 8, y0 + 8,
+                                            fill=self.shade_color(fill, 1.45), width=2,
+                                            tags=(tag, 'controls'))
+        center_y = (y0 + y1) / 2 - 1
+        text_y = center_y - 12 if subtext else center_y
+        text_id = self.canvas.create_text((x0 + x1) / 2, text_y, text=text,
+                                          font=('Arial', font_size, 'bold'), fill=fg,
+                                          tags=(tag, 'controls'))
+        subtext_id = None
+        subtext_center_y = None
+        if subtext:
+            subtext_center_y = center_y + 16
+            subtext_id = self.canvas.create_text((x0 + x1) / 2, subtext_center_y,
+                                                 text=subtext,
+                                                 font=('Arial', subtext_font_size, 'bold'),
+                                                 fill=fg, tags=(tag, 'controls'))
+        self.control_buttons[tag] = {
+            'shadow': shadow, 'rim': rim, 'face': face, 'highlight': highlight,
+            'text': text_id, 'subtext': subtext_id, 'command': command,
+            'fill': fill, 'fg': fg, 'enabled': True, 'pressed': False,
+            'center_y': text_y, 'subtext_center_y': subtext_center_y,
+        }
+
+        def enter(_event=None):
+            button = self.control_buttons.get(tag)
+            if button and button['enabled'] and not button['pressed']:
+                self.canvas.itemconfigure(button['face'], fill=self.shade_color(button['fill'], 1.12))
+
+        def leave(_event=None):
+            button = self.control_buttons.get(tag)
+            if button and button['enabled'] and not button['pressed']:
+                self.canvas.itemconfigure(button['face'], fill=button['fill'])
+
+        def press(_event=None):
+            button = self.control_buttons.get(tag)
+            if not button or not button['enabled']:
+                return
+            button['pressed'] = True
+            self.canvas.itemconfigure(button['face'], fill=self.shade_color(button['fill'], 0.72))
+            self.canvas.itemconfigure(button['highlight'], fill=self.shade_color(button['fill'], 0.8))
+            x, _y = self.canvas.coords(button['text'])
+            self.canvas.coords(button['text'], x, button['center_y'] + 2)
+            if button.get('subtext'):
+                sx, _sy = self.canvas.coords(button['subtext'])
+                self.canvas.coords(button['subtext'], sx, button['subtext_center_y'] + 2)
+
+        def release(_event=None):
+            button = self.control_buttons.get(tag)
+            if not button or not button['enabled'] or not button['pressed']:
+                return
+            button['pressed'] = False
+            self.canvas.itemconfigure(button['face'], fill=button['fill'])
+            self.canvas.itemconfigure(button['highlight'], fill=self.shade_color(button['fill'], 1.45))
+            x, _y = self.canvas.coords(button['text'])
+            self.canvas.coords(button['text'], x, button['center_y'])
+            if button.get('subtext'):
+                sx, _sy = self.canvas.coords(button['subtext'])
+                self.canvas.coords(button['subtext'], sx, button['subtext_center_y'])
+            button['command']()
+
+        self.canvas.tag_bind(tag, '<Enter>', enter)
+        self.canvas.tag_bind(tag, '<Leave>', leave)
+        self.canvas.tag_bind(tag, '<ButtonPress-1>', press)
+        self.canvas.tag_bind(tag, '<ButtonRelease-1>', release)
+        return tag
+
+    def set_control_button_state(self, tag, enabled):
+        button = self.control_buttons.get(tag)
+        if not button:
             return
-        win = tk.Toplevel(self)
-        win.title("本局牌序")
-        win.geometry("730x750")
-        win.resizable(0, 0)
-        win.configure(bg='#f0f0f0')
-        cut_pos = self.game.deck.start_pos
-        cut_label = tk.Label(win, text=f"本局切牌位置: {cut_pos + 1}", font=('Arial', 14, 'bold'), bg='#f0f0f0')
-        cut_label.pack(pady=10)
-        main_frame = tk.Frame(win, bg='#f0f0f0')
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        scrollbar = ttk.Scrollbar(main_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        canvas = tk.Canvas(main_frame, bg='#f0f0f0', yscrollcommand=scrollbar.set)
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=canvas.yview)
-        content_frame = tk.Frame(canvas, bg='#f0f0f0')
-        canvas_frame = canvas.create_window((0, 0), window=content_frame, anchor='nw')
+        button['enabled'] = bool(enabled)
+        button['pressed'] = False
+        x, _y = self.canvas.coords(button['text'])
+        self.canvas.coords(button['text'], x, button['center_y'])
+        if button.get('subtext'):
+            sx, _sy = self.canvas.coords(button['subtext'])
+            self.canvas.coords(button['subtext'], sx, button['subtext_center_y'])
+        if enabled:
+            self.canvas.itemconfigure(button['face'], fill=button['fill'])
+            self.canvas.itemconfigure(button['rim'], fill=self.shade_color(button['fill'], 0.55))
+            self.canvas.itemconfigure(button['highlight'], fill=self.shade_color(button['fill'], 1.45))
+            self.canvas.itemconfigure(button['text'], fill=button['fg'])
+            if button.get('subtext'):
+                self.canvas.itemconfigure(button['subtext'], fill=button['fg'])
+        else:
+            self.canvas.itemconfigure(button['face'], fill='#4a4743')
+            self.canvas.itemconfigure(button['rim'], fill='#262422')
+            self.canvas.itemconfigure(button['highlight'], fill='#66615b')
+            self.canvas.itemconfigure(button['text'], fill='#9b9690')
+            if button.get('subtext'):
+                self.canvas.itemconfigure(button['subtext'], fill='#9b9690')
 
-        card_frame = tk.Frame(content_frame, bg='#f0f0f0')
-        card_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=5)
+    def _gradient_polygon(self, points, top_color, bottom_color, tag):
+        """在凸多边形内部逐行着色，产生金属斜面；完全由 Canvas 绘制。"""
+        c=self.canvas
+        vertices=list(zip(points[::2],points[1::2]))
+        top=min(y for x,y in vertices);bottom=max(y for x,y in vertices)
+        a=tuple(int(top_color[i:i+2],16) for i in (1,3,5))
+        b=tuple(int(bottom_color[i:i+2],16) for i in (1,3,5))
+        body=c.create_polygon(*points,fill=top_color,outline='',tags=tag)
+        for y in range(math.ceil(top),math.floor(bottom)+1):
+            hits=[]
+            for (x1,y1),(x2,y2) in zip(vertices,vertices[1:]+vertices[:1]):
+                if min(y1,y2)<=y<max(y1,y2):
+                    hits.append(x1+(y-y1)*(x2-x1)/(y2-y1))
+            if len(hits)>=2:
+                f=(y-top)/max(1,bottom-top)
+                color='#'+''.join(f'{round(v+(w-v)*f):02x}' for v,w in zip(a,b))
+                c.create_line(min(hits),y,max(hits),y,fill=color,width=1,tags=tag)
+        border=c.create_polygon(*points,fill='',outline='#F6CE68',width=2,tags=tag)
+        return border
 
-        small_size = (60, 90)
-        small_images = {}
-        for i, card in enumerate(self.game.deck.full_deck):
-            key = (card.suit, card.rank)
-            if key in self.original_images:
-                orig_img = self.original_images[key]
-                small_img = orig_img.resize(small_size, Image.LANCZOS)
-                small_images[i] = ImageTk.PhotoImage(small_img)
+    def _draw_progressive_lamp(self, seat, cx, cy):
+        c=self.canvas;tag='spot_'+seat+'_jackpot'
+        # 正视的2D圆环，无投影、侧壁和椭圆透视。弧形文字位于红环内部。
+        radius=self.PROGRESSIVE_LAMP_WIDTH/2
+        scale=.8
+        body=c.create_oval(cx-radius,cy-radius,cx+radius,cy+radius,
+            fill='#B8303B',outline='#CD4550',width=2,tags=tag)
+        center=c.create_oval(cx-27*scale,cy-27*scale,cx+27*scale,cy+27*scale,
+            fill='#681923',outline='#781F28',width=2,tags=tag)
+        segments=[]
+        for i in range(16):
+            segments.append(c.create_arc(cx-56*scale,cy-56*scale,cx+56*scale,cy+56*scale,start=i*22.5,
+                extent=16,style=tk.ARC,width=4,outline='#A33038',tags=tag))
+        for char,angle in zip('累进大奖',(132,104,76,48)):
+            radians=math.radians(angle)
+            self._text(cx+42*scale*math.cos(radians),cy-42*scale*math.sin(radians),char,10,PANEL_BG,
+                angle=angle-90,tags=tag)
+        label='每局$2.50'
+        for index,char in enumerate(label):
+            angle=220+100*index/(len(label)-1)
+            radians=math.radians(angle)
+            self._text(cx+42*scale*math.cos(radians),cy-42*scale*math.sin(radians),char,9,PANEL_BG,
+                angle=angle-270,tags=tag)
+        self.bet_spots[(seat,'jackpot')]=dict(tag=tag,center=(cx,cy),border=body)
+        self.lamps[seat]=dict(body=body,center=center,segments=segments,mode='off',step=0,job=None)
+        c.tag_bind(tag,'<Button-1>',lambda _e,s=seat:self.add_chip_to_bet(s,'jackpot'))
+        c.tag_bind(tag,'<Button-3>',lambda _e,s=seat:self.reset_single_bet(s,'jackpot'))
+        c.tag_bind(tag,'<Enter>',lambda _e:c.configure(cursor='hand2'))
+        c.tag_bind(tag,'<Leave>',lambda _e:c.configure(cursor=''))
+        self._set_lamp_mode(seat,'off')
+
+    def _set_lamp_mode(self, seat, mode):
+        lamp=self.lamps[seat]
+        if lamp['mode']==mode:
+            return
+        if lamp['mode']=='spin':
+            lamp['spin_step']=lamp['step']
+        if lamp['job'] is not None:
+            try:self.after_cancel(lamp['job'])
+            except tk.TclError:pass
+            self._jobs.discard(lamp['job']);lamp['job']=None
+        lamp['mode']=mode
+        if mode=='spin':lamp['step']=lamp.get('spin_step',lamp['step'])
+        elif mode=='fill':
+            lamp['filled']=set()
+            lamp['fill_ticks']=0
+            lamp['fill_colors']=[self.canvas.itemcget(item,'outline') for item in lamp['segments']]
+        elif mode=='win':lamp['step']=0
+        self._paint_lamp(seat)
+
+    def _paint_lamp(self, seat):
+        lamp=self.lamps[seat];mode=lamp['mode'];step=lamp['step'];c=self.canvas
+        on=mode=='steady' or mode=='win' and step%2==0
+        c.itemconfigure(lamp['body'],fill='#E33D48' if on else '#B8303B')
+        c.itemconfigure(lamp['center'],fill='#681923')
+        for i,item in enumerate(lamp['segments']):
+            if mode=='spin':
+                distance=(i-step)%16
+                color={0:'#FFE6D9',1:'#FF9485',2:'#FF534F',3:'#E93B44'}.get(distance,'#9C2832')
+            elif mode=='fill':
+                color='#FF8B79' if i in lamp['filled'] else lamp['fill_colors'][i]
+            else:color='#FF8B79' if on else '#A33038'
+            c.itemconfigure(item,outline=color)
+        if mode in ('spin','fill','win') and not self._closing:
+            def tick():
+                lamp['job']=None;lamp['step']+=1
+                if mode=='fill':
+                    lamp['filled'].add(lamp['step']%16)
+                    lamp['fill_ticks']+=1
+                    if lamp['fill_ticks']==16:
+                        lamp['spin_step']=lamp['step']
+                        self._set_lamp_mode(seat,'steady')
+                        callback=lamp.pop('filled_callback',None)
+                        if callback:callback()
+                        return
+                self._paint_lamp(seat)
+            lamp['job']=self._schedule(250 if mode=='win' else 75,tick)
+
+    def _chip_color(self, amount):
+        return next((col for value,col in reversed(self.chip_specs) if amount>=value),HEADER_BG)
+
+    @staticmethod
+    def _jackpot_label(amount):
+        value=round(float(amount),2)
+        if abs(value)>=1000:return CHEGUI._compact(value)
+        return f'{value:.0f}' if value.is_integer() else f'{value:.2f}'
+
+    def _draw_chip(self, tag, amount, x, y, rectangular=False, extra_tags=(), show_amount=True):
+        c=self.canvas;tags=(tag,*extra_tags)
+        if rectangular:
+            # 大奖筹码只显示中奖数字，不带货币符号；整数省略 .00。
+            label=self._jackpot_label(amount);width=max(96,10*len(label)+16)
+            c.create_rectangle(x-width/2,y-18,x+width/2,y+18,fill='#731D2A',outline='#000000',width=1,tags=tags)
+            if show_amount:self._text(x,y,label,11,'#FFF0C3',tags=tags)
+        else:
+            radius=self.BET_CHIP_RADIUS;color=self._chip_color(amount)
+            c.create_oval(x-radius,y-radius,x+radius,y+radius,fill=color,outline='#000000',width=1,tags=tags)
+            label=self._compact(amount)
+            self._text(x,y,label,10 if len(label)>=5 else 12,TEXT if color in (BLACK,RED) else BLACK,tags=tags)
+
+    def _render_chips(self):
+        self.canvas.delete('bet_chips')
+        # 本金先画、盈利后画；盈利位于原筹码左上方。
+        for key,chip in sorted(self.visual_chips.items(),key=lambda kv:kv[0][2]!='stake'):
+            seat,kind,role=key
+            if chip['amount']>0:
+                self._draw_chip('chip_'+seat+'_'+kind+'_'+role,chip['amount'],*chip['xy'],
+                    rectangular=chip.get('rectangular',False),
+                    extra_tags=('bet_chips',self.bet_spots[(seat,kind)]['tag']))
+
+    def _rack_position(self, index=None, total=1):
+        if index is not None:
+            return 575+(index-(total-1)/2)*min(28,140/max(1,total-1)),674
+        index=next((i for i,(value,_) in enumerate(self.chip_specs) if value==self.selected_chip),None)
+        if index is None:return (575,674)
+        width=len(self.chip_specs)*56+(len(self.chip_specs)-1)*8
+        return (self.WIDTH-width)/2+index*64+28,674
+
+    def _animate_chip(self, amount, start, target, complete=None, rectangular=False, duration=220):
+        if not amount:
+            if complete:complete()
+            return
+        self._motion_count+=1;self._chip_serial+=1
+        tag=f'moving_chip_{self._chip_serial}'
+        self._draw_chip(tag,amount,*start,rectangular,extra_tags=('moving_chips',))
+        self._refresh()
+        steps=max(1,round(duration/16));last=list(start)
+        def frame(index):
+            fraction=index/steps;eased=fraction*fraction*(3-2*fraction)
+            x=start[0]+(target[0]-start[0])*eased
+            y=start[1]+(target[1]-start[1])*eased
+            self.canvas.move(tag,x-last[0],y-last[1]);last[:]=[x,y]
+            self.canvas.tag_raise(tag)
+            if index<steps:self._schedule(round(duration*(index+1)/steps)-round(duration*index/steps),frame,index+1)
             else:
-                img = Image.new('RGB', small_size, 'blue')
-                draw = ImageDraw.Draw(img)
-                text = f"{card.rank}{card.suit}"
-                try:
-                    font = ImageFont.truetype("arial.ttf", 12)
-                except:
-                    font = ImageFont.load_default()
-                bbox = draw.textbbox((0, 0), text, font=font)
-                tw, th = bbox[2]-bbox[0], bbox[3]-bbox[1]
-                draw.text(((small_size[0]-tw)//2, (small_size[1]-th)//2), text, fill="white", font=font)
-                small_images[i] = ImageTk.PhotoImage(img)
+                self.canvas.delete(tag);self._motion_count-=1
+                if complete:complete()
+                self._refresh()
+        self._schedule(round(duration/steps),frame,1)
 
-        for row in range(6):
-            row_frame = tk.Frame(card_frame, bg='#f0f0f0')
-            row_frame.pack(fill=tk.X)
-            cards_in_row = 9 if row < 5 else 7
-            for col in range(cards_in_row):
-                card_index = row * 9 + col
-                if card_index >= 52:
-                    break
-                card_container = tk.Frame(row_frame, bg='#f0f0f0')
-                card_container.grid(row=0, column=col, padx=5)
-                is_cut_position = card_index == self.game.deck.start_pos
-                bg_color = 'light blue' if is_cut_position else '#f0f0f0'
-                card = self.game.deck.full_deck[card_index]
-                card_label = tk.Label(card_container, image=small_images[card_index], bg=bg_color, borderwidth=1, relief="solid")
-                card_label.image = small_images[card_index]
-                card_label.pack()
-                pos_label = tk.Label(card_container, text=str(card_index+1), bg=bg_color, font=('Arial', 9))
-                pos_label.pack()
+    def _run_chip_batch(self, transfers, complete):
+        if not transfers:
+            complete();return
+        pending=[len(transfers)]
+        def arrived(transfer):
+            if transfer.get('arrive'):transfer['arrive']()
+            pending[0]-=1
+            if not pending[0]:complete()
+        for transfer in transfers:
+            self._animate_chip(transfer['amount'],transfer['start'],transfer['target'],
+                lambda t=transfer:arrived(t),transfer.get('rectangular',False),transfer.get('duration',220))
 
-        content_frame.update_idletasks()
-        canvas.config(scrollregion=canvas.bbox("all"))
+    def _set_visual(self, seat, kind, role, amount, xy=None, rectangular=False):
+        key=(seat,kind,role)
+        if amount:
+            self.visual_chips[key]=dict(amount=float(amount),xy=xy or self.bet_spots[(seat,kind)]['center'],rectangular=rectangular)
+        else:self.visual_chips.pop(key,None)
+
+    def _apply_bet_layout(self, new_bets):
+        """提交下注设置；筹码从选中面额的位置飞入，清除时原路返回。"""
+        previous=self.bets;self.bets={s:dict(b) for s,b in new_bets.items()}
+        transfers=[]
+        for seat in self.game.SEATS:
+            for kind in self.game.empty_bet():
+                old=previous[seat][kind];new=self.bets[seat][kind]
+                delta=new-old
+                if not delta:continue
+                center=self.bet_spots[(seat,kind)]['center']
+                if delta>0:
+                    transfers.append(dict(amount=delta,start=self._rack_position(),target=center,
+                        arrive=lambda s=seat,k=kind,a=new:self._set_visual(s,k,'stake',a)))
+                else:
+                    self._set_visual(seat,kind,'stake',new)
+                    transfers.append(dict(amount=-delta,start=center,target=self._rack_position(),duration=440))
+            self._set_lamp_mode(seat,'spin' if self.bets[seat]['jackpot'] else 'off')
+        self._run_chip_batch(transfers,self._refresh)
+        self._refresh()
+
+    def _collect_progressive_and_deal(self):
+        for seat in self.game.SEATS:
+            chip=self.visual_chips.pop((seat,'jackpot','stake'),None)
+            if chip:self._animate_chip(chip['amount'],chip['xy'],self.HOUSE_CHIP_POS,duration=280)
+        self.game.stage='dealing';self._refresh()
+        # 动画与实际取牌共用同一顺序，先发五张公共牌，再轮流发两轮玩家和庄家手牌。
+        self._deal_next(self.game.deal_sequence,0)
+
+    def _outcome_transfers(self, seat, kind, stake, returned):
+        """本金留位，盈利派至左上；输注立即飞向统一庄家收筹码点，平局不动。"""
+        if not stake:return []
+        key=(seat,kind,'stake');center=self.bet_spots[(seat,kind)]['center']
+        if returned<=0:
+            chip=self.visual_chips.pop(key,None)
+            return [dict(amount=chip['amount'],start=chip['xy'],target=self.HOUSE_CHIP_POS,duration=280)] if chip else []
+        profit=round(returned-stake,2)
+        if profit<=0:return []
+        target=(center[0]-32,center[1]-30)
+        return [dict(amount=profit,start=self.HOUSE_CHIP_POS,target=target,duration=440,
+            arrive=lambda:self._set_visual(seat,kind,'profit',profit,target))]
+
+    def _cancel_restart_timer(self):
+        if self._restart_job is not None:
+            try:self.after_cancel(self._restart_job)
+            except tk.TclError:pass
+            self._jobs.discard(self._restart_job)
+            self._restart_job=None
+        self._restart_deadline=None
+        if hasattr(self,'restart_button'):
+            self._restart_caption('再来一局')
+
+    def _restart_caption(self, text):
+        self.canvas.itemconfigure(self.control_buttons[self.restart_button]['text'],text=text)
+
+    def _await_next_round(self):
+        if self.game.stage!='settling':return
+        self.game.stage='await_restart'
+        # 到结算完成才冻结牌序；说明按钮不再提供这个入口。
+        deck=self.game.deck
+        self.last_round_snapshot=dict(full_deck=tuple(deck.full_deck),start_pos=deck.start_pos,
+            images={key:im.copy() for key,im in self.original_images.items()})
+        self._history_available=True
+        self._cancel_restart_timer()
+        jackpot_won=any(outcome['details']['bonus']>0 for outcome in self.game.settlement['hands'].values())
+        if jackpot_won:
+            self._restart_caption('再来一局')
+        else:
+            self._restart_deadline=time.monotonic()+30
+        self._refresh()
+        if not jackpot_won:self._restart_tick()
+
+    def _restart_tick(self):
+        self._restart_job=None
+        if self.game.stage!='await_restart' or self._restart_deadline is None:return
+        remaining=max(0,self._restart_deadline-time.monotonic())
+        self._restart_caption(f'再来一局({math.ceil(remaining)})')
+        if remaining<=0:
+            self._return_all_chips()
+            return
+        self._restart_job=self._schedule(max(1,min(1000,math.ceil(remaining*1000))),self._restart_tick)
+
+    def _inspect_completed_round(self, event=None):
+        if self.game.stage!='await_restart':return
+        self._cancel_restart_timer()
+        self.show_card_sequence()
+
+    def _return_all_chips(self):
+        if self.game.stage=='credit_pending':
+            self._complete_chip_return()
+            return
+        if self.game.stage!='await_restart':return
+        self._cancel_restart_timer()
+        self._history_available=False
+        self._close_card_sequence()
+        self.game.stage='returning'
+        chips=list(self.visual_chips.values());self.visual_chips.clear();transfers=[]
+        for index,chip in enumerate(chips):
+            target=self._rack_position(index,len(chips))
+            def arrived(chip=chip,target=target,index=index):
+                # 筹码先回到筹码区，全部到位后才入账；向右移走的是扑克牌。
+                self._draw_chip(f'returned_chip_{index}',chip['amount'],*target,
+                    chip.get('rectangular',False),extra_tags=('returned_chips',))
+            transfers.append(dict(amount=chip['amount'],start=chip['xy'],target=target,
+                rectangular=chip.get('rectangular',False),duration=600,arrive=arrived))
+        self._refresh();self._run_chip_batch(transfers,self._complete_chip_return)
+
+    def _credit_round_return(self):
+        """动画正常完成或用户关闭时共用；只加钱一次，保存失败可重试。"""
+        if self._crediting:return False
+        if self._return_persisted:return True
+        self._crediting=True
+        try:
+            if not self._credited:
+                self.balance=round(self.balance+self.last_win,2)
+                self._credited=True
+            self._return_persisted=self._persist_balance()
+            return self._return_persisted
+        finally:
+            self._crediting=False
+
+    def _complete_chip_return(self):
+        if self.game.stage not in ('returning','credit_pending'):return
+        self.game.stage='credit_pending'
+        if not self._credit_round_return():
+            self._refresh()
+            return
+        self.game.stage='sweeping'
+        self._refresh()
+        self.canvas.delete('returned_chips')
+        self._sweep_all_cards()
+
+    def _sweep_all_cards(self):
+        """入账后，庄家和玩家的全部已显示扑克牌一起在0.2秒内向右移走。"""
+        self._fade_dealer_notice(False)
+        if not self.card_items:
+            self._finish_round()
+            return
+        self._motion_count+=1
+        distance=self.WIDTH+self.CARD_WIDTH
+        previous=[0.0]
+        def frame(index=0):
+            fraction=index/13
+            offset=distance*fraction*fraction*(3-2*fraction)
+            self.canvas.move('cards',offset-previous[0],0)
+            previous[0]=offset
+            if index<13:
+                self._schedule(round(200*(index+1)/13)-round(200*index/13),frame,index+1)
+            else:
+                self.canvas.delete('cards')
+                self.card_items.clear();self._flip_photos.clear()
+                self._motion_count-=1
+                self._finish_round()
+        frame()
+
+    def _finish_round(self):
+        if self.game.stage!='sweeping':return
+        for seat in self.game.SEATS:self._set_lamp_mode(seat,'off')
+        self._fade_dealer_notice(False)
+        self.game.reset_game()
+        self.selected_discards = {s:None for s in self.game.SEATS}
+        self._card_origins.clear(); self._discard_photos.clear()
+        self._faded_photos.clear(); self._final_usage.clear()
+        self._hand_usage_keys.clear()
+        self._settled_card_photos.clear()
+        self._usage_owner = None
+        self._default_usage_owner = 'Dealer'
+        self._history_available=False
+        self.bets={s:self.game.empty_bet() for s in self.game.SEATS}
+        for side,item in self.title_items.items():
+            self.canvas.itemconfigure(item,text='庄家' if side=='Dealer' else self.SEAT_NAMES[side])
+        self._refresh()
+
+    def _close_card_sequence(self):
+        current=getattr(self,'_sequence_window',None)
+        if current is not None:
+            try:
+                if current.winfo_exists():current.destroy()
+            except tk.TclError:pass
+        self._sequence_window=None
+
+    def _make_dealer_notice(self):
+        """使用透明 RGBA 浮层，在牌桌内淡入，透明部分保留原始牌面。"""
+        scale=3;width,height=210,48
+        layer=Image.new('RGBA',(width*scale,height*scale),(0,0,0,0))
+        draw=ImageDraw.Draw(layer)
+        draw.rounded_rectangle((1,1,width*scale-2,height*scale-2),radius=10*scale,
+            fill=(45,12,16,238),outline=(225,185,99,255),width=2*scale)
+        candidates=['msyhbd.ttc','msyh.ttc','simhei.ttf','Arial Unicode.ttf',
+            '/System/Library/Fonts/PingFang.ttc',
+            '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc',
+            '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc']
+        # Linux 字体由本机 fontconfig 定位；不下载字体，也不依赖额外素材。
+        if sys.platform.startswith('linux'):
+            try:
+                result=subprocess.run(['fc-list','-f','%{file}\n',':lang=zh'],
+                    capture_output=True,text=True,timeout=1,check=False)
+                if result.returncode==0:
+                    candidates[:0]=[line.strip() for line in result.stdout.splitlines() if line.strip()]
+            except (OSError,subprocess.TimeoutExpired):pass
+        font=None
+        for path in candidates:
+            try:font=ImageFont.truetype(path,22*scale);break
+            except OSError:continue
+        self._notice_text_item=None
+        if font is not None:
+            text='庄家不及格';box=draw.textbbox((0,0),text,font=font)
+            draw.text(((width*scale-(box[2]-box[0]))/2-box[0],
+                       (height*scale-(box[3]-box[1]))/2-box[1]),text,font=font,fill='#FFF1D1')
+        else:
+            # 极少数无可供 Pillow 使用的中文字体的系统，交由 Tk 原生字体回退。
+            self._notice_text_item=self._text(575,111,'庄家不及格',16,'#FFF1D1',state='hidden',tags='dealer_notice')
+        self._notice_source=layer.resize((width,height),Image.Resampling.LANCZOS)
+        self._notice_item=self.canvas.create_image(575,111,state='hidden',tags='dealer_notice')
+
+    def _draw_dealer_notice(self):
+        alpha=self._notice_level
+        if self._notice_item is None:return
+        if alpha<=0:
+            self.canvas.itemconfigure('dealer_notice',state='hidden');return
+        layer=self._notice_source.copy()
+        layer.putalpha(self._notice_source.getchannel('A').point(lambda value:round(value*alpha)))
+        self._notice_photo=ImageTk.PhotoImage(layer,master=self)
+        self.canvas.itemconfigure(self._notice_item,image=self._notice_photo,state='normal')
+        self.canvas.tag_raise('dealer_notice')
+        if self._notice_text_item is not None:
+            background=(75,30,34);foreground=(255,241,209)
+            color='#'+''.join(f'{round(a+(b-a)*alpha):02x}' for a,b in zip(background,foreground))
+            self.canvas.itemconfigure(self._notice_text_item,state='normal',fill=color)
+            self.canvas.tag_raise(self._notice_text_item)
+
+    def _fade_dealer_notice(self, visible):
+        target=1.0 if visible else 0.0
+        if self._notice_target==visible and (self._notice_job is not None or self._notice_level==target):return
+        if self._notice_job is not None:
+            try:self.after_cancel(self._notice_job)
+            except tk.TclError:pass
+            self._jobs.discard(self._notice_job);self._notice_job=None
+        self._notice_target=visible
+        if self._notice_source is None:
+            if not visible:return
+            self._make_dealer_notice()
+        start=self._notice_level
+        def step(frame):
+            self._notice_job=None
+            self._notice_level=start+(target-start)*frame/12
+            self._draw_dealer_notice()
+            if frame<12:self._notice_job=self._schedule(25,step,frame+1)
+        step(0)
+
+    def show_card_sequence(self, event=None):
+        if self.game.stage!='await_restart' or not self._history_available:return
+        snapshot=self.last_round_snapshot
+        if not snapshot:
+            messagebox.showinfo('提示','尚无已结算牌局的牌序。',parent=self);return
+        current=getattr(self,'_sequence_window',None)
+        if current is not None and current.winfo_exists():current.lift();return
+        # 原加勒比窗口：730×750，九张一排，切牌位置高亮，滚动显示52张原始牌序。
+        win=tk.Toplevel(self);self._sequence_window=win
+        win.title('上局牌序');win.geometry('730x750');win.resizable(0,0);win.configure(bg='#f0f0f0')
+        cut_pos=snapshot['start_pos']
+        tk.Label(win,text=f'上局切牌位置: {cut_pos+1}',font=('Arial',14,'bold'),bg='#f0f0f0').pack(pady=10)
+        main_frame=tk.Frame(win,bg='#f0f0f0');main_frame.pack(fill=tk.BOTH,expand=True,padx=10,pady=5)
+        scrollbar=ttk.Scrollbar(main_frame);scrollbar.pack(side=tk.RIGHT,fill=tk.Y)
+        canvas=tk.Canvas(main_frame,bg='#f0f0f0',yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT,fill=tk.BOTH,expand=True);scrollbar.config(command=canvas.yview)
+        content_frame=tk.Frame(canvas,bg='#f0f0f0');canvas.create_window((0,0),window=content_frame,anchor='nw')
+        card_frame=tk.Frame(content_frame,bg='#f0f0f0');card_frame.pack(fill=tk.BOTH,expand=True,padx=20,pady=5)
+        small_images={}
+        for i,card in enumerate(snapshot['full_deck']):
+            key=self._card_image_key(card)
+            original=(snapshot['images'].get(key) or snapshot['images'].get((card.suit,card.rank))
+                or self.original_images.get(key) or self.original_images['back'])
+            small_images[i]=ImageTk.PhotoImage(original.resize((60,90),Image.Resampling.LANCZOS),master=win)
+        win._card_images=small_images
+        for row in range(math.ceil(len(snapshot['full_deck'])/9)):
+            row_frame=tk.Frame(card_frame,bg='#f0f0f0');row_frame.pack(fill=tk.X)
+            for col in range(9):
+                idx=row*9+col
+                if idx>=len(snapshot['full_deck']):break
+                container=tk.Frame(row_frame,bg='#f0f0f0');container.grid(row=0,column=col,padx=5)
+                bg='light blue' if idx==cut_pos else '#f0f0f0'
+                tk.Label(container,image=small_images[idx],bg=bg,borderwidth=1,relief='solid').pack()
+                tk.Label(container,text=str(idx+1),bg=bg,font=('Arial',9)).pack()
+        content_frame.update_idletasks();canvas.configure(scrollregion=canvas.bbox('all'))
+
+    def _draw_wild_spot(self, seat, kind, cx, cy, label, radius):
+        tag = 'spot_'+seat+'_'+kind
+        border = self.canvas.create_oval(cx-radius,cy-radius,cx+radius,cy+radius,
+            fill=self.ZONE_COLORS[seat],outline=PANEL_BG,width=2,tags=tag)
+        self._register_spot(seat,kind,cx,cy,border,label)
+        # 放大的下注圈使用清晰字号，完整圆圈均可点击。
+        if kind in ('aa','call'):
+            for item in self.canvas.find_withtag(tag):
+                if self.canvas.type(item)=='text': self.canvas.itemconfigure(item,font=('Arial',14,'bold'))
+
+    def card_size(self, side):
+        return self.CARD_WIDTH,self.CARD_HEIGHT
+
+    def _fade_card_item(self, item, source):
+        # 用alpha淡化，不破坏牌面原图，也不把透明PNG的边缘铺成白底。
+        faded = source.convert('RGBA').copy()
+        faded.putalpha(faded.getchannel('A').point(lambda value:round(value*.45)))
+        photo = ImageTk.PhotoImage(faded,master=self)
+        self._faded_photos[item] = photo
+        self.canvas.itemconfigure(item,image=photo)
+
+    def show_game_instructions(self):
+
+        """Show the game manual in the shared card-based rules window."""
+
+        import os
+
+        import tkinter.font as tkfont
+
+        from PIL import Image, ImageTk
+
+
+
+        parent = self.winfo_toplevel()
+
+        current = getattr(self, '_game_instruction_dialog', None)
+
+        if current is not None:
+
+            try:
+
+                if current.winfo_exists():
+
+                    current.lift()
+
+                    current.focus_force()
+
+                    return
+
+            except tk.TclError:
+
+                pass
+
+
+
+        dialog = tk.Toplevel(parent)
+
+        self._game_instruction_dialog = dialog
+
+        dialog.title('赌场扑克 游戏规则')
+
+        dialog.configure(bg='#faf5e8')
+
+        dialog.resizable(False, False)
+
+        dialog.transient(parent)
+
+
+
+        width, height = 1000, 670
+
+        parent.update_idletasks()
+
+        px, py = parent.winfo_rootx(), parent.winfo_rooty()
+
+        pw, ph = max(1, parent.winfo_width()), max(1, parent.winfo_height())
+
+        dialog.geometry(f'{width}x{height}+{px + (pw-width)//2}+{py + (ph-height)//2}')
+
+
+
+        manual_pages = [('玩法',
+          '了解游戏目标，以及一局从下注到结算的完整顺序。',
+          [['游戏目标', '', [('本局目标', '用手牌和公共牌组成最佳五张牌，与庄家比较。')], []],
+           ['一局如何进行',
+            '',
+            [('玩家下注', '玩家1、玩家2是同一账户的两手牌，共用庄家与公共牌。至少一手下前注，可另选 AA+ 与 $2.50 累进大奖；开牌前可选盲注2X，开始时统一扣款。取消盲注可撤销预加注。'),
+             ('玩家决策', '未盲加注的手牌与前三张公共牌翻开后，每手分别选择下注2X或弃牌。盲加注手牌保持盖牌且无需再次决定；所有有效手牌完成决定后继续摊牌。'),
+             ('庄家开牌', '翻开最后两张公共牌、庄家两张手牌，再翻开盲加注手牌。庄家至少一对4及格，前注按原 Casino 赔率结算。'),
+             ('结算', 'AA+与大奖只看两张手牌加前三张公共牌，弃牌仍结算。筹码回收后返还统一入账。'),
+             ('再来一局', '普通结果30秒后自动回收；大奖中奖后手动继续。再来一局右键查看牌序并暂停倒计时；Enter开牌或开始下一局。')],
+            []],
+           ['游戏流程',
+            '',
+            [('',
+              '下注阶段:\n'
+              '• 可预选盲注2X，或按取消盲注撤销\n'
+              '• 先发5张盖住的公共牌\n'
+              '• 再按玩家1、玩家2（有前注的手牌）、庄家轮流派两轮\n'
+              '翻牌圈:\n'
+              '• 未盲加注手牌及前3张公共牌翻开后选择:\n'
+              '• 弃牌: 输掉前注（AA+和累进大奖仍可能赢）\n'
+              '• 加注: 下注前注的2倍\n'
+              '摊牌:\n'
+              '• 所有有效手牌都决定后，翻开最后2张公共牌\n'
+              '• 庄家两张牌翻开后，再翻盲加注手牌\n'
+              '• 摊牌比较手牌')],
+            []]]),
+         ('下注 & 限红',
+          '普通模式前注 $10–$10,000、AA+最高 $2,500。点击限红表可切换高额模式，密码为当前系统时间 HHMM。',
+          [['下注项目',
+            '',
+            [],
+            [('下注项目与限红',
+              ['项目', '限红', '作用'],
+              [['前注', '最高$10,000', '参与主注比牌。'],
+               ['AA+', '每项最高$2,500', '按AA+规则独立判奖。'],
+               ['累进大奖', '每局$2.50', '按对应的累进大奖牌型判奖。'],
+               ['高额模式', '前注$100–$50,000 / AA+最高$12,500', '切换时清除当前下注与重复下注记录。']])]]]),
+         ('获胜条件 & 赔率',
+          '按下列表格核对各项判定条件、胜负结果及赔率。',
+          [['比牌规则',
+            '',
+            [],
+            [('比牌与及格线',
+              ['判断', '规则'],
+              [['庄家及格线', '庄家至少一对 4 才及格。'], ['比大小', '双方从手牌和公共牌中选五张，先比牌型再比牌点。'], ['完全相同', '双方平局。']])]],
+           ['结算规则',
+            '',
+            [],
+            [('',
+              ['情形／项目', '赔率／结算规则'],
+              [['* 庄家不及格', '无条件获胜，按玩家牌型赔率支付'],
+               ['* 玩家赢', '按玩家牌型赔率支付'],
+               ['* 平局', '退还'],
+               ['* 玩家输', '输掉'],
+               ['* 玩家赢', '支付1:1'],
+               ['* 庄家不及格', '退还'],
+               ['* 平局', '退还'],
+               ['* 其他情况', '输掉'],
+               ['AA+边注', '按玩家两张手牌 + 前三张公共牌支付（见赔率表），弃牌仍结算。']])]],
+           ['赔率表',
+            '',
+            [],
+            [('',
+              ['牌型', '前注赔率', 'AA+赔率', '累进大奖'],
+              [['皇家同花顺', '100:1', '100:1', '100%'],
+               ['同花顺', '49:1', '50:1', '10%'],
+               ['四条', '17:1', '40:1', '$1,250'],
+               ['葫芦', '3:1', '30:1', '$375'],
+               ['同花', '2:1', '20:1', '$250'],
+               ['顺子', '1:1', '10:1', '-'],
+               ['三条', '1:1', '8:1', '-'],
+               ['两对', '1:1', '7:1', '-'],
+               ['对子A', '1:1', '7:1', '-'],
+               ['其他牌型', '1:1', '-', '-']])]],
+           ['庄家资格与主注结算',
+            '',
+            [],
+            [('前注 / 加注结算',
+              ['获胜条件', '前注 / Ante', '相关下注'],
+              [['庄家不及格', '前注按玩家牌型赔付', '加注退还'],
+               ['庄家及格、玩家胜', '前注按玩家牌型赔付', '加注赢 1:1'],
+               ['庄家及格、平局', '前注退还', '加注退还'],
+               ['庄家及格、玩家负', '前注输', '加注输']])]]]),
+         ('牌型等级表',
+          '牌型由强到弱排列；\n同级牌型继续比较相关点数。',
+          [['10 种牌型',
+            '下方图片展示牌型示例；\n同一牌型也可能由其他牌面组成。',
+            [],
+            [('牌型等级与牌例（由高至低）',
+              ['等级', '牌型', '牌例'],
+              [['1',
+                '皇家同花顺',
+                ('__CARD_IMAGES__', (('♠', 'A'), ('♠', 'K'), ('♠', 'Q'), ('♠', 'J'), ('♠', '10')))],
+               ['2', '同花顺', ('__CARD_IMAGES__', (('♥', '9'), ('♥', '8'), ('♥', '7'), ('♥', '6'), ('♥', '5')))],
+               ['3', '四条', ('__CARD_IMAGES__', (('♠', '9'), ('♥', '9'), ('♦', '9'), ('♣', '9'), ('♠', '2')))],
+               ['4', '葫芦', ('__CARD_IMAGES__', (('♠', 'K'), ('♥', 'K'), ('♦', 'K'), ('♣', '5'), ('♦', '5')))],
+               ['5', '同花', ('__CARD_IMAGES__', (('♥', 'A'), ('♥', '10'), ('♥', '8'), ('♥', '5'), ('♥', '2')))],
+               ['6', '顺子', ('__CARD_IMAGES__', (('♠', '9'), ('♥', '8'), ('♦', '7'), ('♣', '6'), ('♠', '5')))],
+               ['7', '三条', ('__CARD_IMAGES__', (('♠', 'Q'), ('♥', 'Q'), ('♦', 'Q'), ('♣', '8'), ('♦', '2')))],
+               ['8', '两对', ('__CARD_IMAGES__', (('♠', 'J'), ('♥', 'J'), ('♦', '4'), ('♣', '4'), ('♠', 'A')))],
+               ['9', '对子', ('__CARD_IMAGES__', (('♠', 'A'), ('♥', 'A'), ('♦', '10'), ('♣', '7'), ('♠', '2')))],
+               ['10',
+                '高牌',
+                ('__CARD_IMAGES__', (('♠', 'A'), ('♥', 'K'), ('♦', '9'), ('♣', '6'), ('♠', '3')))]])]]]),
+         ('特别事项',
+          '补充说明特殊牌、模式差异和金额结算方式。',
+          [['补充说明',
+            '',
+            [('', 'AA+与累进大奖只看两张手牌和前三张公共牌，主注使用全部七张牌选最佳五张。对子A指一对A。'),
+             ('筹码操作', '左键前注或AA+圈添加所选筹码，右键清除单项。大奖灯左键开关 $2.50 参与资格。左键加注圈或盲注2X按钮预选两倍加注，右键加注圈或取消盲注按钮撤销；修改前注时盲加注同步为两倍，清除前注会同时清除盲加注。')],
+            []]])]
+
+
+
+        BG = '#faf5e8'
+
+        HEADER = '#f1e7cd'
+
+        SIDEBAR = '#f2e8d0'
+
+        PANEL = '#fffdf7'
+
+        PANEL_2 = '#f5ecd6'
+
+        BORDER = '#c9b88a'
+
+        GOLD = '#a8842c'
+
+        GOLD_BAR = '#e7d36c'
+
+        TEXT = '#3a2f1e'
+
+        MUTED = '#7a6a50'
+
+        font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
+
+
+
+        header = tk.Frame(dialog, bg=HEADER, height=76)
+
+        header.pack(fill=tk.X, side=tk.TOP)
+
+        header.pack_propagate(False)
+
+        tk.Label(header, text='赌场扑克 游戏规则', font=(font_name, 20, 'bold'),
+
+                 fg=GOLD, bg=HEADER, anchor='w', wraplength=795,
+
+                 justify=tk.LEFT).place(x=24, y=6, width=795, height=41)
+
+        tk.Label(header, text='玩法 · 下注 · 获胜条件 · 牌型 · 特别事项',
+
+                 font=(font_name, 14), fg=MUTED, bg=HEADER, anchor='w').place(x=26, y=46)
+
+
+
+        def close_dialog():
+
+            try:
+
+                self._game_instruction_dialog = None
+
+            except Exception:
+
+                pass
+
+            try:
+
+                dialog.destroy()
+
+            except tk.TclError:
+
+                pass
+
+
+
+        tk.Button(header, text='关闭  ESC', command=close_dialog,
+
+                  font=(font_name, 14, 'bold'), bg='#e8dcc0', fg=TEXT,
+
+                  activebackground='#d9c895', relief=tk.FLAT, bd=0,
+
+                  cursor='hand2').place(x=850, y=17, width=120, height=42)
+
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X, side=tk.TOP)
+
+
+
+        body = tk.Frame(dialog, bg=BG)
+
+        body.pack(fill=tk.BOTH, expand=True)
+
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=205)
+
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+
+        sidebar.pack_propagate(False)
+
+        tk.Label(sidebar, text='说明目录', font=(font_name, 16, 'bold'),
+
+                 fg=GOLD, bg=SIDEBAR, anchor='w').pack(fill=tk.X, padx=18, pady=(17, 10))
+
+
+
+        scroll_host = tk.Frame(body, bg=BG)
+
+        scroll_host.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        canvas = tk.Canvas(scroll_host, bg=BG, highlightthickness=0, bd=0, yscrollincrement=36)
+
+        scrollbar = tk.Scrollbar(scroll_host, orient=tk.VERTICAL, command=canvas.yview,
+
+                                 bg='#ded3b7', troughcolor=BG, activebackground=GOLD_BAR,
+
+                                 relief=tk.FLAT, bd=0, width=13)
+
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=10)
+
+        content = tk.Frame(canvas, bg=BG)
+
+        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
+
+
+
+        def sync_scrollregion(_event=None):
+
+            canvas.configure(scrollregion=canvas.bbox('all'))
+
+
+
+        def fit_content_width(event):
+
+            canvas.itemconfigure(content_window, width=event.width)
+
+
+
+        content.bind('<Configure>', sync_scrollregion)
+
+        canvas.bind('<Configure>', fit_content_width)
+
+
+
+        def add_rule(parent_frame, title, detail):
+
+            row = tk.Frame(parent_frame, bg=PANEL)
+
+            row.pack(fill=tk.X, padx=16, pady=5)
+
+            tk.Frame(row, bg=GOLD_BAR, width=5).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 11))
+
+            text_box = tk.Frame(row, bg=PANEL)
+
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+            if title:
+                tk.Label(text_box, text=title, font=(font_name, 15, 'bold'),
+
+                         fg=TEXT, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                         wraplength=650).pack(fill=tk.X)
+
+            if detail:
+
+                tk.Label(text_box, text=detail, font=(font_name, 14),
+
+                         fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                         wraplength=650).pack(fill=tk.X, pady=(3, 0))
+
+
+
+        def add_table(parent_frame, title, headers, rows):
+
+            block = tk.Frame(parent_frame, bg=PANEL_2,
+
+                             highlightbackground=BORDER, highlightthickness=1, bd=0)
+
+            block.pack(fill=tk.X, padx=16, pady=8)
+
+            if title:
+                tk.Label(block, text=title, font=(font_name, 14, 'bold'),
+
+                         fg=TEXT, bg=GOLD_BAR, anchor='w', justify=tk.LEFT,
+
+                         wraplength=675, padx=11, pady=7).pack(fill=tk.X)
+
+            grid = tk.Frame(block, bg=PANEL_2)
+
+            grid.pack(fill=tk.X)
+
+            count = max([len(headers)] + [len(row) for row in rows]) if rows else len(headers)
+
+            table_font = tkfont.Font(family=font_name, size=14)
+
+            minimums = []
+
+            preferences = []
+
+            for col in range(count):
+
+                picture_width = max((len(row[col][1]) * 74 + 6
+
+                                     for row in rows if col < len(row)
+
+                                     and isinstance(row[col], (tuple, list))
+
+                                     and len(row[col]) == 2 and row[col][0] == '__CARD_IMAGES__'),
+
+                                    default=0)
+
+                minimums.append(max(62, picture_width))
+
+                text_width = max((table_font.measure(str(row[col]))
+
+                                  for row in ([headers] if headers else []) + rows
+
+                                  if col < len(row) and isinstance(row[col], str)), default=0)
+
+                preferences.append(1 if picture_width else max(50, min(text_width, 260)))
+
+            available = 700
+
+            remaining = max(0, available - sum(minimums))
+
+            total_preference = sum(preferences) or 1
+
+            column_widths = [minimums[col] + remaining * preferences[col] // total_preference
+
+                             for col in range(count)]
+
+            if column_widths:
+
+                column_widths[-1] += available - sum(column_widths)
+
+            for col, width in enumerate(column_widths):
+
+                grid.grid_columnconfigure(col, minsize=width)
+
+            matrix = ([headers] if headers else []) + rows
+
+            for r, row in enumerate(matrix):
+
+                for c in range(count):
+
+                    value = row[c] if c < len(row) else ''
+
+                    head = bool(headers) and r == 0
+
+                    bg = GOLD_BAR if head else (PANEL if r % 2 else '#fbf6e9')
+
+                    fg = TEXT if head else MUTED
+
+                    if isinstance(value, (tuple, list)) and len(value) == 2 and value[0] == '__CARD_IMAGES__':
+
+                        image_cell = tk.Frame(grid, bg=bg, borderwidth=1, relief=tk.SOLID)
+
+                        image_cell.grid(row=r, column=c, sticky='nsew')
+
+                        game_dir = os.path.dirname(os.path.abspath(__file__))
+
+                        search_roots = (game_dir, os.path.dirname(game_dir),
+
+                                        os.path.dirname(os.path.dirname(game_dir)))
+
+                        card_dir = next((os.path.join(root, 'A_Tools', 'Card', 'Poker1')
+
+                                         for root in search_roots
+
+                                         if os.path.isdir(os.path.join(root, 'A_Tools', 'Card', 'Poker1'))),
+
+                                        os.path.join(search_roots[1], 'A_Tools', 'Card', 'Poker1'))
+
+                        suits = {'♠': 'Spade', '♥': 'Heart', '♦': 'Diamond', '♣': 'Club'}
+
+                        for suit, rank in value[1]:
+
+                            filename = 'JOKER-A.png' if suit == 'JOKER' else f'{suits.get(suit, suit)}{rank}.png'
+
+                            path = os.path.join(card_dir, filename)
+
+                            try:
+
+                                with Image.open(path) as source_image:
+
+                                    card_width = 70
+
+                                    card_height = max(1, round(source_image.height * card_width / source_image.width))
+
+                                    small_image = source_image.resize((card_width, card_height), Image.LANCZOS)
+
+                                photo = ImageTk.PhotoImage(small_image)
+
+                                image_label = tk.Label(image_cell, image=photo, bg=bg, bd=0)
+
+                                image_label.image = photo
+
+                                image_label.pack(side=tk.LEFT, padx=2, pady=3)
+
+                            except Exception:
+
+                                # Keep the example cell image-only if an asset is unavailable.
+
+                                tk.Label(image_cell, text='', bg='#fffdf7', width=3, height=2,
+
+                                         borderwidth=1, relief=tk.SOLID).pack(side=tk.LEFT, padx=2, pady=3)
+
+                    else:
+
+                        tk.Message(grid, text=value, font=(font_name, 14, 'bold' if head else 'normal'),
+
+                                   fg=fg, bg=bg, anchor='w', justify=tk.LEFT,
+
+                                   width=max(42, column_widths[c] - 16),
+
+                                   padx=7, pady=5, borderwidth=1,
+
+                                   relief=tk.SOLID).grid(row=r, column=c, sticky='nsew')
+
+
+
+        def render_page(index):
+
+            for child in content.winfo_children():
+
+                child.destroy()
+
+            for idx, button in enumerate(nav_buttons):
+
+                button.configure(bg='#e6d9b9' if idx == index else SIDEBAR,
+
+                                 fg=GOLD if idx == index else MUTED)
+
+            page_title, subtitle, cards = manual_pages[index]
+
+            top = tk.Frame(content, bg=BG)
+
+            top.pack(fill=tk.X, padx=14, pady=(7, 2))
+
+            tk.Label(top, text=page_title, font=(font_name, 20, 'bold'),
+
+                     fg=GOLD, bg=BG, anchor='w', justify=tk.LEFT,
+
+                     wraplength=690).pack(fill=tk.X)
+
+            if subtitle:
+
+                tk.Label(top, text=subtitle, font=(font_name, 14),
+
+                         fg=MUTED, bg=BG, anchor='w', justify=tk.LEFT,
+
+                         wraplength=690).pack(fill=tk.X, pady=(3, 0))
+
+            for card_title, card_subtitle, rules, tables in cards:
+
+                card = tk.Frame(content, bg=PANEL, highlightbackground=BORDER,
+
+                                highlightcolor=BORDER, highlightthickness=1, bd=0)
+
+                card.pack(fill=tk.X, padx=10, pady=7)
+
+                head = tk.Frame(card, bg=PANEL)
+
+                head.pack(fill=tk.X, padx=16, pady=(12, 5))
+
+                tk.Label(head, text=card_title, font=(font_name, 16, 'bold'),
+
+                         fg=GOLD, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                         wraplength=680).pack(fill=tk.X)
+
+                if card_subtitle:
+
+                    tk.Label(head, text=card_subtitle, font=(font_name, 14),
+
+                             fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+
+                             wraplength=680).pack(fill=tk.X)
+
+                for rule_title, detail in rules:
+
+                    add_rule(card, rule_title, detail)
+
+                for table_title, table_headers, rows in tables:
+
+                    add_table(card, table_title, table_headers, rows)
+
+                tk.Frame(card, bg=PANEL, height=6).pack(fill=tk.X)
+
+            content.update_idletasks()
+
+            canvas.configure(scrollregion=canvas.bbox('all'))
+
+            canvas.yview_moveto(0)
+
+
+
+        nav_buttons = []
+
+        for index, (page_title, _subtitle, _cards) in enumerate(manual_pages):
+
+            button = tk.Button(sidebar, text=page_title, command=lambda i=index: render_page(i),
+
+                               font=(font_name, 14), fg=MUTED, bg=SIDEBAR,
+
+                               activebackground='#e8d49a', activeforeground=GOLD,
+
+                               relief=tk.FLAT, bd=0, anchor='w', padx=18, pady=10,
+
+                               cursor='hand2')
+
+            button.pack(fill=tk.X)
+
+            nav_buttons.append(button)
+
+
+
+        def on_mousewheel(event):
+
+            canvas.yview_scroll(int(-event.delta / 120), 'units')
+
+            return 'break'
+
+
+
+        dialog.bind('<MouseWheel>', on_mousewheel)
+
+        dialog.bind('<Button-4>', lambda _e: (canvas.yview_scroll(-1, 'units'), 'break')[1])
+
+        dialog.bind('<Button-5>', lambda _e: (canvas.yview_scroll(1, 'units'), 'break')[1])
+
+        dialog.bind('<Escape>', lambda _e: close_dialog())
+
+        dialog.protocol('WM_DELETE_WINDOW', close_dialog)
+
+        if nav_buttons:
+
+            render_page(0)
+
+        dialog.after(30, dialog.focus_force)
+
+    def _center_table(self, event=None):
+        # Keep the original 1150×750 composition centered when embedded.
+        self.canvas.place(x=max(0, (self.winfo_width()-self.WIDTH)//2),
+                          y=max(0, (self.winfo_height()-self.HEIGHT)//2),
+                          width=self.WIDTH, height=self.HEIGHT)
+
+    def _create_widgets(self):
+        self.canvas = tk.Canvas(self, width=self.WIDTH, height=self.HEIGHT,
+                                bg=ROOT_BG, highlightthickness=0)
+        self.canvas.place(x=0, y=0, width=self.WIDTH, height=self.HEIGHT)
+        self.control_buttons = {}
+        self.selected_discards = {s: None for s in self.game.SEATS}
+        self._card_origins, self._discard_photos = {}, {}
+        self._faded_photos, self._final_usage = {}, {}
+        self._hand_usage_keys = {}
+        self._settled_card_photos = {}
+        self._usage_owner = None
+        self._default_usage_owner = 'Dealer'
+        self.canvas.bind('<Motion>', self._on_hand_usage_hover, add='+')
+        self.canvas.bind('<Leave>', self._on_hand_usage_leave, add='+')
+        self._revealed_public = 0
+        c = self.canvas
+        self._text(187, 44, '赌场扑克', 16, GOLD)
+        c.create_rectangle(465, 10, 685, 163, fill=self.TABLE_GREEN, outline='')
+        self.title_items = {'Dealer': self._text(575, 23, '庄家', 16, PANEL_BG)}
+        self._draw_limit_table()
+        self._text(957, 44, 'Casino Hold’em', 14, GOLD)
+        self._draw_progressive_panel()
+        c.create_rectangle(22, 191, 1128, 309, fill=ROOT_BG, outline='#65784B')
+        c.create_line(25, 192, 1125, 192, fill='#E0C879', width=2)
+        c.create_line(25, 308, 1125, 308, fill='#0C241B', width=2)
+        self._text(182, 229, '庄家需要对子4及格\n不及格退回加注', 17, GOLD)
+        self._text(967, 247, '开牌前可盲加注2X\n翻牌后加注2X / 弃牌\nAA+ / 大奖按前5张牌', 16, GOLD)
+        self.street_item = self._text(182, 279, '下注阶段', 14, PANEL_BG)
+        c.create_polygon(
+            366, 173, 784, 173,
+            798, 173, 798, 187,
+            798, 287, 798, 301,
+            784, 301, 366, 301,
+            352, 301, 352, 287,
+            352, 187, 352, 173,
+            smooth=True, splinesteps=16, fill='#234838',
+            outline='#667B55', width=1)
+        for seat, x0, x1 in (('Player1', 22, 566), ('Player2', 582, 1128)):
+            c.create_rectangle(x0, 316, x1, 617, fill=self.ZONE_COLORS[seat], outline='')
+            self.title_items[seat] = self._text(x0+220, 330, self.SEAT_NAMES[seat], 18, PANEL_BG)
+            # 手牌右侧是 AA+，大奖灯与手牌平行，位于每手区域最右侧。
+            self._draw_wild_spot(seat, 'aa', x0+295, 403, 'AA+', 40)
+            self._draw_wild_spot(seat, 'ante', x0+295, 489, '前注', 40)
+            self._draw_wild_spot(seat, 'call', x0+295, 575, '加注', 40)
+            self._draw_progressive_lamp(seat, x0+470, 403)
+            for action, top, caption, color in (
+                ('call', 488, '下注2X', '#397A48'),
+                ('fold', 557, '弃牌', '#9B403A')):
+                self.action_buttons[(seat, action)] = self.create_control_button(
+                    x0+410, top, x1-15, top+58, caption,
+                    lambda s=seat, a=action: self._action_click(s, a),
+                    color, font_size=14, draw_shadow=False)
+        self._draw_bottom_controls()
+        for side in ('Dealer', *self.game.SEATS, 'Public'):
+            for index in range(5 if side == 'Public' else 2):
+                x, y = self.card_position(side, index)
+                w, h = self.card_size(side)
+                c.create_rectangle(x, y, x+w, y+h,
+                    outline='#B59C6A' if side == 'Public' else '#7B9374',
+                    dash=(3, 3), tags='card_slots')
+
+    def card_position(self, side, index):
+        if side == 'Public':
+            return 363+index*86, 181
+        if side == 'Dealer':
+            return 489+index*92, 40
+        return (40 if side == 'Player1' else 600)+index*92, 347
+
+    @staticmethod
+    def _card_image_key(card):
+        return card.suit, card.rank
+
+    def _refresh(self):
+        c = self.canvas
+        c.itemconfigure(self.balance_item, text=f'余额: ${self.balance:,.2f}')
+        total = sum(sum(b.values()) for b in self.bets.values())
+        c.itemconfigure(self.total_item, text=f'本局下注: ${total:,.2f}' if total else f'上局返还: ${self.last_win:,.2f}')
+        limits = ('$100', '$50,000', '$12,500') if self.high_bet_mode else ('$10', '$10,000', '$2,500')
+        for item, value in zip(self.limit_value_items, limits):
+            c.itemconfigure(item, text=value)
+        self._render_chips()
+        betting = self.game.stage == 'betting' and self._motion_count == 0
+        self.set_control_button_state(self.clear_button, betting)
+        self.set_control_button_state(self.repeat_button, betting and bool(self.last_bet))
+        self.set_control_button_state(self.start_button, betting)
+        restarting = self.game.stage in ('await_restart', 'returning', 'credit_pending', 'sweeping')
+        c.itemconfigure(self.repeat_button, state='hidden' if restarting else 'normal')
+        c.itemconfigure(self.start_button, state='hidden' if restarting else 'normal')
+        c.itemconfigure(self.restart_button, state='normal' if restarting else 'hidden')
+        self.set_control_button_state(self.restart_button, self.game.stage in ('await_restart', 'credit_pending'))
+        for seat in self.game.SEATS:
+            ready = self.game.stage == 'decision' and not self._decision_busy and self.game.decisions[seat] == 'pending'
+            affordable = self.game.bets[seat]['ante']*2 <= self.balance
+            call_tag = self.action_buttons[(seat, 'call')]
+            fold_tag = self.action_buttons[(seat, 'fold')]
+            c.itemconfigure(self.control_buttons[call_tag]['text'], text='盲注2X' if self.game.stage == 'betting' else '下注2X')
+            c.itemconfigure(self.control_buttons[fold_tag]['text'], text='取消盲注' if self.game.stage == 'betting' else '弃牌')
+            if self.game.stage == 'betting':
+                candidate = {s: dict(b) for s, b in self.bets.items()}
+                candidate[seat]['call'] = candidate[seat]['ante']*2
+                can_blind = betting and candidate[seat]['ante'] > 0 and self._betting_cost(candidate) <= self.balance
+                self.set_control_button_state(call_tag, can_blind and not self.bets[seat]['call'])
+                self.set_control_button_state(fold_tag, betting and self.bets[seat]['call'] > 0)
+            else:
+                self.set_control_button_state(call_tag, ready and affordable)
+                self.set_control_button_state(fold_tag, ready)
+        caption = '下注阶段' if self.game.stage == 'betting' else '已结算' if restarting else '翻牌圈 · 2X / 弃牌' if self.game.stage == 'decision' else '摊牌中' if self.game.stage == 'showdown' else '发牌 / 翻牌中'
+        c.itemconfigure(self.street_item, text=caption)
+        self._status(caption)
+
+    def _after_initial_reveal(self):
+        self.game.stage = 'revealing'
+        self._refresh()
+        def revealed():
+            self._revealed_public = 3
+            self.game.street, self.game.stage = 'flop', 'decision'
+            self._update_visible_titles()
+            self._refresh()
+            self._maybe_showdown()
+        self._reveal_next([('Public', i) for i in range(3)], 0, revealed)
+
+    def _action_click(self, seat, action):
+        if self.game.stage == 'betting':
+            self.set_pre_raise(seat, 2 if action == 'call' else 0)
+            return
+        self._decide(seat, action, 2 if action == 'call' else 0)
+
+    def raise_action(self, multiplier=2, seat='Player1'):
+        if self.game.stage == 'betting':
+            self.set_pre_raise(seat, multiplier)
+            return
+        self._decide(seat, 'call', multiplier)
+
+    def play_action(self, multiplier=2, seat='Player1'):
+        self.raise_action(multiplier, seat)
+
+    def call_action(self, seat='Player1'):
+        self.raise_action(2, seat)
+
+    def repeat_last_bet(self):
+        self.apply_last_bet()
+
+    def _save_progressive_amount(self):
+        try:
+            save_progressive(self.game.progressive_amount)
+        except Exception as exc:
+            messagebox.showerror('奖池保存失败', str(exc), parent=self)
+        self.progressive_amount_var.set(f'${self.game.progressive_amount:,.2f}')
+
+    @staticmethod
+    def _betting_cost(bets):
+        return round(sum(sum(b.values()) for b in bets.values() if b['ante']), 2)
+
+    def set_pre_raise(self, seat, multiplier):
+        if self.game.stage != 'betting' or self._motion_count or multiplier not in (0, 2):
+            return
+        new = {s: dict(b) for s, b in self.bets.items()}
+        if multiplier and not new[seat]['ante']:
+            return
+        new[seat]['call'] = round(new[seat]['ante']*multiplier, 2)
+        if multiplier and self._betting_cost(new) > self.balance:
+            messagebox.showwarning('无法盲加注', '余额不足以支付已选下注与两倍盲加注。', parent=self)
+            return
+        self._apply_bet_layout(new)
+
+    def add_chip_to_bet(self, seat, kind):
+        if self.game.stage != 'betting' or self._motion_count:
+            return
+        new = {s: dict(b) for s, b in self.bets.items()}
+        b = new[seat]
+        if kind == 'jackpot':
+            b[kind] = 0 if b[kind] else 2.5
+        elif kind == 'call':
+            self.set_pre_raise(seat, 2)
+            return
+        elif kind in ('ante', 'aa'):
+            pre_raised = kind == 'ante' and b['call'] > 0
+            limit = (50000 if self.high_bet_mode else 10000) if kind == 'ante' else (12500 if self.high_bet_mode else 2500)
+            b[kind] = min(limit, b[kind]+self.selected_chip)
+            if pre_raised:
+                b['call'] = round(b['ante']*2, 2)
+            if self._betting_cost(new) > self.balance and any(hand['call'] for hand in new.values()):
+                messagebox.showwarning('无法下注', '余额不足以支付下注与已选两倍盲加注。', parent=self)
+                return
+        else:
+            return
+        self._apply_bet_layout(new)
+
+    def reset_single_bet(self, seat, kind):
+        if self.game.stage != 'betting' or self._motion_count:
+            return
+        new = {s: dict(b) for s, b in self.bets.items()}
+        if kind in new[seat]:
+            new[seat][kind] = 0.0
+            if kind == 'ante':
+                new[seat]['call'] = 0.0
+            self._apply_bet_layout(new)
+
+    def fold_action(self, seat='Player1'):
+        if self.game.stage == 'betting':
+            self.set_pre_raise(seat, 0)
+            return
+        self._decide(seat, 'fold')
+
+    def _decide(self, seat, action, multiplier=0):
+        if self.game.stage != 'decision' or self._decision_busy or self.game.decisions.get(seat) != 'pending':
+            return
+        try:
+            cost = self.game.decide(seat, action, self.balance, multiplier)
+        except ValueError as exc:
+            messagebox.showwarning('无法操作', str(exc), parent=self)
+            return
+        self._decision_busy = True
+        self.balance = round(self.balance-cost, 2)
+        self.bets[seat]['call'] = self.game.bets[seat]['call']
+        self._persist_balance()
+        self._save_progressive_amount()
+        self._update_visible_titles()
+        self._refresh()
+        def done():
+            self._decision_busy = False
+            self._refresh()
+            self._maybe_showdown()
+        if action == 'call':
+            def arrived():
+                self._set_visual(seat, 'call', 'stake', cost)
+                done()
+            self._animate_chip(cost, self._rack_position(), self.bet_spots[(seat, 'call')]['center'], arrived)
+        elif action == 'fold':
+            transfers = []
+            for kind in ('ante', 'call'):
+                chip = self.visual_chips.pop((seat, kind, 'stake'), None)
+                if chip:
+                    transfers.append(dict(amount=chip['amount'], start=chip['xy'], target=self.HOUSE_CHIP_POS, duration=280))
+            self._run_chip_batch(transfers, done)
+        else:
+            done()
+
+    def _maybe_showdown(self):
+        if self._decision_busy or self._showdown_started or self.game.stage != 'decision':
+            return
+        if 'pending' in self.game.decisions.values():
+            return
+        self._showdown_started = True
+        self.game.stage = 'showdown'
+        self._refresh()
+        remaining = [('Public', i) for i in range(self._revealed_public, 5)]
+        remaining += [('Dealer', i) for i in range(2)]
+        # 与 UTH 相同：预下注手牌直到庄家两张手牌翻完后才翻开。
+        remaining += [(seat, i) for seat in self.game.SEATS
+                      if seat in self._blind_seats for i in range(2)]
+        def revealed_all():
+            self._revealed_public = 5
+            self._settle()
+        self._reveal_next(remaining, 0, revealed_all)
+
+    def _update_visible_titles(self):
+        for seat in self.game.SEATS:
+            if not self.game.hands[seat]:
+                continue
+            if seat in self._blind_seats:
+                # Do not expose a face-down hand through its title before showdown.
+                self.canvas.itemconfigure(self.title_items[seat], text=self.SEAT_NAMES[seat])
+                continue
+            cards = self.game.hands[seat]+self.game.public_cards[:self._revealed_public]
+            caption = self.SEAT_NAMES[seat]
+            if len(cards) >= 5:
+                caption += ' - '+HAND_RANK_NAMES[find_best_5(cards)[0][0]]
+            self.canvas.itemconfigure(self.title_items[seat], text=caption)
+
+    def _update_hand_title(self, side):
+        if side != 'Dealer' and not self.game.hands[side]:
+            return
+        name = '庄家' if side == 'Dealer' else self.SEAT_NAMES[side]
+        rank = find_best_5(self.game.pool(side))[0][0]
+        caption = f'{name} - {HAND_RANK_NAMES[rank]}'
+        self.canvas.itemconfigure(self.title_items[side], text=caption)
+
+    def _settle(self):
+        if self._settlement_started:
+            return
+        self._settlement_started = True
+        jackpot_before = self.game.progressive_amount
+        result = self.game.settle()
+        self.game.stage, self.last_win = 'settling', result['returned']
+        try:
+            save_progressive(self.game.progressive_amount)
+        except Exception as exc:
+            messagebox.showerror('奖池保存失败', str(exc), parent=self)
+        for side in ('Dealer', *self.game.SEATS):
+            self._update_hand_title(side)
+        self._render_hand_usage()
+        self._fade_dealer_notice(not self.game.dealer_qualifies())
+        transfers, awards, round_id = [], [], time.time_ns()
+        for seat, outcome in result['hands'].items():
+            for kind in ('ante', 'call', 'aa'):
+                transfers.extend(self._outcome_transfers(seat, kind, self.game.bets[seat][kind], outcome['details'][kind]))
+            bonus = outcome['details']['bonus']
+            if bonus:
+                self._set_lamp_mode(seat, 'win')
+                awards.append((seat, bonus))
+            info = dict(outcome, seat=seat, round_id=round_id, bets=dict(self.game.bets[seat]),
+                        fold=self.game.decisions[seat] == 'fold', total_winnings=outcome['returned'])
+            try:
+                save_che_history(self.game.deck, self.game.hands[seat], self.game.dealer_hand, self.game.public_cards, info)
+            except Exception as exc:
+                messagebox.showerror('历史记录保存失败', str(exc), parent=self)
+        self._refresh()
+        self._run_chip_batch(transfers, lambda: self._pay_progressive_awards(awards, jackpot_before))
+
+    def _render_hand_usage(self):
+        """结算默认显示庄家用牌；鼠标停在玩家手牌时切换查看者。"""
+        if self.game.settlement is None:
+            return
+        self.canvas.delete('hand_usage')
+        self._hand_usage_keys.clear()
+        users = {}
+        for owner in ('Dealer', *self.game.SEATS):
+            hand = self.game.dealer_hand if owner == 'Dealer' else self.game.hands[owner]
+            if not hand:
+                continue
+            best = find_best_5(self.game.pool(owner))[1]
+            used = set()
+            for card in best:
+                public_index = next((i for i, c in enumerate(self.game.public_cards) if c is card), None)
+                side = 'Public' if public_index is not None else owner
+                index = public_index if public_index is not None else next(
+                    i for i, c in enumerate(hand) if c is card)
+                key = side, index
+                used.add(key)
+                if owner == 'Dealer' or self.game.decisions[owner] == 'call':
+                    users.setdefault(key, []).append(owner)
+            self._hand_usage_keys[owner] = used
+        self._final_usage = {key: tuple(owners) for key, owners in users.items()}
+        self._default_usage_owner = 'Dealer'
+        self._faded_photos.clear()
+        self._settled_card_photos.clear()
+        for (side, index), item in self.card_items.items():
+            hand = self.game.public_cards if side == 'Public' else self.game.dealer_hand if side == 'Dealer' else self.game.hands[side]
+            card = hand[index]
+            source = self._pil_cards[self._card_image_key(card)].convert('RGBA').resize(
+                self.card_size(side), Image.Resampling.LANCZOS)
+
+            self._settled_card_photos[item] = ImageTk.PhotoImage(source, master=self)
+            self._fade_card_item(item, source)
+        self._usage_owner = None
+        self._apply_hand_usage(self._default_usage_owner)
+        self._on_hand_usage_hover()
+
+    def _apply_hand_usage(self, owner):
+        """只淡化当前查看者未采用的牌，其他手牌恢复原有不透明度。"""
+        used = self._hand_usage_keys.get(owner, set())
+        for key, item in self.card_items.items():
+            faded = key[0] in (owner, 'Public') and key not in used
+            photos = self._faded_photos if faded else self._settled_card_photos
+            self.canvas.itemconfigure(item, image=photos[item])
+        self._usage_owner = owner
+
+    def _on_hand_usage_hover(self, event=None):
+        if (self.game.settlement is None or not self._hand_usage_keys
+                or self.game.stage not in ('settled', 'settling', 'await_restart')):
+            return
+        current = set(self.canvas.find_withtag('current'))
+        seat = next((side for (side, _), item in self.card_items.items()
+                     if item in current and side in self.game.SEATS
+                     and self.game.hands[side]), None)
+        owner = seat or self._default_usage_owner
+        if owner != self._usage_owner:
+            self._apply_hand_usage(owner)
+
+    def _on_hand_usage_leave(self, event=None):
+        if (self.game.settlement is not None and self._hand_usage_keys
+                and self.game.stage in ('settled', 'settling', 'await_restart')
+                and self._usage_owner != self._default_usage_owner):
+            self._apply_hand_usage(self._default_usage_owner)
 
 def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, user=None,
          on_back=None, on_balance_change=None):
@@ -2092,7 +2817,7 @@ def main(initial_balance=10000, username="Guest", *, parent=None, balance=None, 
         )
 
     root = tk.Tk()
-    root.title("Casino Holdem")
+    root.title("赌场扑克")
     root.geometry("1150x750+50+10")
     root.resizable(False, False)
     page = CHEGUI(root, actual_balance, actual_user)

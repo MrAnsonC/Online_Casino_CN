@@ -1,0 +1,5 @@
+{"timestamp":"2026-10-06T10:40:18","level":"ERROR","operation":"ACQUIRE_CHAMBER","error_type":"CSMError","message":"NO_ELIGIBLE_CHAMBER: 沒有至少8張且最近三局未使用的牌倉。","context":{}}
+{"timestamp":"2026-10-07T06:08:04","level":"ERROR","operation":"ACQUIRE_CHAMBER","error_type":"CSMError","message":"NO_ELIGIBLE_CHAMBER: 沒有至少8張且最近三局未使用的牌倉。","context":{}}
+{"timestamp":"2026-10-19T11:04:41","level":"ERROR","operation":"ACQUIRE_CHAMBER","error_type":"CSMError","message":"NO_ELIGIBLE_CHAMBER: 沒有至少8張且最近三局未使用的牌倉。","context":{}}
+{"timestamp":"2026-10-29T10:12:55","level":"ERROR","operation":"ACQUIRE_CHAMBER","error_type":"CSMError","message":"NO_ELIGIBLE_CHAMBER: 沒有至少8張且最近三局未使用的牌倉。","context":{}}
+{"timestamp":"2026-11-04T23:38:07","level":"ERROR","operation":"ACQUIRE_CHAMBER","error_type":"CSMError","message":"NO_ELIGIBLE_CHAMBER: 沒有至少8張且最近三局未使用的牌倉。","context":{}}

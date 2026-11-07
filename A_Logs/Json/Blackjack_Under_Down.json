@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "shoe": {
+    "mode": "CSM",
+    "decks": 8,
+    "chambers": 15,
+    "game_id": "Blackjack_Under_Down:local:42cfdb2da82e4b06ab8b01ae4e715573"
+  }
+}

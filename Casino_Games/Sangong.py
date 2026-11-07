@@ -238,9 +238,12 @@ class SangongV13(tk.Frame):
         self.external_card_images={}; self.external_card_images_rotated={}; self.external_card_pil={}
         self.external_back_image=None; self.external_back_pil=None; self.card_asset_dir=None; self.load_original_card_assets()
         top=self.winfo_toplevel()
-        try: top.geometry('1150x750+50+10'); top.resizable(False,False)
-        except tk.TclError: pass
-        top.bind('<Return>',self.handle_enter_deal); self.create_ui(); self.select_chip(self.selected_chip); self.update_display()
+        # Embedded games preserve the window settings owned by the parent.
+        self._enter_window = top
+        self._previous_enter_binding = top.bind('<Return>')
+        self._enter_binding_id = top.bind('<Return>', self.handle_enter_deal)
+        self.bind('<Destroy>', self._restore_enter_binding, add='+')
+        self.create_ui(); self.select_chip(self.selected_chip); self.update_display()
     def handle_enter_deal(self,_event=None): self.deal_cards()
     def _current_round_total_cost(self): return self.bet_state.total_at_risk()
     def place_base_bet(self,bet_type,amount=None,record_undo=True):
@@ -1012,51 +1015,1092 @@ class SangongV13(tk.Frame):
             self.place_bet(bet_type,amount=amount/2 if bet_type=='Banker' else amount,record_undo=True)
 
     def show_game_instructions(self):
-        win=tk.Toplevel(self); win.title('三公完整玩法说明'); win.geometry('940x720'); win.resizable(False,False)
-        win.configure(bg='#061f1d'); win.transient(self.winfo_toplevel())
-        tk.Label(win,text='三公 · SANGONG',font=('Arial',25,'bold'),fg='#e4c357',bg='#061f1d').pack(pady=(18,3))
-        tk.Label(win,text='主注、边注、特殊牌与赔付规则',font=('Arial',11),fg='#9fc7bd',bg='#061f1d').pack(pady=(0,10))
-        frame=tk.Frame(win,bg='#d9b64c',padx=2,pady=2); frame.pack(fill='both',expand=True,padx=22,pady=(0,12))
-        body=tk.Text(frame,wrap='word',bg='#102c29',fg='#f3eee4',insertbackground='white',
-                     relief='flat',font=('Arial',12),padx=24,pady=18,spacing1=2,spacing3=7)
-        scroll=tk.Scrollbar(frame,command=body.yview); body.configure(yscrollcommand=scroll.set)
-        scroll.pack(side='right',fill='y'); body.pack(side='left',fill='both',expand=True)
-        rules=(
-        '一、牌局与点数\n'
-        '使用1副52张扑克牌。玩家1、玩家2和庄家各获三张牌。A计1点，2至9按牌面计点，10/J/Q/K计0点；总和只取个位数。\n\n'
-        '二、主牌型（由大至小）\n'
-        '1. 大三公：三张全为相同的J、Q或K；K > Q > J。\n'
-        '2. 小三公：三张全为J/Q/K，但不完全相同；比较最大单张。\n'
-        '3. 混三公：至少一张J/Q/K、并非全公牌，而且点数为0；比较最大单张。\n'
-        '4. 对子：先比较对子牌面，再比较余下单张；K最高，A最低。\n'
-        '5. 点数牌：先比较9点至0点；同点再比较最大单张。\n\n'
-        '三、特殊牌\n'
-        '庄家4-4-4为「破煞」，庄家通杀所有主注。玩家8-8-8为「发发发」；玩家主注按88:1获胜。'
-        '若下注庄家而对应玩家开出发发发，除该手本金落败外，再扣该手下注额的88倍；余额不足时余额直接归零。\n\n'
-        '四、主注\n'
-        '玩家1主注和玩家2主注可以同时下注；任何玩家主注均不能与庄家主注同时存在。边注不受此互斥限制。\n'
-        '玩家主注：胜赔0.95:1；平局输；发发发赔88:1。每区最高500K。\n'
-        '庄家主注：选择一枚筹码会同时向两手各投注一枚同面额筹码。例如选择10K即总下注20K。庄家区左筹码固定对战玩家1，右筹码固定对战玩家2。'
-        '庄家胜或平局均赔1:1。庄家主注总上限500K，即每手最高250K。\n\n'
-        '五、对子+边注（每区最高50K）\n'
-        '同花顺40:1；三条30:1；顺子6:1；同花3:1；对子1:1。只按最高符合牌型赔付一次。A-2-3及Q-K-A均属于顺子。\n\n'
-        '六、玩家平局边注（每区最高50K）\n'
-        '对应玩家与庄家的公牌张数相同，并且两手点数相同，即中奖24:1。公牌只指J、Q、K，不要求公牌牌面完全相同。\n\n'
-        '七、三公边注（每区最高50K）\n'
-        '三张牌全部为J、Q、K即中奖70:1；可以重复，所以小三公及大三公均中奖。混三公不中奖。\n\n'
-        '八、显示、轮转与结算\n'
-        '发出1至2张时只显示当前点数；三张齐后显示最终牌型。对子会整理至前两张。'
-        '客观中奖的下注格会以原色与白色交替闪烁，即使该格没有筹码也会闪烁；实际获胜筹码随后返回筹码区。'
-        '结算后下注板先轮转，上方牌区在下一次按下开牌时才轮转。\n\n'
-        '九、操作\n'
-        '左键：下注或选择筹码　　右键：清除单一下注区\n'
-        '清除：退回本局全部未开牌下注　　重复下注：依上局金额重下\n'
-        'Enter／开牌：开始下一局　　返回按钮：离开游戏')
-        body.insert('1.0',rules); body.configure(state='disabled')
-        tk.Button(win,text='关闭说明',command=win.destroy,font=('Arial',12,'bold'),bg='#d9b64c',fg='#111',
-                  activebackground='#f0d879',relief='flat',width=14).pack(pady=(0,16))
-        win.protocol('WM_DELETE_WINDOW',win.destroy); win.after(20,win.focus_force)
+        """三公完整图解说明，文字通过 \\n 明确分行。"""
+        import os
+        import tkinter as tk
 
+        try:
+            from PIL import Image, ImageTk
+        except ImportError:
+            Image = ImageTk = None
+
+        parent = self.winfo_toplevel()
+        current = getattr(self, "_game_instruction_dialog", None)
+
+        if current is not None:
+            try:
+                if current.winfo_exists():
+                    current.lift()
+                    current.focus_force()
+                    return
+            except tk.TclError:
+                pass
+
+        BG = "#faf5e8"
+        HEADER = "#f1e7cd"
+        SIDEBAR = "#f2e8d0"
+        PANEL = "#fffdf7"
+        PANEL_2 = "#f5ecd6"
+        BORDER = "#c9b88a"
+        GOLD = "#a8842c"
+        GOLD_BAR = "#e7d36c"
+        TEXT = "#3a2f1e"
+        MUTED = "#7a6a50"
+
+        font_name = getattr(self, "cn_font", "Microsoft YaHei UI")
+
+        dialog = tk.Toplevel(parent)
+        self._game_instruction_dialog = dialog
+        dialog.title("三公 · 完整图解玩法")
+        dialog.configure(bg=BG)
+        dialog.resizable(False, False)
+        dialog.transient(parent)
+
+        width, height = 1000, 670
+        parent.update_idletasks()
+        px, py = parent.winfo_rootx(), parent.winfo_rooty()
+        pw = max(1, parent.winfo_width())
+        ph = max(1, parent.winfo_height())
+        x = max(0, px + (pw - width) // 2)
+        y = max(0, py + (ph - height) // 2)
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+
+        def card_images(*items):
+            return ("__CARD_IMAGES__", items)
+
+        manual_pages = [
+            (
+                "玩法",
+                "玩家1、玩家2与庄家各持三张牌。\n"
+                "两位玩家分别与庄家比较，按下注区域独立结算。",
+                [
+                    (
+                        "游戏目标",
+                        "",
+                        [
+                            (
+                                "两位玩家分别对战庄家",
+                                "使用一副不含大小王的52张扑克牌。\n"
+                                "玩家1、庄家、玩家2各获三张牌，每局共发九张。\n"
+                                "玩家1与玩家2分别对战庄家，不互相比牌。\n"
+                                "牌靴剩余不足九张时，下一局发牌前重新洗牌。"
+                            ),
+                            (
+                                "主注与边注",
+                                "主注可选择玩家1、玩家2或庄家。\n"
+                                "玩家1与玩家2主注可以同时下注。\n"
+                                "任一玩家主注均不能与庄家主注同时存在。\n"
+                                "\n"
+                                "对子+、玩家平局及三公属于独立边注。\n"
+                                "边注可以单独购买，不要求先下主注。"
+                            ),
+                        ],
+                        [],
+                    ),
+                    (
+                        "一局如何进行",
+                        "",
+                        [
+                            (
+                                "① 设置下注",
+                                "先选择筹码，再左键点击下注区域。\n"
+                                "下注成功时立即扣除余额。\n"
+                                "开牌前可右键清除单一区域。\n"
+                                "点击“清除”可退回全部未开牌下注。"
+                            ),
+                            (
+                                "② 开始发牌",
+                                "点击“开牌”或按Enter开始。\n"
+                                "依玩家1、庄家、玩家2的顺序轮流发牌。\n"
+                                "每方各获三张牌。\n"
+                                "发牌与结算期间不能修改下注。"
+                            ),
+                            (
+                                "③ 自动比牌",
+                                "三张牌发齐后，判断最终牌型。\n"
+                                "先比较牌型，再比较该牌型规定的数值。\n"
+                                "无需换牌、弃牌或追加下注。"
+                            ),
+                            (
+                                "④ 分项结算",
+                                "两手主注分别结算，边注独立判奖。\n"
+                                "结算后下注板先轮转。\n"
+                                "上方牌区在下一次开牌时再轮转。"
+                            ),
+                        ],
+                        [],
+                    ),
+                    (
+                        "点数如何计算",
+                        "",
+                        [
+                            (
+                                "三张牌相加，只取个位数",
+                                "A计1点，2至9按牌面计点。\n"
+                                "10、J、Q、K均计0点。\n"
+                                "三张牌的点数相加后，只取个位数。\n"
+                                "\n"
+                                "例如：7＋8＋3＝18，最终为8点。\n"
+                                "J、Q、K称为公牌，10不属于公牌。"
+                            ),
+                        ],
+                        [],
+                    ),
+                ],
+            ),
+            (
+                "下注 & 限红",
+                "常规筹码以$100为单位。\n"
+                "全桌下注总额最高$2,000,000。",
+                [
+                    (
+                        "下注项目与限额",
+                        "",
+                        [],
+                        [
+                            (
+                                "各区限红",
+                                ["项目", "最高下注", "作用"],
+                                [
+                                    [
+                                        "玩家1／玩家2\n主注",
+                                        "每区$500,000",
+                                        "对应玩家\n与庄家比牌",
+                                    ],
+                                    [
+                                        "庄家主注",
+                                        "合计$500,000\n每手$250,000",
+                                        "平均分为两手\n分别对战两位玩家",
+                                    ],
+                                    [
+                                        "对子+",
+                                        "每区$50,000",
+                                        "玩家1、玩家2\n及庄家均可下注",
+                                    ],
+                                    [
+                                        "玩家平局",
+                                        "每区$50,000",
+                                        "对应玩家与庄家\n满足平局边注条件",
+                                    ],
+                                    [
+                                        "三公",
+                                        "每区$50,000",
+                                        "玩家1、玩家2\n及庄家均可下注",
+                                    ],
+                                ],
+                            ),
+                        ],
+                    ),
+                    (
+                        "下注操作",
+                        "",
+                        [
+                            (
+                                "添加与清除筹码",
+                                "左键选择筹码，再左键点击下注区增加金额。\n"
+                                "右键清除对应区域，并退回该区下注。\n"
+                                "“清除”退回本局全部尚未开牌的下注。"
+                            ),
+                            (
+                                "庄家下注同时投入两手",
+                                "点击庄家主注时，两手各投入一枚所选筹码。\n"
+                                "\n"
+                                "例如选择$100筹码，再点击一次庄家区：\n"
+                                "对玩家1下注$100，对玩家2下注$100。\n"
+                                "本次合计扣除$200。\n"
+                                "\n"
+                                "清除庄家主注时，两手会一并清除。"
+                            ),
+                            (
+                                "余额或限额不足",
+                                "玩家主注及边注会根据余额和剩余限额，\n"
+                                "以$100整数倍加入本次可下注金额。\n"
+                                "\n"
+                                "庄家主注必须能够完整投入两手金额。\n"
+                                "余额或限额不足时，本次庄家下注不成立。"
+                            ),
+                            (
+                                "重复下注",
+                                "点击“重复下注”后，先清除当前下注，\n"
+                                "再按保存的上次下注金额恢复。\n"
+                                "\n"
+                                "庄家记录的是两手合计金额，恢复时不会翻倍。\n"
+                                "若清除当前下注后的余额仍不足，\n"
+                                "不会恢复上次下注。"
+                            ),
+                        ],
+                        [],
+                    ),
+                ],
+            ),
+            (
+                "获胜条件 & 赔率",
+                "净赔率不包含本金。\n"
+                "中奖返还＝下注金额×（净赔率＋1）。",
+                [
+                    (
+                        "主注结算",
+                        "庄家总下注平均分为两手。\n"
+                        "每手分别使用总下注的一半进行结算。",
+                        [
+                            (
+                                "比较顺序",
+                                "先判断庄家是否为“破煞”。\n"
+                                "再判断对应玩家是否为“发发发”。\n"
+                                "其余情况先比牌型，再比该牌型规定的数值。\n"
+                                "\n"
+                                "比较结果完全相同时：\n"
+                                "玩家主注输，庄家主注赢。"
+                            ),
+                        ],
+                        [
+                            (
+                                "玩家主注",
+                                ["情形", "净赔率", "含本金返还"],
+                                [
+                                    ["普通获胜", "0.95:1", "下注×1.95"],
+                                    ["发发发获胜", "88:1", "下注×89"],
+                                    ["落败或主注平局", "输", "0"],
+                                    ["庄家破煞", "输", "0"],
+                                ],
+                            ),
+                            (
+                                "庄家主注：每手分别计算",
+                                ["情形", "净赔率", "该手返还"],
+                                [
+                                    [
+                                        "庄家破煞",
+                                        "1:1",
+                                        "该手下注×2",
+                                    ],
+                                    [
+                                        "庄家赢或平局\n普通点数0～4点",
+                                        "0.5:1",
+                                        "该手下注×1.5",
+                                    ],
+                                    [
+                                        "庄家赢或平局\n其他牌型或\n普通5～9点",
+                                        "1:1",
+                                        "该手下注×2",
+                                    ],
+                                    [
+                                        "输给普通玩家牌",
+                                        "输",
+                                        "0",
+                                    ],
+                                    [
+                                        "输给玩家发发发",
+                                        "输本金\n另扣88倍",
+                                        "返还0\n另扣该手下注×88",
+                                    ],
+                                ],
+                            ),
+                        ],
+                    ),
+                    (
+                        "对子+",
+                        "只使用所下注一方自己的三张牌。\n"
+                        "不要求主注获胜。",
+                        [
+                            (
+                                "独立判断牌型",
+                                "按赔率表从高到低，只赔最高符合项目一次。\n"
+                                "此表仅用于对子+，不是三公主注的牌型顺序。\n"
+                                "\n"
+                                "A-2-3与Q-K-A均算顺子。\n"
+                                "K-A-2不算顺子。\n"
+                                "同花Q-K-A按同花顺40:1赔付。"
+                            ),
+                        ],
+                        [
+                            (
+                                "对子+赔率表",
+                                ["牌型", "净赔率", "含本金返还"],
+                                [
+                                    ["同花顺", "40:1", "下注×41"],
+                                    ["三条", "30:1", "下注×31"],
+                                    ["顺子", "6:1", "下注×7"],
+                                    ["同花", "3:1", "下注×4"],
+                                    ["对子", "1:1", "下注×2"],
+                                    ["其他", "不中奖", "0"],
+                                ],
+                            ),
+                        ],
+                    ),
+                    (
+                        "玩家平局",
+                        "玩家1与玩家2分别有对应的平局下注区。",
+                        [
+                            (
+                                "必须同时满足三个条件",
+                                "① 平局边注评估的牌型等级相同。\n"
+                                "② J、Q、K的张数相同。\n"
+                                "③ 三张牌总点数取个位后相同。\n"
+                                "\n"
+                                "此边注不比较最大单张或对子大小。\n"
+                                "平局边注中奖，不代表主注比较结果为平局。"
+                            ),
+                            (
+                                "特殊牌的评估方式",
+                                "按当前代码，平局边注评估玩家8-8-8时，\n"
+                                "不启用“发发发”特殊等级，而按对子等级处理。\n"
+                                "\n"
+                                "庄家4-4-4仍按“破煞”等级处理。"
+                            ),
+                        ],
+                        [
+                            (
+                                "玩家平局赔率表",
+                                ["结果", "净赔率", "含本金返还"],
+                                [
+                                    ["三个条件均满足", "24:1", "下注×25"],
+                                    ["任一条件不满足", "不中奖", "0"],
+                                ],
+                            ),
+                        ],
+                    ),
+                    (
+                        "三公边注",
+                        "只使用所下注一方自己的三张牌。",
+                        [
+                            (
+                                "三张必须全是公牌",
+                                "三张均为J、Q或K即中奖，允许点数重复。\n"
+                                "大三公与小三公均符合，混三公不符合。\n"
+                                "\n"
+                                "若同时购买对子+与三公边注，\n"
+                                "两项可以分别中奖。"
+                            ),
+                        ],
+                        [
+                            (
+                                "三公边注赔率表",
+                                ["结果", "净赔率", "含本金返还"],
+                                [
+                                    ["三张均为J／Q／K", "70:1", "下注×71"],
+                                    ["其他", "不中奖", "0"],
+                                ],
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            (
+                "牌型等级表",
+                "以下顺序用于三公主注。\n"
+                "特殊牌优先于常规牌型。",
+                [
+                    (
+                        "特殊牌与五种常规牌型",
+                        "由强到弱排列。\n"
+                        "图片为示例，不代表唯一组成方式。",
+                        [],
+                        [
+                            (
+                                "牌型与牌例",
+                                ["牌型", "判定条件", "牌例"],
+                                [
+                                    [
+                                        "破煞",
+                                        "仅庄家4-4-4\n最高优先级",
+                                        card_images(
+                                            ("♠", "4"), ("♥", "4"), ("♦", "4")
+                                        ),
+                                    ],
+                                    [
+                                        "发发发",
+                                        "仅玩家8-8-8\n仅输庄家破煞",
+                                        card_images(
+                                            ("♠", "8"), ("♥", "8"), ("♦", "8")
+                                        ),
+                                    ],
+                                    [
+                                        "大三公",
+                                        "三张同点公牌",
+                                        card_images(
+                                            ("♠", "K"), ("♥", "K"), ("♦", "K")
+                                        ),
+                                    ],
+                                    [
+                                        "小三公",
+                                        "三张均为公牌\n但不全同点",
+                                        card_images(
+                                            ("♠", "K"), ("♥", "Q"), ("♦", "J")
+                                        ),
+                                    ],
+                                    [
+                                        "混三公",
+                                        "含至少一张公牌\n且总点数为0",
+                                        card_images(
+                                            ("♠", "K"), ("♥", "6"), ("♦", "4")
+                                        ),
+                                    ],
+                                    [
+                                        "对子",
+                                        "未符合更高牌型\n至少两张同点",
+                                        card_images(
+                                            ("♠", "9"), ("♥", "9"), ("♦", "2")
+                                        ),
+                                    ],
+                                    [
+                                        "普通点数",
+                                        "不符合以上牌型",
+                                        card_images(
+                                            ("♠", "7"), ("♥", "8"), ("♦", "3")
+                                        ),
+                                    ],
+                                ],
+                            ),
+                        ],
+                    ),
+                    (
+                        "同牌型如何分胜负",
+                        "",
+                        [
+                            (
+                                "牌面大小与花色",
+                                "主注比较牌面时：\n"
+                                "K＞Q＞J＞10＞9＞…＞2＞A。\n"
+                                "A最小，花色不分大小。\n"
+                                "\n"
+                                "牌面大小与计点数值不同。\n"
+                                "例如K计0点，但比较单张时大于9。"
+                            ),
+                            (
+                                "大三公",
+                                "比较三张相同公牌的牌面大小。\n"
+                                "K-K-K＞Q-Q-Q＞J-J-J。"
+                            ),
+                            (
+                                "小三公与混三公",
+                                "同类只比较最大单张。\n"
+                                "最大单张相同，即为主注平局。\n"
+                                "不再比较第二张及第三张。\n"
+                                "\n"
+                                "例如K-Q-J与K-J-J均为小三公，\n"
+                                "最大单张都是K，因此主注比较结果为平局。"
+                            ),
+                            (
+                                "对子",
+                                "先比较重复牌的牌面大小。\n"
+                                "重复牌相同，再比较剩余单牌。\n"
+                                "\n"
+                                "未触发特殊牌或更高牌型的三张同点牌，\n"
+                                "在主注中也归入对子等级。\n"
+                                "其单牌比较值使用该重复牌的牌面大小。\n"
+                                "\n"
+                                "例如玩家4-4-4、庄家8-8-8，\n"
+                                "均按对子等级处理。"
+                            ),
+                            (
+                                "普通点数",
+                                "先比较总点数，9点最大，0点最小。\n"
+                                "点数相同，再比较最大单张。\n"
+                                "最大单张也相同，即为主注平局。\n"
+                                "不再比较其余两张。"
+                            ),
+                            (
+                                "优先判断更高牌型",
+                                "例如J-5-5含公牌，且总点数为0。\n"
+                                "主注判为混三公，不是对子。\n"
+                                "\n"
+                                "同花或顺子本身不会提高三公主注等级，\n"
+                                "但可以在对子+边注中中奖。"
+                            ),
+                        ],
+                        [],
+                    ),
+                ],
+            ),
+            (
+                "特别事项",
+                "核对特殊牌优先级、界面显示及返还金额。",
+                [
+                    (
+                        "特殊牌与额外扣款",
+                        "",
+                        [
+                            (
+                                "破煞优先",
+                                "庄家4-4-4通杀两手玩家主注，\n"
+                                "包括玩家8-8-8。\n"
+                                "\n"
+                                "此时庄家两手均返还2倍。\n"
+                                "不会触发发发发的额外扣款。\n"
+                                "各项边注仍按自身规则独立判奖。"
+                            ),
+                            (
+                                "下注庄家遇到发发发",
+                                "庄家不是破煞，对应玩家为8-8-8时：\n"
+                                "该手庄家本金落败，\n"
+                                "另外扣除该手下注的88倍。\n"
+                                "\n"
+                                "两位玩家分别判断，另一手照常结算。\n"
+                                "最终余额＝下注后余额＋全部返还－额外扣款。\n"
+                                "若结果小于0，余额归零。"
+                            ),
+                        ],
+                        [],
+                    ),
+                    (
+                        "界面显示与轮转",
+                        "",
+                        [
+                            (
+                                "牌面显示",
+                                "发出一至两张时，显示当前点数。\n"
+                                "三张发齐后，显示最终牌型。\n"
+                                "对子会整理到前两张，整理不改变判定结果。"
+                            ),
+                            (
+                                "中奖提示",
+                                "符合中奖条件的下注格会交替闪烁。\n"
+                                "即使该格没有下注，也可能闪烁。\n"
+                                "实际返还按已下注金额及对应规则计算。"
+                            ),
+                            (
+                                "下一局位置",
+                                "结算后下注板先轮转。\n"
+                                "上方牌区在下一次开牌时再轮转。\n"
+                                "下注时请认准玩家1、玩家2及庄家标签。"
+                            ),
+                        ],
+                        [],
+                    ),
+                    (
+                        "返还与净盈亏示例",
+                        "以下示例均未购买边注。",
+                        [
+                            (
+                                "示例一：玩家普通获胜",
+                                "玩家1主注$100，普通获胜。\n"
+                                "返还：$100×1.95＝$195。\n"
+                                "净赢：$195－$100＝$95。"
+                            ),
+                            (
+                                "示例二：庄家低点赢一手、输一手",
+                                "庄家总下注$200，每手$100。\n"
+                                "庄家为普通4点。\n"
+                                "对玩家1获胜，对玩家2落败。\n"
+                                "\n"
+                                "第一手返还：$100×1.5＝$150。\n"
+                                "第二手返还：$0。\n"
+                                "合计返还$150，净输$50。\n"
+                                "\n"
+                                "半赔只适用于庄家普通0～4点赢或平局。\n"
+                                "对子、三公及破煞不受此半赔规则影响。"
+                            ),
+                            (
+                                "示例三：玩家发发发获胜",
+                                "玩家1主注$100，玩家1为8-8-8。\n"
+                                "庄家不是破煞。\n"
+                                "\n"
+                                "返还：$100×89＝$8,900。\n"
+                                "净赢：$8,900－$100＝$8,800。"
+                            ),
+                            (
+                                "示例四：庄家遇到发发发",
+                                "庄家总下注$200，每手$100。\n"
+                                "对玩家1的发发发落败。\n"
+                                "对玩家2按普通全赔规则获胜。\n"
+                                "\n"
+                                "第一手返还$0，另扣$100×88＝$8,800。\n"
+                                "第二手返还$100×2＝$200。\n"
+                                "规则净盈亏：$200－$200－$8,800＝－$8,800。\n"
+                                "\n"
+                                "若余额不足承担扣款，最终余额归零。"
+                            ),
+                            (
+                                "示例五：主注与平局边注分别判断",
+                                "玩家：K-6-2；庄家：Q-7-A。\n"
+                                "双方均为普通8点，且均有一张公牌。\n"
+                                "\n"
+                                "主注比较最大单张，K大于Q，因此玩家胜。\n"
+                                "平局边注的三个条件仍全部满足。\n"
+                                "已购买的平局边注按24:1中奖。"
+                            ),
+                        ],
+                        [],
+                    ),
+                ],
+            ),
+        ]
+
+        def close_dialog():
+            if getattr(self, "_game_instruction_dialog", None) is dialog:
+                self._game_instruction_dialog = None
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
+
+        header = tk.Frame(dialog, bg=HEADER, height=76)
+        header.pack(fill=tk.X)
+        header.pack_propagate(False)
+
+        tk.Label(
+            header,
+            text="三公 · 完整图解玩法",
+            font=(font_name, 20, "bold"),
+            fg=GOLD,
+            bg=HEADER,
+            anchor="w",
+        ).place(x=24, y=6, width=795, height=41)
+
+        tk.Label(
+            header,
+            text="玩法 · 下注 · 获胜条件 · 牌型 · 特别事项",
+            font=(font_name, 14),
+            fg=MUTED,
+            bg=HEADER,
+            anchor="w",
+        ).place(x=26, y=46)
+
+        tk.Button(
+            header,
+            text="关闭  ESC",
+            command=close_dialog,
+            font=(font_name, 14, "bold"),
+            bg="#e8dcc0",
+            fg=TEXT,
+            activebackground="#d9c895",
+            relief=tk.FLAT,
+            bd=0,
+            cursor="hand2",
+        ).place(x=850, y=17, width=120, height=42)
+
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X)
+
+        body = tk.Frame(dialog, bg=BG)
+        body.pack(fill=tk.BOTH, expand=True)
+
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=205)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+
+        tk.Label(
+            sidebar,
+            text="说明目录",
+            font=(font_name, 16, "bold"),
+            fg=GOLD,
+            bg=SIDEBAR,
+            anchor="w",
+        ).pack(fill=tk.X, padx=18, pady=(17, 10))
+
+        scroll_host = tk.Frame(body, bg=BG)
+        scroll_host.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        canvas = tk.Canvas(
+            scroll_host,
+            bg=BG,
+            highlightthickness=0,
+            bd=0,
+            yscrollincrement=36,
+        )
+        scrollbar = tk.Scrollbar(
+            scroll_host,
+            orient=tk.VERTICAL,
+            command=canvas.yview,
+            bg="#ded3b7",
+            troughcolor=BG,
+            activebackground=GOLD_BAR,
+            relief=tk.FLAT,
+            bd=0,
+            width=13,
+        )
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(
+            side=tk.LEFT,
+            fill=tk.BOTH,
+            expand=True,
+            padx=(10, 0),
+            pady=10,
+        )
+        scrollbar.pack(
+            side=tk.RIGHT,
+            fill=tk.Y,
+            padx=(0, 8),
+            pady=10,
+        )
+
+        content = tk.Frame(canvas, bg=BG)
+        content_window = canvas.create_window(
+            (0, 0), window=content, anchor="nw"
+        )
+
+        def sync_scrollregion(_event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def fit_content_width(event):
+            canvas.itemconfigure(content_window, width=event.width)
+
+        content.bind("<Configure>", sync_scrollregion)
+        canvas.bind("<Configure>", fit_content_width)
+
+        game_dir = os.path.dirname(os.path.abspath(__file__))
+        search_roots = (
+            game_dir,
+            os.path.dirname(game_dir),
+            os.path.dirname(os.path.dirname(game_dir)),
+        )
+        card_dir = getattr(self, "card_asset_dir", None)
+
+        if not card_dir or not os.path.isdir(card_dir):
+            card_dir = next(
+                (
+                    os.path.join(root, "A_Tools", "Card", "Poker1")
+                    for root in search_roots
+                    if os.path.isdir(
+                        os.path.join(root, "A_Tools", "Card", "Poker1")
+                    )
+                ),
+                None,
+            )
+
+        suits = {
+            "♠": "Spade",
+            "♥": "Heart",
+            "♦": "Diamond",
+            "♣": "Club",
+        }
+        image_cache = {}
+
+        def get_card_photo(suit, rank):
+            key = (suit, rank)
+            if key in image_cache:
+                return image_cache[key]
+            if Image is None or ImageTk is None:
+                return None
+
+            asset_key = (suits.get(suit, suit), rank)
+            source = getattr(self, "external_card_pil", {}).get(asset_key)
+
+            try:
+                if source is not None:
+                    source = source.copy()
+                elif card_dir:
+                    path = os.path.join(
+                        card_dir, f"{asset_key[0]}{rank}.png"
+                    )
+                    with Image.open(path) as original:
+                        source = original.convert("RGBA")
+                else:
+                    return None
+
+                resampling = getattr(Image, "Resampling", Image)
+                card_height = max(
+                    1, round(source.height * 70 / source.width)
+                )
+                resized = source.resize(
+                    (70, card_height), resampling.LANCZOS
+                )
+                photo = ImageTk.PhotoImage(resized, master=dialog)
+            except (OSError, ValueError, tk.TclError):
+                return None
+
+            image_cache[key] = photo
+            return photo
+
+        def add_rule(parent_frame, title, detail):
+            row = tk.Frame(parent_frame, bg=PANEL)
+            row.pack(fill=tk.X, padx=16, pady=5)
+
+            tk.Frame(row, bg=GOLD_BAR, width=5).pack(
+                side=tk.LEFT, fill=tk.Y, padx=(0, 11)
+            )
+            text_box = tk.Frame(row, bg=PANEL)
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+            if title:
+                tk.Label(
+                    text_box,
+                    text=title,
+                    font=(font_name, 15, "bold"),
+                    fg=TEXT,
+                    bg=PANEL,
+                    anchor="w",
+                    justify=tk.LEFT,
+                    wraplength=650,
+                ).pack(fill=tk.X)
+
+            if detail:
+                tk.Label(
+                    text_box,
+                    text=detail,
+                    font=(font_name, 14),
+                    fg=MUTED,
+                    bg=PANEL,
+                    anchor="w",
+                    justify=tk.LEFT,
+                    wraplength=650,
+                ).pack(fill=tk.X, pady=(3, 0))
+
+        def is_card_cell(value):
+            return (
+                isinstance(value, (tuple, list))
+                and len(value) == 2
+                and value[0] == "__CARD_IMAGES__"
+            )
+
+        def add_table(parent_frame, title, headers, rows):
+            block = tk.Frame(
+                parent_frame,
+                bg=PANEL_2,
+                highlightbackground=BORDER,
+                highlightthickness=1,
+                bd=0,
+            )
+            block.pack(fill=tk.X, padx=16, pady=8)
+
+            if title:
+                tk.Label(
+                    block,
+                    text=title,
+                    font=(font_name, 14, "bold"),
+                    fg=TEXT,
+                    bg=GOLD_BAR,
+                    anchor="w",
+                    justify=tk.LEFT,
+                    wraplength=675,
+                    padx=11,
+                    pady=7,
+                ).pack(fill=tk.X)
+
+            grid = tk.Frame(block, bg=PANEL_2)
+            grid.pack(fill=tk.X)
+
+            matrix = ([headers] if headers else []) + rows
+            count = max((len(row) for row in matrix), default=0)
+            if not count:
+                return
+
+            # 牌例列预留三张70px扑克牌的空间。
+            picture_columns = {
+                c
+                for row in rows
+                for c, value in enumerate(row)
+                if is_card_cell(value)
+            }
+
+            if count == 3:
+                column_widths = (
+                    [150, 316, 234]
+                    if picture_columns
+                    else [280, 180, 240]
+                )
+            else:
+                column_widths = [700 // count] * count
+                column_widths[-1] += 700 - sum(column_widths)
+
+            for c, col_width in enumerate(column_widths):
+                grid.grid_columnconfigure(c, minsize=col_width)
+
+            for r, row in enumerate(matrix):
+                head = bool(headers) and r == 0
+                bg = GOLD_BAR if head else (
+                    PANEL if r % 2 else "#fbf6e9"
+                )
+
+                for c in range(count):
+                    value = row[c] if c < len(row) else ""
+
+                    if is_card_cell(value):
+                        cell = tk.Frame(
+                            grid,
+                            bg=bg,
+                            borderwidth=1,
+                            relief=tk.SOLID,
+                        )
+                        cell.grid(row=r, column=c, sticky="nsew")
+
+                        for suit, rank in value[1]:
+                            photo = get_card_photo(suit, rank)
+
+                            if photo is not None:
+                                label = tk.Label(
+                                    cell, image=photo, bg=bg, bd=0
+                                )
+                                label.image = photo
+                                label.pack(
+                                    side=tk.LEFT, padx=2, pady=3
+                                )
+                            else:
+                                placeholder = tk.Canvas(
+                                    cell,
+                                    width=70,
+                                    height=98,
+                                    bg=PANEL,
+                                    highlightthickness=0,
+                                )
+                                placeholder.pack(
+                                    side=tk.LEFT, padx=2, pady=3
+                                )
+                                placeholder.create_rectangle(
+                                    1, 1, 69, 97,
+                                    fill="white",
+                                    outline=BORDER,
+                                )
+                                placeholder.create_text(
+                                    35, 49,
+                                    text=f"{rank}\n{suit}",
+                                    font=(font_name, 19, "bold"),
+                                    fill=(
+                                        "#b33131"
+                                        if suit in ("♥", "♦")
+                                        else "#252525"
+                                    ),
+                                    justify=tk.CENTER,
+                                )
+                    else:
+                        tk.Label(
+                            grid,
+                            text=str(value),
+                            font=(
+                                font_name,
+                                14,
+                                "bold" if head else "normal",
+                            ),
+                            fg=TEXT if head else MUTED,
+                            bg=bg,
+                            anchor="w",
+                            justify=tk.LEFT,
+                            wraplength=column_widths[c] - 18,
+                            padx=7,
+                            pady=7,
+                            borderwidth=1,
+                            relief=tk.SOLID,
+                        ).grid(row=r, column=c, sticky="nsew")
+
+        nav_buttons = []
+
+        def render_page(index):
+            for child in content.winfo_children():
+                child.destroy()
+
+            for idx, button in enumerate(nav_buttons):
+                button.configure(
+                    bg="#e6d9b9" if idx == index else SIDEBAR,
+                    fg=GOLD if idx == index else MUTED,
+                )
+
+            page_title, subtitle, page_cards = manual_pages[index]
+            top = tk.Frame(content, bg=BG)
+            top.pack(fill=tk.X, padx=14, pady=(7, 2))
+
+            tk.Label(
+                top,
+                text=page_title,
+                font=(font_name, 20, "bold"),
+                fg=GOLD,
+                bg=BG,
+                anchor="w",
+                justify=tk.LEFT,
+                wraplength=690,
+            ).pack(fill=tk.X)
+
+            if subtitle:
+                tk.Label(
+                    top,
+                    text=subtitle,
+                    font=(font_name, 14),
+                    fg=MUTED,
+                    bg=BG,
+                    anchor="w",
+                    justify=tk.LEFT,
+                    wraplength=690,
+                ).pack(fill=tk.X, pady=(3, 0))
+
+            for card_title, card_subtitle, rules, tables in page_cards:
+                card = tk.Frame(
+                    content,
+                    bg=PANEL,
+                    highlightbackground=BORDER,
+                    highlightcolor=BORDER,
+                    highlightthickness=1,
+                    bd=0,
+                )
+                card.pack(fill=tk.X, padx=10, pady=7)
+
+                head = tk.Frame(card, bg=PANEL)
+                head.pack(fill=tk.X, padx=16, pady=(12, 5))
+
+                tk.Label(
+                    head,
+                    text=card_title,
+                    font=(font_name, 16, "bold"),
+                    fg=GOLD,
+                    bg=PANEL,
+                    anchor="w",
+                    justify=tk.LEFT,
+                    wraplength=680,
+                ).pack(fill=tk.X)
+
+                if card_subtitle:
+                    tk.Label(
+                        head,
+                        text=card_subtitle,
+                        font=(font_name, 14),
+                        fg=MUTED,
+                        bg=PANEL,
+                        anchor="w",
+                        justify=tk.LEFT,
+                        wraplength=680,
+                    ).pack(fill=tk.X)
+
+                for rule_title, detail in rules:
+                    add_rule(card, rule_title, detail)
+
+                for table_title, table_headers, rows in tables:
+                    add_table(card, table_title, table_headers, rows)
+
+                tk.Frame(card, bg=PANEL, height=6).pack(fill=tk.X)
+
+            content.update_idletasks()
+            sync_scrollregion()
+            canvas.yview_moveto(0)
+
+        for index, (page_title, _subtitle, _cards) in enumerate(manual_pages):
+            button = tk.Button(
+                sidebar,
+                text=page_title,
+                command=lambda i=index: render_page(i),
+                font=(font_name, 14),
+                fg=MUTED,
+                bg=SIDEBAR,
+                activebackground="#e8d49a",
+                activeforeground=GOLD,
+                relief=tk.FLAT,
+                bd=0,
+                anchor="w",
+                padx=18,
+                pady=10,
+                cursor="hand2",
+            )
+            button.pack(fill=tk.X)
+            nav_buttons.append(button)
+
+        def on_mousewheel(event):
+            if event.delta:
+                step = max(1, abs(int(event.delta / 120)))
+                canvas.yview_scroll(
+                    -step if event.delta > 0 else step,
+                    "units",
+                )
+            return "break"
+
+        def scroll_linux(direction):
+            canvas.yview_scroll(direction, "units")
+            return "break"
+
+        dialog.bind("<MouseWheel>", on_mousewheel)
+        dialog.bind("<Button-4>", lambda _e: scroll_linux(-1))
+        dialog.bind("<Button-5>", lambda _e: scroll_linux(1))
+        dialog.bind("<Escape>", lambda _e: close_dialog())
+        dialog.protocol("WM_DELETE_WINDOW", close_dialog)
+
+        render_page(0)
+        dialog.focus_set()
+        
     def deal_cards(self):
         if not self.accept_bets or self.animation_running or self.settlement_running: return
         self.canvas.delete('fafa_award')
@@ -1379,6 +2423,21 @@ class SangongV13(tk.Frame):
         try:
             with open(path,'w',encoding='utf-8') as handle: json.dump(data,handle,ensure_ascii=False,indent=4)
         except OSError: pass
+    def _restore_enter_binding(self, event):
+        if event.widget is not self:
+            return
+        binding_id = getattr(self, '_enter_binding_id', None)
+        if not binding_id:
+            return
+        self._enter_binding_id = None
+        top = self._enter_window
+        try:
+            if binding_id in (top.bind('<Return>') or ''):
+                top.bind('<Return>', self._previous_enter_binding)
+            top.deletecommand(binding_id)
+        except tk.TclError:
+            pass
+
     def cancel_pending_callbacks(self):
         for aid in list(self.animation_after_ids)+list(self.chip_motion_after_ids):
             try:self.after_cancel(aid)
@@ -1409,6 +2468,8 @@ def main(parent=None,balance=10000,user=None,on_back=None,on_balance_change=None
     if username is not None and user is None:user=username
     if parent is not None and not isinstance(parent,tk.Misc):balance=parent; parent=None
     if parent is not None:return SangongV13(parent,balance,user,on_back,on_balance_change)
-    root=tk.Tk(); root.title('三公'); game=SangongV13(root,balance,user,on_back,on_balance_change); game.pack(fill=tk.BOTH,expand=True)
+    root=tk.Tk(); root.title('三公')
+    root.geometry('1150x750+50+10'); root.resizable(False,False)
+    game=SangongV13(root,balance,user,on_back,on_balance_change); game.pack(fill=tk.BOTH,expand=True)
     root.protocol('WM_DELETE_WINDOW',game.exit_game); root.mainloop(); return game
 if __name__=='__main__':main(balance=10_000_000)

@@ -10,6 +10,10 @@ _install_secure_json()
 del _install_secure_json, _account_root, _AccountPath, _account_sys
 
 import copy
+import math
+import random
+import time
+from itertools import combinations
 import json
 import os
 import re
@@ -18,7 +22,7 @@ import tkinter as tk
 from datetime import datetime
 from tkinter import messagebox
 
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageDraw, ImageEnhance, ImageTk
 
 
 # -----------------------------------------------------------------------------
@@ -56,6 +60,565 @@ def update_balance_in_json(username, new_balance):
 # -----------------------------------------------------------------------------
 # Dice and Sic Bo rules
 # -----------------------------------------------------------------------------
+GD_PIPS = {
+    1: ((0, 0),), 2: ((-1, -1), (1, 1)),
+    3: ((-1, -1), (0, 0), (1, 1)),
+    4: ((-1, -1), (1, -1), (-1, 1), (1, 1)),
+    5: ((-1, -1), (1, -1), (0, 0), (-1, 1), (1, 1)),
+    6: ((-1, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (1, 1)),
+}
+GD_DICE_COLORS = ((47, 127, 235), (224, 64, 59), (239, 187, 57))
+GD_DICE_PIP_COLORS = ((250, 247, 238, 255), (250, 247, 238, 255), (53, 33, 8, 255))
+
+# World-space rigid cubes; geometry is shared by collision, rendering and scoring.
+GD_SCENE_UNIT = 600.0
+GD_DICE_EDGE_PX = 38.0 * .75
+GD_BOWL_SCALE = 1.55
+GD_BOWL_RADIUS_SCALE = 1.35
+GD_BOWL_HEIGHT_SCALE = .80
+GD_DOME_HEIGHT_SCALE = 1.00
+GD_BOWL_DISPLAY_SIZE = (274, 193)
+GD_DOME_EXTRA_HEIGHT_PX = 15
+GD_BOWL_DROP_PX = 20
+GD_VIEW_DEPTH = .28 / math.hypot(.28, .70)
+GD_VIEW_UP = .70 / math.hypot(.28, .70)
+def _gd_view_projection():
+    return GD_VIEW_DEPTH, GD_VIEW_UP, 96., (0., GD_VIEW_UP, GD_VIEW_DEPTH)
+
+
+def _gd_dot(a, b):
+    return sum(x*y for x, y in zip(a, b))
+
+
+def _gd_cross(a, b):
+    return (a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0])
+
+
+def _gd_add(a, b):
+    return tuple(x+y for x, y in zip(a, b))
+
+
+def _gd_sub(a, b):
+    return tuple(x-y for x, y in zip(a, b))
+
+
+def _gd_scale(a, amount):
+    return tuple(x*amount for x in a)
+
+
+def _gd_length(a):
+    return math.sqrt(_gd_dot(a, a))
+
+
+def _gd_unit(a):
+    length = _gd_length(a)
+    return _gd_scale(a, 1/length) if length > 1e-12 else (0., 0., 0.)
+
+
+def _gd_rotate(q, omega, dt):
+    speed = _gd_length(omega)
+    if speed < 1e-12:
+        return q
+    a = speed*dt/2
+    dw = math.cos(a)
+    dx, dy, dz = _gd_scale(omega, math.sin(a)/speed)
+    w, x, y, z = q
+    r = (dw*w-dx*x-dy*y-dz*z, dw*x+dx*w+dy*z-dz*y,
+         dw*y-dx*z+dy*w+dz*x, dw*z+dx*y-dy*x+dz*w)
+    norm = math.sqrt(sum(v*v for v in r))
+    return tuple(v/norm for v in r)
+
+
+def _gd_qvector(q, v):
+    xyz = q[1:]
+    t = _gd_scale(_gd_cross(xyz, v), 2)
+    return _gd_add(v, _gd_add(_gd_scale(t, q[0]), _gd_cross(xyz, t)))
+
+
+# Standard six-sided dice: 1 opposite 6, 2 opposite 5, 3 opposite 4.
+# Fixed standard pip layouts rotate with the cube; the result is its upward face.
+GD_CUBE_FACES = (
+    (1, (0., 0., 1.), (1., 0., 0.), (0., 1., 0.)),
+    (6, (0., 0., -1.), (1., 0., 0.), (0., -1., 0.)),
+    (3, (1., 0., 0.), (0., 1., 0.), (0., 0., 1.)),
+    (4, (-1., 0., 0.), (0., -1., 0.), (0., 0., 1.)),
+    (2, (0., 1., 0.), (-1., 0., 0.), (0., 0., 1.)),
+    (5, (0., -1., 0.), (1., 0., 0.), (0., 0., 1.)),
+)
+
+
+class GoldenRigidDie:
+    EDGE = GD_DICE_EDGE_PX / GD_SCENE_UNIT
+    HALF = EDGE/2
+    INVERSE_INERTIA = 6/(EDGE*EDGE)  # unit mass, uniform solid cube
+    LANDING_ANGLE_DEGREES = 8.0
+    LANDING_ALIGNMENT = math.cos(math.radians(LANDING_ANGLE_DEGREES))
+    CONTACT_TOLERANCE = EDGE*math.sin(math.radians(LANDING_ANGLE_DEGREES))
+
+    def __init__(self, x, top=1):
+        self.p = (x, 0., self.HALF)
+        self.v = (0., 0., 0.)
+        self.omega = (0., 0., 0.)
+        self.q = (1., 0., 0., 0.)
+        # This initialization restores saved top faces only; rounds never assign faces.
+        normal = next(face[1] for face in GD_CUBE_FACES if face[0] == top)
+        axis = _gd_cross(normal, (0., 0., 1.))
+        if _gd_length(axis) > 1e-10:
+            self.q = _gd_rotate(self.q, _gd_unit(axis), math.acos(normal[2]))
+        elif normal[2] < 0:
+            self.q = _gd_rotate(self.q, (1., 0., 0.), math.pi)
+
+    def axes(self):
+        return tuple(_gd_qvector(self.q, axis) for axis in
+                     ((1., 0., 0.), (0., 1., 0.), (0., 0., 1.)))
+
+    def vertices(self):
+        axes = self.axes()
+        return [_gd_add(self.p, _gd_scale(_gd_add(_gd_scale(axes[0], x),
+                         _gd_add(_gd_scale(axes[1], y), _gd_scale(axes[2], z))), self.HALF))
+                for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)]
+
+    def support(self, normal):
+        point = self.p
+        for axis in self.axes():
+            projection = _gd_dot(axis, normal)
+            if abs(projection) > 1e-9:
+                point = _gd_add(point, _gd_scale(axis, math.copysign(self.HALF, projection)))
+        return point
+
+    def impulse(self, impulse, point):
+        self.v = _gd_add(self.v, impulse)
+        self.omega = _gd_add(self.omega, _gd_scale(_gd_cross(_gd_sub(point, self.p), impulse),
+                                            self.INVERSE_INERTIA))
+
+    def top_face(self):
+        candidates = [(number, _gd_qvector(self.q, normal)[2])
+                      for number, normal, _u, _v in GD_CUBE_FACES]
+        number, alignment = max(candidates, key=lambda item: item[1])
+        return number if alignment >= self.LANDING_ALIGNMENT-1e-12 else None
+
+    def settled(self):
+        floor = min(point[2] for point in self.vertices())
+        return (self.top_face() is not None and abs(floor) <= self.CONTACT_TOLERANCE
+                and _gd_length(self.v) < .005 and _gd_length(self.omega) < .12)
+
+    def stabilize_contact(self):
+        """Remove contact chatter only when a face is already almost flat."""
+        face = max(GD_CUBE_FACES, key=lambda f: _gd_qvector(self.q, f[1])[2])
+        normal = _gd_qvector(self.q, face[1])
+        if (normal[2] > .999 and self.p[2] < self.HALF+self.EDGE*.04
+                and _gd_length(self.v) < .08 and _gd_length(self.omega) < 12.):
+            axis = _gd_cross(normal, (0., 0., 1.))
+            if _gd_length(axis) > 1e-12:
+                self.q = _gd_rotate(self.q, _gd_unit(axis), math.acos(min(1., normal[2])))
+            self.p = (self.p[0], self.p[1], self.HALF)
+            self.v = self.omega = (0., 0., 0.)
+
+
+def _gd_overlap(a, b):
+    """Read-only OBB contact query for physics and initial placement."""
+    aa, ba = a.axes(), b.axes()
+    axes = list(aa)+list(ba)+[_gd_cross(x, y) for x in aa for y in ba]
+    delta = _gd_sub(b.p, a.p)
+    normal, penetration = None, float('inf')
+    for axis in axes:
+        if _gd_length(axis) < 1e-8:
+            continue
+        axis = _gd_unit(axis)
+        ra = a.HALF*sum(abs(_gd_dot(axis, v)) for v in aa)
+        rb = b.HALF*sum(abs(_gd_dot(axis, v)) for v in ba)
+        overlap = ra+rb-abs(_gd_dot(delta, axis))
+        if overlap <= 0:
+            return None
+        if overlap < penetration:
+            penetration = overlap
+            normal = axis if _gd_dot(delta, axis) >= 0 else _gd_scale(axis, -1)
+    return normal, penetration
+
+
+def _gd_collide_dice(a, b):
+    """OBB contact, friction impulses and angular response from BacBo."""
+    contact_info = _gd_overlap(a, b)
+    if contact_info is None:
+        return False
+    normal, penetration = contact_info
+    contact = _gd_scale(_gd_add(a.support(normal), b.support(_gd_scale(normal, -1))), .5)
+    ra, rb = _gd_sub(contact, a.p), _gd_sub(contact, b.p)
+    av = _gd_add(a.v, _gd_cross(a.omega, ra))
+    bv = _gd_add(b.v, _gd_cross(b.omega, rb))
+    relative = _gd_sub(bv, av)
+    speed = _gd_dot(relative, normal)
+    if speed < 0:
+        effective = 2+a.INVERSE_INERTIA*(_gd_dot(_gd_cross(ra, normal), _gd_cross(ra, normal))
+                                       + _gd_dot(_gd_cross(rb, normal), _gd_cross(rb, normal)))
+        amount = -(1.4 if speed < -.08 else 1.)*speed/effective
+        impulse = _gd_scale(normal, amount)
+        a.impulse(_gd_scale(impulse, -1), contact)
+        b.impulse(impulse, contact)
+        tangent = _gd_sub(relative, _gd_scale(normal, speed))
+        if _gd_length(tangent) > 1e-9:
+            direction = _gd_unit(tangent)
+            effective = 2+a.INVERSE_INERTIA*(
+                _gd_length(_gd_cross(ra, direction))**2+_gd_length(_gd_cross(rb, direction))**2)
+            friction = min(.35*amount, _gd_length(tangent)/effective)
+            a.impulse(_gd_scale(direction, friction), contact)
+            b.impulse(_gd_scale(direction, -friction), contact)
+    correction = _gd_scale(normal, (penetration+.000002)*.5)
+    a.p = _gd_sub(a.p, correction)
+    b.p = _gd_add(b.p, correction)
+    return True
+
+
+class GoldenDiceBowl:
+    DICE_COUNT = 3
+    RADIUS = .085 * GD_BOWL_SCALE * GD_BOWL_RADIUS_SCALE
+    HEIGHT = (.128 * GD_BOWL_SCALE * GD_DOME_HEIGHT_SCALE
+              + GD_DOME_EXTRA_HEIGHT_PX
+              / (680 * GD_VIEW_UP * GD_BOWL_DISPLAY_SIZE[1] / round(138 * GD_BOWL_SCALE)))
+
+    def __init__(self, values=None, rng=None):
+        self.rng = rng or random.SystemRandom()
+        values = values or [self.rng.randint(1, 6) for _ in range(self.DICE_COUNT)]
+        if len(values) != self.DICE_COUNT or any(type(n) is not int or n not in range(1, 7) for n in values):
+            raise ValueError('骰宝需要三颗有效骰子。')
+        self.dice = [GoldenRigidDie((index - 1) * GoldenRigidDie.EDGE * 1.4, value)
+                     for index, value in enumerate(values)]
+        self.color = (239, 187, 57)
+        self.origin = self.velocity = (0., 0., 0.)
+        self.collision_count = 0
+        self.durations = []
+        self.randomize_positions()
+
+    def randomize_positions(self):
+        """Place all three cubes flat with independent positions and headings."""
+        for _ in range(256):
+            for die in self.dice:
+                angle = self.rng.uniform(0, math.tau)
+                radius = math.sqrt(self.rng.random())*(self.RADIUS-die.EDGE)
+                die.p = (radius*math.cos(angle), radius*math.sin(angle), die.HALF)
+                die.q = _gd_rotate(die.q, (0., 0., 1.), self.rng.uniform(0, math.tau))
+                die.v = die.omega = (0., 0., 0.)
+            if (self.landing_error() is None
+                    and all(_gd_overlap(a, b) is None for a, b in combinations(self.dice, 2))):
+                return
+        # A bounded fallback still has random heading and preserves rolled faces.
+        heading = self.rng.uniform(0, math.tau)
+        for index, die in enumerate(self.dice):
+            angle = heading + index * math.tau / self.DICE_COUNT
+            radius = min(self.RADIUS-die.EDGE, die.EDGE*2.6)
+            die.p = (radius * math.cos(angle), radius * math.sin(angle), die.HALF)
+            die.q = _gd_rotate(die.q, (0., 0., 1.), heading)
+
+    def landing_error(self):
+        """Accept faces within 8 degrees when every die rests on the floor."""
+        for die in self.dice:
+            vertices = [self.local(p) for p in die.vertices()]
+            if die.top_face() is None:
+                return '骰子未平放'
+            # Overlap means vertical stacking, not side contact or occlusion
+            # from the camera. A stacked die's bottom is above the floor.
+            floor = min(p[2] for p in vertices)
+            if floor > die.CONTACT_TOLERANCE:
+                return '骰子上下重叠或未落地'
+            if floor < -die.CONTACT_TOLERANCE:
+                return '骰子未落地'
+            if any((x*x+y*y)/self.RADIUS**2 + max(0.,z)**2/self.HEIGHT**2 > 1.0001
+                   for x,y,z in vertices):
+                return '骰子超出底盘'
+        return None
+
+    def begin(self, duration=None):
+        # Fast upright directional shakes. No bowl flips or inverted holds.
+        # Continuous 5–8 second shakes, centred near 7, to microsecond precision.
+        if duration is None:
+            while True:
+                seconds = self.rng.normalvariate(7., .5)
+                if 5. <= seconds <= 8.:
+                    self.duration = round(seconds, 6)
+                    break
+        else:
+            self.duration = float(duration)
+        count = round(self.duration / .145)
+        self.durations = []
+        remaining = self.duration
+        for strokes_left in range(count, 1, -1):
+            low = max(.12, remaining - (strokes_left-1)*.17)
+            high = min(.17, remaining - (strokes_left-1)*.12)
+            seconds = self.rng.uniform(low, high)
+            self.durations.append(seconds)
+            remaining -= seconds
+        self.durations.append(remaining)
+        # Draw each movement from the system RNG only when it starts. Future
+        # shake directions and the final upward faces are never precomputed.
+        self.strokes = [None] * count
+        self.collision_count = 0
+
+    def motion(self, t):
+        elapsed = 0.
+        for index, duration in enumerate(self.durations):
+            if t < elapsed+duration:
+                stroke = self.strokes[index]
+                if stroke is None:
+                    heading = self.rng.randrange(4)*math.pi/2+self.rng.uniform(-.45, .45)
+                    strength = self.rng.uniform(1.2, 1.8)
+                    stroke = (strength*math.cos(heading), strength*math.sin(heading),
+                              self.rng.choice((-1, 1))*self.rng.uniform(1.0, 1.8),
+                              self.rng.uniform(-.012, .012), self.rng.uniform(.013, .026))
+                    self.strokes[index] = stroke
+                u = max(0., (t-elapsed)/duration)
+                first = math.sin(math.pi*u)**4
+                second = math.sin(math.tau*u)**4
+                vx, vy, snap, side, hop = stroke
+                along, lateral = .045*first+.014*snap*second, side*second*1.8
+                return vx*along-vy*lateral, vy*along+vx*lateral, hop*second
+            elapsed += duration
+        return (0., 0., 0.)
+
+    def world(self, local):
+        return _gd_add(self.origin, local)
+
+    def local(self, world):
+        return _gd_sub(world, self.origin)
+
+    def wall_contact(self, die, point, normal, penetration):
+        die.p = _gd_add(die.p, _gd_scale(normal, penetration+.0000005))
+        point = _gd_add(point, _gd_scale(normal, penetration))
+        radius = _gd_sub(point, die.p)
+        surface = self.velocity
+        relative = _gd_sub(_gd_add(die.v, _gd_cross(die.omega, radius)), surface)
+        speed = _gd_dot(relative, normal)
+        if speed >= 0:
+            return
+        rn = _gd_cross(radius, normal)
+        impulse = -(1.25 if speed < -.2 else 1.)*speed/(1+die.INVERSE_INERTIA*_gd_dot(rn, rn))
+        die.impulse(_gd_scale(normal, impulse), point)
+        relative = _gd_sub(_gd_add(die.v, _gd_cross(die.omega, radius)), surface)
+        tangent = _gd_sub(relative, _gd_scale(normal, _gd_dot(relative, normal)))
+        if _gd_length(tangent) > 1e-10:
+            direction = _gd_unit(tangent)
+            effective = 1+die.INVERSE_INERTIA*_gd_length(_gd_cross(radius, direction))**2
+            friction = min(.48*impulse, _gd_length(tangent)/effective)
+            die.impulse(_gd_scale(direction, -friction), point)
+
+    def contain(self, die):
+        touching = False
+        # Iterated vertex contacts give flat cubes a four-point floor manifold.
+        for _ in range(4):
+            vertices = die.vertices()
+            contacts = []
+            for point in vertices:
+                local = self.local(point)
+                if local[2] < 0:
+                    normal = (0., 0., 1.)
+                    contacts.append((-local[2], point, normal))
+                level = (local[0]**2+local[1]**2)/self.RADIUS**2+max(0., local[2])**2/self.HEIGHT**2
+                if level > 1:
+                    gradient = (local[0]/self.RADIUS**2, local[1]/self.RADIUS**2,
+                                max(0., local[2])/self.HEIGHT**2)
+                    depth = (level-1)/(2*_gd_length(gradient))
+                    normal = _gd_scale(_gd_unit(gradient), -1)
+                    contacts.append((depth, point, normal))
+            if not contacts:
+                break
+            depth, point, normal = max(contacts, key=lambda item: item[0])
+            self.wall_contact(die, point, normal, depth)
+            touching = True
+        return touching
+
+    def step(self, dt, t, shaking=True):
+        if dt <= 0:
+            return
+        target = self.motion(t) if shaking else (0., 0., 0.)
+        travel = _gd_length(_gd_sub(target, self.origin))
+        speed = max(_gd_length(die.v)+_gd_length(die.omega)*die.HALF for die in self.dice)
+        # Smaller contact steps when fast motion could cross a significant cube width.
+        steps = max(1, min(8, math.ceil((travel+speed*dt)/(GoldenRigidDie.EDGE*.22))))
+        h = dt/steps
+        for index in range(steps):
+            self._step_once(h, t-dt+(index+1)*h, shaking)
+
+    def _step_once(self, dt, t, shaking=True):
+        old_origin = self.origin
+        if shaking:
+            self.origin = self.motion(t)
+        else:
+            self.origin = (0., 0., 0.)
+        self.velocity = _gd_scale(_gd_sub(self.origin, old_origin), 1/dt)
+        for die in self.dice:
+            die.v = _gd_add(die.v, (0., 0., -9.81*dt))
+            die.p = _gd_add(die.p, _gd_scale(die.v, dt))
+            die.q = _gd_rotate(die.q, die.omega, dt)
+            touching = self.contain(die)
+            die.omega = _gd_scale(die.omega, math.exp(-(2.8 if touching else .1)*dt))
+            if touching and not shaking:
+                die.v = _gd_scale(die.v, math.exp(-4*dt))
+        for _ in range(2):
+            collided = False
+            for a, b in combinations(self.dice, 2):
+                if _gd_collide_dice(a, b):
+                    self.collision_count += 1
+                    collided = True
+            if not collided:
+                break
+            for die in self.dice:
+                self.contain(die)
+        if not shaking:
+            for die in self.dice:
+                die.stabilize_contact()
+
+    def settled(self):
+        return all(die.settled() for die in self.dice)
+
+    def values(self):
+        if not self.settled() or self.landing_error():
+            raise ValueError('骰子尚未平稳朝上，不能读取结果')
+        return [die.top_face() for die in self.dice]
+
+    def snapshot(self):
+        return {'version': 1, 'dice': [{'p': list(d.p), 'q': list(d.q)} for d in self.dice]}
+
+    @classmethod
+    def restore(cls, state):
+        """Restore complete saved bodies within 8 degrees and on the floor."""
+        try:
+            if state.get('version') != 1 or len(state['dice']) != cls.DICE_COUNT:
+                return None
+            bowl = cls.__new__(cls)
+            bowl.rng, bowl.color = random.SystemRandom(), (239, 187, 57)
+            bowl.origin = bowl.velocity = (0.,0.,0.)
+            bowl.collision_count, bowl.durations = 0, []
+            bowl.dice = [GoldenRigidDie(0) for _ in range(cls.DICE_COUNT)]
+            for die, data in zip(bowl.dice, state['dice']):
+                die.p, die.q = tuple(map(float,data['p'])), tuple(map(float,data['q']))
+                if (len(die.p) != 3 or len(die.q) != 4
+                        or not all(math.isfinite(v) for v in die.p+die.q)
+                        or abs(sum(v*v for v in die.q)-1) > 1e-6):
+                    return None
+            return bowl if bowl.settled() and bowl.landing_error() is None else None
+        except (KeyError, ValueError, TypeError, AttributeError):
+            return None
+
+
+def _gd_bowl_mesh(bowl):
+    """Transparent Sic Bo dome and dish, with blue, red and gold dice."""
+    solids, glass = [], []
+    _depth, _up, _center, camera = _gd_view_projection()
+    def face(points, color, line=None, width=.7, transparent=False, paint_depth=None):
+        if len(points) >= 3:
+            n = _gd_cross(_gd_sub(points[1], points[0]), _gd_sub(points[2], points[0]))
+            if not transparent and _gd_dot(n, camera) <= 0:
+                return
+        depth = (sum(_gd_dot(point, camera) for point in points)/len(points)
+                 if paint_depth is None else paint_depth)
+        (glass if transparent else solids).append((depth, points, color, line, width))
+        return depth
+    def ring(radius, z):
+        return [(radius*math.cos(k*math.tau/32), radius*math.sin(k*math.tau/32), z)
+                for k in range(32)]
+    def band(a, b, color):
+        for k in range(32):
+            j = (k+1)%32
+            shade = .86+.14*math.cos(k*math.tau/32-2.2)
+            rgb = tuple(round(v*shade) for v in color)+(255,)
+            face([bowl.world(p) for p in (a[k], b[k], b[j], a[j])], rgb)
+    profile = [(radius * GD_BOWL_SCALE * GD_BOWL_RADIUS_SCALE,
+                z * GD_BOWL_SCALE * GD_BOWL_HEIGHT_SCALE) for radius, z in
+               ((.083, 0.), (.088, .005), (.093, .002), (.094, -.007),
+                (.092, -.014), (.083, -.020))]
+    rings = [ring(radius, z) for radius, z in profile]
+    for k in range(32):
+        j = (k+1)%32
+        face([bowl.world(p) for p in ((0.,0.,0.), rings[0][k], rings[0][j])], (248,234,197,255))
+        face([bowl.world(p) for p in ((0.,0.,-.020*GD_BOWL_SCALE*GD_BOWL_HEIGHT_SCALE), rings[-1][j], rings[-1][k])], (142,111,70,255))
+    for a,b,color in zip(rings,rings[1:],((187,151,99),(255,231,176),(191,158,107),(243,215,156),(148,117,75))):
+        band(a,b,color)
+    # The dish is below the bodies. Sorting its large triangles against the
+    # small cube faces by average depth can paint the dish over a resting die.
+    # Keep the whole support surface behind the dice, with glass in front.
+    dish = sorted(solids,key=lambda f:f[0])
+    solids = []
+    for die, color, pip_color in zip(bowl.dice, GD_DICE_COLORS, GD_DICE_PIP_COLORS):
+        for number, normal, u, v in GD_CUBE_FACES:
+            n = _gd_qvector(die.q, normal)
+            if _gd_dot(n, camera) <= 0:
+                continue
+            def cube_point(x, y, z=die.HALF):
+                return _gd_add(die.p, _gd_qvector(die.q, _gd_add(_gd_scale(normal,z),
+                             _gd_add(_gd_scale(u,x), _gd_scale(v,y)))))
+            corners = [cube_point(x*die.HALF,y*die.HALF) for x,y in ((-1,-1),(1,-1),(1,1),(-1,1))]
+            lighting = .72+.28*max(0., _gd_dot(n, _gd_unit((-.4,.5,1.))))
+            shade = lighting
+            rgb = tuple(round(channel*shade) for channel in color)+(255,)
+            rim = tuple(round(channel*.55) for channel in color)+(255,)
+            face_depth = face(corners, rgb, rim, .35)
+            for px, py in GD_PIPS[number]:
+                centerx, centery = px*die.EDGE*.27, py*die.EDGE*.27
+                dot = [cube_point(centerx+math.cos(k*math.tau/10)*die.EDGE*.085,
+                                  centery+math.sin(k*math.tau/10)*die.EDGE*.085,
+                                  die.HALF+.00008) for k in range(10)]
+                # Keep a face and all its pips in one stable paint group. Sorting
+                # each pip by its own centre lets the parent face cover far pips
+                # as the cube turns, incorrectly changing the apparent number.
+                face(dot, pip_color, paint_depth=face_depth)
+    raised = 0.
+    levels = 12
+    rings = [ring(bowl.RADIUS*math.cos(j/levels*math.pi/2),
+                  bowl.HEIGHT*math.sin(j/levels*math.pi/2)+raised) for j in range(levels+1)]
+    for j in range(levels):
+        for k in range(32):
+            n = (k+1)%32
+            face([bowl.world(p) for p in (rings[j][k],rings[j][n],rings[j+1][n],rings[j+1][k])],
+                 (166,214,202,18), transparent=True)
+    for z,radius,color,width in ((raised,bowl.RADIUS,(225,248,237,220),1.2),
+                                (raised+.002*GD_BOWL_SCALE*GD_BOWL_HEIGHT_SCALE,
+                                 .086*GD_BOWL_SCALE*GD_BOWL_RADIUS_SCALE,(168,207,194,185),.6)):
+        rim = ring(radius,z)
+        for k in range(32):
+            face([bowl.world(rim[k]),bowl.world(rim[(k+1)%32])],None,color,width,True)
+    for azimuth,color,width in ((-2.4,(242,255,249,220),1.2),(.55,(219,246,235,160),.8)):
+        curve = []
+        for k in range(22):
+            a = .10+1.28*k/21
+            curve.append(bowl.world((bowl.RADIUS*math.cos(a)*math.cos(azimuth),
+                                     bowl.RADIUS*math.cos(a)*math.sin(azimuth),
+                                     bowl.HEIGHT*math.sin(a)+raised+.0005*GD_BOWL_SCALE*GD_BOWL_HEIGHT_SCALE)))
+        for k in range(len(curve)-1):
+            face(curve[k:k+2],None,color,width,True)
+    return dish + sorted(solids,key=lambda f:f[0]), sorted(glass,key=lambda f:f[0])
+
+
+def _gd_project(point, bowl):
+    # The real bowl translation drives physics. Its screen travel is reduced to
+    # fit the betting area, applied identically to glass, dish and dice.
+    point = _gd_sub(point, _gd_scale(bowl.origin, .78))
+    return (98*GD_BOWL_SCALE+point[0]*680,
+            96*GD_BOWL_SCALE+(point[1]*GD_VIEW_DEPTH-point[2]*GD_VIEW_UP)*680)
+
+
+def _gd_render_bowl(bowl):
+    """Antialiased image of the same geometry used by contact and scoring."""
+    # Extra headroom extends the dome without scaling the dice or the dish.
+    width, height = GD_BOWL_DISPLAY_SIZE
+    size, aa = (width, height + GD_DOME_EXTRA_HEIGHT_PX), 3
+    scale_x = width / round(196 * GD_BOWL_SCALE)
+    scale_y = height / round(138 * GD_BOWL_SCALE)
+    picture = Image.new('RGBA', (size[0]*aa, size[1]*aa))
+    for meshes in _gd_bowl_mesh(bowl):
+        layer = Image.new('RGBA', picture.size)
+        draw = ImageDraw.Draw(layer)
+        for _depth, points, color, line, width in meshes:
+            projected = [(x*scale_x*aa, (y*scale_y+GD_DOME_EXTRA_HEIGHT_PX)*aa)
+                         for x,y in (_gd_project(p,bowl) for p in points)]
+            if color:
+                draw.polygon(projected, fill=color)
+            if line:
+                draw.line(projected+([projected[0]] if len(points)>2 else []),
+                          fill=line,width=max(1,round(width*scale_y*aa)))
+        picture.alpha_composite(layer)
+    return picture.resize(size, Image.Resampling.LANCZOS)
+
+
+
 class Dice:
     def __init__(self):
         self.value = 1
@@ -78,6 +641,12 @@ class SicboEngine:
     }
     PAIRS = tuple(f'{a}&{b}' for a in range(1, 7) for b in range(a + 1, 7))
     GROUPS = ('1234', '2345', '2356', '3456')
+    # AAB keeps the repeated face first; ABC is ascending. String keys remain
+    # compatible with bet snapshots, repeat bets and JSON serialization.
+    EXACT_AAB = tuple(f'{a}{a}{b}' for a in range(1, 7)
+                      for b in range(1, 7) if a != b)
+    EXACT_ABC = tuple(''.join(map(str, values))
+                      for values in combinations(range(1, 7), 3))
 
     def __init__(self):
         self.bets = self.new_bets()
@@ -96,7 +665,22 @@ class SicboEngine:
             'triple': {number: 0.0 for number in range(1, 7)},
             'guess_num': {number: 0.0 for number in range(1, 7)},
             'number_group': {group: 0.0 for group in cls.GROUPS},
+            'exact_aab': {key: 0.0 for key in cls.EXACT_AAB},
+            'exact_abc': {key: 0.0 for key in cls.EXACT_ABC},
         }
+
+    @staticmethod
+    def exact_combination_key(dice):
+        """Return the matching exact market, regardless of the dice order."""
+        values = sorted(dice)
+        distinct = set(values)
+        if len(distinct) == 2:
+            repeated = next(value for value in distinct if values.count(value) == 2)
+            other = next(value for value in distinct if value != repeated)
+            return 'exact_aab', f'{repeated}{repeated}{other}'
+        if len(distinct) == 3:
+            return 'exact_abc', ''.join(map(str, values))
+        return None  # Triples retain their existing, separate markets.
 
     def total_at_risk(self):
         total = 0.0
@@ -210,6 +794,13 @@ class SicboEngine:
             settle(f'四数组合 {group}', ('number_group', group), amount,
                    len(unique_dice) == 3 and unique_dice.issubset(group_set), 7)
 
+        exact_key = self.exact_combination_key(dice)
+        for bet_type, payout in (('exact_aab', 60), ('exact_abc', 30)):
+            for combination, amount in self.bets[bet_type].items():
+                key = (bet_type, combination)
+                settle(f'骰子组合 {"·".join(combination)}', key, amount,
+                       key == exact_key, payout)
+
         description, result_color = self.describe_result(dice)
         return {
             'dice': sorted(dice),
@@ -251,6 +842,7 @@ class BubbleSicboGame(tk.Frame):
     BIG_RED = '#ff4d4f'
     TRIPLE_GREEN = '#55d66b'
     SMALL_YELLOW = '#f2d35f'
+    BOARD_CREAM = '#f7f3ea'
 
     SINGLE_NUMBER_ODDS_TEXT = '1次1:1 / 2次2:1 / 3次12:1'
     SINGLE_NUMBER_TITLES = {1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六'}
@@ -259,6 +851,13 @@ class BubbleSicboGame(tk.Frame):
     MAX_AREA_BET = 100000.0
     MAX_TABLE_BET = 2000000.0
     MAX_RECORDS = 500
+    BET_CHIP_RADIUS = 19
+    CHIP_MOVE_MS = 200
+    SETTLEMENT_FLASH_MS = 450
+    SETTLEMENT_GOLD = '#e5b94b'
+    SETTLEMENT_WHITE = '#ffffff'
+    DICE_RESULT_TIMEOUT_MS = 8000
+    DICE_RECOVERY_SHAKE_SECONDS = 1.0
 
     CHIP_SPECS = [
         (0.5, '#d8b46a', '0.50'),
@@ -291,8 +890,6 @@ class BubbleSicboGame(tk.Frame):
         self.summary_mode = 'bet'
         self.accept_bets = True
         self.engine = SicboEngine()
-        self.dice_objects = [Dice(), Dice(), Dice()]
-        self.developer_dice = None
         self.triple_mode = False
 
         self.selected_chip = 1.0
@@ -306,6 +903,13 @@ class BubbleSicboGame(tk.Frame):
         self.animation_after_id = None
         self.animation_frames_left = 0
         self.animation_final_dice = None
+        self._sicbo_bowl = None
+        self._sicbo_cup_item = self._sicbo_cup_photo = None
+        self._sicbo_dice_phase = 'idle'
+        self._sicbo_dice_time = self._sicbo_dice_stable_time = 0.
+        self._sicbo_dice_rest_anchor = None
+        self._sicbo_result_timeout_id = self._sicbo_result_deadline = None
+        self._sicbo_recovering = self._sicbo_round_voided = False
         self.result_after_id = None
         self.flash_after_id = None
         self.settlement_running = False
@@ -316,19 +920,19 @@ class BubbleSicboGame(tk.Frame):
         self.flash_winner_amounts = {}
         self.flash_original_amounts = {}
         self.flash_original_text_colors = {}
+        self._settlement_spot_styles = {}
+        self._settlement_dim_images = {}
+        self._chip_motion_jobs = set()
+        self._chip_motion_count = self._chip_serial = 0
+        self._pending_bet_amounts = {}
+        self._settlement_chips_returning = False
         self.pre_roll_bets = None
         self._closing = False
 
         top = self.winfo_toplevel()
-        try:
-            top.geometry('1150x750+50+10')
-            top.resizable(False, False)
-        except tk.TclError:
-            pass
 
         top.bind('<Return>', self.handle_enter_roll)
         self.bind('<Control-z>', lambda _event: self.undo_last_bet())
-        self.bind('<Shift-R>', lambda _event: self.show_developer_input_dialog())
 
         self.history_panel_mode = 'history'
         self.history_file = self.get_history_file()
@@ -342,10 +946,12 @@ class BubbleSicboGame(tk.Frame):
     def create_dice_images(self):
         self.dice_images_history = []
         self.dice_images_board = []
+        self.dice_images_board_sizes = {size: [] for size in (19, 20, 21, 25)}
         self.dice_images_animation = []
         self.dice_images_triple_info = []
+        self.dice_images_status = []
 
-        def make_die(size, number, board_style=False):
+        def make_die(size, number, board_style=False, raw=False):
             image = Image.new('RGBA', (size, size), (0, 0, 0, 0))
             draw = ImageDraw.Draw(image)
             margin = max(1, size // 28)
@@ -383,13 +989,18 @@ class BubbleSicboGame(tk.Frame):
             pip = max(1, size // 11)
             for x, y in positions[number]:
                 draw.ellipse((x - pip, y - pip, x + pip, y + pip), fill=pip_color)
-            return ImageTk.PhotoImage(image)
+            return image if raw else ImageTk.PhotoImage(image)
 
         for number in range(1, 7):
             self.dice_images_history.append(make_die(23, number))
-            self.dice_images_board.append(make_die(23, number, board_style=True))
+            board_die = make_die(23, number, board_style=True, raw=True)
+            self.dice_images_board.append(ImageTk.PhotoImage(board_die))
+            for size, images in self.dice_images_board_sizes.items():
+                images.append(ImageTk.PhotoImage(board_die.resize(
+                    (size, size), Image.Resampling.LANCZOS)))
             self.dice_images_animation.append(make_die(86, number))
             self.dice_images_triple_info.append(make_die(38, number))
+            self.dice_images_status.append(make_die(30, number))
 
     # ---------------------------------------------------------------------- UI
     def create_ui(self):
@@ -404,7 +1015,7 @@ class BubbleSicboGame(tk.Frame):
 
     def draw_history_panel(self):
         c = self.canvas
-        x0, y0, x1, y1 = 12, 4, 278, 620
+        x0, y0, x1, y1 = 872, 4, 1138, 620
         c.create_rectangle(x0, y0, x1, y1, fill=self.PANEL,
                            outline=self.PANEL_LINE, width=2, tags='static')
 
@@ -629,87 +1240,163 @@ class BubbleSicboGame(tk.Frame):
 
     def draw_animation_panel(self):
         c = self.canvas
-        x0, y0, x1, y1 = 286, 4, 1138, 246
+        x0, y0, x1, y1 = 12, 4, 864, 246
         c.create_rectangle(x0, y0, x1, y1, fill=self.PANEL,
                            outline=self.PANEL_LINE, width=2, tags='static')
         self.animation_panel = (x0, y0, x1, y1)
-        self.animation_phase_text = c.create_text(
-            (x0 + x1) / 2, y0 + 18, text='骰宝 SIC BO',
-            font=('Arial', 16, 'bold'), fill='#d4c3a9', tags='animation'
-        )
-        c.create_oval(x0 + 186, y0 + 31, x1 - 186, y1 - 14,
-                      fill='#193d35', outline='#f1f1ed', width=4, tags='animation')
-        c.create_oval(x0 + 210, y0 + 48, x1 - 210, y1 - 31,
-                      fill='#0f5a49', outline='#86b9aa', width=2, tags='animation')
+        centre_x = (x0 + x1) / 2
+        self._sicbo_title_position = (centre_x, y0 + 18)
+        c.create_text(*self._sicbo_title_position, text='骰宝 SIC BO',
+                      font=('Arial', 16, 'bold'), fill='#d4c3a9', tags='animation')
 
-        # Latest triple information at the upper-right of the dice-cup area.
-        triple_panel_x0 = x1 - 170
-        triple_panel_y0 = y0 + 34
-        triple_panel_x1 = x1 - 12
-        triple_panel_y1 = y0 + 176
+        # Last triple sits directly above the existing insurance control.
+        triple_panel_x0, triple_panel_x1 = x0 + 12, x0 + 170
+        triple_panel_y0, triple_panel_y1 = y0 + 34, y0 + 176
+        self._sicbo_triple_panel_bounds = (
+            triple_panel_x0, triple_panel_y0, triple_panel_x1, triple_panel_y1)
         c.create_rectangle(
             triple_panel_x0, triple_panel_y0, triple_panel_x1, triple_panel_y1,
-            fill='#15110f', outline='#7c6754', width=1, tags='animation'
-        )
+            fill='#15110f', outline='#7c6754', width=1, tags='animation')
+        triple_centre_x = (triple_panel_x0 + triple_panel_x1) / 2
         self.last_triple_text = c.create_text(
-            (triple_panel_x0 + triple_panel_x1) / 2,
-            triple_panel_y0 + 38,
-            text='围骰\n暂无记录',
-            width=140, justify='center',
-            font=('Arial', 22, 'bold'), fill='#d4c3a9', tags='animation'
-        )
-        triple_dice_y = triple_panel_y0 + 112
-        triple_dice_centre_x = (triple_panel_x0 + triple_panel_x1) / 2
+            triple_centre_x, triple_panel_y0 + 38, text='围骰\n暂无记录',
+            width=140, justify='center', font=('Arial', 22, 'bold'),
+            fill='#d4c3a9', tags='animation')
         self.last_triple_dice_items = [
-            c.create_image(
-                triple_dice_centre_x - 48 + index * 48,
-                triple_dice_y,
-                image=self.dice_images_triple_info[5],
-                state='hidden',
-                tags=('animation', 'last_triple')
-            )
-            for index in range(3)
-        ]
+            c.create_image(triple_centre_x - 48 + index * 48, triple_panel_y0 + 112,
+                           image=self.dice_images_triple_info[5], state='hidden',
+                           tags=('animation', 'last_triple'))
+            for index in range(3)]
 
-        centre_x = (x0 + x1) / 2
-        centre_y = y0 + 111
-        self.animation_dice_base_positions = (
-            (centre_x - 104, centre_y),
-            (centre_x, centre_y),
-            (centre_x + 104, centre_y),
-        )
         initial_dice = self.initial_animation_dice()
-        self.animation_dice_items = [
-            c.create_image(x, y, image=self.dice_images_animation[value - 1],
-                           state='normal', tags='animation_dice')
-            for (x, y), value in zip(self.animation_dice_base_positions, initial_dice)
-        ]
-        self.animation_status_bubble = c.create_rectangle(
-            x0 + 178, y1 - 48, x1 - 178, y1 - 12,
-            fill='#0b2723', outline='#c8efe7', width=2, tags='animation'
-        )
+        self._sicbo_bowl = GoldenDiceBowl(initial_dice)
+        self._sicbo_cup_position = (
+            centre_x, y0 + 20 + GD_BOWL_DROP_PX - GD_DOME_EXTRA_HEIGHT_PX)
+        self._draw_sicbo_dice()
+
+        self._draw_sicbo_status_panel(x1 - 224, y0 + 34, x1 - 12, y0 + 224)
+
+    def _draw_sicbo_status_panel(self, x0, y0, x1, y1):
+        c = self.canvas
+        centre_x = (x0 + x1) / 2
+        tags = ('animation', 'sicbo_status')
+
+        def rounded_rect(left, top, right, bottom, radius=9, **kw):
+            return c.create_polygon(
+                left+radius, top, right-radius, top, right, top, right, top+radius,
+                right, bottom-radius, right, bottom, right-radius, bottom,
+                left+radius, bottom, left, bottom, left, bottom-radius,
+                left, top+radius, left, top, smooth=True, splinesteps=20, **kw)
+
+        rounded_rect(x0+3, y0+4, x1+3, y1+4, fill='#100d0b', outline='', tags=tags)
+        self._sicbo_status_frame = rounded_rect(
+            x0, y0, x1, y1, fill='#dceef8', outline='#9b8663', width=1, tags=tags)
+        self.animation_status_bubble = rounded_rect(
+            x0+1, y0+40, x1-1, y1-1, radius=8,
+            fill=self.BOARD_CREAM, outline='', tags=tags)
+        self._sicbo_status_body_top = c.create_rectangle(
+            x0+1, y0+40, x1-1, y0+49,
+            fill=self.BOARD_CREAM, outline='', tags=tags)
+        self._sicbo_status_dot = c.create_oval(
+            x0+16, y0+17, x0+22, y0+23, fill='#376543', outline='', tags=tags)
+        self._sicbo_status_title = c.create_text(
+            x0+30, y0+20, anchor='w', text='状态',
+            font=('Arial', 12, 'bold'), fill='#4b3a28', tags=tags)
+        self._sicbo_status_badge = rounded_rect(
+            x1-81, y0+10, x1-16, y0+30, radius=6,
+            fill='#e5eddf', outline='', tags=tags)
+        self._sicbo_status_badge_text = c.create_text(
+            x1-48.5, y0+20, text='可下注', font=('Arial', 10, 'bold'),
+            fill='#376543', tags=tags)
+        c.create_line(x0+16, y0+40, x1-16, y0+40, fill='#c9bba5', tags=tags)
+        self._sicbo_status_caption = c.create_text(
+            centre_x, y0+58, text='本局点数', font=('Arial', 10),
+            fill='#76634d', tags=tags)
         self.animation_status_text = c.create_text(
-            centre_x, y1 - 30, text='选择筹码并点击下注区域，然后按“转动”',
-            width=500, font=('Arial', 13, 'bold'), fill='white', tags='animation'
-        )
-        result_y = y1 - 30
-        result_xs = (centre_x - 150, centre_x - 100, centre_x - 50)
-        self.animation_result_dice_items = [
-            c.create_image(x, result_y, image=self.dice_images_history[0],
-                           state='hidden', tags=('animation', 'animation_result'))
-            for x in result_xs
-        ]
+            centre_x, y0+91, text='—', font=('Arial', 28, 'bold'),
+            fill='#766853', tags=tags)
+
+        result_y = y0 + 136
+        result_xs = (centre_x-56, centre_x, centre_x+56)
+        self._sicbo_status_unknown_items = []
+        self.animation_result_dice_items = []
+        for x in result_xs:
+            face = rounded_rect(x-15, result_y-15, x+15, result_y+15,
+                                radius=5, fill='#f0f0e9', outline='#222', tags=tags)
+            mark = c.create_text(x, result_y, text='?', font=('Arial', 13, 'bold'),
+                                 fill='#111', tags=tags)
+            self._sicbo_status_unknown_items.extend((face, mark))
+            self.animation_result_dice_items.append(c.create_image(
+                x, result_y, image=self.dice_images_status[0], state='hidden',
+                tags=('animation', 'animation_result', 'sicbo_status')))
         self.animation_result_plus_items = [
-            c.create_text(centre_x - 125, result_y, text='+', font=('Arial', 12, 'bold'),
-                          fill='white', state='hidden', tags=('animation', 'animation_result')),
-            c.create_text(centre_x - 75, result_y, text='+', font=('Arial', 12, 'bold'),
-                          fill='white', state='hidden', tags=('animation', 'animation_result')),
-        ]
+            c.create_text(centre_x+offset, result_y, text='+',
+                          font=('Arial', 11, 'bold'), fill='#81725e',
+                          tags=('animation', 'animation_result', 'sicbo_status'))
+            for offset in (-28, 28)]
+        self.animation_phase_text = c.create_text(
+            centre_x, y1-18, text='等待开局', width=180,
+            font=('Arial', 11, 'bold'), fill='#b7a486', tags=tags)
         self.animation_result_suffix = c.create_text(
-            centre_x - 25, result_y, anchor='w', text='',
-            font=('Arial', 13, 'bold'), fill='white',
-            state='hidden', tags=('animation', 'animation_result')
-        )
+            centre_x, y1-18, text='', width=180, font=('Arial', 12, 'bold'),
+            fill='#e7d36c', state='hidden',
+            tags=('animation', 'animation_result', 'sicbo_status'))
+        self._set_sicbo_status('ready')
+
+    def _set_sicbo_status(self, state, result=None):
+        c = self.canvas
+        finished = state == 'result' and result is not None
+        big_result = finished and result['result_color'] == self.BIG_RED
+        result_text_color = 'black' if big_result else '#2f2b27'
+        if finished:
+            background = result['result_color']
+            badge = '已开点'
+            caption, phase, total = '本局点数', '', f"{result['total']} 点"
+        elif state == 'rolling':
+            background = self.BOARD_CREAM
+            badge = '摇动中'
+            caption, phase, total = '点数未定', '摇动中 · 停止下注', '—'
+        elif state == 'recovering':
+            background = self.BOARD_CREAM
+            badge = '整理中'
+            caption, phase, total = '本局无效 · 已全额退款', '整理骰子 · 暂停下注', '—'
+        else:
+            background = self.BOARD_CREAM
+            badge = '可下注'
+            caption, phase, total = '本局点数', '等待开局', '—'
+
+        c.itemconfigure(self.animation_status_bubble, fill=background)
+        c.itemconfigure(self._sicbo_status_body_top, fill=background)
+        c.itemconfigure(self._sicbo_status_badge_text, text=badge)
+        c.itemconfigure(self._sicbo_status_caption, text=caption,
+                        fill='black' if big_result else '#76634d')
+        c.itemconfigure(self.animation_status_text, text=total, state='normal',
+                        fill=result_text_color if finished else '#766853',
+                        font=('Arial', 29 if finished else 28, 'bold'))
+        c.itemconfigure(self.animation_phase_text, text=phase,
+                        state='hidden' if finished else 'normal',
+                        fill='#76520f' if state == 'rolling' else '#76634d')
+        for item in self._sicbo_status_unknown_items:
+            c.itemconfigure(item, state='hidden' if finished else 'normal')
+        for item in self.animation_result_plus_items:
+            c.itemconfigure(item, state='normal', fill='black' if big_result else '#574532')
+        shown_dice = sorted(int(value) for value in result['dice']) if finished else []
+        for index, item in enumerate(self.animation_result_dice_items):
+            if finished:
+                value = shown_dice[index]
+                c.itemconfigure(item, image=self.dice_images_status[value-1], state='normal')
+            else:
+                c.itemconfigure(item, state='hidden')
+        if finished:
+            if result['is_triple']:
+                description = '围骰'
+            else:
+                description = ('大' if result['total'] >= 11 else '小') + ' · ' + (
+                    '双' if result['total'] % 2 == 0 else '单')
+            c.itemconfigure(self.animation_result_suffix, text=description,
+                            fill=result_text_color, state='normal')
+        else:
+            c.itemconfigure(self.animation_result_suffix, state='hidden')
 
     def update_last_triple_display(self):
         """Display Last_Triple exactly as stored in Sicbo.json."""
@@ -752,339 +1439,208 @@ class BubbleSicboGame(tk.Frame):
         return [6, 6, 6]
 
     def draw_board(self):
-        """Draw a Chinese Sic Bo layout based on the supplied casino-table reference.
-
-        The layout follows the reference's visual hierarchy: gold payout bands,
-        red dice tiles, paired double/triple columns, total bets, two-dice
-        combinations and a six-cell single-number row. No third-party logos or
-        external artwork are embedded.
-        """
+        """Draw all 106 markets inside the original 852 by 368 betting area."""
         c = self.canvas
-        bx, by, bw, bh = 286, 252, 852, 368
-        self.board_bounds = (bx, by, bx + bw, by + bh)
-
-        border = '#9b8663'
-        grid = '#c9bba5'
-        cream = '#f7f3ea'
-        cream_alt = '#eee5d5'
-        gold_band = '#e5cf9e'
-        gold_dark = '#7a5a22'
-        title_color = '#2f2b27'
-        red_text = '#9f2b16'
-
-        c.create_rectangle(
-            bx, by, bx + bw, by + bh,
-            fill='#e9dfcd', outline=border, width=2, tags='board'
-        )
-
-        # Craps-style mode button, positioned above the betting board.
-        self.insurance_mode_button = self.create_control_button(
-            bx + 2, by - 56, bx + 92, by - 30, '保险~关',
-            self.toggle_triple_mode, '#77383b', fg='white', font_size=10
-        )
-        self.canvas.tag_raise(self.insurance_mode_button)
-
-        def draw_dice(cx, cy, numbers, gap=28, tag='board'):
-            if not numbers:
-                return
-            start_x = cx - gap * (len(numbers) - 1) / 2
-            for offset, number in enumerate(numbers):
-                c.create_image(
-                    start_x + offset * gap, cy,
-                    image=self.dice_images_board[int(number) - 1],
-                    tags=('board', tag)
-                )
-
-        def draw_dice_vertical(cx, cy, numbers, gap=29, tag='board'):
-            if not numbers:
-                return
-            start_y = cy - gap * (len(numbers) - 1) / 2
-            for offset, number in enumerate(numbers):
-                c.create_image(
-                    cx, start_y + offset * gap,
-                    image=self.dice_images_board[int(number) - 1],
-                    tags=('board', tag)
-                )
-
-        def register_rect(bet_type, param, x0, y0, x1, y1, label, chip_y=None):
-            tag = self.spot_tag((bet_type, param))
-            self.register_spot(
-                bet_type, param, x0, y0, x1, y1,
-                ((x0 + x1) / 2, chip_y if chip_y is not None else (y0 + y1) / 2),
-                label,
-            )
-            c.tag_bind(tag, '<Button-1>',
-                       lambda _event, bt=bet_type, p=param: self.place_bet(bt, p))
-            c.tag_bind(tag, '<Button-3>',
-                       lambda _event, bt=bet_type, p=param: self.clear_single_bet(bt, p))
-            return tag
-
-        def draw_simple_cell(x0, y0, x1, y1, bet_type, param, title, subtitle='',
-                             fill=cream, title_size=13, subtitle_size=9,
-                             chip_y=None, title_y=None, subtitle_y=None):
-            tag = register_rect(bet_type, param, x0, y0, x1, y1, title, chip_y)
-            c.create_rectangle(
-                x0, y0, x1, y1, fill=fill, outline=grid, width=1,
-                tags=('board', tag)
-            )
-            c.create_text(
-                (x0 + x1) / 2,
-                title_y if title_y is not None else y0 + (y1 - y0) * 0.39,
-                text=title, font=('Arial', title_size, 'bold'), fill=title_color,
-                tags=('board', tag)
-            )
-            if subtitle:
-                subtitle_item = c.create_text(
-                    (x0 + x1) / 2,
-                    subtitle_y if subtitle_y is not None else y0 + (y1 - y0) * 0.73,
-                    text=subtitle, font=('Arial', subtitle_size, 'bold'), fill=red_text,
-                    tags=('board', tag)
-                )
-                if bet_type == 'small':
-                    self.small_range_text = subtitle_item
-                elif bet_type == 'big':
-                    self.big_range_text = subtitle_item
-            return tag
-
-        y = by
-
-        # Gold payout band above the main bet row.
-        odds_h = 18
-        c.create_rectangle(bx, y, bx + bw, y + odds_h,
-                           fill=gold_band, outline=border, width=1, tags='board')
-
-        # 13 visual groups: small, odd, three doubles, a three-row triple group,
-        # any triple, a three-row triple group, three doubles, even and big.
-        weights = [1.16, 1.10, 0.74, 0.74, 0.74, 2.25, 1.25,
-                   2.25, 0.74, 0.74, 0.74, 1.10, 1.16]
-        total_weight = sum(weights)
-        bounds = [bx]
-        cursor = bx
-        for weight in weights:
-            cursor += bw * weight / total_weight
-            bounds.append(cursor)
-
+        self.board_bounds = (12, 252, 864, 620)
+        colors = {
+            'felt': '#322128', 'header': '#5e3039', 'header_text': '#f1dfb7',
+            'light': '#dceef8', 'dark': '#dfc59c', 'ink': '#3d2928',
+        }
+        alternating = (colors['light'], colors['dark'])
         self.basic_payout_text_items = []
-        payout_groups = [
-            (0, 2, '1:1｜围骰通杀'),
-            (2, 5, '11:1'),
-            (5, 6, '190:1'),
-            (6, 7, '31:1'),
-            (7, 8, '190:1'),
-            (8, 11, '11:1'),
-            (11, 13, '1:1｜围骰通杀'),
-        ]
-        for start_index, end_index, label in payout_groups:
-            x0, x1 = bounds[start_index], bounds[end_index]
-            c.create_line(x0, y, x0, y + odds_h, fill=border, tags='board')
-            payout_text_id = c.create_text(
-                (x0 + x1) / 2, y + odds_h / 2,
-                text=label, font=('Arial', 10, 'bold'), fill=gold_dark, tags='board'
-            )
-            if start_index in (0, 11):
-                self.basic_payout_text_items.append(payout_text_id)
-        c.create_line(bounds[-1], y, bounds[-1], y + odds_h, fill=border, tags='board')
-        y += odds_h
+        self.basic_rule_text_items = []
+        self._board_dice_item_images = {}
 
-        top_h = 118
-        draw_simple_cell(bounds[0], y, bounds[1], y + top_h,
-                         'small', None, '小', '4–10',
-                         title_size=15, subtitle_size=10,
-                         chip_y=y + top_h * 0.52)
-        draw_simple_cell(bounds[1], y, bounds[2], y + top_h,
-                         'odd', None, '单', '', title_size=15,
-                         chip_y=y + top_h * 0.52)
+        def rect(bounds, fill, outline='', radius=0, tag=None):
+            tags = ('board', tag) if tag else ('board',)
+            x0, y0, x1, y1 = bounds
+            if not radius:
+                return c.create_rectangle(*bounds, fill=fill, outline=outline,
+                                          width=1, tags=tags)
+            r = radius
+            return c.create_polygon(
+                x0+r, y0, x1-r, y0, x1, y0, x1, y0+r,
+                x1, y1-r, x1, y1, x1-r, y1, x0+r, y1,
+                x0, y1, x0, y1-r, x0, y0+r, x0, y0,
+                smooth=True, fill=fill, outline=outline, width=1, tags=tags)
 
-        # Left doubles: two identical dice stacked vertically, no text.
-        for slot, number in enumerate((1, 2, 3), start=2):
-            x0, x1 = bounds[slot], bounds[slot + 1]
-            tag = register_rect('double', number, x0, y, x1, y + top_h,
-                                f'对子{number}', chip_y=y + top_h * 0.52)
-            c.create_rectangle(x0, y, x1, y + top_h,
-                               fill=cream_alt, outline=grid, width=1,
-                               tags=('board', tag))
-            draw_dice_vertical((x0 + x1) / 2, y + top_h * 0.48,
-                               [number, number], gap=30, tag=tag)
+        def label(x, y, text, size=12, color=None, bold=False,
+                  anchor='center', tag=None):
+            # Pixel sizes keep these compact headers independent of screen DPI.
+            font = ('Arial', -size, 'bold') if bold else ('Arial', -size)
+            return c.create_text(x, y, text=text, font=font,
+                                 fill=color or colors['ink'], anchor=anchor,
+                                 tags=('board', tag) if tag else ('board',))
 
-        # Left exact triples: three horizontal identical dice, displayed in 3 rows.
-        triple_x0, triple_x1 = bounds[5], bounds[6]
-        row_h = top_h / 3
-        for row, number in enumerate((1, 2, 3)):
-            y0 = y + row * row_h
-            y1 = y + (row + 1) * row_h
-            tag = register_rect('triple', number, triple_x0, y0, triple_x1, y1,
-                                f'围骰{number}', chip_y=(y0 + y1) / 2)
-            c.create_rectangle(triple_x0, y0, triple_x1, y1,
-                               fill=cream_alt, outline=grid, width=1,
-                               tags=('board', tag))
-            draw_dice((triple_x0 + triple_x1) / 2, (y0 + y1) / 2,
-                      [number, number, number], gap=28, tag=tag)
+        def bet(kind, param, bounds, fill, title, radius=2):
+            x0, y0, x1, y1 = bounds
+            tag = self.spot_tag((kind, param))
+            self.register_spot(kind, param, *bounds,
+                               ((x0+x1)/2, (y0+y1)/2), title)
+            rect((x0+.5, y0+.5, x1-.5, y1-.5), fill, radius=radius, tag=tag)
+            c.tag_bind(tag, '<Button-1>',
+                       lambda _event, bt=kind, p=param: self.place_bet(bt, p))
+            c.tag_bind(tag, '<Button-3>',
+                       lambda _event, bt=kind, p=param: self.clear_single_bet(bt, p))
+            return tag
 
-        # Any triple: text only, with no dice below it.
-        any_x0, any_x1 = bounds[6], bounds[7]
-        any_tag = register_rect('all_triples', None, any_x0, y, any_x1, y + top_h,
-                                '任何围骰', chip_y=y + top_h * 0.58)
-        c.create_rectangle(any_x0, y, any_x1, y + top_h,
-                           fill='#f1eadb', outline=grid, width=1,
-                           tags=('board', any_tag))
-        c.create_text((any_x0 + any_x1) / 2, y + top_h * 0.40,
-                      text='任何\n围骰', font=('Arial', 11, 'bold'),
-                      fill=title_color, justify='center', tags=('board', any_tag))
+        def dice(cx, cy, values, size=23, pitch=None, vertical=False, tag=None):
+            pitch = pitch or size+4
+            images = (self.dice_images_board if size == 23
+                      else self.dice_images_board_sizes[size])
+            for index, value in enumerate(values):
+                delta = (index-(len(values)-1)/2)*pitch
+                x, y = (cx, cy+delta) if vertical else (cx+delta, cy)
+                photo = images[int(value)-1]
+                item = c.create_image(x, y, image=photo,
+                                      tags=('board', tag) if tag else ('board',))
+                self._board_dice_item_images[item] = photo
 
-        # Right exact triples: three horizontal identical dice, displayed in 3 rows.
-        triple_x0, triple_x1 = bounds[7], bounds[8]
-        for row, number in enumerate((4, 5, 6)):
-            y0 = y + row * row_h
-            y1 = y + (row + 1) * row_h
-            tag = register_rect('triple', number, triple_x0, y0, triple_x1, y1,
-                                f'围骰{number}', chip_y=(y0 + y1) / 2)
-            c.create_rectangle(triple_x0, y0, triple_x1, y1,
-                               fill=cream_alt, outline=grid, width=1,
-                               tags=('board', tag))
-            draw_dice((triple_x0 + triple_x1) / 2, (y0 + y1) / 2,
-                      [number, number, number], gap=28, tag=tag)
+        def section_header(x0, y0, x1, y1, title, odds, parts=None):
+            rect((x0, y0, x1, y1), colors['header'])
+            cy = (y0+y1)/2
+            label(x0+8, cy, title, 12, colors['header_text'],
+                  bold=True, anchor='w')
+            fragments = parts or [(odds, 15)]
+            items, widths = [], []
+            for text, size in fragments:
+                item = label(0, cy, text, size, colors['header_text'], bold=True)
+                bounds = c.bbox(item)
+                items.append(item)
+                widths.append(bounds[2]-bounds[0])
+            gap = 6
+            x = (x0+x1-sum(widths)-gap*(len(items)-1))/2
+            for item, width in zip(items, widths):
+                c.coords(item, x+width/2, cy)
+                x += width+gap
 
-        # Right doubles: two identical dice stacked vertically, no text.
-        for slot, number in enumerate((4, 5, 6), start=8):
-            x0, x1 = bounds[slot], bounds[slot + 1]
-            tag = register_rect('double', number, x0, y, x1, y + top_h,
-                                f'对子{number}', chip_y=y + top_h * 0.52)
-            c.create_rectangle(x0, y, x1, y + top_h,
-                               fill=cream_alt, outline=grid, width=1,
-                               tags=('board', tag))
-            draw_dice_vertical((x0 + x1) / 2, y + top_h * 0.48,
-                               [number, number], gap=30, tag=tag)
+        def side_market(kind, title, bounds, range_text='', dark=False):
+            x0, y0, x1, y1 = bounds
+            fill = '#713441' if dark else colors['light']
+            ink = '#fff3dc' if dark else '#56383a'
+            secondary = '#dfbf83' if dark else '#82694b'
+            tag = bet(kind, None, bounds, fill, title, radius=5)
+            rect((x0+4, y0+4, x1-4, y1-4), '', '#b8955c', radius=3, tag=tag)
+            cx = (x0+x1)/2
+            label(cx, y0+31, title, 35, ink, bold=True, tag=tag)
+            if range_text:
+                item = label(cx, y0+59, range_text, 13, secondary, bold=True, tag=tag)
+                if kind == 'small':
+                    self.small_range_text = item
+                else:
+                    self.big_range_text = item
+            payout = label(cx, y0+(81 if range_text else 72), '1:1',
+                           20, ink, bold=True, tag=tag)
+            rule = label(cx, y1-11, '围骰通杀', 9, secondary, tag=tag)
+            self.basic_payout_text_items.append(payout)
+            self.basic_rule_text_items.append(rule)
 
-        draw_simple_cell(bounds[11], y, bounds[12], y + top_h,
-                         'even', None, '双', '', title_size=15,
-                         chip_y=y + top_h * 0.52)
-        draw_simple_cell(bounds[12], y, bounds[13], y + top_h,
-                         'big', None, '大', '11–17',
-                         title_size=15, subtitle_size=10,
-                         chip_y=y + top_h * 0.52)
-        y += top_h
+        rect(self.board_bounds, colors['felt'])
 
-        # Total points 4-17.
-        totals_h = 48
-        total_w = bw / 14
-        for index, point in enumerate(range(4, 18)):
-            x0 = bx + index * total_w
-            x1 = bx + (index + 1) * total_w
-            draw_simple_cell(
-                x0, y, x1, y + totals_h,
-                'total_points', point, str(point), f'{SicboEngine.TOTAL_PAYOUT[point]}:1',
-                fill=cream, title_size=15, subtitle_size=8,
-                chip_y=y + totals_h * 0.48,
-                title_y=y + 17, subtitle_y=y + 36,
-            )
-        y += totals_h
+        # The existing insurance control stays centred below the last triple.
+        triple_x0, _y0, triple_x1, triple_y1 = self._sicbo_triple_panel_bounds
+        insurance_x = (triple_x0+triple_x1)/2
+        self.insurance_mode_button = self.create_control_button(
+            insurance_x-45, triple_y1+16, insurance_x+45, triple_y1+42,
+            '保险~关', self.toggle_triple_mode, '#77383b', fg='white', font_size=10)
+        c.tag_raise(self.insurance_mode_button)
 
-        # Fifteen two-dice combinations. A right-pointing payout wedge is
-        # placed to the left of 1+2, and a matching right-pointing “双骰”
-        # wedge is placed immediately after 5+6.
-        pairs_h = 62
-        left_wedge_w = 50
-        right_wedge_w = 50
-        pairs_x0 = bx + left_wedge_w
-        pair_w = (bw - left_wedge_w - right_wedge_w) / 15
+        side_market('small', '小', (12, 252, 112, 360), '4—10', dark=True)
+        side_market('odd', '单', (12, 364, 112, 472))
+        side_market('big', '大', (764, 252, 864, 360), '11—17', dark=True)
+        side_market('even', '双', (764, 364, 864, 472))
 
-        wedge_tag = 'pairs_payout_wedge'
-        c.create_polygon(
-            bx, y,
-            bx + left_wedge_w - 12, y,
-            bx + left_wedge_w, y + pairs_h / 2,
-            bx + left_wedge_w - 12, y + pairs_h,
-            bx, y + pairs_h,
-            fill=gold_band, outline=grid, width=1, tags=('board', wedge_tag)
+        section_header(116, 252, 356, 266, '对子', '11:1')
+        section_header(444, 252, 760, 266, '指定围骰', '190:1')
+        for number in range(1, 7):
+            fill = alternating[(number-1) % 2]
+            x0, x1 = 116+(number-1)*40, 116+number*40
+            tag = bet('double', number, (x0, 266, x1, 310), fill, f'对子{number}')
+            dice((x0+x1)/2, 288, (number, number), 20, 22, vertical=True, tag=tag)
+            x0, x1 = 444+(number-1)*316/6, 444+number*316/6
+            tag = bet('triple', number, (x0, 266, x1, 310), fill, f'围骰{number}')
+            # 品: one die above two, preserving room for a full-size bet chip.
+            dice((x0+x1)/2, 277, (number,), 20, tag=tag)
+            dice((x0+x1)/2, 299, (number, number), 20, 22, tag=tag)
+        tag = bet('all_triples', None, (360, 252, 440, 310),
+                  '#d4b576', '任何围骰', radius=4)
+        label(400, 269, '任何围骰', 15, '#4a3035', bold=True, tag=tag)
+        label(400, 294, '31:1', 20, '#4a3035', bold=True, tag=tag)
+
+        rect((116, 314, 144, 358), colors['header'], radius=2)
+        label(130, 336, '总\n点', 12, colors['header_text'])
+        for index, value in enumerate(range(4, 18)):
+            x0, x1 = 144+index*44, 144+(index+1)*44
+            tag = bet('total_points', value, (x0, 314, x1, 358),
+                      alternating[index % 2], f'总点{value}')
+            label((x0+x1)/2, 328, str(value), 20, bold=True, tag=tag)
+            label((x0+x1)/2, 348, f'{self.engine.TOTAL_PAYOUT[value]}:1',
+                  12, '#875c30', bold=True, tag=tag)
+
+        rect((116, 362, 156, 410), colors['header'], radius=2)
+        label(136, 377, '双骰', 12, colors['header_text'])
+        label(136, 396, '6:1', 18, colors['header_text'], bold=True)
+        for index, pair in enumerate(self.engine.PAIRS):
+            x0, x1 = 156+index*604/15, 156+(index+1)*604/15
+            tag = bet('pairs', pair, (x0, 362, x1, 410),
+                      alternating[index % 2], f'组合{pair}')
+            dice((x0+x1)/2, 386, tuple(map(int, pair.split('&'))),
+                 21, 23, vertical=True, tag=tag)
+
+        section_header(116, 414, 388, 428, '四数组合', '7:1')
+        section_header(392, 414, 760, 428, '单骰', '', parts=[
+            ('1颗', 11), ('1:1', 15), ('·', 11),
+            ('2颗', 11), ('2:1', 15), ('·', 11),
+            ('3颗', 11), ('12:1', 15)])
+        for index, group in enumerate(self.engine.GROUPS):
+            x0, x1 = 116+index*68, 116+(index+1)*68
+            tag = bet('number_group', group, (x0, 428, x1, 472),
+                      alternating[index % 2], f'四数组合{group}')
+            values = tuple(map(int, group))
+            dice((x0+x1)/2, 439, values[:2], 19, 23, tag=tag)
+            dice((x0+x1)/2, 461, values[2:], 19, 23, tag=tag)
+        for number, chinese in enumerate('一二三四五六', start=1):
+            x0, x1 = 392+(number-1)*368/6, 392+number*368/6
+            tag = bet('guess_num', number, (x0, 428, x1, 472),
+                      alternating[(number-1) % 2], f'单骰{number}')
+            dice((x0+x1)/2-10, 450, (number,), 25, tag=tag)
+            label((x0+x1)/2+19, 450, chinese, 15, tag=tag)
+
+        # AAB: 30 choices in ten columns. ABC: 7, 7, 6 choices. Every
+        # 41px-high cell fits the unchanged 38px chip with no overlap.
+        aab_right = 12+(852-4)*10/17
+        left_centre = (12+aab_right)/2
+        right_centre = (aab_right+4+864)/2
+        rect((12, 476, 864, 497), colors['header'])
+        label(left_centre, 486.5, '60:1', 18, colors['dark'], bold=True)
+        label((left_centre+right_centre)/2, 486.5,
+              '骰子组合', 16, colors['header_text'], bold=True)
+        label(right_centre, 486.5, '30:1', 18, colors['light'], bold=True)
+        exact_panels = (
+            ('exact_aab', 12, aab_right, (10, 10, 10), self.engine.EXACT_AAB,
+             colors['dark'], '#6b3640', '#bea17a'),
+            ('exact_abc', aab_right+4, 864, (7, 7, 6), self.engine.EXACT_ABC,
+             colors['light'], '#344d5b', '#c6b58f'),
         )
-        c.create_text(
-            bx + 19, y + pairs_h * 0.46,
-            text='赔付\n6:1', font=('Arial', 9, 'bold'),
-            fill=red_text, justify='center', tags=('board', wedge_tag)
-        )
+        for kind, x0, x1, row_counts, values, fill, ink, grid in exact_panels:
+            index = 0
+            for row, columns in enumerate(row_counts):
+                width = (x1-x0)/columns
+                for col in range(columns):
+                    combination = values[index]
+                    left, top = x0+col*width, 497+row*41
+                    bounds = (left, top, left+width, top+41)
+                    title = '·'.join(combination)
+                    tag = bet(kind, combination, bounds, fill,
+                              f'骰子组合{title}', radius=0)
+                    rect(bounds, '', grid, tag=tag)
+                    label(left+width/2, top+20.5, title, 15, ink, bold=True, tag=tag)
+                    index += 1
 
-        for index, pair in enumerate(SicboEngine.PAIRS):
-            x0 = pairs_x0 + index * pair_w
-            x1 = pairs_x0 + (index + 1) * pair_w
-            a, b = [int(value) for value in pair.split('&')]
-            tag = register_rect('pairs', pair, x0, y, x1, y + pairs_h,
-                                f'{a}+{b}', chip_y=y + pairs_h * 0.50)
-            c.create_rectangle(x0, y, x1, y + pairs_h,
-                               fill=cream, outline=grid, width=1,
-                               tags=('board', tag))
-            draw_dice_vertical((x0 + x1) / 2, y + pairs_h * 0.50,
-                               [a, b], gap=29, tag=tag)
+        # One overall outline, with no additional frames around sections.
+        c.create_rectangle(*self.board_bounds, fill='', outline='#a68c60',
+                           width=1, tags=('board', 'board_outer_frame'))
 
-        right_x0 = pairs_x0 + 15 * pair_w
-        right_x1 = bx + bw
-        right_tag = 'pairs_label_wedge'
-        c.create_polygon(
-            right_x0, y + pairs_h / 2,
-            right_x0 + 12, y,
-            right_x1, y,
-            right_x1, y + pairs_h,
-            right_x0 + 12, y + pairs_h,
-            fill=gold_band, outline=grid, width=1, tags=('board', right_tag)
-        )
-        c.create_text(
-            right_x0 + 12 + (right_wedge_w - 12) / 2, y + pairs_h / 2,
-            text='双骰', font=('Arial', 10, 'bold'),
-            fill=title_color, tags=('board', right_tag)
-        )
-        y += pairs_h
-
-        # Four-number groups: win only when all three rolled dice are distinct
-        # and all three belong to the selected four-number set. Payout 7:1.
-        group_h = 48
-        group_w = bw / 4
-        for index, group in enumerate(SicboEngine.GROUPS):
-            x0 = bx + index * group_w
-            x1 = bx + (index + 1) * group_w
-            tag = register_rect('number_group', group, x0, y, x1, y + group_h,
-                                f'四数组合{group}', chip_y=y + group_h * 0.50)
-            c.create_rectangle(x0, y, x1, y + group_h,
-                               fill=cream_alt, outline=grid, width=1,
-                               tags=('board', tag))
-            group_numbers = [int(value) for value in group]
-            draw_dice((x0 + x1) / 2, y + 16, group_numbers, gap=28, tag=tag)
-            c.create_text((x0 + x1) / 2, y + 39,
-                          text='7:1', font=('Arial', 8, 'bold'),
-                          fill=red_text, tags=('board', tag))
-        y += group_h
-
-        # Single-number bets.
-        single_h = 44
-        single_w = bw / 6
-        chinese_numbers = {1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六'}
-        for index, number in enumerate(range(1, 7)):
-            x0 = bx + index * single_w
-            x1 = bx + (index + 1) * single_w
-            tag = register_rect('guess_num', number, x0, y, x1, y + single_h,
-                                f'单骰{number}', chip_y=y + single_h * 0.50)
-            c.create_rectangle(x0, y, x1, y + single_h,
-                               fill=cream, outline=grid, width=1,
-                               tags=('board', tag))
-            centre_x = (x0 + x1) / 2
-            draw_dice(centre_x - 14, y + single_h / 2, [number], tag=tag)
-            c.create_text(centre_x + 3, y + single_h / 2,
-                          anchor='w', text=chinese_numbers[number],
-                          font=('Arial', 14, 'bold'), fill=title_color,
-                          tags=('board', tag))
-        y += single_h
-
-        # Bottom payout legend mirrors the reference's profit-only notation.
-        footer_h = by + bh - y
-        c.create_rectangle(bx, y, bx + bw, y + footer_h,
-                           fill=gold_band, outline=border, width=1, tags='board')
-        footer_texts = (
-            ('出现 1 颗：1:1', bx + bw * 0.17),
-            ('出现 2 颗：2:1', bx + bw * 0.50),
-            ('出现 3 颗：12:1', bx + bw * 0.83),
-        )
-        for label, x in footer_texts:
-            c.create_text(x, y + footer_h / 2,
-                          text=label, font=('Arial', 10, 'bold'),
-                          fill=gold_dark, tags='board')
 
     def draw_bottom_controls(self):
         c = self.canvas
@@ -1133,20 +1689,358 @@ class BubbleSicboGame(tk.Frame):
         self.update_control_states()
 
     def show_help_window(self):
-        messagebox.showinfo(
-            '骰宝玩法说明',
-            '• 小：保险关闭时为 4–10；保险开启时为 3–10。\n'
-            '• 大：保险关闭时为 11–17；保险开启时为 11–18。\n'
-            '• 单 / 双：按总点数计算；保险关闭时任何围骰不中奖。\n'
-            '• 保险模式：小、大、单、双遇围骰也可中奖，赔付改为 0.95:1；围骰类下注赔率不变。\n'
-            '• 对子：指定点数至少出现两颗，赔付 11:1。\n'
-            '• 指定围骰：三颗指定点数相同，赔付 190:1。\n'
-            '• 任何围骰：任意三颗相同，赔付 31:1。\n'
-            '• 两骰组合：指定两种点数同时出现，赔付 6:1。\n'
-            '• 四数组合：三颗骰子必须互不重复，且全部属于所选四个点数，赔付 7:1。\n'
-            '• 单骰：出现一颗、两颗、三颗时分别赔付 1:1、2:1、12:1。',
-            parent=self.winfo_toplevel(),
-        )
+        """Keep the existing help-button callback compatible."""
+        return self.show_game_instructions()
+
+    def showgameinstruction(self):
+        """Compatibility entry point for the instruction UI."""
+        return self.show_game_instructions()
+
+    def show_game_instructions(self):
+        """按原版卡片式布局显示本游戏的图解说明。"""
+        import tkinter as tk
+        import tkinter.font as tkfont
+
+        owner = self if isinstance(self, tk.Misc) else self.root
+        parent = owner.winfo_toplevel()
+        current = getattr(self, '_game_instruction_dialog', None)
+        if current is not None:
+            try:
+                if current.winfo_exists():
+                    current.lift()
+                    current.focus_force()
+                    return
+            except tk.TclError:
+                pass
+        dialog = tk.Toplevel(owner)
+        self._game_instruction_dialog = dialog
+        dialog.title('骰宝 · 完整图解玩法')
+        dialog.configure(bg='#faf5e8')
+        dialog.resizable(False, False)
+        dialog.transient(parent)
+        width, height = 1000, min(670, max(400, parent.winfo_screenheight() - 80))
+        parent.update_idletasks()
+        px, py = parent.winfo_rootx(), parent.winfo_rooty()
+        pw, ph = max(1, parent.winfo_width()), max(1, parent.winfo_height())
+        dialog.geometry(f'{width}x{height}+{max(0, px + (pw-width)//2)}+{max(0, py + (ph-height)//2)}')
+
+        manual_pages = [('玩法',
+          '摇动三颗骰子，按点数、总和及组合逐项结算。',
+          [('一局如何进行',
+            '',
+            [('① 选择筹码与下注', '左键点击下注区域加注，可同时下注多项；右键点击区域清除该项。\n下注时立即扣除余额，清除尚未开局的下注会退回筹码。'),
+             ('② 转动三颗骰子', '点击“转动”或在游戏窗口按 Enter 开局，也可零下注试玩。\n转动与结算期间暂停下注、清除、重复下注及切换保险。'),
+             ('③ 逐项结算', '同一结果可命中多项下注；中奖项返还本金及盈利，未中奖项不返还。')],
+            []),
+           ('三骰结果示意', '', [], []),
+           ('赔率如何阅读', '', [('盈利与返还', '本说明中的 x:1 均为盈利赔率，不包含本金。\n中奖返还＝该项下注 ×（赔率＋1）；净盈亏＝总返还－总下注。')], [])]),
+         ('下注 & 赔率',
+          '赔率为盈利倍数；各中奖项目独立计算。',
+          [('下注项目',
+            '',
+            [],
+            [('基础赔率',
+              ['项目', '中奖条件', '盈利赔率'],
+              [['小 / 大', '小 4–10；大 11–17。保险关闭时围骰不中奖。', '1:1'],
+               ['单 / 双', '按三骰总点数的奇偶判断。保险关闭时围骰不中奖。', '1:1'],
+               ['对子', '指定点数出现至少两颗；三颗相同也中奖。', '11:1'],
+               ['指定围骰', '三颗骰子全部为指定点数。', '190:1'],
+               ['任何围骰', '任意三颗骰子点数相同。', '31:1'],
+               ['两骰组合', '指定的两种不同点数同时出现，第三颗不限。', '6:1'],
+               ['四数组合', '三颗互不重复，且全部属于所选四个点数。', '7:1'],
+               ['单骰', '所选点数出现 1 / 2 / 3 颗；未出现则输。', '1:1 / 2:1 / 12:1']])]),
+           ('总点数',
+            '',
+            [('猜中三骰总和', '可押 4 至 17 点；三骰总和等于所押点数即中奖，围骰也计入。')],
+            [('总点数赔率',
+              ['总点数', '基础盈利赔率'],
+              [['4 / 17', '62:1'],
+               ['5 / 16', '31:1'],
+               ['6 / 15', '18:1'],
+               ['7 / 14', '12:1'],
+               ['8 / 13', '8:1'],
+               ['9 / 12', '7:1'],
+               ['10 / 11', '6:1']])]),
+           ('四数组合示意', '', [], []),
+           ('下注限额',
+            '',
+            [('限额与余额', '下注受单区上限、全台上限及余额限制。若剩余额度不足，系统会提示并自动缩减本次金额。')],
+            [('当前限额', ['单次请求最低', '单区最高', '全台最高'], [['{MIN_BET}', '{MAX_AREA_BET}', '{MAX_TABLE_BET}']])])]),
+         ('保险模式',
+          '保险只改变小、大、单、双的中奖规则与赔率。',
+          [('保险开关',
+            '',
+            [('何时切换', '开局前点击“保险~开 / 保险~关”切换；转动或结算期间不可切换。\n开关状态适用于本局全部小、大、单、双下注。')],
+            [('规则对照',
+              ['项目', '保险关闭', '保险开启'],
+              [['小', '4–10 点；围骰输', '3–10 点；围骰按总点判断'],
+               ['大', '11–17 点；围骰输', '11–18 点；围骰按总点判断'],
+               ['单 / 双', '按总点奇偶；围骰输', '按总点奇偶；包含围骰'],
+               ['盈利赔率', '1:1', '0.95:1']])]),
+           ('围骰与保险示意', '', [], []),
+           ('其他下注',
+            '',
+            [('规则保持一致', '对子、指定围骰、任何围骰、两骰组合、总点数、四数组合与单骰，均按各自规则结算。\n保险不会让所有下注都获赔，也不会增加其他项目的赔率。')],
+            [])]),
+         ('操作 & 记录',
+          '下注阶段可调整筹码；历史面板可切换记录和统计。',
+          [('常用操作',
+            '',
+            [],
+            [('操作对照',
+              ['操作', '作用'],
+              [['筹码按钮 + 左键', '选择金额后，点击下注区域逐次加注。'],
+               ['右键下注区域', '清除该区全部未开奖下注并退回金额。'],
+               ['清除下注', '清空本局全部未开奖下注并退回金额。'],
+               ['Ctrl+Z', '游戏框架获得键盘焦点时，撤销最近一笔加注。'],
+               ['重复下注', '把最近一次有下注的金额追加到当前下注；不会先清空。余额须足够，仍受限额限制。'],
+               ['转动 / Enter', '开始本局；动画与结算中不可再次开局。'],
+               ['关闭 / Esc', '关闭本说明窗口。']])]),
+           ('历史记录',
+            '',
+            [('记录与统计切换', '点击历史面板标题，切换最近 15 局记录与最近最多 500 局统计。'),
+             ('围骰单独归类', '统计中的小 / 大 / 围、单 / 双 / 围会把围骰单独计数；即使开启保险，也仍显示为围骰。')],
+            [])]),
+         ('结算示例',
+          '以下金额均区分盈利与含本金返还。',
+          [('多个项目同时中奖',
+            '',
+            [('结果：1、2、3；保险关闭', '“小”下注 $10，“两骰组合 1+2”下注 $10。\n小返还 $20；组合以 6:1 返还 $70。\n总返还 $90；总下注 $20；净赢 $70。')],
+            []),
+           ('围骰与保险',
+            '',
+            [('结果：2、2、2；只在“小”下注 $10', '保险关闭：围骰不赔，返还 $0，净亏 $10。\n保险开启：总点 6 属于小，按 0.95:1 返还 $19.50，净赢 $9.50。')],
+            []),
+           ('单骰三颗结算',
+            '',
+            [('结果：3、3、3；只在号码 3 下注 $10',
+              '单骰出现 3 颗的赔率为 12:1。\n返还 $10 ×（12＋1）＝$130；净赢 $120。\n如同时下注指定围骰或任何围骰，各项另行计算。')],
+            [])])]
+        # Read limit values from the game so the manual stays in sync.
+        limit_text = {
+            '{MIN_BET}': f'${self.MIN_BET:,.2f}',
+            '{MAX_AREA_BET}': f'${self.MAX_AREA_BET:,.2f}',
+            '{MAX_TABLE_BET}': f'${self.MAX_TABLE_BET:,.2f}',
+        }
+        for _title, _subtitle, cards in manual_pages:
+            for _card_title, _card_subtitle, _rules, tables in cards:
+                for _table_title, _headers, rows in tables:
+                    for row in rows:
+                        row[:] = [limit_text.get(value, value) for value in row]
+        illustration_cards = {
+            '三骰结果示意': 'result',
+            '四数组合示意': 'group',
+            '围骰与保险示意': 'insurance',
+            '三军金色示意': 'super',
+        }
+
+        BG = '#faf5e8'
+        HEADER = '#f1e7cd'
+        SIDEBAR = '#f2e8d0'
+        PANEL = '#fffdf7'
+        PANEL_2 = '#f5ecd6'
+        BORDER = '#c9b88a'
+        GOLD = '#a8842c'
+        GOLD_BAR = '#e7d36c'
+        TEXT = '#3a2f1e'
+        MUTED = '#7a6a50'
+        font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
+        header = tk.Frame(dialog, bg=HEADER, height=76)
+        header.pack(fill=tk.X, side=tk.TOP)
+        header.pack_propagate(False)
+        tk.Label(header, text='骰宝 · 完整图解玩法', font=(font_name, 20, 'bold'),
+                 fg=GOLD, bg=HEADER, anchor='w', wraplength=795,
+                 justify=tk.LEFT).place(x=24, y=6, width=795, height=41)
+        tk.Label(header, text='玩法 · 下注 · 派奖 · 图解 · 结算示例',
+                 font=(font_name, 14), fg=MUTED, bg=HEADER, anchor='w').place(x=26, y=46)
+        def close_dialog():
+            try:
+                self._game_instruction_dialog = None
+            except Exception:
+                pass
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
+        tk.Button(header, text='关闭  ESC', command=close_dialog,
+                  font=(font_name, 14, 'bold'), bg='#e8dcc0', fg=TEXT,
+                  activebackground='#d9c895', relief=tk.FLAT, bd=0,
+                  cursor='hand2').place(x=850, y=17, width=120, height=42)
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X, side=tk.TOP)
+        body = tk.Frame(dialog, bg=BG)
+        body.pack(fill=tk.BOTH, expand=True)
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=205)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+        tk.Label(sidebar, text='说明目录', font=(font_name, 16, 'bold'),
+                 fg=GOLD, bg=SIDEBAR, anchor='w').pack(fill=tk.X, padx=18, pady=(17, 10))
+        scroll_host = tk.Frame(body, bg=BG)
+        scroll_host.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(scroll_host, bg=BG, highlightthickness=0, bd=0, yscrollincrement=36)
+        scrollbar = tk.Scrollbar(scroll_host, orient=tk.VERTICAL, command=canvas.yview,
+                                 bg='#ded3b7', troughcolor=BG, activebackground=GOLD_BAR,
+                                 relief=tk.FLAT, bd=0, width=13)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=10)
+        content = tk.Frame(canvas, bg=BG)
+        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
+        def sync_scrollregion(_event=None):
+            canvas.configure(scrollregion=canvas.bbox('all'))
+        def fit_content_width(event):
+            canvas.itemconfigure(content_window, width=event.width)
+        content.bind('<Configure>', sync_scrollregion)
+        canvas.bind('<Configure>', fit_content_width)
+        def add_rule(parent_frame, title, detail):
+            row = tk.Frame(parent_frame, bg=PANEL)
+            row.pack(fill=tk.X, padx=16, pady=5)
+            tk.Frame(row, bg=GOLD_BAR, width=5).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 11))
+            text_box = tk.Frame(row, bg=PANEL)
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(text_box, text=title, font=(font_name, 15, 'bold'),
+                     fg=TEXT, bg=PANEL, anchor='w', justify=tk.LEFT,
+                     wraplength=650).pack(fill=tk.X)
+            if detail:
+                tk.Label(text_box, text=detail, font=(font_name, 14),
+                         fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+                         wraplength=650).pack(fill=tk.X, pady=(3, 0))
+        def add_table(parent_frame, title, headers, rows):
+            block = tk.Frame(parent_frame, bg=PANEL_2,
+                             highlightbackground=BORDER, highlightthickness=1, bd=0)
+            block.pack(fill=tk.X, padx=16, pady=8)
+            tk.Label(block, text=title, font=(font_name, 14, 'bold'),
+                     fg=TEXT, bg=GOLD_BAR, anchor='w', justify=tk.LEFT,
+                     wraplength=675, padx=11, pady=7).pack(fill=tk.X)
+            grid = tk.Frame(block, bg=PANEL_2)
+            grid.pack(fill=tk.X)
+            count = max([len(headers)] + [len(row) for row in rows]) if rows else len(headers)
+            table_font = tkfont.Font(family=font_name, size=14)
+            matrix = ([headers] if headers else []) + rows
+            minimums = [62] * count
+            preferences = []
+            for col in range(count):
+                text_width = max((table_font.measure(line)
+                                  for row in matrix if col < len(row)
+                                  for line in str(row[col]).split('\n')), default=0)
+                preferences.append(max(50, min(text_width, 260)))
+            available = 700
+            remaining = max(0, available - sum(minimums))
+            total_preference = sum(preferences) or 1
+            column_widths = [minimums[col] + remaining * preferences[col] // total_preference
+                             for col in range(count)]
+            if column_widths:
+                column_widths[-1] += available - sum(column_widths)
+            for col, width in enumerate(column_widths):
+                grid.grid_columnconfigure(col, minsize=width)
+            for r, row in enumerate(matrix):
+                for c in range(count):
+                    value = row[c] if c < len(row) else ''
+                    head = bool(headers) and r == 0
+                    bg = GOLD_BAR if head else (PANEL if r % 2 else '#fbf6e9')
+                    fg = TEXT if head else MUTED
+                    tk.Message(grid, text=value, font=(font_name, 14, 'bold' if head else 'normal'),
+                               fg=fg, bg=bg, anchor='w', justify=tk.LEFT,
+                               width=max(42, column_widths[c] - 16),
+                               padx=7, pady=5, borderwidth=1,
+                               relief=tk.SOLID).grid(row=r, column=c, sticky='nsew')
+        def draw_illustration(parent_frame, kind):
+            # Draw actual dice pips; no image assets or extra dependencies needed.
+            examples = {
+                'result': [((1, 2, 3), '总点 6 · 小 · 双', '可同时命中小、双、总点 6、两骰组合等项目。')],
+                'group': [((1, 2, 4), '四数组合 1234：中奖', '三颗不同，且全部属于 1、2、3、4。'),
+                          ((1, 1, 4), '四数组合 1234：不中奖', '虽在所选范围内，但点数重复。')],
+                'insurance': [((2, 2, 2), '围骰 · 总点 6', '保险关：小、双均输。保险开：小、双均按 0.95:1 赔。')],
+                'super': [((3, 3, 3), '号码 3 金色：2颗 12:1', '实际出现 3 颗，按较高的 12:1 结算。')],
+            }
+            rows = examples[kind]
+            c = tk.Canvas(parent_frame, width=700, height=132 * len(rows),
+                          bg=PANEL, highlightthickness=0)
+            c.pack(padx=16, pady=(5, 10))
+            pips = {
+                1: ((1, 1),),
+                2: ((0, 0), (2, 2)),
+                3: ((0, 0), (1, 1), (2, 2)),
+                4: ((0, 0), (2, 0), (0, 2), (2, 2)),
+                5: ((0, 0), (2, 0), (1, 1), (0, 2), (2, 2)),
+                6: ((0, 0), (2, 0), (0, 1), (2, 1), (0, 2), (2, 2)),
+            }
+            for row, (dice, title, detail) in enumerate(rows):
+                y = row * 132 + 10
+                for index, number in enumerate(dice):
+                    x = 10 + index * 68
+                    c.create_rectangle(x, y, x + 56, y + 56,
+                                       fill='#fffaf0', outline=BORDER, width=2)
+                    for col, line in pips[number]:
+                        px, py = x + 13 + col * 15, y + 13 + line * 15
+                        c.create_oval(px - 4, py - 4, px + 4, py + 4,
+                                      fill='#b13d35' if number in (1, 4) else TEXT, outline='')
+                c.create_text(225, y + 25, text=title, anchor='w', width=455,
+                              fill=GOLD, font=(font_name, 16, 'bold'))
+                c.create_text(10, y + 77, text=detail, anchor='nw', width=680,
+                              fill=MUTED, font=(font_name, 14))
+
+        def render_page(index):
+            for child in content.winfo_children():
+                child.destroy()
+            for idx, button in enumerate(nav_buttons):
+                button.configure(bg='#e6d9b9' if idx == index else SIDEBAR,
+                                 fg=GOLD if idx == index else MUTED)
+            page_title, subtitle, cards = manual_pages[index]
+            top = tk.Frame(content, bg=BG)
+            top.pack(fill=tk.X, padx=14, pady=(7, 2))
+            tk.Label(top, text=page_title, font=(font_name, 20, 'bold'),
+                     fg=GOLD, bg=BG, anchor='w', justify=tk.LEFT,
+                     wraplength=690).pack(fill=tk.X)
+            if subtitle:
+                tk.Label(top, text=subtitle, font=(font_name, 14),
+                         fg=MUTED, bg=BG, anchor='w', justify=tk.LEFT,
+                         wraplength=690).pack(fill=tk.X, pady=(3, 0))
+            for card_title, card_subtitle, rules, tables in cards:
+                card = tk.Frame(content, bg=PANEL, highlightbackground=BORDER,
+                                highlightcolor=BORDER, highlightthickness=1, bd=0)
+                card.pack(fill=tk.X, padx=10, pady=7)
+                head = tk.Frame(card, bg=PANEL)
+                head.pack(fill=tk.X, padx=16, pady=(12, 5))
+                tk.Label(head, text=card_title, font=(font_name, 16, 'bold'),
+                         fg=GOLD, bg=PANEL, anchor='w', justify=tk.LEFT,
+                         wraplength=680).pack(fill=tk.X)
+                if card_subtitle:
+                    tk.Label(head, text=card_subtitle, font=(font_name, 14),
+                             fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+                             wraplength=680).pack(fill=tk.X)
+                if card_title in illustration_cards:
+                    draw_illustration(card, illustration_cards[card_title])
+                for rule_title, detail in rules:
+                    add_rule(card, rule_title, detail)
+                for table_title, table_headers, rows in tables:
+                    add_table(card, table_title, table_headers, rows)
+                tk.Frame(card, bg=PANEL, height=6).pack(fill=tk.X)
+            content.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox('all'))
+            canvas.yview_moveto(0)
+        nav_buttons = []
+        for index, (page_title, _subtitle, _cards) in enumerate(manual_pages):
+            button = tk.Button(sidebar, text=page_title, command=lambda i=index: render_page(i),
+                               font=(font_name, 14), fg=MUTED, bg=SIDEBAR,
+                               activebackground='#e8d49a', activeforeground=GOLD,
+                               relief=tk.FLAT, bd=0, anchor='w', padx=18, pady=10,
+                               cursor='hand2')
+            button.pack(fill=tk.X)
+            nav_buttons.append(button)
+        def on_mousewheel(event):
+            if event.delta:
+                steps = max(1, int(abs(event.delta) / 120))
+                canvas.yview_scroll(-steps if event.delta > 0 else steps, 'units')
+            return 'break'
+        dialog.bind('<MouseWheel>', on_mousewheel)
+        dialog.bind('<Button-4>', lambda _e: (canvas.yview_scroll(-1, 'units'), 'break')[1])
+        dialog.bind('<Button-5>', lambda _e: (canvas.yview_scroll(1, 'units'), 'break')[1])
+        dialog.bind('<Escape>', lambda _e: close_dialog())
+        dialog.protocol('WM_DELETE_WINDOW', close_dialog)
+        if nav_buttons:
+            render_page(0)
+        dialog.focus_set()
+
 
     @staticmethod
     def shade_color(color, factor):
@@ -1309,7 +2203,8 @@ class BubbleSicboGame(tk.Frame):
         return 'break'
 
     def update_control_states(self):
-        enabled = self.accept_bets and not self.animation_running and not self.settlement_running
+        enabled = (self.accept_bets and not self.animation_running
+                   and not self.settlement_running and not self._chips_moving())
         for name in ('repeat_button', 'clear_button', 'insurance_mode_button'):
             tag = getattr(self, name, None)
             if tag:
@@ -1372,12 +2267,28 @@ class BubbleSicboGame(tk.Frame):
         if record_undo:
             self.undo_stack.append((bet_type, param, allowed))
         self.summary_mode = 'bet'
+        key = (bet_type, param)
+        spot = self.bet_spots.get(key)
+        if spot:
+            self._pending_bet_amounts[key] = self._pending_bet_amounts.get(key, 0.0) + allowed
         self.update_display()
         self.save_balance()
+        if spot:
+            def arrived():
+                remaining = self._pending_bet_amounts.get(key, 0.0) - allowed
+                if remaining > 1e-9:
+                    self._pending_bet_amounts[key] = remaining
+                else:
+                    self._pending_bet_amounts.pop(key, None)
+                self.update_bet_chips()
+            self._animate_sicbo_chip(
+                allowed, self._chip_rack_position(allowed), self._bet_chip_position(spot),
+                arrived, start_radius=27)
         return True
 
     def clear_single_bet(self, bet_type, param=None):
-        if not self.accept_bets or self.animation_running or self.settlement_running:
+        if (not self.accept_bets or self.animation_running or self.settlement_running
+                or self._chips_moving()):
             return
         refunded = self.engine.clear_area(bet_type, param)
         if refunded <= 0:
@@ -1386,9 +2297,11 @@ class BubbleSicboGame(tk.Frame):
         self.undo_stack = [item for item in self.undo_stack if item[:2] != (bet_type, param)]
         self.update_display()
         self.save_balance()
+        self._return_bet_chips([((bet_type, param), refunded)])
 
     def undo_last_bet(self):
-        if not self.accept_bets or self.animation_running or self.settlement_running:
+        if (not self.accept_bets or self.animation_running or self.settlement_running
+                or self._chips_moving()):
             return
         while self.undo_stack:
             bet_type, param, amount = self.undo_stack.pop()
@@ -1397,22 +2310,28 @@ class BubbleSicboGame(tk.Frame):
                 self.balance += removed
                 self.update_display()
                 self.save_balance()
+                self._return_bet_chips([((bet_type, param), removed)])
                 return
 
     def clear_bets(self):
-        if not self.accept_bets or self.animation_running or self.settlement_running:
+        if (not self.accept_bets or self.animation_running or self.settlement_running
+                or self._chips_moving()):
             return
         refunded = self.engine.total_at_risk()
         if refunded <= 0:
             return
         self.balance += refunded
+        returning = [((bet_type, param), amount)
+                     for bet_type, param, amount in self.snapshot_bets()]
         self.engine.bets = self.engine.new_bets()
         self.undo_stack.clear()
         self.update_display()
         self.save_balance()
+        self._return_bet_chips(returning)
 
     def repeat_last_bets(self):
-        if not self.accept_bets or self.animation_running or self.settlement_running or not self.last_round_bets:
+        if (not self.accept_bets or self.animation_running or self.settlement_running
+                or self._chips_moving() or not self.last_round_bets):
             return
 
         required_balance = sum(float(amount) for _bet_type, _param, amount in self.last_round_bets)
@@ -1437,10 +2356,12 @@ class BubbleSicboGame(tk.Frame):
         self.update_control_button_style(
             self.insurance_mode_button, text=label, fill=fill, fg='white'
         )
-        payout_label = ('0.95:1｜围骰赔付'
-                        if self.triple_mode else '1:1｜围骰通杀')
+        payout_label = '0.95:1' if self.triple_mode else '1:1'
         for item_id in getattr(self, 'basic_payout_text_items', []):
             self.canvas.itemconfigure(item_id, text=payout_label)
+        rule_label = '围骰赔付' if self.triple_mode else '围骰通杀'
+        for item_id in getattr(self, 'basic_rule_text_items', []):
+            self.canvas.itemconfigure(item_id, text=rule_label)
         if hasattr(self, 'small_range_text'):
             self.canvas.itemconfigure(
                 self.small_range_text, text='3–10' if self.triple_mode else '4–10'
@@ -1479,42 +2400,126 @@ class BubbleSicboGame(tk.Frame):
     def update_bet_chips(self):
         self.canvas.delete('bet_chip_dynamic')
         for key, spot in self.bet_spots.items():
-            amount = self.engine.current_area_bet(*key)
-            if key in self.flash_winner_amounts:
-                if self.flash_mode == 'win':
-                    amount = self.flash_winner_amounts[key]
-                elif self.flash_mode == 'original':
-                    amount = self.flash_original_amounts.get(key, amount)
+            settled_winner = self.settlement_running and key in self.flash_original_amounts
+            if settled_winner and self._settlement_chips_returning:
+                continue
+            amount = (self.flash_original_amounts[key] if settled_winner else
+                      self.engine.current_area_bet(*key) - self._pending_bet_amounts.get(key, 0.0))
+            if settled_winner and self.flash_mode == 'win':
+                amount = self.flash_winner_amounts.get(key, amount)
             if amount <= 0:
                 continue
-            x, chip_y = spot['chip_pos']
-            x0, y0, x1, y1 = spot['bounds']
+            tags = ('bet_chip_dynamic', spot['tag'])
+            self._draw_sicbo_chip(amount, *self._bet_chip_position(spot), (*tags, 'stake_chip'))
+        self.canvas.tag_raise('bet_chip_label')
 
-            # All table chips use one compact minimum size and remain centered
-            # in their registered betting cells.
-            radius = 14
-            x = max(x0 + radius + 1, min(x1 - radius - 1, x))
-            chip_y = max(y0 + radius + 1, min(y1 - radius - 1, chip_y))
-            chip_color = self.bet_chip_color(amount)
-            text_color = self.contrast_text_color(chip_color)
+    def _bet_chip_position(self, spot):
+        x, y = spot['chip_pos']
+        x0, y0, x1, y1 = spot['bounds']
+        inset_x = min(self.BET_CHIP_RADIUS + 1, (x1-x0)/2)
+        inset_y = min(self.BET_CHIP_RADIUS + 1, (y1-y0)/2)
+        x = max(x0+inset_x, min(x1-inset_x, x))
+        y = max(y0+inset_y, min(y1-inset_y, y))
+        return x, y
 
-            self.canvas.create_oval(
-                x - radius, chip_y - radius, x + radius, chip_y + radius,
-                fill='#292522', outline='#151311', width=1,
-                tags=('bet_chip_dynamic', spot['tag'])
-            )
-            inner_radius = radius - 3
-            self.canvas.create_oval(
-                x - inner_radius, chip_y - inner_radius,
-                x + inner_radius, chip_y + inner_radius,
-                fill=chip_color, outline='#e2ddd5', width=1,
-                tags=('bet_chip_dynamic', spot['tag'])
-            )
-            text = self._compact_amount(amount)
-            self.canvas.create_text(
-                x, chip_y, text=text, font=('Arial', 8, 'bold'),
-                fill=text_color, tags=('bet_chip_dynamic', spot['tag'])
-            )
+    def _draw_sicbo_chip(self, amount, x, y, tags, radius=None):
+        radius = self.BET_CHIP_RADIUS if radius is None else radius
+        color = self.bet_chip_color(amount)
+        self.canvas.create_oval(
+            x-radius, y-radius, x+radius, y+radius,
+            fill='#292522', outline='#151311', width=1, tags=tags)
+        inner = radius-3
+        self.canvas.create_oval(
+            x-inner, y-inner, x+inner, y+inner,
+            fill=color, outline='#e2ddd5', width=1, tags=tags)
+        text = self._compact_amount(amount)
+        font_size = max(6, min(9, 13-len(text)))
+        self.canvas.create_text(
+            x, y, text=text, font=('Arial', font_size, 'bold'),
+            fill=self.contrast_text_color(color), tags=(*tags, 'bet_chip_label'))
+
+    def _chips_moving(self):
+        return bool(getattr(self, '_chip_motion_count', 0))
+
+    def _chip_rack_position(self, amount):
+        index = 0
+        for candidate, (threshold, _color, _label) in enumerate(self.CHIP_SPECS):
+            if amount >= threshold:
+                index = candidate
+            else:
+                break
+        return 447 + index*57, 672
+
+    def _animate_sicbo_chip(self, amount, start, target, complete=None,
+                            start_radius=None, end_radius=None):
+        if amount <= 0 or self._closing:
+            if complete and not self._closing:
+                complete()
+            return
+        self._chip_motion_count += 1
+        self._chip_serial += 1
+        tag = f'chip_motion_{self._chip_serial}'
+        start_radius = self.BET_CHIP_RADIUS if start_radius is None else start_radius
+        end_radius = self.BET_CHIP_RADIUS if end_radius is None else end_radius
+        steps = max(1, math.ceil(self.CHIP_MOVE_MS/16))
+        self.update_control_states()
+
+        def frame(index):
+            if self._closing:
+                return
+            self.canvas.delete(tag)
+            t = index/steps
+            t = t*t*(3-2*t)
+            self._draw_sicbo_chip(
+                amount, start[0]+(target[0]-start[0])*t,
+                start[1]+(target[1]-start[1])*t,
+                (tag, 'chip_motion'), radius=start_radius+(end_radius-start_radius)*t)
+            self.canvas.tag_raise('chip_motion')
+            self.canvas.tag_raise('bet_chip_label')
+            if index < steps:
+                delay = round((index+1)*self.CHIP_MOVE_MS/steps)-round(index*self.CHIP_MOVE_MS/steps)
+                job_id = None
+                def tick():
+                    self._chip_motion_jobs.discard(job_id)
+                    frame(index+1)
+                job_id = self.after(delay, tick)
+                self._chip_motion_jobs.add(job_id)
+            else:
+                self.canvas.delete(tag)
+                self._chip_motion_count -= 1
+                if complete:
+                    complete()
+                self.update_control_states()
+        frame(0)
+
+    def _run_sicbo_chip_batch(self, transfers, complete=None):
+        transfers = [transfer for transfer in transfers if transfer['amount'] > 0]
+        if not transfers:
+            if complete:
+                complete()
+            return
+        pending = len(transfers)
+        def arrived(transfer):
+            nonlocal pending
+            if transfer.get('arrive'):
+                transfer['arrive']()
+            pending -= 1
+            if pending == 0 and complete:
+                complete()
+        for transfer in transfers:
+            self._animate_sicbo_chip(
+                transfer['amount'], transfer['start'], transfer['target'],
+                lambda transfer=transfer: arrived(transfer),
+                start_radius=transfer.get('start_radius'), end_radius=transfer.get('end_radius'))
+
+    def _return_bet_chips(self, entries):
+        transfers = []
+        for key, amount in entries:
+            spot = self.bet_spots.get(key)
+            if spot and amount > 0:
+                transfers.append(dict(amount=amount, start=self._bet_chip_position(spot),
+                                      target=self._chip_rack_position(amount), end_radius=27))
+        self._run_sicbo_chip_batch(transfers)
 
     @classmethod
     def bet_chip_color(cls, amount):
@@ -1547,65 +2552,230 @@ class BubbleSicboGame(tk.Frame):
 
     # ------------------------------------------------------------ roll/animation
     def roll_dice(self):
-        if not self.accept_bets or self.animation_running or self.settlement_running:
+        if (not self.accept_bets or self.animation_running or self.settlement_running
+                or self._chips_moving()):
             return
         self.accept_bets = False
         self.animation_running = True
+        self._sicbo_recovering = self._sicbo_round_voided = False
         current_round_bets = self.snapshot_bets()
         if current_round_bets:
             self.last_round_bets = current_round_bets
         self.undo_stack.clear()
 
-        if self.developer_dice:
-            final_dice = list(self.developer_dice)
-            self.developer_dice = None
-        else:
-            final_dice = [die.roll() for die in self.dice_objects]
-        self.animation_final_dice = final_dice
-        self.animation_frames_left = secrets.randbelow(15) + 27
-        self.canvas.itemconfigure(self.animation_phase_text, text='骰子摇动中…')
-        self.canvas.itemconfigure(self.animation_status_text, text='请停止下注', state='normal')
-        for item in self.animation_result_dice_items:
-            self.canvas.itemconfigure(item, state='hidden')
-        for item in self.animation_result_plus_items:
-            self.canvas.itemconfigure(item, state='hidden')
-        self.canvas.itemconfigure(self.animation_result_suffix, state='hidden')
+        self.animation_final_dice = None
+        self.animation_frames_left = 0
+        self._set_sicbo_status('rolling')
         self.update_control_states()
+        self._start_sicbo_dice_roll()
+
+    def _draw_sicbo_dice(self):
+        picture = _gd_render_bowl(self._sicbo_bowl)
+        photo = ImageTk.PhotoImage(picture, master=self.canvas)
+        if self._sicbo_cup_item is not None and self.canvas.find_withtag('animation_dice'):
+            self.canvas.itemconfigure(self._sicbo_cup_item, image=photo)
+        else:
+            self._sicbo_cup_item = self.canvas.create_image(
+                *self._sicbo_cup_position, anchor='n', image=photo,
+                tags=('animation', 'animation_dice'))
+        self._sicbo_cup_photo = photo
+        self.animation_dice_items = [self._sicbo_cup_item]
+
+    def _start_sicbo_dice_roll(self):
+        if (self._closing or not self.animation_running or self.settlement_running
+                or self.animation_final_dice is not None or self._sicbo_recovering):
+            return
+        self._cancel_sicbo_result_timeout()
+        self._sicbo_bowl.begin()
+        self._sicbo_dice_phase = 'shake'
+        self._sicbo_dice_time = self._sicbo_dice_stable_time = 0.
+        self._sicbo_dice_rest_anchor = None
         self.animate_dice()
 
+    def _sicbo_dice_is_motionless(self, dt):
+        pose = tuple(point for die in self._sicbo_bowl.dice for point in die.vertices())
+        anchor = self._sicbo_dice_rest_anchor
+        if anchor is None or any(_gd_length(_gd_sub(p, q)) > .00005 for p, q in zip(pose, anchor)):
+            self._sicbo_dice_rest_anchor = pose
+            self._sicbo_dice_stable_time = 0.
+            return False
+        self._sicbo_dice_stable_time += dt
+        return self._sicbo_dice_stable_time >= .65
+
+
     def animate_dice(self):
-        if self._closing:
+        if (self._closing or not self.animation_running
+                or self._sicbo_dice_phase not in ('shake', 'settle')):
             return
-        if self.animation_frames_left > 0:
-            current = [secrets.randbelow(6) + 1 for _ in range(3)]
-            for index, (item, value) in enumerate(zip(self.animation_dice_items, current)):
-                base_x, base_y = self.animation_dice_base_positions[index]
-                shake_x = secrets.randbelow(31) - 15
-                shake_y = secrets.randbelow(31) - 15
-                self.canvas.coords(item, base_x + shake_x, base_y + shake_y)
-                self.canvas.itemconfigure(
-                    item,
-                    image=self.dice_images_animation[value - 1],
-                    state='normal',
-                )
-            self.animation_frames_left -= 1
-            delay = 45 if self.animation_frames_left > 10 else 70
+        if (self._sicbo_dice_phase == 'settle' and self._sicbo_result_deadline is not None
+                and time.monotonic() >= self._sicbo_result_deadline):
+            self._sicbo_result_timed_out()
+            return
+        started = time.monotonic()
+        bowl = self._sicbo_bowl
+        valid_result = False
+        dt = 1/480
+        for _ in range(16):
+            if self._sicbo_dice_phase == 'shake':
+                self._sicbo_dice_time += dt
+                bowl.step(dt, self._sicbo_dice_time, self._sicbo_dice_time < bowl.duration)
+                if self._sicbo_dice_time >= bowl.duration:
+                    self._sicbo_dice_phase = 'settle'
+                    self._arm_sicbo_result_timeout()
+            else:
+                bowl.step(dt, 0., False)
+                if self._sicbo_dice_is_motionless(dt):
+                    if bowl.landing_error():
+                        if self._sicbo_recovering:
+                            self._draw_sicbo_dice()
+                            self._queue_sicbo_recovery()
+                            return
+                        continue
+                    for die in bowl.dice:
+                        die.v = die.omega = (0., 0., 0.)
+                    valid_result = True
+                    break
+        if valid_result:
+            if (self._sicbo_result_deadline is not None
+                    and time.monotonic() >= self._sicbo_result_deadline):
+                self._sicbo_result_timed_out()
+                return
+            if self._sicbo_recovering:
+                self._cancel_sicbo_result_timeout()
+                self._draw_sicbo_dice()
+                self._finish_sicbo_recovery()
+                return
+            # Read the three upward faces only after the bodies have stopped.
+            # From here on, rendering and settlement never change their poses.
+            try:
+                final_dice = bowl.values()
+            except ValueError:
+                valid_result = False
+            else:
+                self._cancel_sicbo_result_timeout()
+                self.animation_final_dice = final_dice
+                self.animation_frames_left = 0
+                self._sicbo_dice_phase = 'landed'
+        self._draw_sicbo_dice()
+        if not valid_result:
+            delay = max(1, 33-round((time.monotonic()-started)*1000))
             self.animation_after_id = self.after(delay, self.animate_dice)
             return
+        self.animation_after_id = self.after(0, self.finish_roll)
 
-        for index, (item, value) in enumerate(zip(self.animation_dice_items, self.animation_final_dice)):
-            base_x, base_y = self.animation_dice_base_positions[index]
-            self.canvas.coords(item, base_x, base_y)
-            self.canvas.itemconfigure(
-                item,
-                image=self.dice_images_animation[value - 1],
-                state='normal',
-            )
-        self.animation_after_id = self.after(350, self.finish_roll)
+    def _cancel_sicbo_result_timeout(self):
+        if self._sicbo_result_timeout_id is not None:
+            try:
+                self.after_cancel(self._sicbo_result_timeout_id)
+            except (tk.TclError, ValueError):
+                pass
+        self._sicbo_result_timeout_id = self._sicbo_result_deadline = None
+
+    def _arm_sicbo_result_timeout(self):
+        self._cancel_sicbo_result_timeout()
+        self._sicbo_result_deadline = time.monotonic()+self.DICE_RESULT_TIMEOUT_MS/1000
+        self._sicbo_result_timeout_id = self.after(
+            self.DICE_RESULT_TIMEOUT_MS, self._sicbo_result_timed_out)
+
+    def _sicbo_result_timed_out(self):
+        if (self._closing or not self.animation_running
+                or self._sicbo_dice_phase != 'settle'
+                or self.animation_final_dice is not None
+                or self._sicbo_result_deadline is None):
+            return
+        remaining = self._sicbo_result_deadline-time.monotonic()
+        if remaining>0:
+            self._sicbo_result_timeout_id = self.after(
+                max(1, math.ceil(remaining*1000)), self._sicbo_result_timed_out)
+            return
+        self._cancel_sicbo_result_timeout()
+        if self._sicbo_recovering:
+            self._queue_sicbo_recovery()
+        else:
+            self._void_sicbo_round()
+
+    def _queue_sicbo_recovery(self):
+        if self._closing or not self._sicbo_recovering:
+            return
+        self._cancel_sicbo_result_timeout()
+        if self.animation_after_id is not None:
+            try:
+                self.after_cancel(self.animation_after_id)
+            except (tk.TclError, ValueError):
+                pass
+        self._sicbo_dice_phase = 'recovery_wait'
+        self.animation_final_dice = None
+        self.animation_after_id = self.after(0, self._start_sicbo_recovery)
+
+    def _void_sicbo_round(self):
+        if (self._closing or self._sicbo_round_voided or self.settlement_running
+                or not self.animation_running or self.animation_final_dice is not None):
+            return
+        self._sicbo_round_voided = self._sicbo_recovering = True
+        refunds = [((kind,param),amount) for kind,param,amount in self.snapshot_bets()]
+        refunded = self.engine.total_at_risk()
+        # Clear paid stakes before crediting them so close/repeated callbacks cannot refund twice.
+        self.engine.bets = self.engine.new_bets()
+        self.balance += refunded
+        self.undo_stack.clear()
+        self.pre_roll_bets = None
+        self.cancel_pending_callbacks()
+        self.canvas.delete('win_flash_area')
+        self.restore_flash_text_colors()
+        self.flash_mode = None
+        self.flash_winning_keys.clear()
+        self.flash_winner_amounts.clear()
+        self.flash_original_amounts.clear()
+        self._settlement_chips_returning = False
+        self.summary_mode = 'bet'
+        self.accept_bets = False
+        self._set_sicbo_status('recovering')
+        self.update_display()
+        self.save_balance()
+        self._return_bet_chips(refunds)
+        self._queue_sicbo_recovery()
+
+    def _start_sicbo_recovery(self):
+        if self._closing or not self._sicbo_recovering or not self._sicbo_round_voided:
+            return
+        self.animation_after_id = None
+        self._cancel_sicbo_result_timeout()
+        # A fresh, separated physical starting pose prevents a bad stack persisting.
+        self._sicbo_bowl = GoldenDiceBowl(rng=self._sicbo_bowl.rng)
+        self._sicbo_bowl.begin(duration=self.DICE_RECOVERY_SHAKE_SECONDS)
+        self._sicbo_dice_phase = 'shake'
+        self._sicbo_dice_time = self._sicbo_dice_stable_time = 0.
+        self._sicbo_dice_rest_anchor = None
+        self.animation_final_dice = None
+        self.animate_dice()
+
+    def _finish_sicbo_recovery(self):
+        if self._closing or not self._sicbo_recovering:
+            return
+        if not self._sicbo_bowl.settled() or self._sicbo_bowl.landing_error():
+            self._queue_sicbo_recovery()
+            return
+        self._cancel_sicbo_result_timeout()
+        if self._chips_moving():
+            self._sicbo_dice_phase = 'recovery_ready'
+            self.animation_after_id = self.after(16, self._finish_sicbo_recovery)
+            return
+        self.animation_after_id = None
+        self._sicbo_dice_phase = 'idle'
+        self._sicbo_recovering = False
+        self.animation_running = self.settlement_running = False
+        self.animation_final_dice = None
+        self.accept_bets = True
+        self._set_sicbo_status('ready')
+        self.update_display()
 
     def finish_roll(self):
-        # Preserve the exact pre-roll stakes so the winning chip can alternate
-        # between the original bet and the total returned amount, as in Craps.
+        if (self._closing or not self.animation_running or self.settlement_running
+                or self._sicbo_recovering or self._sicbo_round_voided
+                or self._sicbo_dice_phase != 'landed' or self.animation_final_dice is None):
+            return
+        self._sicbo_dice_phase = 'result'
+        # Retain the stake and total return for the alternating win display.
         self.pre_roll_bets = copy.deepcopy(self.engine.bets)
         result = self.engine.resolve_roll(self.animation_final_dice, self.triple_mode)
         self.balance += result['credit']
@@ -1617,6 +2787,7 @@ class BubbleSicboGame(tk.Frame):
         self.flash_winning_keys = self.winning_keys_for_result(result)
         self.flash_winner_amounts = {}
         self.flash_original_amounts = {}
+        self._settlement_chips_returning = False
         for outcome in result.get('outcomes', []):
             if outcome.get('status') != 'win' or not outcome.get('key'):
                 continue
@@ -1629,35 +2800,10 @@ class BubbleSicboGame(tk.Frame):
                 self.pre_roll_bets, key
             )
 
-        # Sic Bo wagers are one-roll bets. Clear the live table immediately;
-        # the flash layer below temporarily renders winning original/return chips.
+        # Clear one-roll bets; a single result chip remains at each winning spot.
         self.engine.bets = self.engine.new_bets()
         self.summary_mode = 'win'
-        sorted_dice = sorted(result['dice'])
-        if result['is_triple']:
-            result_suffix = f"= {result['total']}点，围骰"
-        else:
-            size_text = '大' if result['total'] >= 11 else '小'
-            parity_text = '双' if result['total'] % 2 == 0 else '单'
-            result_suffix = f"= {result['total']}点{size_text}，{parity_text}"
-
-        self.canvas.itemconfigure(self.animation_phase_text, text='本局结果')
-        self.canvas.itemconfigure(
-            self.animation_status_bubble,
-            fill=self._darken_result_color(result['result_color']),
-            outline=result['result_color'],
-        )
-        self.canvas.itemconfigure(self.animation_status_text, state='hidden')
-        for item, value in zip(self.animation_result_dice_items, sorted_dice):
-            self.canvas.itemconfigure(item, image=self.dice_images_history[int(value) - 1], state='normal')
-        for item in self.animation_result_plus_items:
-            self.canvas.itemconfigure(item, fill='white', state='normal')
-        self.canvas.itemconfigure(
-            self.animation_result_suffix,
-            text=result_suffix,
-            fill=result['result_color'],
-            state='normal',
-        )
+        self._set_sicbo_status('result', result)
 
         self.animation_after_id = None
         self.accept_bets = False
@@ -1671,6 +2817,18 @@ class BubbleSicboGame(tk.Frame):
             self.run_settlement_flash()
         else:
             self.result_after_id = self.after(1600, self.finish_settlement)
+
+        # Lost stakes leave their betting spots and disappear at the title.
+        transfers = []
+        for outcome in result.get('outcomes', []):
+            if outcome.get('status') != 'lose' or not outcome.get('key'):
+                continue
+            spot = self.bet_spots.get(tuple(outcome['key']))
+            amount = float(outcome.get('stake', 0.0))
+            if spot and amount > 0:
+                transfers.append(dict(amount=amount, start=self._bet_chip_position(spot),
+                                      target=self._sicbo_title_position))
+        self._run_sicbo_chip_batch(transfers)
 
     def winning_keys_for_result(self, result):
         """Return every table area that wins for this roll, independent of wagers."""
@@ -1717,6 +2875,10 @@ class BubbleSicboGame(tk.Frame):
                 if unique_dice.issubset({int(value) for value in group}):
                     keys.add(('number_group', group))
 
+        exact_key = SicboEngine.exact_combination_key(dice)
+        if exact_key is not None:
+            keys.add(exact_key)
+
         return keys
 
     def snapshot_bet_amount(self, bets, key):
@@ -1729,31 +2891,20 @@ class BubbleSicboGame(tk.Frame):
         return float(value)
 
     def run_settlement_flash(self):
-        """Alternate winning areas between a white win layer and the original UI."""
+        """Dim non-winners and alternate winning cells between gold and white."""
         if self._closing or not self.settlement_running:
             return
         if self.settlement_flash_step >= 6:
-            self.finish_settlement()
+            self.settlement_after_id = None
+            self._return_settlement_chips()
             return
 
         self.flash_mode = 'win' if self.settlement_flash_step % 2 == 0 else 'original'
         self.canvas.delete('win_flash_area')
-
-        if self.flash_mode == 'original':
-            self.restore_flash_text_colors()
-
-        if self.flash_mode == 'win':
-            for key in self.flash_winning_keys:
-                spot = self.bet_spots.get(key)
-                if not spot:
-                    continue
-                x0, y0, x1, y1 = spot['bounds']
-                self.canvas.create_rectangle(
-                    x0, y0, x1, y1,
-                    fill='#ffffff', outline='#111111', width=2,
-                    tags=('win_flash_area', 'settlement_flash'),
-                )
-                self.raise_spot_content_above_flash(spot)
+        if not self._settlement_spot_styles:
+            self._prepare_settlement_board()
+        for key in self.flash_winning_keys:
+            self._paint_settlement_spot(key, 'gold' if self.flash_mode == 'win' else 'white')
 
         self.update_bet_chips()
         self.canvas.tag_raise('bet_chip_dynamic')
@@ -1762,7 +2913,84 @@ class BubbleSicboGame(tk.Frame):
             self.canvas.tag_raise(self.insurance_mode_button)
 
         self.settlement_flash_step += 1
-        self.settlement_after_id = self.after(1000, self.run_settlement_flash)
+        self.settlement_after_id = self.after(self.SETTLEMENT_FLASH_MS, self.run_settlement_flash)
+
+    def _prepare_settlement_board(self):
+        """Remember the real shapes, borders, text and dice before any shading."""
+        for key, spot in self.bet_spots.items():
+            items = []
+            for item in self.canvas.find_withtag(spot['tag']):
+                if 'board' not in self.canvas.gettags(item):
+                    continue
+                kind = self.canvas.type(item)
+                style = {}
+                if kind == 'image':
+                    image = self._board_dice_item_images.get(item)
+                    if image is not None:
+                        style['image'] = image
+                else:
+                    for option in ('fill', 'outline'):
+                        try:
+                            style[option] = self.canvas.itemcget(item, option)
+                        except tk.TclError:
+                            pass
+                items.append((item, kind, style))
+            self._settlement_spot_styles[key] = items
+        for key in self.bet_spots:
+            if key not in self.flash_winning_keys:
+                self._paint_settlement_spot(key, 'dim')
+
+    def _paint_settlement_spot(self, key, mode):
+        """Recolour existing items so rounded corners and decorative borders stay."""
+        for item, kind, original in self._settlement_spot_styles.get(key, []):
+            style = dict(original)
+            if mode == 'dim':
+                for option in ('fill', 'outline'):
+                    if style.get(option):
+                        style[option] = self.shade_color(style[option], .42)
+                image = style.get('image')
+                if image is not None:
+                    cache_key = id(image)
+                    if cache_key not in self._settlement_dim_images:
+                        picture = image if isinstance(image, Image.Image) else ImageTk.getimage(image)
+                        self._settlement_dim_images[cache_key] = ImageTk.PhotoImage(
+                            ImageEnhance.Brightness(picture).enhance(.42))
+                    style['image'] = self._settlement_dim_images[cache_key]
+            elif mode in ('gold', 'white'):
+                if kind == 'text':
+                    style['fill'] = '#211608'
+                elif kind != 'image':
+                    if style.get('fill'):
+                        style['fill'] = self.SETTLEMENT_GOLD if mode == 'gold' else self.SETTLEMENT_WHITE
+                    if style.get('outline'):
+                        style['outline'] = '#79551b'
+            if style:
+                self.canvas.itemconfigure(item, **style)
+
+    def _restore_settlement_board(self):
+        for key in self._settlement_spot_styles:
+            self._paint_settlement_spot(key, 'original')
+        self._settlement_spot_styles.clear()
+        self._settlement_dim_images.clear()
+
+    def _return_settlement_chips(self):
+        if self._closing or self._settlement_chips_returning:
+            return
+        self._settlement_chips_returning = True
+        self.canvas.delete('win_flash_area')
+        self.restore_flash_text_colors()
+        for key in self.flash_winning_keys:
+            self._paint_settlement_spot(key, 'white')
+        transfers = []
+        for key, amount in self.flash_winner_amounts.items():
+            spot = self.bet_spots.get(key)
+            if not spot:
+                continue
+            if amount > 0:
+                transfers.append(dict(amount=amount, start=self._bet_chip_position(spot),
+                                      target=self._chip_rack_position(amount), end_radius=27))
+        self.update_bet_chips()
+        self._run_sicbo_chip_batch(transfers, self.finish_settlement)
 
     def raise_spot_content_above_flash(self, spot):
         """Keep a cell's dice/text visible over the white flash layer."""
@@ -1802,27 +3030,18 @@ class BubbleSicboGame(tk.Frame):
             self.result_after_id = None
         self.canvas.delete('win_flash_area')
         self.restore_flash_text_colors()
+        self._restore_settlement_board()
         self.flash_mode = None
         self.flash_winning_keys = set()
         self.flash_winner_amounts = {}
         self.flash_original_amounts = {}
+        self._settlement_chips_returning = False
         self.pre_roll_bets = None
         self.settlement_running = False
         self.animation_running = False
+        self._sicbo_dice_phase = 'idle'
         self.accept_bets = True
-        self.canvas.itemconfigure(self.animation_phase_text, text='骰宝')
-        self.canvas.itemconfigure(
-            self.animation_status_bubble, fill='#0b2723', outline='#c8efe7'
-        )
-        self.canvas.itemconfigure(
-            self.animation_status_text,
-            text='选择筹码并点击下注区域，然后按“转动”', fill='white', state='normal'
-        )
-        for item in self.animation_result_dice_items:
-            self.canvas.itemconfigure(item, state='hidden')
-        for item in self.animation_result_plus_items:
-            self.canvas.itemconfigure(item, state='hidden')
-        self.canvas.itemconfigure(self.animation_result_suffix, state='hidden')
+        self._set_sicbo_status('ready')
         self.update_display()
 
     def ready_next_round(self):
@@ -2094,49 +3313,8 @@ class BubbleSicboGame(tk.Frame):
                 fill=color, tags='history_dynamic'
             )
 
-    # ----------------------------------------------------------- developer mode
-    def arm_developer_mode(self):
-        self._developer_armed = True
 
-    def open_developer_after_arm(self):
-        if getattr(self, '_developer_armed', False):
-            self._developer_armed = False
-            self.show_developer_input_dialog()
 
-    def show_developer_input_dialog(self):
-        win = tk.Toplevel(self.winfo_toplevel())
-        win.title('固定三颗骰子')
-        win.geometry('350x145')
-        win.resizable(False, False)
-        win.transient(self.winfo_toplevel())
-        win.grab_set()
-        tk.Label(win, text='输入三个 1–6 的数字；留空恢复随机：',
-                 font=('Arial', 11)).pack(pady=(14, 5))
-        entry = tk.Entry(win, font=('Arial', 16), justify=tk.CENTER)
-        entry.pack(fill=tk.X, padx=28)
-        entry.focus_set()
-
-        def confirm():
-            value = entry.get().strip()
-            if not value:
-                self.developer_dice = None
-                win.destroy()
-                return
-            parts = re.split(r'[\s,;]+', value)
-            try:
-                dice = [int(item) for item in parts]
-            except ValueError:
-                messagebox.showwarning('输入错误', '请输入三个 1 到 6 的整数。', parent=win)
-                return
-            if len(dice) != 3 or not all(1 <= item <= 6 for item in dice):
-                messagebox.showwarning('输入错误', '请输入三个 1 到 6 的整数。', parent=win)
-                return
-            self.developer_dice = dice
-            win.destroy()
-
-        tk.Button(win, text='确定', width=12, command=confirm).pack(pady=10)
-        win.bind('<Return>', lambda _event: confirm())
-        win.bind('<Escape>', lambda _event: win.destroy())
 
     # ---------------------------------------------------------------- lifecycle
     def save_balance(self):
@@ -2146,6 +3324,7 @@ class BubbleSicboGame(tk.Frame):
             self.on_balance_change(float(self.balance))
 
     def cancel_pending_callbacks(self):
+        self._cancel_sicbo_result_timeout()
         for after_id in (
             self.animation_after_id, self.result_after_id,
             self.flash_after_id, self.settlement_after_id,
@@ -2159,6 +3338,15 @@ class BubbleSicboGame(tk.Frame):
         self.result_after_id = None
         self.flash_after_id = None
         self.settlement_after_id = None
+        for job_id in tuple(self._chip_motion_jobs):
+            try:
+                self.after_cancel(job_id)
+            except (tk.TclError, ValueError):
+                pass
+        self._chip_motion_jobs.clear()
+        self._chip_motion_count = 0
+        self._pending_bet_amounts.clear()
+        self.canvas.delete('chip_motion')
 
     def on_close(self):
         self.exit_game()

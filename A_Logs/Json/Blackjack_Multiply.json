@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "shoe": {
+    "mode": "CSM",
+    "decks": 8,
+    "chambers": 15,
+    "game_id": "MultiplyBlackjack:root01:cc0fe618d629443593af0851dd1b5d46"
+  }
+}

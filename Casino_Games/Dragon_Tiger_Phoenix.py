@@ -324,8 +324,7 @@ class DragonTigerEngine:
         return 0.0
 
     @classmethod
-    def resolve_bets(cls, bets, result, mode, jackpot_amount=0.0):
-        del jackpot_amount
+    def resolve_bets(cls, bets, result, mode):
         side_factors = cls.side_return_factors(result, mode, bets)
         outcomes = []
         credit = 0.0
@@ -376,7 +375,6 @@ class DragonTigerEngine:
             'net': gross_profit - lost_stake,
             'outcomes': outcomes,
             'side_factors': side_factors,
-            'jackpot_win': 0.0,
         }
 
 
@@ -458,6 +456,9 @@ class BubbleDragonTigerGame(tk.Frame):
     TIE_FLASH_DARK = '#23874b'
     TIE_FLASH_LIGHT = '#78e49a'
 
+    CHIP_MOVE_DURATION_MS = 200
+    CHIP_MOVE_STEPS = 10
+
     MIN_BET = 100.0
     MAX_TABLE_BET = 2_000_000.0
     MAX_RECORDS = 300
@@ -515,6 +516,10 @@ class BubbleDragonTigerGame(tk.Frame):
         self.animation_running = False
         self.settlement_running = False
         self.animation_after_ids = []
+        self.chip_motion_after_ids = set()
+        self.chip_motion_serial = 0
+        self.chip_motion_items = {}
+        self.pending_bet_visual_amounts = {}
         self.settlement_after_id = None
         self.flash_mode = None
         self.flash_winning_keys = set()
@@ -556,8 +561,6 @@ class BubbleDragonTigerGame(tk.Frame):
         # the winning point value by clicking anywhere on the bead grid.
         self.bead_show_scores = False
 
-        self.jackpot_file = self.get_jackpot_file()
-        self.jackpot_amount = self.load_jackpot()
 
         # Prefer the original external card artwork. If the project
         # assets are unavailable, draw the temporary V4-style cards instead.
@@ -568,11 +571,6 @@ class BubbleDragonTigerGame(tk.Frame):
         self.load_original_card_assets()
 
         top = self.winfo_toplevel()
-        try:
-            top.geometry('1150x750+50+10')
-            top.resizable(False, False)
-        except tk.TclError:
-            pass
 
         top.bind('<Return>', self.handle_enter_deal)
         self.bind('<Escape>', lambda _event: self.exit_game())
@@ -842,41 +840,6 @@ class BubbleDragonTigerGame(tk.Frame):
             cell['value'] = cell['payload']['road_value']
         return cells
 
-    def _record_specials_for_mode(self, record, mode):
-        by_mode = record.get('special_by_mode', {})
-        if isinstance(by_mode, dict):
-            values = by_mode.get(mode, [])
-            if isinstance(values, list):
-                return values
-        # Backward compatibility with older records that only stored the mode
-        # in which the hand was originally played.
-        if record.get('mode', 'classic') == mode:
-            values = record.get('specials', [])
-            return values if isinstance(values, list) else []
-        return []
-
-    def _special_marker(self, record):
-        """Compact marker used by the Bead Plate only.
-
-        The marker is intentionally mode-specific.  Switching from Lucky 7 to
-        Tiger therefore re-renders the same historical hand with the marker
-        for the newly selected mode instead of leaking another mode's symbol.
-        """
-        selected = set(self._record_specials_for_mode(record, self.game_mode))
-        priority = (
-            ('Super 7', '7'), ('Lucky 7', '7'), ('Dragon 7', '7'),
-            ('Big Lucky 6', '6'), ('Small Lucky 6', '6'), ('Lucky 6', '6'),
-            ('Big Tiger', '大'), ('Small Tiger', '小'), ('Tiger Tie', '虎'),
-            # Pair outcomes never replace the bead text; pair dots are enough.
-            ('Panda 8', '8'),
-            ('Big Monkey', '猴'), ('Monkey 7', '7'), ('Monkey 6', '6'),
-            ('Lucky Monkey', '猴'),
-        )
-        for name, marker in priority:
-            if name in selected:
-                return marker
-        return ''
-
     def _derive_road(self, records, offset):
         """Build Big-Eye Boy / Small Road / Cockroach Pig correctly.
 
@@ -997,9 +960,8 @@ class BubbleDragonTigerGame(tk.Frame):
                 else:
                     text = ''
             else:
-                marker = self._special_marker(record)
-                text = marker or {'Dragon': '龙', 'Tiger': '虎', 'Phoenix': '凤',
-                                  'Tie': '和'}.get(winner, '')
+                text = {'Dragon': '龙', 'Tiger': '虎', 'Phoenix': '凤',
+                        'Tie': '和'}.get(winner, '')
             bead_text_color = '#111111' if winner == 'Tiger' else 'white'
             self.canvas.create_text(cx, cy, text=text, font=('Arial', 12, 'bold'),
                                     fill=bead_text_color, tags='history_dynamic')
@@ -1491,6 +1453,7 @@ class BubbleDragonTigerGame(tk.Frame):
         self.draw_mode_betting_board()
 
     def draw_mode_betting_board(self):
+        self._cancel_chip_motion()
         c = self.canvas
         c.delete('board_dynamic')
         c.delete('bet_chip_dynamic')
@@ -1541,7 +1504,7 @@ class BubbleDragonTigerGame(tk.Frame):
         c = self.canvas
         tag = self.spot_tag((bet_type, None))
         fill = self.BET_COLORS.get(bet_type, '#45665c')
-        fg = '#111111' if bet_type == 'Panda 8' else 'white'
+        fg = 'white'
         outline = '#d5cbbd'
         outline_width = 1
         rect_id = c.create_rectangle(
@@ -1642,6 +1605,8 @@ class BubbleDragonTigerGame(tk.Frame):
         self.update_control_states()
 
     def show_game_instructions(self):
+        """Game rules dialog with the Baccarat instruction layout."""
+        parent = self.winfo_toplevel()
         existing = getattr(self, '_intro_window', None)
         try:
             if existing is not None and existing.winfo_exists():
@@ -1651,116 +1616,287 @@ class BubbleDragonTigerGame(tk.Frame):
         except tk.TclError:
             pass
 
-        window = tk.Toplevel(self.winfo_toplevel())
-        self._intro_window = window
-        window.title('龙虎凤 · 游戏简介')
-        window.configure(bg='#120f0d')
-        window.resizable(False, False)
-        window.transient(self.winfo_toplevel())
+        dialog = tk.Toplevel(parent)
+        self._intro_window = dialog
+        engine = DragonTigerEngine
+        mode = self.game_mode
+        mode_title = engine.MODE_NAMES.get(mode, mode)
+        info = {'title': '龙虎凤',
+         'subtitle': '玩法 · 下注区 · 赔率 · 限红 · 历史记录',
+         'intro': [('比较点数', '龙、虎、凤各发一张；A 最小，K 最大。\n只有最高点数的一家独赢；并列最高为和局。'),
+                   ('同点区分', '两家并列最高时，两家下注各赔 1:1；\n三家同点时三家下注全部落空。两家较低同点不算和局。')],
+         'main_classic': [('龙／虎／凤独赢', '1.8:1'),
+                          ('两家并列最高 · 两家下注', '各 1:1'),
+                          ('三家同点 · 三家下注', '均不中奖'),
+                          ('两家并列最高 · 和局', '7:1'),
+                          ('三家同点 · 和局', '20:1')],
+         'specials': [('点数差距', '最大点数减最小点数：0–6 或 7–12。A=1、J=11、Q=12、K=13。'),
+                      ('花色计数', '三张牌中按红牌张数选择三黑、一红二黑、二红一黑或三红。红牌为红心和方块。'),
+                      ('大路连续', '一般格按整列共同颜色的交集判断连续；三家和只和紧接的三家和连续。')],
+         'history': [('右侧记录', '右侧显示大路、珠盘路，以及珠盘下方龙／虎／凤／和四项占比饼图。'),
+                     ('珠盘容量', '独立保留 72 局；超过时按整列移除最旧 6 局。单击珠盘可切换文字与点数。'),
+                     ('统计范围', '历史记录最多保留最近 300 局。')],
+         'extra': [('和局判定', '并列最高才算和局。例：8 / 8 / 2 为两家和；8 / 2 / 2 为龙独赢。'),
+                   ('差距例子', '2 / K / 8 → 差距 11；\n2 / 8 / 8 → 差距 6；\n8 / 8 / 8 → 差距 0。'),
+                   ('连续洗牌机', '8 副牌、15 仓连续洗牌；每局结算后牌张归还机器。')],
+         'main_bets': ('Dragon', 'Tiger', 'Phoenix')}
+        dialog.title(f"{info['title']} · 游戏说明 · {mode_title}")
+        dialog.configure(bg='#0a1414')
+        dialog.resizable(False, False)
+        dialog.transient(parent)
+        win_w, win_h = 1000, 650
+        parent.update_idletasks()
+        pos_x = parent.winfo_rootx() + (max(1, parent.winfo_width()) - win_w) // 2
+        pos_y = parent.winfo_rooty() + (max(1, parent.winfo_height()) - win_h) // 2
+        dialog.geometry(f'{win_w}x{win_h}+{pos_x}+{pos_y}')
+        font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
+        bg, sidebar_bg, panel, border = '#0a1414', '#0e1a1a', '#132020', '#3d5a55'
+        gold, fg, muted = '#f0d48b', '#eef4f4', '#a8bdbd'
 
-        width, height = 860, 720
-        try:
-            parent = self.winfo_toplevel()
-            x = parent.winfo_rootx() + max(0, (parent.winfo_width() - width) // 2)
-            y = parent.winfo_rooty() + max(0, (parent.winfo_height() - height) // 2)
-            window.geometry(f'{width}x{height}+{x}+{y}')
-        except tk.TclError:
-            window.geometry(f'{width}x{height}')
-
-        header = tk.Frame(window, bg='#352417', height=96,
-                          highlightbackground='#a7844d', highlightthickness=1)
-        header.pack(fill='x', padx=12, pady=(12, 8))
+        header = tk.Frame(dialog, bg='#0f1c1c', height=82)
+        header.pack(fill=tk.X)
         header.pack_propagate(False)
-        tk.Label(header, text='龙  虎  凤', bg='#352417', fg='#f2d37b',
-                 font=('Arial', 28, 'bold')).place(x=24, y=14)
-        tk.Label(header, text='DRAGON  ·  TIGER  ·  PHOENIX', bg='#352417', fg='#bda98d',
-                 font=('Arial', 10, 'bold')).place(x=27, y=61)
-        mode_name = DragonTigerEngine.MODE_NAMES.get(self.game_mode, self.game_mode)
-        tk.Label(header, text=f'当前玩法  {mode_name}', bg='#a77a31', fg='#130f0b',
-                 padx=18, pady=7, font=('Arial', 12, 'bold')).place(x=630, y=28)
+        tk.Label(header, text=f"{info['title']}  {mode_title}", bg='#0f1c1c',
+                 fg=gold, font=(font_name, 20, 'bold')).place(x=24, y=10)
+        tk.Label(header, text=info['subtitle'], bg='#0f1c1c', fg=muted,
+                 font=(font_name, 14)).place(x=25, y=48)
+        close_btn = tk.Button(header, text='关闭  ESC', font=(font_name, 14, 'bold'),
+                              bg='#2a3330', fg=fg, activebackground='#3a4644',
+                              activeforeground='white', relief=tk.FLAT, bd=0,
+                              cursor='hand2')
+        close_btn.place(x=850, y=20, width=120, height=42)
+        tk.Frame(dialog, bg=gold, height=3).pack(fill=tk.X)
 
-        content = tk.Frame(window, bg='#120f0d')
-        content.pack(fill='both', expand=True, padx=12)
-        left = tk.Frame(content, bg='#120f0d')
-        right = tk.Frame(content, bg='#120f0d')
-        left.pack(side='left', fill='both', expand=True, padx=(0, 5))
-        right.pack(side='right', fill='both', expand=True, padx=(5, 0))
+        body = tk.Frame(dialog, bg=bg)
+        body.pack(fill=tk.BOTH, expand=True)
+        sidebar = tk.Frame(body, bg=sidebar_bg, width=220)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+        tk.Frame(body, bg=border, width=1).pack(side=tk.LEFT, fill=tk.Y)
+        tk.Label(sidebar, text='主题', bg=sidebar_bg, fg=gold,
+                 font=(font_name, 14, 'bold'), anchor='w').pack(fill=tk.X, padx=16, pady=(18, 10))
 
-        def section(parent, title, accent, body, height_px):
-            frame = tk.Frame(parent, bg='#201914', height=height_px,
-                             highlightbackground='#58483a', highlightthickness=1)
-            frame.pack(fill='x', pady=(0, 8))
-            frame.pack_propagate(False)
-            tk.Frame(frame, bg=accent, width=5).pack(side='left', fill='y')
-            inner = tk.Frame(frame, bg='#201914')
-            inner.pack(side='left', fill='both', expand=True, padx=14, pady=10)
-            tk.Label(inner, text=title, bg='#201914', fg=accent,
-                     font=('Arial', 13, 'bold'), anchor='w').pack(fill='x')
-            tk.Label(inner, text=body, bg='#201914', fg='#e9dfd4',
-                     font=('Arial', 10), justify='left', anchor='nw',
-                     wraplength=360).pack(fill='both', expand=True, pady=(7, 0))
-            return frame
+        wrap = tk.Frame(body, bg=bg)
+        wrap.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        wrap.grid_rowconfigure(0, weight=1)
+        wrap.grid_columnconfigure(0, weight=1)
+        canvas = tk.Canvas(wrap, bg=bg, highlightthickness=0, bd=0, yscrollincrement=40)
+        bar = tk.Scrollbar(wrap, orient=tk.VERTICAL, command=canvas.yview,
+                           bg='#1f2a29', troughcolor='#0d1515', activebackground=gold,
+                           relief=tk.FLAT, bd=0, width=12)
+        canvas.configure(yscrollcommand=bar.set)
+        canvas.grid(row=0, column=0, sticky='nsew', padx=(0, 4), pady=6)
+        bar.grid(row=0, column=1, sticky='ns', padx=(0, 8), pady=6)
+        content = tk.Frame(canvas, bg=bg)
+        content_id = canvas.create_window((0, 0), window=content, anchor='nw')
+        content.bind('<Configure>', lambda _e: canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>', lambda e: canvas.itemconfigure(content_id, width=e.width))
 
-        section(
-            left, '一眼看懂', '#e25a60',
-            '龙、虎、凤各发 1 张牌，比较点数大小。\n'
-            'A 最小，依次到 K 最大。最高点数的一家获胜；\n'
-            '两家或三家同为最高点数时为和局。', 128)
+        def wheel(event):
+            delta = getattr(event, 'delta', 0)
+            units = -int(delta / 120) if delta else (1 if event.num == 5 else -1)
+            if units:
+                canvas.yview_scroll(units, 'units')
+            return 'break'
 
-        rank_frame = tk.Frame(left, bg='#201914', height=92,
-                              highlightbackground='#58483a', highlightthickness=1)
-        rank_frame.pack(fill='x', pady=(0, 8))
-        rank_frame.pack_propagate(False)
-        tk.Label(rank_frame, text='牌面顺序', bg='#201914', fg='#f2d37b',
-                 font=('Arial', 12, 'bold')).pack(anchor='w', padx=14, pady=(8, 4))
-        ranks = tk.Frame(rank_frame, bg='#201914')
-        ranks.pack(fill='x', padx=12)
-        for rank in ('A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'):
-            tk.Label(ranks, text=rank, bg='#3b3028', fg='white', width=2,
-                     font=('Arial', 9, 'bold'), padx=1, pady=4).pack(side='left', padx=1)
+        for sequence in ('<MouseWheel>', '<Button-4>', '<Button-5>'):
+            dialog.bind(sequence, wheel)
 
-        section(
-            left, '胜方赔率', '#56b58b',
-            '独赢：龙／虎／凤获胜，利润赔率 1.8:1。\n'
-            '两家同为最高：同大两家各按 1:1 赔付。\n'
-            '三家同点：龙／虎／凤下注全部通杀。', 126)
-        section(
-            left, '操作与记录', '#70a9d6',
-            '左键下注 · 右键清除单区 · Enter 开牌\n'
-            '右方只显示大路及珠盘路，四项饼图在珠盘路下方。\n'
-            '珠盘独立保留 72 局；第 73 局时按整列移除最旧 6 局。', 120)
+        def title(text, note=''):
+            row = tk.Frame(content, bg=bg)
+            row.pack(fill=tk.X, padx=24, pady=(14, 0))
+            tk.Label(row, text=text, bg=bg, fg=gold,
+                     font=(font_name, 18, 'bold')).pack(side=tk.LEFT)
+            if note:
+                tk.Label(row, text=note, bg=bg, fg=muted,
+                         font=(font_name, 12)).pack(side=tk.RIGHT)
+            tk.Frame(content, bg=border, height=1).pack(fill=tk.X, padx=24, pady=(10, 16))
 
-        section(
-            right, '和局赔率', '#d6aa58',
-            '两家同为最高点数：7:1\n'
-            '三家同点：20:1\n'
-            '只有并列最高才算和局；两家较低同点不算。', 105)
-        section(
-            right, '花色下注', '#b884e0',
-            '三黑／三红：利润赔率 6.9:1\n'
-            '一红二黑／二红一黑：利润赔率 1.6:1\n'
-            '红色为红心、方块；黑色为黑桃、梅花。', 120)
-        section(
-            right, '点数差距', '#f0c84d',
-            '最大点数－最小点数：差距 0–6 或 7–12。\n'
-            '两区利润赔率均为 0.95:1。A=1、J=11、Q=12、K=13。\n'
-            '例：2/K/8→11；2/8/8→6；8/8/8→0。', 125)
-        section(
-            right, '大路连续规则', '#68c9c0',
-            '一般格按整列共同颜色的交集判断连续。\n'
-            '三家和只可与紧接的三家和连续；它前后的一般结果必须另开新列。', 105)
+        def card(heading):
+            block = tk.Frame(content, bg=panel, highlightbackground=border,
+                             highlightthickness=1)
+            block.pack(fill=tk.X, padx=24, pady=(0, 16))
+            tk.Label(block, text=heading, bg=panel, fg=gold,
+                     font=(font_name, 16, 'bold'), anchor='w').pack(
+                         fill=tk.X, padx=22, pady=(16, 10))
+            return block
 
-        footer = tk.Frame(window, bg='#120f0d', height=54)
-        footer.pack(fill='x', padx=12, pady=(4, 10))
-        tk.Label(footer, text=f'版本 {DRAGON_TIGER_VERSION}', bg='#120f0d',
-                 fg='#756b62', font=('Arial', 9)).pack(side='left', padx=4)
-        tk.Button(footer, text='知道了', command=window.destroy,
-                  bg='#a77a31', fg='#130f0b', activebackground='#d1a750',
-                  relief='flat', padx=28, pady=7,
-                  font=('Arial', 11, 'bold')).pack(side='right')
-        window.protocol('WM_DELETE_WINDOW', window.destroy)
-        window.bind('<Escape>', lambda _event: window.destroy())
-        window.after(20, window.focus_force)
+        def rule(block, heading, description):
+            line = tk.Frame(block, bg=panel)
+            line.pack(fill=tk.X, padx=22, pady=(0, 14))
+            tk.Frame(line, bg=gold, width=4).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 16))
+            text_box = tk.Frame(line, bg=panel)
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(text_box, text=heading, bg=panel, fg=fg, anchor='w',
+                     font=(font_name, 15, 'bold')).pack(fill=tk.X)
+            tk.Label(text_box, text=description, bg=panel, fg=muted,
+                     anchor='w', justify=tk.LEFT, wraplength=630,
+                     font=(font_name, 14)).pack(fill=tk.X, pady=(5, 0))
+
+        def table(block, heading, rows):
+            grid = tk.Frame(block, bg='#1a2a2a', highlightbackground='#2b3d3d',
+                            highlightthickness=1)
+            grid.pack(fill=tk.X, padx=16, pady=(4, 16))
+            tk.Label(grid, text=heading, bg=gold, fg='#111111', anchor='w',
+                     font=(font_name, 14, 'bold'), padx=16, pady=8).pack(fill=tk.X)
+            cells = tk.Frame(grid, bg='#1a2a2a')
+            cells.pack(fill=tk.X)
+            cells.grid_columnconfigure(0, weight=1)
+            cells.grid_columnconfigure(1, minsize=165)
+            for i, (label, value) in enumerate(rows):
+                shade = '#162424' if i % 2 == 0 else '#1a2a2a'
+                tk.Label(cells, text=label, bg=shade, fg=fg, anchor='w',
+                         font=(font_name, 14), padx=18, pady=10).grid(
+                             row=i, column=0, sticky='nsew', padx=(0, 1), pady=(0, 1))
+                tk.Label(cells, text=value, bg=shade, fg=gold,
+                         font=(font_name, 14, 'bold'), padx=8, pady=10).grid(
+                             row=i, column=1, sticky='nsew', pady=(0, 1))
+
+        def page_rules():
+            title('玩法与胜负规则', 'A < 2 < … < 10 < J < Q < K')
+            block = card('基本流程')
+            for heading, desc in info['intro']:
+                rule(block, heading, desc)
+            block = card('牌面与附加条件')
+            for heading, desc in info['extra'][:2]:
+                rule(block, heading, desc)
+
+        def page_board():
+            title('下注区示意', '读取当前模式的真实下注区与赔率')
+            block = card('下注位置')
+            board = tk.Canvas(block, width=680, height=352, bg=panel, highlightthickness=0)
+            board.pack(padx=12, pady=(4, 16))
+            board.create_rectangle(6, 6, 674, 346, fill='#0e3d3d', outline='#3d6a68', width=2)
+            board.create_text(24, 28, anchor='w', text=f'{mode_title} · 下注区',
+                              font=(font_name, 14, 'bold'), fill=fg)
+            rows = engine.MODE_ROWS.get(mode, ())
+            odds = engine.ODDS_TEXT.get(mode, {})
+
+            def band(keys, y0, y1, widths=None):
+                if not keys:
+                    return
+                left, right = 22, 658
+                fractions = widths or [1.0 / len(keys)] * len(keys)
+                cursor = left
+                for i, key in enumerate(keys):
+                    end = right if i == len(keys) - 1 else cursor + (right-left) * fractions[i]
+                    colour = self.BET_COLORS.get(key, '#45665c')
+                    board.create_rectangle(cursor+2, y0+2, end-2, y1-2,
+                                           fill=colour, outline='#d5cbbd')
+                    label = engine.DISPLAY_NAMES.get(key, key)
+                    board.create_text((cursor+end)/2, y0+24, text=label,
+                                      font=(font_name, 12, 'bold'), fill='white')
+                    board.create_text((cursor+end)/2, y1-17, text=odds.get(key, ''),
+                                      font=(font_name, 11, 'bold'), fill='#f6e6b8')
+                    cursor = end
+
+            for i, row in enumerate(rows[:2]):
+                band(row, 44 + i*75, 112 + i*75)
+            band(info['main_bets'], 200, 336,
+                 (0.4, 0.2, 0.4) if len(info['main_bets']) == 3 and info['title'] == '龙虎' else None)
+            block = card('操作')
+            for heading, desc in (
+                ('左键下注', '点击下注区投入当前选中的筹码。'),
+                ('右键清除', '右键点击下注区，退还该区域尚未开牌的下注。'),
+                ('清除 / 重复 / 开牌', '底部按钮可清除本局、重复上一局下注或开牌；Enter 也可开牌。'),
+            ):
+                rule(block, heading, desc)
+
+        def page_main():
+            title('主注赔率', '表内为净利润赔率；返还时另含本金')
+            block = card(mode_title)
+            table(block, '开奖结果 · 下注回报', info['main_classic'])
+            block = card('并列最高')
+            rule(block, '例子', info['extra'][0][1])
+
+        def page_side():
+            title('边注赔率表', f'{mode_title} · 以实际下注区为准')
+            odds = engine.ODDS_TEXT.get(mode, {})
+            main = set(info['main_bets']) | {'Tie'}
+            for group_name, keys in zip(('颜色下注', '点数／特殊下注'), engine.MODE_ROWS.get(mode, ())):
+                selected = [(engine.DISPLAY_NAMES.get(key, key), odds.get(key, ''))
+                            for key in keys if key not in main]
+                if selected:
+                    table(card(group_name), '下注条件 · 净利润赔率', selected)
+            rule(card('和局注'), '和局赔率', '两家并列最高 7:1；三家同点 20:1。')
+
+        def page_limits():
+            title('下注限制与操作', '每局总下注上限 $2,000,000')
+            table(card('限红'), '下注区 · 上限', [
+                ('下注单位', '$100 或 $100 的倍数'),
+                ('龙／虎／凤各区', '$500,000'),
+                ('和局', '$100,000'),
+                ('每个边注', '$30,000'),
+                ('每局总下注', '$2,000,000'),
+            ])
+            block = card('下注操作')
+            for heading, desc in (
+                ('筹码与调整', '下注超出余额或限红时，系统按 $100 单位向下调整。'),
+                ('清除 / 撤销', '开牌前可清除单区或本局下注，也可撤销最近一次下注。'),
+                ('重复下注', '按上一局注额重新投入，仍受当前余额及限红限制。'),
+                ('开牌', '点击开牌或按 Enter'),
+            ):
+                rule(block, heading, desc)
+
+        def page_history():
+            title('历史记录说明', '右侧面板')
+            block = card('道路与数据')
+            for heading, desc in info['history']:
+                rule(block, heading, desc)
+
+        def page_notes():
+            title('重要提示', mode_title)
+            block = card('结算与机器')
+            for heading, desc in info['specials'] + info['extra'][2:]:
+                rule(block, heading, desc)
+
+        themes = (
+            ('玩法与胜负规则', page_rules), ('下注区示意', page_board),
+            ('主注赔率', page_main), ('边注赔率表', page_side),
+            ('下注限制与操作', page_limits), ('历史记录说明', page_history),
+            ('重要提示', page_notes),
+        )
+        buttons = {}
+        current = [None]
+
+        def select_theme(name):
+            if current[0] == name:
+                return
+            current[0] = name
+            for key, button in buttons.items():
+                active = key == name
+                button.configure(bg='#1e3433' if active else sidebar_bg,
+                                 fg=gold if active else muted)
+            for child in content.winfo_children():
+                child.destroy()
+            for key, builder in themes:
+                if key == name:
+                    builder()
+                    break
+            canvas.update_idletasks()
+            canvas.yview_moveto(0)
+
+        for name, _builder in themes:
+            button = tk.Button(sidebar, text=name, command=lambda n=name: select_theme(n),
+                               font=(font_name, 14), fg=muted, bg=sidebar_bg,
+                               activebackground='#24403e', activeforeground=gold,
+                               relief=tk.FLAT, bd=0, anchor='w', padx=20, pady=12,
+                               cursor='hand2')
+            button.pack(fill=tk.X)
+            buttons[name] = button
+        select_theme(themes[0][0])
+
+        def close():
+            self._intro_window = None
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
+
+        close_btn.configure(command=close)
+        dialog.protocol('WM_DELETE_WINDOW', close)
+        dialog.bind('<Escape>', lambda _event: close())
+        dialog.after(30, dialog.focus_force)
 
     def show_help_window(self):
         self.show_game_instructions()
@@ -1888,6 +2024,134 @@ class BubbleDragonTigerGame(tk.Frame):
             if tag:
                 self.set_control_button_state(tag, enabled)
 
+    # -------------------------------------------------------------- chip motion
+    def _schedule_chip_motion(self, delay_ms, callback, motion_tag):
+        """Track each flight's next frame so it can be cancelled independently."""
+        holder = {}
+
+        def run():
+            after_id = holder.get('id')
+            self.chip_motion_after_ids.discard(after_id)
+            motion = self.chip_motion_items.get(motion_tag)
+            if self._closing or motion is None:
+                return
+            motion['after_id'] = None
+            callback()
+
+        after_id = self.after(max(0, int(delay_ms)), run)
+        holder['id'] = after_id
+        self.chip_motion_after_ids.add(after_id)
+        self.chip_motion_items[motion_tag]['after_id'] = after_id
+        return after_id
+
+    def _cancel_chip_motion(self, key=None):
+        """Remove incoming chips for one spot, or finish all pending visuals."""
+        for tag, motion in list(self.chip_motion_items.items()):
+            if key is not None and motion['key'] != key:
+                continue
+            after_id = motion.get('after_id')
+            if after_id is not None:
+                try:
+                    self.after_cancel(after_id)
+                except (tk.TclError, ValueError):
+                    pass
+                self.chip_motion_after_ids.discard(after_id)
+            try:
+                self.canvas.delete(tag)
+            except tk.TclError:
+                pass
+            self.chip_motion_items.pop(tag, None)
+        if key is None:
+            self.pending_bet_visual_amounts.clear()
+        else:
+            self.pending_bet_visual_amounts.pop(key, None)
+
+    def _chip_rack_source_position(self):
+        """Return the centre of the selected chip in the bottom chip rack."""
+        items = self.chip_selector_items.get(self.selected_chip)
+        if items:
+            try:
+                coords = self.canvas.coords(items[1])
+                if len(coords) >= 4:
+                    return ((coords[0] + coords[2]) / 2.0,
+                            (coords[1] + coords[3]) / 2.0)
+            except tk.TclError:
+                pass
+        return (self.WIDTH / 2.0, 674.0)
+
+    def _animate_amount_chip(self, amount, start_xy, target_xy,
+                             on_complete=None, key=None):
+        """Use Baccarat_Special's 0.2-second smooth chip flight."""
+        if self._closing:
+            return
+        amount = float(amount)
+        if amount <= 0:
+            if callable(on_complete):
+                on_complete()
+            return
+
+        self.chip_motion_serial += 1
+        tag = f'chip_motion_{self.chip_motion_serial}'
+        self.chip_motion_items[tag] = {'key': key, 'after_id': None}
+        x, y = map(float, start_xy)
+        tx, ty = map(float, target_xy)
+        radius = 19.0
+        chip_color = self.bet_chip_color(amount)
+        text_color = self.contrast_text_color(chip_color)
+        outer = self.canvas.create_oval(
+            x - radius, y - radius, x + radius, y + radius,
+            fill='#292522', outline='#151311', width=1,
+            tags=(tag, 'chip_motion'))
+        inner = self.canvas.create_oval(
+            x - radius + 3, y - radius + 3, x + radius - 3, y + radius - 3,
+            fill=chip_color, outline='#e2ddd5', width=1,
+            tags=(tag, 'chip_motion'))
+        text = self.canvas.create_text(
+            x, y, text=self._compact_amount(amount),
+            font=('Arial', 9, 'bold'), fill=text_color,
+            tags=(tag, 'chip_motion'))
+        steps = max(1, int(self.CHIP_MOVE_STEPS))
+        frame_ms = max(1, int(round(self.CHIP_MOVE_DURATION_MS / steps)))
+
+        def place_items(cx, cy):
+            self.canvas.coords(outer, cx - radius, cy - radius,
+                               cx + radius, cy + radius)
+            self.canvas.coords(inner, cx - radius + 3, cy - radius + 3,
+                               cx + radius - 3, cy + radius - 3)
+            self.canvas.coords(text, cx, cy)
+            self.canvas.tag_raise(tag)
+
+        def frame(step):
+            if self._closing or tag not in self.chip_motion_items:
+                return
+            ratio = min(1.0, max(0.0, step / steps))
+            eased = ratio * ratio * (3.0 - 2.0 * ratio)
+            cx = x + (tx - x) * eased
+            cy = y + (ty - y) * eased
+            place_items(cx, cy)
+            if step >= steps:
+                self.canvas.delete(tag)
+                self.chip_motion_items.pop(tag, None)
+                if callable(on_complete):
+                    on_complete()
+                return
+            self._schedule_chip_motion(frame_ms, lambda: frame(step + 1), tag)
+
+        place_items(x, y)
+        self._schedule_chip_motion(frame_ms, lambda: frame(1), tag)
+
+    def _complete_pending_bet_visual(self, key, amount):
+        pending = max(0.0, float(self.pending_bet_visual_amounts.get(key, 0.0))
+                      - float(amount))
+        if pending > 1e-9:
+            self.pending_bet_visual_amounts[key] = pending
+        else:
+            self.pending_bet_visual_amounts.pop(key, None)
+        if not self._closing:
+            self.update_bet_chips()
+            self.canvas.tag_raise('controls')
+            self.canvas.tag_raise('chip_motion')
+
     # --------------------------------------------------------------- bet actions
     def select_chip(self, amount):
         self.selected_chip = float(amount)
@@ -1939,18 +2203,27 @@ class BubbleDragonTigerGame(tk.Frame):
         if allowed < requested:
             messagebox.showwarning('下注限制', f'下注已自动调整为 {self.format_money(allowed)}。',
                                    parent=self.winfo_toplevel())
+        key = (bet_type, None)
+        self.pending_bet_visual_amounts[key] = (
+            self.pending_bet_visual_amounts.get(key, 0.0) + allowed)
         self.bet_state.add_bet(bet_type, allowed)
         self.balance -= allowed
         if record_undo:
             self.undo_stack.append((bet_type, None, allowed))
         self.summary_mode = 'bet'
         self.update_display()
+        source = self._chip_rack_source_position()
+        target = tuple(self.bet_spots[key]['chip_pos'])
+        self._animate_amount_chip(
+            allowed, source, target, key=key,
+            on_complete=lambda k=key, a=allowed: self._complete_pending_bet_visual(k, a))
         self.save_balance()
         return True
 
     def clear_single_bet(self, bet_type, _param=None):
         if not self.accept_bets or self.animation_running or self.settlement_running:
             return
+        self._cancel_chip_motion((bet_type, None))
         refunded = self.bet_state.clear_area(bet_type)
         if refunded <= 0:
             return
@@ -1966,6 +2239,7 @@ class BubbleDragonTigerGame(tk.Frame):
             bet_type, _param, amount = self.undo_stack.pop()
             removed = self.bet_state.remove_amount(bet_type, amount)
             if removed > 0:
+                self._cancel_chip_motion((bet_type, None))
                 self.balance += removed
                 self.update_display()
                 self.save_balance()
@@ -1974,6 +2248,7 @@ class BubbleDragonTigerGame(tk.Frame):
     def clear_bets(self):
         if not self.accept_bets or self.animation_running or self.settlement_running:
             return
+        self._cancel_chip_motion()
         refunded = self.bet_state.clear_all()
         if refunded <= 0:
             return
@@ -2044,6 +2319,10 @@ class BubbleDragonTigerGame(tk.Frame):
         self.canvas.delete('bet_chip_dynamic')
         for key, spot in self.bet_spots.items():
             amount = self.bet_state.current_area_bet(key[0])
+            # Merge a new wager into the static chip only after it lands.
+            pending_in = float(self.pending_bet_visual_amounts.get(key, 0.0))
+            if pending_in > 0 and not self.settlement_running:
+                amount = max(0.0, amount - pending_in)
             # Keep tied winning wagers on the felt until finish_settlement().
             if self.settlement_running and key in self.settlement_hold_amounts:
                 amount = self.settlement_hold_amounts[key]
@@ -2489,6 +2768,8 @@ class BubbleDragonTigerGame(tk.Frame):
                                  parent=self.winfo_toplevel())
             return
 
+        self._cancel_chip_motion()
+        self.update_bet_chips()
         self.accept_bets = False
         self.animation_running = True
         current_bets = self.snapshot_bets()
@@ -2713,7 +2994,7 @@ class BubbleDragonTigerGame(tk.Frame):
 
 
         settle = DragonTigerEngine.resolve_bets(
-            self.pre_deal_bets, result, self.game_mode, self.jackpot_amount)
+            self.pre_deal_bets, result, self.game_mode)
         self.balance += settle['credit']
 
         self.last_win_amount = settle['credit']
@@ -3229,45 +3510,6 @@ class BubbleDragonTigerGame(tk.Frame):
             self.statistic_data['tie_win'] = int(self.statistic_data.get('tie_win', 0)) + 1
         self.save_statistic_data()
 
-    def get_jackpot_file(self):
-        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Progressive.json')
-
-    def load_jackpot(self):
-        try:
-            with open(self.jackpot_file, 'r', encoding='utf-8') as handle:
-                data = json.load(handle)
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict) and item.get('Games') == 'BCT':
-                        return max(5_000_000.0, float(item.get('jackpot', 5_000_000)))
-            elif isinstance(data, dict) and data.get('Games') == 'BCT':
-                return max(5_000_000.0, float(data.get('jackpot', 5_000_000)))
-        except (FileNotFoundError, json.JSONDecodeError, OSError, TypeError, ValueError):
-            pass
-        return 5_000_000.0
-
-    def save_jackpot(self):
-        try:
-            if os.path.exists(self.jackpot_file):
-                with open(self.jackpot_file, 'r', encoding='utf-8') as handle:
-                    data = json.load(handle)
-            else:
-                data = []
-            if not isinstance(data, list):
-                data = []
-            found = False
-            for item in data:
-                if isinstance(item, dict) and item.get('Games') == 'BCT':
-                    item['jackpot'] = float(self.jackpot_amount)
-                    found = True
-                    break
-            if not found:
-                data.append({'Games': 'BCT', 'jackpot': float(self.jackpot_amount)})
-            with open(self.jackpot_file, 'w', encoding='utf-8') as handle:
-                json.dump(data, handle, ensure_ascii=False, indent=4)
-        except (OSError, json.JSONDecodeError):
-            pass
-
     # ---------------------------------------------------------------- lifecycle
     def save_balance(self):
         if self.username:
@@ -3276,6 +3518,7 @@ class BubbleDragonTigerGame(tk.Frame):
             self.on_balance_change(float(self.balance))
 
     def cancel_pending_callbacks(self):
+        self._cancel_chip_motion()
         for after_id in list(self.animation_after_ids):
             try:
                 self.after_cancel(after_id)

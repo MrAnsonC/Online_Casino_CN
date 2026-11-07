@@ -1,10 +1,10 @@
 {
-    "Total": 3624,
+    "Total": 3652,
     "Record1": {
-        "3624_Data": {
-            "round": 3624,
+        "3652_Data": {
+            "round": 3652,
             "outcomes": [
-                4,
+                2,
                 1,
                 3
             ],
@@ -13,71 +13,23 @@
                 "0.00",
                 "0.00",
                 "0.00",
-                "0.00",
+                "10000.00",
                 "0.00",
                 "0.00"
             ],
-            "returned": "0.00",
-            "net": "0.00",
+            "returned": "20000.00",
+            "net": "10000.00",
             "plinko": {
                 "multiplier": 0,
                 "slot": -1,
                 "values": []
             }
         },
-        "3623_Data": {
-            "round": 3623,
+        "3651_Data": {
+            "round": 3651,
             "outcomes": [
-                4,
-                0,
-                4
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "3622_Data": {
-            "round": 3622,
-            "outcomes": [
-                0,
                 3,
-                2
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "3621_Data": {
-            "round": 3621,
-            "outcomes": [
-                1,
-                2,
+                3,
                 0
             ],
             "invalid": false,
@@ -85,22 +37,22 @@
                 "0.00",
                 "0.00",
                 "0.00",
-                "0.00",
+                "10000.00",
                 "0.00",
                 "0.00"
             ],
-            "returned": "0.00",
-            "net": "0.00",
+            "returned": "30000.00",
+            "net": "20000.00",
             "plinko": {
                 "multiplier": 0,
                 "slot": -1,
                 "values": []
             }
         },
-        "3620_Data": {
-            "round": 3620,
+        "3650_Data": {
+            "round": 3650,
             "outcomes": [
-                4,
+                3,
                 0,
                 1
             ],
@@ -109,71 +61,23 @@
                 "0.00",
                 "0.00",
                 "0.00",
-                "0.00",
+                "10000.00",
                 "0.00",
                 "0.00"
             ],
-            "returned": "0.00",
-            "net": "0.00",
+            "returned": "20000.00",
+            "net": "10000.00",
             "plinko": {
                 "multiplier": 0,
                 "slot": -1,
                 "values": []
             }
         },
-        "3619_Data": {
-            "round": 3619,
+        "3649_Data": {
+            "round": 3649,
             "outcomes": [
                 1,
-                2,
-                1
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "3618_Data": {
-            "round": 3618,
-            "outcomes": [
-                5,
-                1,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "3617_Data": {
-            "round": 3617,
-            "outcomes": [
                 3,
-                0,
                 4
             ],
             "invalid": false,
@@ -181,23 +85,23 @@
                 "0.00",
                 "0.00",
                 "0.00",
-                "0.00",
+                "10000.00",
                 "0.00",
                 "0.00"
             ],
-            "returned": "0.00",
-            "net": "0.00",
+            "returned": "20000.00",
+            "net": "10000.00",
             "plinko": {
                 "multiplier": 0,
                 "slot": -1,
                 "values": []
             }
         },
-        "3616_Data": {
-            "round": 3616,
+        "3648_Data": {
+            "round": 3648,
             "outcomes": [
-                1,
-                3,
+                5,
+                2,
                 2
             ],
             "invalid": false,
@@ -205,23 +109,159 @@
                 "0.00",
                 "0.00",
                 "0.00",
-                "0.00",
+                "10000.00",
                 "0.00",
                 "0.00"
             ],
             "returned": "0.00",
-            "net": "0.00",
+            "net": "-10000.00",
             "plinko": {
                 "multiplier": 0,
                 "slot": -1,
                 "values": []
             }
         },
-        "3615_Data": {
-            "round": 3615,
+        "3647_Data": {
+            "round": 3647,
             "outcomes": [
-                2,
+                3,
+                0,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3646_Data": {
+            "round": 3646,
+            "outcomes": [
                 5,
+                4,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3645_Data": {
+            "round": 3645,
+            "outcomes": [
+                3,
+                2,
+                2
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3644_Data": {
+            "round": 3644,
+            "outcomes": [
+                4,
+                3,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3643_Data": {
+            "round": 3643,
+            "outcomes": [
+                1,
+                1,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 5,
+                "slot": 12,
+                "values": [
+                    20,
+                    10,
+                    50,
+                    10,
+                    5,
+                    5,
+                    5,
+                    20,
+                    5,
+                    10,
+                    10,
+                    5,
+                    5,
+                    5,
+                    5
+                ]
+            }
+        },
+        "3642_Data": {
+            "round": 3642,
+            "outcomes": [
+                5,
+                1,
                 3
             ],
             "invalid": false,
@@ -229,23 +269,95 @@
                 "0.00",
                 "0.00",
                 "0.00",
-                "0.00",
+                "10000.00",
                 "0.00",
                 "0.00"
             ],
-            "returned": "0.00",
-            "net": "0.00",
+            "returned": "20000.00",
+            "net": "10000.00",
             "plinko": {
                 "multiplier": 0,
                 "slot": -1,
                 "values": []
             }
         },
-        "3614_Data": {
-            "round": 3614,
+        "3641_Data": {
+            "round": 3641,
             "outcomes": [
                 4,
-                3,
+                4,
+                2
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3640_Data": {
+            "round": 3640,
+            "outcomes": [
+                5,
+                0,
+                4
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3639_Data": {
+            "round": 3639,
+            "outcomes": [
+                0,
+                5,
+                2
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3638_Data": {
+            "round": 3638,
+            "outcomes": [
+                5,
+                2,
                 5
             ],
             "invalid": false,
@@ -254,123 +366,11 @@
                 "0.00",
                 "0.00",
                 "0.00",
-                "0.00",
+                "10000.00",
                 "0.00"
             ],
             "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "3613_Data": {
-            "round": 3613,
-            "outcomes": [
-                5,
-                2,
-                1
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "3612_Data": {
-            "round": 3612,
-            "outcomes": [
-                2,
-                2,
-                2
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 10,
-                "slot": 11,
-                "values": [
-                    5,
-                    10,
-                    20,
-                    5,
-                    10,
-                    5,
-                    10,
-                    5,
-                    10,
-                    5,
-                    10,
-                    10,
-                    10,
-                    10,
-                    5
-                ]
-            }
-        },
-        "3611_Data": {
-            "round": 3611,
-            "outcomes": [
-                4,
-                2,
-                2
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "3610_Data": {
-            "round": 3610,
-            "outcomes": [
-                3,
-                1,
-                1
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
+            "net": "-10000.00",
             "plinko": {
                 "multiplier": 0,
                 "slot": -1,
@@ -379,6 +379,694 @@
         }
     },
     "Record2": {
+        "3652_Data": {
+            "round": 3652,
+            "outcomes": [
+                2,
+                1,
+                3
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3651_Data": {
+            "round": 3651,
+            "outcomes": [
+                3,
+                3,
+                0
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "30000.00",
+            "net": "20000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3650_Data": {
+            "round": 3650,
+            "outcomes": [
+                3,
+                0,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3649_Data": {
+            "round": 3649,
+            "outcomes": [
+                1,
+                3,
+                4
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3648_Data": {
+            "round": 3648,
+            "outcomes": [
+                5,
+                2,
+                2
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3647_Data": {
+            "round": 3647,
+            "outcomes": [
+                3,
+                0,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3646_Data": {
+            "round": 3646,
+            "outcomes": [
+                5,
+                4,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3645_Data": {
+            "round": 3645,
+            "outcomes": [
+                3,
+                2,
+                2
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3644_Data": {
+            "round": 3644,
+            "outcomes": [
+                4,
+                3,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3643_Data": {
+            "round": 3643,
+            "outcomes": [
+                1,
+                1,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 5,
+                "slot": 12,
+                "values": [
+                    20,
+                    10,
+                    50,
+                    10,
+                    5,
+                    5,
+                    5,
+                    20,
+                    5,
+                    10,
+                    10,
+                    5,
+                    5,
+                    5,
+                    5
+                ]
+            }
+        },
+        "3642_Data": {
+            "round": 3642,
+            "outcomes": [
+                5,
+                1,
+                3
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3641_Data": {
+            "round": 3641,
+            "outcomes": [
+                4,
+                4,
+                2
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3640_Data": {
+            "round": 3640,
+            "outcomes": [
+                5,
+                0,
+                4
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3639_Data": {
+            "round": 3639,
+            "outcomes": [
+                0,
+                5,
+                2
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3638_Data": {
+            "round": 3638,
+            "outcomes": [
+                5,
+                2,
+                5
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3637_Data": {
+            "round": 3637,
+            "outcomes": [
+                5,
+                2,
+                3
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3636_Data": {
+            "round": 3636,
+            "outcomes": [
+                2,
+                0,
+                5
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3635_Data": {
+            "round": 3635,
+            "outcomes": [
+                3,
+                2,
+                4
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3634_Data": {
+            "round": 3634,
+            "outcomes": [
+                3,
+                1,
+                2
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3633_Data": {
+            "round": 3633,
+            "outcomes": [
+                0,
+                5,
+                4
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3632_Data": {
+            "round": 3632,
+            "outcomes": [
+                4,
+                1,
+                4
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "30000.00",
+            "net": "20000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3631_Data": {
+            "round": 3631,
+            "outcomes": [
+                4,
+                0,
+                5
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3630_Data": {
+            "round": 3630,
+            "outcomes": [
+                2,
+                3,
+                2
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3629_Data": {
+            "round": 3629,
+            "outcomes": [
+                3,
+                2,
+                1
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3628_Data": {
+            "round": 3628,
+            "outcomes": [
+                1,
+                1,
+                0
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3627_Data": {
+            "round": 3627,
+            "outcomes": [
+                3,
+                1,
+                3
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "0.00",
+            "net": "-10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3626_Data": {
+            "round": 3626,
+            "outcomes": [
+                0,
+                4,
+                4
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "30000.00",
+            "net": "20000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
+        "3625_Data": {
+            "round": 3625,
+            "outcomes": [
+                0,
+                4,
+                5
+            ],
+            "invalid": false,
+            "bets": [
+                "0.00",
+                "0.00",
+                "0.00",
+                "0.00",
+                "10000.00",
+                "0.00"
+            ],
+            "returned": "20000.00",
+            "net": "10000.00",
+            "plinko": {
+                "multiplier": 0,
+                "slot": -1,
+                "values": []
+            }
+        },
         "3624_Data": {
             "round": 3624,
             "outcomes": [
@@ -24426,725 +25114,21 @@
                 "slot": -1,
                 "values": []
             }
-        },
-        "2652_Data": {
-            "round": 2652,
-            "outcomes": [
-                2,
-                0,
-                3
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2651_Data": {
-            "round": 2651,
-            "outcomes": [
-                4,
-                4,
-                4
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 20,
-                "slot": 2,
-                "values": [
-                    20,
-                    10,
-                    20,
-                    10,
-                    5,
-                    10,
-                    10,
-                    10,
-                    10,
-                    10,
-                    10,
-                    100,
-                    10,
-                    20,
-                    5
-                ]
-            }
-        },
-        "2650_Data": {
-            "round": 2650,
-            "outcomes": [
-                4,
-                5,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2649_Data": {
-            "round": 2649,
-            "outcomes": [
-                1,
-                2,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2648_Data": {
-            "round": 2648,
-            "outcomes": [
-                3,
-                2,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2647_Data": {
-            "round": 2647,
-            "outcomes": [
-                5,
-                5,
-                3
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2646_Data": {
-            "round": 2646,
-            "outcomes": [
-                3,
-                3,
-                5
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2645_Data": {
-            "round": 2645,
-            "outcomes": [
-                2,
-                5,
-                4
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2644_Data": {
-            "round": 2644,
-            "outcomes": [
-                3,
-                5,
-                1
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2643_Data": {
-            "round": 2643,
-            "outcomes": [
-                3,
-                3,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2642_Data": {
-            "round": 2642,
-            "outcomes": [
-                3,
-                5,
-                5
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2641_Data": {
-            "round": 2641,
-            "outcomes": [
-                4,
-                1,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2640_Data": {
-            "round": 2640,
-            "outcomes": [
-                0,
-                2,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2639_Data": {
-            "round": 2639,
-            "outcomes": [
-                4,
-                2,
-                1
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2638_Data": {
-            "round": 2638,
-            "outcomes": [
-                5,
-                1,
-                1
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2637_Data": {
-            "round": 2637,
-            "outcomes": [
-                1,
-                0,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2636_Data": {
-            "round": 2636,
-            "outcomes": [
-                1,
-                1,
-                1
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 10,
-                "slot": 13,
-                "values": [
-                    10,
-                    10,
-                    10,
-                    50,
-                    10,
-                    5,
-                    5,
-                    10,
-                    5,
-                    10,
-                    5,
-                    20,
-                    20,
-                    10,
-                    5
-                ]
-            }
-        },
-        "2635_Data": {
-            "round": 2635,
-            "outcomes": [
-                4,
-                1,
-                5
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2634_Data": {
-            "round": 2634,
-            "outcomes": [
-                5,
-                1,
-                5
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2633_Data": {
-            "round": 2633,
-            "outcomes": [
-                0,
-                2,
-                1
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2632_Data": {
-            "round": 2632,
-            "outcomes": [
-                4,
-                0,
-                4
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2631_Data": {
-            "round": 2631,
-            "outcomes": [
-                4,
-                2,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2630_Data": {
-            "round": 2630,
-            "outcomes": [
-                3,
-                1,
-                4
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2629_Data": {
-            "round": 2629,
-            "outcomes": [
-                1,
-                5,
-                5
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2628_Data": {
-            "round": 2628,
-            "outcomes": [
-                3,
-                1,
-                4
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2627_Data": {
-            "round": 2627,
-            "outcomes": [
-                5,
-                2,
-                4
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2626_Data": {
-            "round": 2626,
-            "outcomes": [
-                2,
-                2,
-                0
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
-        },
-        "2625_Data": {
-            "round": 2625,
-            "outcomes": [
-                5,
-                5,
-                4
-            ],
-            "invalid": false,
-            "bets": [
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00",
-                "0.00"
-            ],
-            "returned": "0.00",
-            "net": "0.00",
-            "plinko": {
-                "multiplier": 0,
-                "slot": -1,
-                "values": []
-            }
         }
     },
     "LatestTriple": {
-        "round": 3612,
+        "round": 3643,
         "outcomes": [
-            2,
-            2,
-            2
+            1,
+            1,
+            1
         ],
         "labels": [
-            "J",
-            "J",
-            "J"
+            "10",
+            "10",
+            "10"
         ],
-        "rounds_ago": 13,
-        "multiplier": 10
+        "rounds_ago": 10,
+        "multiplier": 5
     }
 }

@@ -519,11 +519,6 @@ class BubbleCrapsGame(tk.Frame):
 
         # Embedded in the parent application's single Tk root.
         top = self.winfo_toplevel()
-        try:
-            top.geometry('1150x750+50+10')
-            top.resizable(False, False)
-        except tk.TclError:
-            pass
         self._enter_bindings = []
         for sequence in ('<Return>', '<KP_Enter>'):
             bind_id = top.bind(sequence, self.handle_enter_roll, add='+')
@@ -1224,92 +1219,491 @@ class BubbleCrapsGame(tk.Frame):
         c.tag_raise('chip_selector')
         self.update_control_states()
 
+# 将下方方法完整替换到原类中，保留四空格缩进。
+
     def show_help_window(self):
-        # 在独立 Toplevel 中显示本游戏的玩法说明。
-        owner = self.winfo_toplevel()
-        win = tk.Toplevel(owner)
-        win.title('花旗骰玩法说明')
-        win.configure(bg='#17120f')
-        win.resizable(False, False)
-        win.transient(owner)
+        """显示分栏图解帮助；全部赔付使用统一表格，文本显式使用 \n 换行。"""
+        import tkinter as tk
+        import tkinter.font as tkfont
 
-        width, height = 720, 620
-        try:
-            owner.update_idletasks()
-            owner_width = max(owner.winfo_width(), 1150)
-            owner_height = max(owner.winfo_height(), 750)
-            x = owner.winfo_rootx() + max(0, (owner_width - width) // 2)
-            y = owner.winfo_rooty() + max(0, (owner_height - height) // 2)
-            win.geometry(f'{width}x{height}+{x}+{y}')
-        except tk.TclError:
-            win.geometry(f'{width}x{height}')
+        owner = self if isinstance(self, tk.Misc) else self.root
+        parent = owner.winfo_toplevel()
+        current = getattr(self, '_game_instruction_dialog', None)
+        if current is not None:
+            try:
+                if current.winfo_exists():
+                    current.lift()
+                    current.focus_force()
+                    return
+            except tk.TclError:
+                pass
+        dialog = tk.Toplevel(parent)
+        self._game_instruction_dialog = dialog
+        dialog.title('花旗骰 · 完整图解玩法')
+        dialog.configure(bg='#faf5e8')
+        dialog.resizable(False, False)
+        dialog.transient(parent)
+        width, height = 1000, 670
+        parent.update_idletasks()
+        px, py = parent.winfo_rootx(), parent.winfo_rooty()
+        pw, ph = max(1, parent.winfo_width()), max(1, parent.winfo_height())
+        dialog.geometry(f'{width}x{height}+{max(0, px + (pw-width)//2)}+{max(0, py + (ph-height)//2)}')
 
-        tk.Label(
-            win, text='🎲 花旗骰玩法说明',
-            font=('Microsoft YaHei UI', 20, 'bold'),
-            bg='#17120f', fg='#e7d36c'
-        ).pack(pady=(16, 10))
+        # 所有赔率均为本程序的净赢赔率；多行内容用 \n 明确分行。
+        # 卡片结构：(标题、副标题、规则列表、表格列表)。
+        manual_pages = [
+            ('玩法', '先认识 Come-Out 与 Point，再选择下注类型。', [
+                ('回合流程', '', [
+                    ('Come-Out：尚未建立 Point',
+                     '7／11：Pass Line 赢；2／3／12：Pass Line 输。\n'
+                     '4／5／6／8／9／10：该号码成为桌面 Point。'),
+                    ('Point：等待目标号码或 7',
+                     '先出 Point：Pass Line 赢；先出 7：Pass Line 输（Seven Out）。\n'
+                     '其他点数：继续掷骰；本阶段结束后回到 Come-Out。\n'
+                     '桌面没有下注时，也可以转动。'),
+                ], []),
+                ('Pass Line 流程示意', '箭头表示下一步；其他点数不结束 Point 阶段。', [], []),
+                ('读懂赔付表', '', [
+                    ('净赢、本金与返还',
+                     '净赢赔率 a:b 表示每下注 b，获胜利润为 a。\n'
+                     '返还＝本金＋利润；和局只退本金。\n'
+                     'WIN 数字与 Hardway 中奖时只派利润，本金继续留桌。\n'
+                     '以下规则与赔付以本程序实现为准。'),
+                ], []),
+            ]),
+            ('主线 & Odds', 'Come 使用自己的号码；Odds 跟随桌面 Point。', [
+                ('主线', '', [
+                    ('下注时机',
+                     'Pass Line／Don’t Pass：只能在 Come-Out 新增。\n'
+                     'Come／Don’t Come：只能在桌面 Point 建立后新增。'),
+                ], [
+                    ('Pass 类下注', ['项目', '初次掷出', '建立号码后', '净赢'], [
+                        ['Pass Line', '7／11 赢\n2／3／12 输', 'Point 先出：赢\n7 先出：输', '1:1'],
+                        ["Don't Pass", '2／3 赢\n7／11 输\n12 和局', '7 先出：赢\nPoint 先出：输', '1:1'],
+                        ['Come', '7／11 赢\n2／3／12 输', '自身号码先出：赢\n7 先出：输', '1:1'],
+                        ["Don't Come", '2／3 赢\n7／11 输\n12 和局', '7 先出：赢\n自身号码先出：输', '1:1'],
+                    ]),
+                ]),
+                ('Come 移注示意', '示例：桌面 Point 为 6，新的 Come 注随后掷出 8。', [
+                    ('自身号码独立结算',
+                     '初次掷出 4／5／6／8／9／10，Come／Don’t Come 移至该号码。\n'
+                     '已移注的号码在之后每次掷骰都参与结算，包括新的 Come-Out。\n'
+                     '桌面 Point 改变，不会把该注的自身号码改掉。'),
+                ], []),
+                ('Odds 附加下注', '', [
+                    ('前提与上限',
+                     '必须已有对应的 Pass Line／Don’t Pass，且桌面已建立 Point。\n'
+                     '两种 Odds 的下注金额上限均为对应主线下注的 3 倍。\n'
+                     'Pass Odds：Point 先出赢；Don’t Odds：7 先出赢。\n'
+                     '反向结果则输，其他点数继续等待。'),
+                ], [
+                    ('Odds 赔付', ['桌面 Point', 'Pass Odds\n净赢赔率', "Don't Odds\n净赢赔率"], [
+                        ['4／10', '2:1', '1:2'],
+                        ['5／9', '3:2', '2:3'],
+                        ['6／8', '6:5', '5:6'],
+                    ]),
+                ]),
+                ('Odds 关联示意', '主线与 Odds 使用同一个 Point，分别计算赔付。', [], []),
+            ]),
+            ('数字 & Hardway', '先确认命中条件，再看本金是否保留。', [
+                ('WIN / LOSE 数字', '', [
+                    ('号码与 7 的先后顺序',
+                     'WIN：所押号码先于 7 出现则赢；7 先出则输。\n'
+                     'LOSE：7 先于所押号码出现则赢；所押号码先出则输。\n'
+                     '其他点数不结算该注。'),
+                ], [
+                    ('数字赔付', ['号码', 'WIN\n净赢赔率', 'LOSE\n净赢赔率'], [
+                        ['4／10', '9:5', '1:2'],
+                        ['5／9', '7:5', '2:3'],
+                        ['6／8', '7:6', '5:6'],
+                    ]),
+                    ('中奖后本金去向', ['项目', '即时派发', '本金处理'], [
+                        ['WIN 数字', '仅利润', '保留桌面\n继续参与结算'],
+                        ['LOSE 数字', '本金＋利润', '返还余额\n该注结束'],
+                    ]),
+                ]),
+                ('Hardway 骰子图解', '以 Hard 6 为例：相同总点数，对子与非对子的结果不同。', [
+                    ('对子规则',
+                     '两颗骰子相同，且合计等于所押号码，才算中奖。\n'
+                     '该号码以非对子出现，或掷出 7，均输掉该注。\n'
+                     '其他点数继续等待；中奖后本金保留桌面。'),
+                ], [
+                    ('Hardway 赔付', ['项目', '获胜组合', '净赢赔率'], [
+                        ['Hard 4', '2＋2', '8:1'],
+                        ['Hard 6', '3＋3', '10:1'],
+                        ['Hard 8', '4＋4', '10:1'],
+                        ['Hard 10', '5＋5', '8:1'],
+                    ]),
+                ]),
+                ('数字注开关', '', [], [
+                    ('生效阶段', ['开关状态', 'Come-Out', 'Point 阶段'], [
+                        ['激活', 'WIN／LOSE 参与结算', 'WIN／LOSE 参与结算'],
+                        ['关闭', 'WIN／LOSE 暂不结算', 'WIN／LOSE 参与结算'],
+                    ]),
+                ]),
+                ('开关说明', '', [
+                    ('只控制 WIN／LOSE 数字注',
+                     '关闭时，建立 Point 的那一掷仍按 Come-Out 处理；下一掷恢复结算。\n'
+                     'Hardway 不受这个开关影响，每掷都会检查结果。'),
+                ], []),
+            ]),
+            ('单次下注', '只看下一掷；命中获胜，未命中输掉本金。', [
+                ('FIELD 命中图示', '绿色号码命中，浅灰号码未命中；具体赔付见下表。', [], []),
+                ('一掷定胜负', '不同赔率分行列出，避免号码与赔付混淆。', [], [
+                    ('单次下注赔付', ['项目', '命中点数', '净赢赔率'], [
+                        ['FIELD', '2／12', '2:1'],
+                        ['FIELD', '3／4／9／10／11', '1:1'],
+                        ['SEVEN', '7', '5:1'],
+                        ['CRAPS', '2／3／12', '8:1'],
+                        ['C·E', '11', '7:1'],
+                        ['C·E', '2／3／12', '3:1'],
+                        ['单独 2', '2', '30:1'],
+                        ['单独 12', '12', '30:1'],
+                        ['单独 3', '3', '15:1'],
+                        ['单独 11', '11', '15:1'],
+                    ]),
+                ]),
+            ]),
+            ('操作 & 记录', '选筹码、下注、转动，再查看结算与留桌筹码。', [
+                ('桌面操作', '', [
+                    ('下注与撤回',
+                     '选筹码后，左键点击下注区；右键清除该区可撤下注。\n'
+                     'Pass Line／Don’t Pass 在 Point 建立后锁定。\n'
+                     '已移至号码的 Come／Don’t Come 也会锁定。'),
+                    ('重复下注与转动',
+                     '“重复下注”尝试恢复上局可重下注。\n'
+                     '结算动画结束后可以下注；转动按钮另有 5 秒冷却。'),
+                    ('帮助与提示',
+                     '右键点击帮助按钮，可切换下注区悬停提示。\n'
+                     '帮助窗口：左侧切页，右侧滚动；按 ESC 关闭。'),
+                ], []),
+                ('本金去向图解', '获胜、和局、输注的资金去向不同。', [], []),
+                ('金额记录', '', [
+                    ('“上局获胜”与实际返还',
+                     '“上局获胜”统计获胜区域的本金与奖金，不含和局退回。\n'
+                     '保留本金的下注只把利润加入余额，本金仍在桌面。\n'
+                     '因此，“上局获胜”不一定等于本次余额增加额。'),
+                ], []),
+            ]),
+            ('结算示例', '把利润、返还与留桌本金分开看。', [
+                ('示例一：WIN 6', '下注 $60，数字注有效结算时掷出 6。', [], [
+                    ('WIN 6 结算表', ['项目', '计算', '结果'], [
+                        ['净赢赔率', '7:6', '每 $6 净赢 $7'],
+                        ['本次利润', '$60 × 7/6', '$70 加入余额'],
+                        ['本金', '$60', '保留桌面'],
+                        ['后续风险', '有效结算时先出 7', '留桌本金输掉'],
+                    ]),
+                ]),
+                ('示例二：主线加 Odds',
+                 'Pass Line 下注 $10，Point 为 4。\n再下注 Pass Odds $30，之后先掷出 4。', [], [
+                    ('分别计算赔付', ['项目', '本金／净赢赔率', '利润／返还'], [
+                        ['Pass Line', '$10\n1:1', '利润 $10\n返还 $20'],
+                        ['Pass Odds', '$30\n2:1', '利润 $60\n返还 $90'],
+                        ['合计', '总下注 $40', '净赢 $70\n返还 $110'],
+                    ]),
+                ]),
+                ('示例三：和局', 'Come-Out 掷出 12，Don’t Pass 下注 $10。', [], [
+                    ('和局结算表', ['结果', '利润', '本金'], [
+                        ['和局', '$0', '$10 退回余额'],
+                    ]),
+                ]),
+            ]),
+        ]
+        illustration_cards = {
+            'Pass Line 流程示意': 'flow',
+            'Come 移注示意': 'come',
+            'Odds 关联示意': 'odds',
+            'Hardway 骰子图解': 'hard',
+            'FIELD 命中图示': 'field',
+            '本金去向图解': 'money',
+        }
 
-        body = tk.Frame(win, bg='#17120f')
-        body.pack(fill=tk.BOTH, expand=True, padx=18, pady=(0, 12))
-        scrollbar = tk.Scrollbar(body, orient=tk.VERTICAL)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        BG = '#faf5e8'
+        HEADER = '#f1e7cd'
+        SIDEBAR = '#f2e8d0'
+        PANEL = '#fffdf7'
+        PANEL_2 = '#f5ecd6'
+        BORDER = '#c9b88a'
+        GOLD = '#a8842c'
+        GOLD_BAR = '#e7d36c'
+        TEXT = '#3a2f1e'
+        MUTED = '#7a6a50'
+        font_name = getattr(self, 'cn_font', 'Microsoft YaHei UI')
+        header = tk.Frame(dialog, bg=HEADER, height=76)
+        header.pack(fill=tk.X, side=tk.TOP)
+        header.pack_propagate(False)
+        tk.Label(header, text='花旗骰 · 完整图解玩法', font=(font_name, 20, 'bold'),
+                 fg=GOLD, bg=HEADER, anchor='w', wraplength=795,
+                 justify=tk.LEFT).place(x=24, y=6, width=795, height=41)
+        tk.Label(header, text='玩法 · 下注 · 派奖 · 图解 · 结算示例',
+                 font=(font_name, 14), fg=MUTED, bg=HEADER, anchor='w').place(x=26, y=46)
+        def close_dialog():
+            try:
+                self._game_instruction_dialog = None
+            except Exception:
+                pass
+            try:
+                dialog.destroy()
+            except tk.TclError:
+                pass
+        tk.Button(header, text='关闭  ESC', command=close_dialog,
+                  font=(font_name, 14, 'bold'), bg='#e8dcc0', fg=TEXT,
+                  activebackground='#d9c895', relief=tk.FLAT, bd=0,
+                  cursor='hand2').place(x=850, y=17, width=120, height=42)
+        tk.Frame(dialog, bg=GOLD_BAR, height=3).pack(fill=tk.X, side=tk.TOP)
+        body = tk.Frame(dialog, bg=BG)
+        body.pack(fill=tk.BOTH, expand=True)
+        sidebar = tk.Frame(body, bg=SIDEBAR, width=205)
+        sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        sidebar.pack_propagate(False)
+        tk.Label(sidebar, text='说明目录', font=(font_name, 16, 'bold'),
+                 fg=GOLD, bg=SIDEBAR, anchor='w').pack(fill=tk.X, padx=18, pady=(17, 10))
+        scroll_host = tk.Frame(body, bg=BG)
+        scroll_host.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(scroll_host, bg=BG, highlightthickness=0, bd=0, yscrollincrement=36)
+        scrollbar = tk.Scrollbar(scroll_host, orient=tk.VERTICAL, command=canvas.yview,
+                                 bg='#ded3b7', troughcolor=BG, activebackground=GOLD_BAR,
+                                 relief=tk.FLAT, bd=0, width=13)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0), pady=10)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 8), pady=10)
+        content = tk.Frame(canvas, bg=BG)
+        content_window = canvas.create_window((0, 0), window=content, anchor='nw')
+        def sync_scrollregion(_event=None):
+            canvas.configure(scrollregion=canvas.bbox('all'))
+        def fit_content_width(event):
+            canvas.itemconfigure(content_window, width=event.width)
+        content.bind('<Configure>', sync_scrollregion)
+        canvas.bind('<Configure>', fit_content_width)
+        def add_rule(parent_frame, title, detail):
+            row = tk.Frame(parent_frame, bg=PANEL)
+            row.pack(fill=tk.X, padx=16, pady=5)
+            tk.Frame(row, bg=GOLD_BAR, width=5).pack(side=tk.LEFT, fill=tk.Y, padx=(0, 11))
+            text_box = tk.Frame(row, bg=PANEL)
+            text_box.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            tk.Label(text_box, text=title, font=(font_name, 15, 'bold'),
+                     fg=TEXT, bg=PANEL, anchor='w', justify=tk.LEFT,
+                     wraplength=650).pack(fill=tk.X)
+            if detail:
+                tk.Label(text_box, text=detail, font=(font_name, 14),
+                         fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+                         wraplength=650).pack(fill=tk.X, pady=(3, 0))
+        def add_table(parent_frame, title, headers, rows):
+            """沿用 Pass 表格的金色标题、网格边框和交替行底色。"""
+            block = tk.Frame(parent_frame, bg=PANEL_2,
+                             highlightbackground=BORDER, highlightthickness=1, bd=0)
+            block.pack(fill=tk.X, padx=16, pady=8)
+            tk.Label(block, text=title, font=(font_name, 14, 'bold'),
+                     fg=TEXT, bg=GOLD_BAR, anchor='w', justify=tk.LEFT,
+                     padx=11, pady=7).pack(fill=tk.X)
+            grid = tk.Frame(block, bg=BORDER)
+            grid.pack(fill=tk.X)
+            count = len(headers)
+            table_font = tkfont.Font(family=font_name, size=12)
+            matrix = [headers] + rows
+            preferences = [
+                max(70, min(240, max(
+                    table_font.measure(line)
+                    for row in matrix for line in str(row[col]).split('\n')
+                ) + 18)) for col in range(count)
+            ]
+            cells = []
+            for col, weight in enumerate(preferences):
+                grid.grid_columnconfigure(col, weight=weight, minsize=0)
+            for r, row in enumerate(matrix):
+                for col, value in enumerate(row):
+                    head = r == 0
+                    color = GOLD_BAR if head else (PANEL if r % 2 else '#fbf6e9')
+                    cell = tk.Label(
+                        grid, text=value, font=(font_name, 12, 'bold' if head else 'normal'),
+                        fg=TEXT if head else MUTED, bg=color, anchor='w', justify=tk.LEFT,
+                        width=1, wraplength=100, padx=8, pady=9,
+                    )
+                    cell.grid(row=r, column=col, sticky='nsew', padx=1, pady=1)
+                    cells.append((cell, col))
 
-        text_widget = tk.Text(
-            body, wrap=tk.WORD, yscrollcommand=scrollbar.set,
-            font=('Microsoft YaHei UI', 11), bg='#211811', fg='#f4eee5',
-            insertbackground='white', relief=tk.FLAT, padx=14, pady=12,
-            spacing1=3, spacing2=2, spacing3=8
-        )
-        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=text_widget.yview)
+            def fit_table(event):
+                # 显式换行优先；自动折行用于字体/DPI 差异，避免文字越界。
+                available = max(1, event.width - 2 * count)
+                total = sum(preferences)
+                for cell, col in cells:
+                    wrap = max(24, int(available * preferences[col] / total) - 20)
+                    if cell.cget('wraplength') != wrap:
+                        cell.configure(wraplength=wrap)
+            grid.bind('<Configure>', fit_table)
 
-        help_text = (
-            '基本流程\n'
-            '• 没有 Point 时为花摇骰（Come-Out）。掷出 4、5、6、8、9、10 会建立 Point。\n'
-            '• 建立 Point 后，再次掷中 Point，Pass Line 获胜；先掷出 7 则 Don\'t Pass 获胜并 Seven Out。\n'
-            '• 没有任何下注时也可以按“转动”。\n\n'
-            '主要下注\n'
-            '• PASS LINE：Come-Out 的 7、11 赢；2、3、12 输。建立 Point 后，Point 先于 7 出现则赢。\n'
-            '• DON\'T PASS：Come-Out 的 2、3 赢；7、11 输；12 和局。建立 Point 后，7 先于 Point 出现则赢。\n'
-            '• COME / DON\'T COME：只可在 Point 建立后下注，规则相当于新的 Pass / Don\'t Pass。\n'
-            '• WIN 数字：所选数字先于 7 出现即赢。4/10 付 9:5，5/9 付 7:5，6/8 付 7:6。\n'
-            '• LOSE 数字：7 先于所选数字出现即赢。4/10 付 1:2，5/9 付 2:3，6/8 付 5:6。\n\n'
-            '单次下注\n'
-            '• FIELD：2、12 付 2:1；3、4、9、10、11 付 1:1。\n'
-            '• SEVEN：掷出 7，付 5:1。\n'
-            '• CRAPS：掷出 2、3、12，付 8:1。\n'
-            '• C·E：11 付 7:1；2、3、12 付 3:1。\n'
-            '• 单独 2 / 12 付 30:1；单独 3 / 11 付 15:1。\n\n'
-            'Hardway\n'
-            '• HARD 4、10：对子先于软点或 7 出现，付 8:1。\n'
-            '• HARD 6、8：对子先于软点或 7 出现，付 10:1。\n\n'
-            '桌面操作\n'
-            '• 选择筹码后，左键点击下注区域增加当前筹码。\n'
-            '• 右键点击下注区域或该区域筹码，清除该格全部可撤下注。\n'
-            '• 左键点击右下角“❓”打开完整玩法说明；右键点击该按钮开启或关闭下注格悬停提示。\n'
-            '• 下注格悬停提示默认关闭。\n'
-            '• “重复下注”会尝试恢复上一局的全部下注。\n'
-            '• “激活”状态：WIN / LOSE 数字在任何阶段都结算。\n'
-            '• “关闭”状态：Come-Out（OFF）阶段的 WIN / LOSE 暂不结算；Point 建立后恢复。\n'
-            '• 结算动画结束后可以下注；“转动”按钮会额外冷却 5 秒。\n\n'
-            '显示说明\n'
-            '• “上局获胜”显示所有获胜区域的本金加获胜奖金，不包含和局退回。\n'
-            '• 白色闪烁表示该区域本轮获胜；ON 圆牌表示当前 Point。'
-        )
-        text_widget.insert(tk.END, help_text)
-        text_widget.config(state=tk.DISABLED)
+        def draw_illustration(parent_frame, kind):
+            """使用 Tk Canvas 绘图，不依赖图片文件或特殊骰子字体。"""
+            heights = {'flow': 360, 'come': 265, 'odds': 200,
+                       'hard': 205, 'field': 165, 'money': 290}
+            base_height = heights[kind]
+            c = tk.Canvas(parent_frame, width=700, height=base_height,
+                          bg=PANEL, highlightthickness=0)
+            c.pack(fill=tk.X, padx=16, pady=(5, 12))
 
-        tk.Button(
-            win, text='关闭说明', command=win.destroy,
-            font=('Microsoft YaHei UI', 11, 'bold'),
-            bg='#315b72', fg='white', activebackground='#447b99',
-            activeforeground='white', relief=tk.RAISED, bd=3,
-            padx=24, pady=7, cursor='hand2'
-        ).pack(pady=(0, 14))
+            def paint(event):
+                c.delete('all')
+                scale = max(0.1, event.width / 700)
+                font_size = max(8, round(12 * min(scale, 1.15)))
+                good, bad = '#e0efdc', '#f7e1d9'
 
-        win.bind('<Escape>', lambda _event: win.destroy())
-        win.focus_set()
+                def label(x, y, text, color=TEXT, bold=False):
+                    c.create_text(x * scale, y, text=text, fill=color,
+                                  font=(font_name, font_size, 'bold' if bold else 'normal'),
+                                  justify=tk.CENTER)
+
+                def box(x1, y1, x2, y2, text, fill=PANEL_2):
+                    c.create_rectangle(x1 * scale, y1, x2 * scale, y2,
+                                       fill=fill, outline=BORDER, width=1.5)
+                    label((x1 + x2) / 2, (y1 + y2) / 2, text, bold=True)
+
+                def arrow(x1, y1, x2, y2):
+                    c.create_line(x1 * scale, y1, x2 * scale, y2,
+                                  fill=GOLD, width=2, arrow=tk.LAST)
+
+                def die(x, y, value):
+                    size = 48 * min(scale, 1.0)
+                    left = x * scale
+                    c.create_rectangle(left, y, left + size, y + size,
+                                       fill='#ffffff', outline=BORDER, width=2)
+                    patterns = {
+                        1: [(1, 1)], 2: [(0, 0), (2, 2)],
+                        3: [(0, 0), (1, 1), (2, 2)],
+                        4: [(0, 0), (2, 0), (0, 2), (2, 2)],
+                        5: [(0, 0), (2, 0), (1, 1), (0, 2), (2, 2)],
+                        6: [(0, 0), (2, 0), (0, 1), (2, 1), (0, 2), (2, 2)],
+                    }
+                    radius = size * 0.065
+                    for dx, dy in patterns[value]:
+                        px = left + size * (0.24 + dx * 0.26)
+                        py = y + size * (0.24 + dy * 0.26)
+                        c.create_oval(px-radius, py-radius, px+radius, py+radius,
+                                      fill=TEXT, outline='')
+
+                if kind == 'flow':
+                    box(225, 8, 475, 60, 'Come-Out\n尚无 Point', GOLD_BAR)
+                    for x in (112, 350, 588):
+                        arrow(350, 60, x, 98)
+                    box(12, 98, 212, 162, '7／11\nPass Line 赢', good)
+                    box(250, 98, 450, 162, '4／5／6／8／9／10\n建立 Point', GOLD_BAR)
+                    box(488, 98, 688, 162, '2／3／12\nPass Line 输', bad)
+                    arrow(350, 162, 112, 223)
+                    arrow(350, 162, 350, 223)
+                    arrow(350, 162, 588, 223)
+                    box(12, 223, 212, 287, 'Point 先出\nPass Line 赢', good)
+                    box(250, 223, 450, 287, '其他点数\n继续等待')
+                    box(488, 223, 688, 287, '7 先出\nPass Line 输', bad)
+                    label(350, 330, '主线结算后回到 Come-Out；\nDon’t Pass 的 12 和局规则见主线表格。', MUTED)
+                elif kind == 'come':
+                    box(12, 15, 207, 90, '桌面 Point＝6\n新增 Come 注')
+                    arrow(207, 52, 253, 52)
+                    box(253, 15, 448, 90, '下一掷出 8\nCome 移至 8', GOLD_BAR)
+                    arrow(448, 52, 494, 52)
+                    box(494, 15, 688, 90, '独立目标＝8\n不是桌面 Point')
+                    arrow(350, 90, 175, 152)
+                    arrow(350, 90, 525, 152)
+                    box(65, 152, 285, 210, '之后 8 先出\nCome 8 赢', good)
+                    box(415, 152, 635, 210, '之后 7 先出\nCome 8 输', bad)
+                    label(350, 244, '其他点数继续等待；Don’t Come 移注后的输赢相反。', MUTED)
+                elif kind == 'odds':
+                    box(15, 22, 220, 110, '已有对应主线\n下注金额＝B')
+                    arrow(220, 65, 263, 65)
+                    box(263, 22, 453, 110, '桌面已建立\nPoint', GOLD_BAR)
+                    arrow(453, 65, 495, 65)
+                    box(495, 22, 685, 110, '可加 Odds\n金额上限＝3 × B')
+                    label(350, 155, 'Pass Odds 等 Point 先出；Don’t Odds 等 7 先出。\n赔率随 Point 变化，统一查上方 Odds 赔付表。', MUTED)
+                elif kind == 'hard':
+                    for x, values, title, result, fill in (
+                        (12, (3, 3), '对子 3＋3＝6', 'Hard 6 赢\n本金留桌', good),
+                        (250, (2, 4), '非对子 2＋4＝6', 'Hard 6 输\n本金扣除', bad),
+                        (488, (3, 4), '合计 3＋4＝7', 'Hard 6 输\n本金扣除', bad),
+                    ):
+                        box(x, 8, x+200, 195, '', fill)
+                        label(x+100, 33, title, bold=True)
+                        die(x+43, 61, values[0])
+                        die(x+109, 61, values[1])
+                        label(x+100, 155, result)
+                elif kind == 'field':
+                    for i, number in enumerate(range(2, 13)):
+                        x = 13 + i * 62
+                        hit = number in (2, 3, 4, 9, 10, 11, 12)
+                        box(x, 15, x+54, 71, str(number), good if hit else '#ece8df')
+                        label(x+27, 94, '中' if hit else '输', '#3c6937' if hit else MUTED)
+                    label(350, 139, '只看总点数；每次掷骰后，FIELD 下注即结束。', MUTED)
+                elif kind == 'money':
+                    for y, title, result, fill in (
+                        (10, '一般获胜', '本金＋利润 → 余额\n该注结束', good),
+                        (80, 'WIN／Hardway 获胜', '利润 → 余额\n本金 → 留桌', good),
+                        (150, '和局', '本金 → 余额\n利润为零', PANEL_2),
+                        (220, '输注', '本金扣除\n该注结束', bad),
+                    ):
+                        box(15, y, 270, y+58, title, fill)
+                        arrow(270, y+29, 345, y+29)
+                        box(345, y, 685, y+58, result, fill)
+            c.bind('<Configure>', paint)
+
+        def render_page(index):
+            for child in content.winfo_children():
+                child.destroy()
+            for idx, button in enumerate(nav_buttons):
+                button.configure(bg='#e6d9b9' if idx == index else SIDEBAR,
+                                 fg=GOLD if idx == index else MUTED)
+            page_title, subtitle, cards = manual_pages[index]
+            top = tk.Frame(content, bg=BG)
+            top.pack(fill=tk.X, padx=14, pady=(7, 2))
+            tk.Label(top, text=page_title, font=(font_name, 20, 'bold'),
+                     fg=GOLD, bg=BG, anchor='w', justify=tk.LEFT,
+                     wraplength=690).pack(fill=tk.X)
+            if subtitle:
+                tk.Label(top, text=subtitle, font=(font_name, 14),
+                         fg=MUTED, bg=BG, anchor='w', justify=tk.LEFT,
+                         wraplength=690).pack(fill=tk.X, pady=(3, 0))
+            for card_title, card_subtitle, rules, tables in cards:
+                card = tk.Frame(content, bg=PANEL, highlightbackground=BORDER,
+                                highlightcolor=BORDER, highlightthickness=1, bd=0)
+                card.pack(fill=tk.X, padx=10, pady=7)
+                head = tk.Frame(card, bg=PANEL)
+                head.pack(fill=tk.X, padx=16, pady=(12, 5))
+                tk.Label(head, text=card_title, font=(font_name, 16, 'bold'),
+                         fg=GOLD, bg=PANEL, anchor='w', justify=tk.LEFT,
+                         wraplength=680).pack(fill=tk.X)
+                if card_subtitle:
+                    tk.Label(head, text=card_subtitle, font=(font_name, 14),
+                             fg=MUTED, bg=PANEL, anchor='w', justify=tk.LEFT,
+                             wraplength=680).pack(fill=tk.X)
+                if card_title in illustration_cards:
+                    draw_illustration(card, illustration_cards[card_title])
+                for rule_title, detail in rules:
+                    add_rule(card, rule_title, detail)
+                for table_title, table_headers, rows in tables:
+                    add_table(card, table_title, table_headers, rows)
+                tk.Frame(card, bg=PANEL, height=6).pack(fill=tk.X)
+            content.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox('all'))
+            canvas.yview_moveto(0)
+        nav_buttons = []
+        for index, (page_title, _subtitle, _cards) in enumerate(manual_pages):
+            button = tk.Button(sidebar, text=page_title, command=lambda i=index: render_page(i),
+                               font=(font_name, 14), fg=MUTED, bg=SIDEBAR,
+                               activebackground='#e8d49a', activeforeground=GOLD,
+                               relief=tk.FLAT, bd=0, anchor='w', padx=18, pady=10,
+                               cursor='hand2')
+            button.pack(fill=tk.X)
+            nav_buttons.append(button)
+        def on_mousewheel(event):
+            delta = event.delta
+            if delta:
+                step = max(1, abs(int(delta / 120)))
+                canvas.yview_scroll(-step if delta > 0 else step, 'units')
+            return 'break'
+        dialog.bind('<MouseWheel>', on_mousewheel)
+        dialog.bind('<Button-4>', lambda _e: (canvas.yview_scroll(-1, 'units'), 'break')[1])
+        dialog.bind('<Button-5>', lambda _e: (canvas.yview_scroll(1, 'units'), 'break')[1])
+        dialog.bind('<Escape>', lambda _e: close_dialog())
+        dialog.protocol('WM_DELETE_WINDOW', close_dialog)
+        if nav_buttons:
+            render_page(0)
+        dialog.focus_set()
 
     @staticmethod
     def shade_color(color, factor):

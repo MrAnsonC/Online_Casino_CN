@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "shoe": {
+    "mode": "CSM",
+    "decks": 8,
+    "chambers": 15,
+    "game_id": "DoubleBetBlackjack:local:f1680e553c054b6994032789a9334dc2"
+  }
+}

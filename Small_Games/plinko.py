@@ -1,24 +1,19 @@
-"""Plinko — ChickenCrossing-style warm fixed HMI.
+"""Plinko: full-width 15-slot board with real-time physical collisions.
 
-Gameplay retained from the original plinko.py:
-- 8 peg rows / 9 payout slots.
-- Easy / medium / hard payout tables are unchanged.
-- Every launched ball costs the current stake once.
-- Multiple balls may be launched while balls are already falling.
-- Each ball's final slot is fixed before animation by 8 independent 50/50
-  left/right decisions; the visible motion is then naturally guided there.
-- Balance is credited when each ball reaches its final slot.
+Retains the original chip betting, debit-per-ball, concurrent launches and
+slot-based payouts. Outcomes are assigned ONLY when a ball physically rests
+inside a bin. Seven motor-driven pinwheels run continuously, arranged 2-3-2.
+Pegs, complete rotating blades, walls, dividers and other balls all collide.
 
-Additional persistence:
-- Final landing slots are stored in ../A_Logs/Plinko.json.
-- Data is separated into easy / medium / hard.
-- Each mode keeps only its latest 20 raw landing slots in the requested
-  [{"game_01": ..., ..., "game_20": ...}] structure.
-- The on-screen history shows the latest 8 results converted to the
-  corresponding payout multiplier for the active risk mode.
+Three fixed payout tables target 95% RTP using 120,000 sampled physical
+landings from this seven-rotor layout. This is a statistical calibration,
+not an exact theoretical guarantee for arbitrary launch timing or concurrency.
+There is no payout feedback, outcome steering or precomputed ball trajectory.
 
-The UI follows ChickenCrossing_tk.py's fixed 1150x750 warm HMI and supports
-the project's EmbeddedGamePage single-Tk mode.
+The sidebar history lies below active balls and above rules, with 24
+chevron cells showing actual historical multipliers across three rows.
+Older slot-only logs are migrated with the previous payout tables. Account
+encryption, embedding and 15-slot disk logging are preserved.
 """
 
 from __future__ import annotations
@@ -53,7 +48,7 @@ except ImportError:
         EmbeddedGamePage = None
 
 
-VERSION = "Plinko-ChickenStyle-R5-EventDrivenRigidBody"
+VERSION = "Plinko-15Slots-7Rotors-Calibrated-R5"
 
 
 class Theme:
@@ -98,12 +93,13 @@ class Theme:
     FONT_EMOJI = "Segoe UI Emoji"
 
 
+# (amount, chip_colour, label). Text colour is auto-derived from luminance.
 CHIP_CONFIGS = (
-    ("$1", "1", "#D75A54", "white"),
-    ("$5", "5", "#67B56A", "black"),
-    ("$10", "10", "#292929", "white"),
-    ("$25", "25", "#D47AB7", "black"),
-    ("$100", "100", "#F4F1EA", "black"),
+    (5,    "#ba3438", "5"),
+    (25,   "#42a95b", "25"),
+    (100,  "#202020", "100"),
+    (500,  "#70439a", "500"),
+    (1000, "#d0a347", "1K"),
 )
 
 RISK_CONFIGS = (
@@ -112,11 +108,73 @@ RISK_CONFIGS = (
     ("困难", "3", "hard"),
 )
 
-PAYOUTS = {
-    "1": [5.6, 2.1, 1.1, 1.0, 0.5, 1.0, 1.1, 2.1, 5.6],
-    "2": [13.0, 3.0, 1.3, 0.7, 0.4, 0.7, 1.3, 3.0, 13.0],
-    "3": [29.0, 4.0, 1.5, 0.3, 0.2, 0.3, 1.5, 4.0, 29.0],
+SLOT_COUNT = 15
+# Previous paid multipliers are retained only to migrate existing slot-only logs.
+LEGACY_PAYOUT_CENTS = {
+    "1": (574, 409, 227, 170, 125, 113, 80, 57, 80, 113, 125, 170, 227, 409, 574),
+    "2": (3679, 1685, 648, 389, 168, 90, 53, 25, 53, 90, 168, 389, 648, 1685, 3679),
+    "3": (42834, 5612, 1804, 501, 190, 30, 20, 0, 20, 30, 190, 501, 1804, 5612, 42834),
 }
+# Seven-rotor calibration: 60,000 independent balls + 60,000 balls launched
+# in groups of 15 at 0.2-second intervals; initial rotor phase uniform over
+# a full revolution, x uniform in centre +/-5, vx uniform in [-24, 24].
+# Fit symmetrical cent-precision tables against their pooled slot frequencies.
+# Each table returns exactly 95% on that calibration sample. Actual long-run
+# RTP is an estimate, not a guarantee: release timing and ball collisions can
+# change the distribution. No paths/results are selected to enforce an RTP.
+RTP_CALIBRATION = {
+    "target": 0.95,
+    "sample_balls": 120000,
+    "board_size": (716, 570),
+    "rotor_layout": "2-3-2",
+    "single_seed": 20260929,
+    "multi_seed": 20260930,
+    "counts": (844, 1537, 3359, 4807, 5197, 13588, 16582, 19080,
+               19444, 18541, 6133, 4916, 3512, 1613, 847),
+    "single_counts": (422, 798, 1665, 2444, 2636, 6808, 8198, 9551,
+                      9663, 9160, 3099, 2531, 1784, 809, 432),
+    "multi_counts": (422, 739, 1694, 2363, 2561, 6780, 8384, 9529,
+                     9781, 9381, 3034, 2385, 1728, 804, 415),
+    # Nominal pooled Monte Carlo standard errors in RTP fraction units.
+    # Multi-ball samples are clustered; these are descriptive estimates,
+    # not confidence guarantees or independent holdout validation.
+    "nominal_standard_error": {"1": 0.001923, "2": 0.006156, "3": 0.015081},
+}
+PAYOUT_CENTS = {
+    '1': (453, 324, 179, 133, 99, 89, 63, 44, 63, 89, 99, 133, 179, 324, 453),
+    '2': (1541, 714, 277, 166, 71, 38, 22, 11, 22, 38, 71, 166, 277, 714, 1541),
+    '3': (4387, 568, 188, 52, 20, 3, 2, 0, 2, 3, 20, 52, 188, 568, 4387),
+}
+PAYOUTS = {mode: tuple(value / 100 for value in values)
+           for mode, values in PAYOUT_CENTS.items()}
+if any(len(values) != SLOT_COUNT for values in PAYOUT_CENTS.values()):
+    raise ValueError("Every risk mode must define exactly 15 payouts")
+
+
+def format_multiplier(value: float) -> str:
+    return f"{value:.2f}".rstrip("0").rstrip(".") + "×"
+
+
+def _format_history_value(value: float) -> str:
+    """Compact multiplier text that fits in the narrow history cell."""
+    if value >= 100:
+        return f"{value:.0f}"
+    if value >= 10:
+        return f"{value:.1f}"
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def _pick_text_colour(hex_colour: str) -> str:
+    """Return black or white depending on the background's perceived luminance."""
+    try:
+        r = int(hex_colour[1:3], 16)
+        g = int(hex_colour[3:5], 16)
+        b = int(hex_colour[5:7], 16)
+    except (ValueError, IndexError):
+        return "#FFFFFF"
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return "#111111" if luminance >= 140 else "#FFFFFF"
+
 
 RISK_KEY = {"1": "easy", "2": "medium", "3": "hard"}
 RISK_LABEL = {"1": "简单", "2": "中等", "3": "困难"}
@@ -133,7 +191,7 @@ def get_data_file_path() -> str:
 def get_plinko_log_path() -> str:
     return os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "../A_Logs/Json/Plinko.json",
+        "../A_Logs/Json/Plinko_15.json",
     )
 
 
@@ -172,6 +230,7 @@ def _empty_landing_log() -> dict:
         "easy": [{}],
         "medium": [{}],
         "hard": [{}],
+        "_paid_multipliers": {"easy": [], "medium": [], "hard": []},
     }
 
 
@@ -191,7 +250,7 @@ def _extract_mode_values(data: dict, mode: str) -> list[int]:
                 landing = int(value)
             except (ValueError, TypeError):
                 continue
-            if 1 <= landing <= 9:
+            if 1 <= landing <= SLOT_COUNT:
                 pairs.append((index, landing))
         pairs.sort(key=lambda pair: pair[0])
         return [landing for _, landing in pairs][-20:]
@@ -215,21 +274,38 @@ def load_landing_log() -> dict:
             f"game_{index:02d}": value
             for index, value in enumerate(values, start=1)
         }]
+        stored = raw.get("_paid_multipliers", {})
+        paid = stored.get(mode, []) if isinstance(stored, dict) else []
+        valid = (isinstance(paid, list) and len(paid) == len(values) and
+                 all(isinstance(v, (int, float)) and math.isfinite(v) and v >= 0
+                     for v in paid))
+        risk = {"easy": "1", "medium": "2", "hard": "3"}[mode]
+        # Older files stored only slots; recover their original paid values
+        # using the previous fixed tables, not the newly calibrated tables.
+        base["_paid_multipliers"][mode] = (
+            list(paid) if valid else
+            [LEGACY_PAYOUT_CENTS[risk][slot-1] / 100 for slot in values]
+        )
     return base
 
 
-def record_landing(mode: str, slot: int) -> None:
-    """Append one landing slot and keep the newest 20 for the selected mode."""
+def record_landing(mode: str, slot: int, multiplier: Optional[float] = None) -> None:
+    """Append one landing slot and keep the newest 24 for the selected mode."""
     if mode not in ("easy", "medium", "hard"):
         return
     slot = int(slot)
-    if not 1 <= slot <= 9:
+    if not 1 <= slot <= SLOT_COUNT:
         return
 
     data = load_landing_log()
+    risk = {"easy": "1", "medium": "2", "hard": "3"}[mode]
+    paid = float(PAYOUTS[risk][slot-1] if multiplier is None else multiplier)
+    if not math.isfinite(paid) or paid < 0:
+        return
+    data["_paid_multipliers"][mode] = (data["_paid_multipliers"][mode] + [paid])[-24:]
     values = _extract_mode_values(data, mode)
     values.append(slot)
-    values = values[-20:]
+    values = values[-24:]
 
     data[mode] = [{
         f"game_{index:02d}": value
@@ -253,6 +329,199 @@ def record_landing(mode: str, slot: int) -> None:
             json.dump(data, file, ensure_ascii=False, indent=4)
     except OSError:
         pass
+
+
+class PlinkoPhysics:
+    """Real-time circle/capsule collisions in the same pixel space as the canvas.
+
+    No target slot, route, payout-dependent force or simulated trajectory cache.
+    All balls and seven motor-driven rotors share one fixed-step simulation clock.
+    """
+    DT = 1.0 / 240.0
+    GRAVITY = 660.0
+    BALL_RADIUS = 5.5
+    PEG_RADIUS = 3.5
+    ROTOR_RADIUS = 3.0
+    ROTOR_LENGTH = 24.0
+    ROTOR_SPEED = 2.6
+
+    PEG_ROW_COUNT = 13
+
+    def __init__(self, width: float, height: float):
+        self.left, self.right = 5.0, width - 5.0
+        self.top, self.bottom = 5.0, height - 5.0
+        self.floor = self.bottom - 34.0
+        self.divider_top = self.floor - 66.0
+        self.slot_width = (self.right - self.left) / SLOT_COUNT
+        self.centre = (self.left + self.right) / 2
+        self.time = 0.0
+        # 2-3-2 layout. The two outermost middle-row rotors spin opposite to
+        # their previous direction (left rotor now clockwise, right rotor now
+        # counter-clockwise) as requested.
+        self.rotors = tuple((self.left + (self.right-self.left)*fx,
+                             self.top + (self.floor-self.top)*fy, direction)
+                            for fx, fy, direction in
+                            ((.33, .30, 1), (.67, .30, -1),
+                             (.20, .50, 1), (.50, .50, 1), (.80, .50, -1),
+                             (.34, .71, 1), (.66, .71, -1)))
+        self.funnel = ((self.centre-24, self.top+12, self.left, self.top+80),
+                       (self.centre+24, self.top+12, self.right, self.top+80))
+        self.peg_rows = []
+        rows = self.PEG_ROW_COUNT
+        base_spacing = (self.right - self.left) / 23
+        for row in range(rows):
+            y = self.top + 99 + row * (self.divider_top - self.top - 143) / (rows - 1)
+            if row == rows - 1:
+                # Bottom row: shortened central span so the lowest pegs sit
+                # higher than the side pegs, leaving more open space below.
+                count = 15
+                start = 4.5
+            elif row % 2 == 0:
+                count = 23
+                start = 0.5
+            else:
+                count = 22
+                start = 1.0
+            xs = [self.left + (j + start) * base_spacing for j in range(count)]
+            clearance = self.ROTOR_LENGTH + self.ROTOR_RADIUS + self.PEG_RADIUS + 5
+            self.peg_rows.append([(x, y) for x in xs
+                                  if all(math.hypot(x-rx, y-ry) > clearance
+                                         for rx, ry, _ in self.rotors)])
+        self.pegs = [p for row in self.peg_rows for p in row]
+
+    def rotor_segments(self):
+        for cx, cy, direction in self.rotors:
+            omega = direction * self.ROTOR_SPEED
+            for blade in range(4):
+                angle = omega * self.time + blade * math.pi / 2
+                yield (cx, cy, cx+self.ROTOR_LENGTH*math.cos(angle),
+                       cy+self.ROTOR_LENGTH*math.sin(angle), omega)
+
+    @staticmethod
+    def _contact(ball, nx, ny, penetration, restitution=.55,
+                 friction=.10, surface_vx=0.0, surface_vy=0.0):
+        ball['x'] += nx * max(0.0, penetration)
+        ball['y'] += ny * max(0.0, penetration)
+        rvx, rvy = ball['vx']-surface_vx, ball['vy']-surface_vy
+        normal_speed = rvx*nx + rvy*ny
+        if normal_speed >= 0:
+            return
+        # Remove restitution at tiny impacts to permit physical resting contact.
+        bounce = restitution if normal_speed < -12.0 else 0.0
+        impulse = -(1+bounce)*normal_speed
+        # A solid disk rolls instead of being artificially glued to a peg by
+        # translational friction. Inertia I = m*r*r/2, inverse contact mass = 3.
+        radius = PlinkoPhysics.BALL_RADIUS
+        slip = -rvx*ny + rvy*nx - ball.get('spin', 0.0)*radius
+        tangent_impulse = max(-friction*impulse, min(friction*impulse, -slip/3.0))
+        ball['vx'] += impulse*nx - tangent_impulse*ny
+        ball['vy'] += impulse*ny + tangent_impulse*nx
+        ball['spin'] = ball.get('spin', 0.0) - 2*tangent_impulse/radius
+
+    def _capsule(self, ball, ax, ay, bx, by, radius, *, omega=0.0,
+                 restitution=.55):
+        dx, dy = bx-ax, by-ay
+        length2 = dx*dx + dy*dy
+        u = max(0.0, min(1.0, ((ball['x']-ax)*dx+(ball['y']-ay)*dy)/length2)) if length2 else 0.0
+        px, py = ax+u*dx, ay+u*dy
+        nx, ny = ball['x']-px, ball['y']-py
+        distance = math.hypot(nx, ny)
+        separation = self.BALL_RADIUS+radius
+        if distance >= separation:
+            return
+        if distance > 1e-9:
+            nx, ny = nx/distance, ny/distance
+        else:
+            length = math.sqrt(length2) or 1.0
+            nx, ny = (-dy/length, dx/length) if length2 else (0.0, -1.0)
+        self._contact(ball, nx, ny, separation-distance, restitution,
+                      surface_vx=-omega*(py-ay), surface_vy=omega*(px-ax))
+
+    def _terrain(self, ball, segments):
+        r = self.BALL_RADIUS
+        if ball['x'] < self.left+r:
+            self._contact(ball, 1, 0, self.left+r-ball['x'])
+        if ball['x'] > self.right-r:
+            self._contact(ball, -1, 0, ball['x']-(self.right-r))
+        if ball['y'] < self.top+r:
+            self._contact(ball, 0, 1, self.top+r-ball['y'])
+        if ball['y'] > self.floor-r:
+            self._contact(ball, 0, -1, ball['y']-(self.floor-r), .20, .25)
+        if ball['y'] < self.top+90:
+            for segment in self.funnel:
+                self._capsule(ball, *segment, 1.5, restitution=.4)
+        separation = r+self.PEG_RADIUS
+        for row in self.peg_rows:
+            if not row or abs(ball['y']-row[0][1]) >= separation:
+                continue
+            for px, py in row:
+                dx, dy = ball['x']-px, ball['y']-py
+                if abs(dx) >= separation:
+                    continue
+                distance = math.hypot(dx, dy)
+                if distance < separation:
+                    nx, ny = (dx/distance, dy/distance) if distance > 1e-9 else (0., -1.)
+                    self._contact(ball, nx, ny, separation-distance, .62)
+        reach = self.ROTOR_LENGTH+self.ROTOR_RADIUS+r
+        for cx, cy, px, py, omega in segments:
+            if abs(ball['x']-cx) < reach and abs(ball['y']-cy) < reach:
+                self._capsule(ball, cx, cy, px, py, self.ROTOR_RADIUS, omega=omega)
+        if ball['y'] > self.divider_top-r-1:
+            # Only adjacent dividers can touch a ball, all use the drawn geometry.
+            cell = int((ball['x']-self.left)/self.slot_width)
+            for wall in (cell, cell+1):
+                if 1 <= wall < SLOT_COUNT:
+                    x = self.left+wall*self.slot_width
+                    self._capsule(ball, x, self.divider_top, x, self.floor, 1.0, restitution=.35)
+
+    def _ball_pairs(self, balls):
+        diameter = 2*self.BALL_RADIUS
+        for i, a in enumerate(balls):
+            for b in balls[i+1:]:
+                dx, dy = b['x']-a['x'], b['y']-a['y']
+                if abs(dx) >= diameter or abs(dy) >= diameter:
+                    continue
+                distance = math.hypot(dx, dy)
+                if distance >= diameter:
+                    continue
+                nx, ny = (dx/distance, dy/distance) if distance > 1e-9 else (1., 0.)
+                correction = (diameter-distance)/2
+                a['x'] -= nx*correction; a['y'] -= ny*correction
+                b['x'] += nx*correction; b['y'] += ny*correction
+                relative = (b['vx']-a['vx'])*nx+(b['vy']-a['vy'])*ny
+                if relative < 0:
+                    impulse = -(1+.65)*relative/2
+                    a['vx'] -= impulse*nx; a['vy'] -= impulse*ny
+                    b['vx'] += impulse*nx; b['vy'] += impulse*ny
+
+    def step(self, balls, dt=None):
+        dt = self.DT if dt is None else dt
+        self.time += dt
+        live = [ball for ball in balls if not ball.get('finished')]
+        if not live:
+            return
+        segments = tuple(self.rotor_segments())
+        for ball in live:
+            drag = 1/(1+.0007*math.hypot(ball['vx'], ball['vy'])*dt)
+            ball['vx'] *= drag; ball['vy'] *= drag
+            ball['x'] += ball['vx']*dt
+            ball['y'] += ball['vy']*dt+.5*self.GRAVITY*dt*dt
+            ball['vy'] += self.GRAVITY*dt
+        for _ in range(3):
+            self._ball_pairs(live)
+            for ball in live:
+                self._terrain(ball, segments)
+        for ball in live:
+            grounded = ball['y'] >= self.floor-self.BALL_RADIUS-1e-5
+            if grounded:
+                ball['vx'] *= max(0., 1-12*dt)
+                ball['spin'] = ball.get('spin', 0.)*max(0., 1-12*dt)
+            resting = grounded and abs(ball['vy']) < 1.0 and abs(ball['vx']) < 2.0
+            ball['rest_time'] = ball.get('rest_time', 0.)+dt if resting else 0.
+            if ball['rest_time'] >= .12:
+                # The ONLY place an outcome is assigned: the actual resting x.
+                ball['slot'] = min(SLOT_COUNT, max(1, int((ball['x']-self.left)/self.slot_width)+1))
+                ball['finished'] = True
 
 
 # ---------------------------------------------------------------------------
@@ -328,7 +597,6 @@ class ChipButton(tk.Canvas):
         label: str,
         amount: str,
         chip_color: str,
-        text_color: str,
         command: Callable[[str], None],
         width: int = 57,
         height: int = 50,
@@ -345,7 +613,7 @@ class ChipButton(tk.Canvas):
         self.label = label
         self.amount = amount
         self.chip_color = chip_color
-        self.text_color = text_color
+        self.text_color = _pick_text_colour(chip_color)
         self.command = command
         self.control_width = width
         self.control_height = height
@@ -405,7 +673,7 @@ class ChipButton(tk.Canvas):
 
         self.create_text(
             cx, cy, text=self.label, fill=self.text_color,
-            font=(Theme.FONT, 10 if len(self.label) <= 4 else 9, "bold")
+            font=(Theme.FONT, 11 if len(self.label) <= 3 else 9, "bold")
         )
         if disabled:
             self.create_oval(
@@ -527,7 +795,11 @@ class PlinkoGame:
     PANEL_GAP = 14
 
     BOARD_WIDTH = 716
-    BOARD_HEIGHT = 478
+    BOARD_HEIGHT = 570
+
+    HISTORY_COLS = 8
+    HISTORY_ROWS = 3
+    HISTORY_VISIBLE = HISTORY_COLS * HISTORY_ROWS  # 24
 
     def __init__(self, root, initial_balance: float, username: str):
         self.root = root
@@ -545,16 +817,17 @@ class PlinkoGame:
         self.active_balls = 0
         self.last_result_text = "等待发射"
 
-        # Continuous event-driven rigid-body tuning (pixel / second units).
-        # Between impacts the ball follows x = x0 + vx*t and
-        # y = y0 + vy*t + 1/2*g*t^2 exactly.  Result control is applied only as
-        # an instantaneous collision impulse while the ball touches a peg.
-        self.gravity = 980.0
-        self.ball_radius = 8.0
-        self.peg_radius = 5.0
+        self.physics = PlinkoPhysics(self.BOARD_WIDTH, self.BOARD_HEIGHT)
+        self.ball_radius = self.physics.BALL_RADIUS
+        self.peg_radius = self.physics.PEG_RADIUS
         self.frame_interval_ms = 16
-        self.max_frame_dt = 0.040
         self._last_frame_time = time.monotonic()
+        self._physics_accumulator = 0.0
+        self._animation_job = None
+        self._closed = False
+
+        # History strip state: newest first, 24 values.
+        self._history_values: list[Optional[float]] = [None] * self.HISTORY_VISIBLE
 
         self.chip_buttons: list[ChipButton] = []
         self.risk_buttons: list[ModernButton] = []
@@ -563,12 +836,14 @@ class PlinkoGame:
         self.bet_var = tk.StringVar()
         self.last_win_var = tk.StringVar()
         self.active_var = tk.StringVar()
-        self.mode_var = tk.StringVar()
         self.status_var = tk.StringVar()
-        self.history_var = tk.StringVar()
 
         self.create_widgets()
+        self._reload_history()
         self.update_display()
+        self.root.bind("<Destroy>", self._on_destroy, add="+")
+        self.animation_running = True
+        self._animation_job = self.root.after(self.frame_interval_ms, self.animate_balls)
 
     def _configure_root(self) -> None:
         if isinstance(self.root, (tk.Tk, tk.Toplevel)):
@@ -700,19 +975,6 @@ class PlinkoGame:
         panel = self._card(master, width=self.GAME_PANEL_WIDTH, height=self.BODY_HEIGHT, padding=0)
         panel.place(x=0, y=0, width=self.GAME_PANEL_WIDTH, height=self.BODY_HEIGHT)
 
-        tk.Label(
-            panel, text="落球板",
-            bg=Theme.PANEL, fg=Theme.TEXT,
-            font=(Theme.FONT_CJK, 12, "bold"), anchor=tk.W,
-        ).place(x=16, y=10, width=100, height=24)
-
-        self.mode_badge = tk.Label(
-            panel, textvariable=self.mode_var,
-            bg=Theme.ACCENT_SOFT, fg=Theme.ACCENT,
-            font=(Theme.FONT_CJK, 10, "bold"), anchor=tk.CENTER,
-        )
-        self.mode_badge.place(x=590, y=10, width=140, height=24)
-
         self.board_canvas = tk.Canvas(
             panel,
             width=self.BOARD_WIDTH,
@@ -721,29 +983,7 @@ class PlinkoGame:
             bd=0,
             highlightthickness=0,
         )
-        self.board_canvas.place(x=16, y=43, width=self.BOARD_WIDTH, height=self.BOARD_HEIGHT)
-
-        history_box = tk.Frame(
-            panel,
-            bg=Theme.PANEL_ALT,
-            highlightthickness=1,
-            highlightbackground=Theme.BORDER_SOFT,
-        )
-        history_box.place(x=16, y=533, width=716, height=80)
-        tk.Label(
-            history_box,
-            text="当前模式最新 8 局落点倍率",
-            bg=Theme.PANEL_ALT,
-            fg=Theme.TEXT_MUTED,
-            font=(Theme.FONT_CJK, 9, "bold"),
-            anchor=tk.W,
-        ).place(x=10, y=5, width=180, height=18)
-
-        self.history_canvas = tk.Canvas(
-            history_box, width=694, height=47,
-            bg=Theme.PANEL_ALT, bd=0, highlightthickness=0,
-        )
-        self.history_canvas.place(x=10, y=27, width=694, height=47)
+        self.board_canvas.place(x=16, y=30, width=self.BOARD_WIDTH, height=self.BOARD_HEIGHT)
 
     def _build_sidebar(self, master: tk.Frame) -> None:
         sidebar = tk.Frame(
@@ -768,16 +1008,15 @@ class PlinkoGame:
             width=169, height=68,
         ).place(x=179, y=0, width=169, height=68)
 
-        chips = self._card(sidebar, width=348, height=101)
-        chips.place(x=0, y=78, width=348, height=101)
+        chips = self._card(sidebar, width=348, height=96)
+        chips.place(x=0, y=74, width=348, height=96)
         self._section_title(chips.inner, "下注筹码").place(x=0, y=0, width=120, height=20)
-        for index, (label, amount, chip_color, text_color) in enumerate(CHIP_CONFIGS):
+        for index, (amount, chip_color, label) in enumerate(CHIP_CONFIGS):
             chip = ChipButton(
                 chips.inner,
                 label=label,
-                amount=amount,
+                amount=str(amount),
                 chip_color=chip_color,
-                text_color=text_color,
                 command=self.add_chip,
                 width=57,
                 height=50,
@@ -785,8 +1024,8 @@ class PlinkoGame:
             chip.place(x=index * 62, y=24, width=57, height=50)
             self.chip_buttons.append(chip)
 
-        risk = self._card(sidebar, width=348, height=82)
-        risk.place(x=0, y=189, width=348, height=82)
+        risk = self._card(sidebar, width=348, height=76)
+        risk.place(x=0, y=176, width=348, height=76)
         self._section_title(risk.inner, "风险模式").place(x=0, y=0, width=120, height=20)
         for index, (label, value, _mode) in enumerate(RISK_CONFIGS):
             btn = ModernButton(
@@ -802,20 +1041,12 @@ class PlinkoGame:
             btn.place(x=index * 107, y=28, width=100, height=32)
             self.risk_buttons.append(btn)
 
-        payout = self._card(sidebar, width=348, height=103)
-        payout.place(x=0, y=281, width=348, height=103)
-        self._section_title(payout.inner, "当前 9 槽赔率").place(x=0, y=0, width=150, height=20)
-        self.payout_canvas = tk.Canvas(
-            payout.inner, width=322, height=55,
-            bg=Theme.PANEL, bd=0, highlightthickness=0,
-        )
-        self.payout_canvas.place(x=0, y=26, width=322, height=55)
-
-        actions = self._card(sidebar, width=348, height=92)
-        actions.place(x=0, y=394, width=348, height=92)
+        # Clear bet and launch share a single row.
+        actions = self._card(sidebar, width=348, height=60)
+        actions.place(x=0, y=258, width=348, height=60)
         self.reset_bet_button = ModernButton(
             actions.inner,
-            text="清空全部筹码",
+            text="清空",
             command=self.reset_bet,
             background=Theme.RED,
             hover_background=Theme.RED_HOVER,
@@ -823,7 +1054,7 @@ class PlinkoGame:
             font_size=12,
             bold=True,
         )
-        self.reset_bet_button.place(x=0, y=0, width=322, height=34)
+        self.reset_bet_button.place(x=0, y=0, width=156, height=36)
 
         self.launch_button = ModernButton(
             actions.inner,
@@ -835,10 +1066,10 @@ class PlinkoGame:
             font_size=12,
             bold=True,
         )
-        self.launch_button.place(x=0, y=42, width=322, height=34)
+        self.launch_button.place(x=168, y=0, width=156, height=36)
 
         state = self._card(sidebar, width=348, height=60, padding=9)
-        state.place(x=0, y=496, width=348, height=60)
+        state.place(x=0, y=324, width=348, height=60)
         tk.Label(
             state.inner,
             text="活动弹珠",
@@ -873,11 +1104,25 @@ class PlinkoGame:
             anchor=tk.E,
         ).place(x=92, y=20, width=230, height=20)
 
-        rules = self._card(sidebar, width=348, height=64, padding=9)
-        rules.place(x=0, y=566, width=348, height=64)
+        # History card: 3 rows of 8 chevron cells.
+        history = self._card(sidebar, width=348, height=174, padding=9)
+        history.place(x=0, y=390, width=348, height=174)
+        self._section_title(history.inner, "最近 24 球 · 当前模式").place(
+            x=0, y=0, width=225, height=19)
+        tk.Label(history.inner, text="最新在左上", bg=Theme.PANEL,
+                 fg=Theme.TEXT_MUTED, font=(Theme.FONT_CJK, 8)).place(
+            x=230, y=0, width=100, height=19)
+        self.history_canvas = tk.Canvas(
+            history.inner, width=328, height=135, bg=Theme.PANEL,
+            bd=0, highlightthickness=0,
+        )
+        self.history_canvas.place(x=0, y=23, width=328, height=135)
+
+        rules = self._card(sidebar, width=348, height=60, padding=9)
+        rules.place(x=0, y=570, width=348, height=60)
         tk.Label(
             rules.inner,
-            text="规则：每次点击发射一颗；可连续多球。每颗球会沿 8 层随机路径下落，最终按 1–9 槽赔率返还。",
+            text="规则：每次发射按当前下注扣款，可连续多球。弹珠通过物理碰撞自然落槽，按底部固定赔率返还；目标返还率 95%（统计校准）。",
             bg=Theme.PANEL,
             fg=Theme.TEXT_MUTED,
             font=(Theme.FONT_CJK, 8),
@@ -914,6 +1159,7 @@ class PlinkoGame:
         if self.active_balls > 0 or risk not in PAYOUTS:
             return
         self.risk_level = risk
+        self._reload_history()
         self.update_display()
 
     def update_display(self) -> None:
@@ -921,7 +1167,6 @@ class PlinkoGame:
         self.bet_var.set(f"${self.current_bet:,.2f}")
         self.last_win_var.set(f"${self.last_win:,.2f}")
         self.active_var.set(str(self.active_balls))
-        self.mode_var.set(f"{RISK_LABEL[self.risk_level]}模式")
         self.status_var.set(self.last_result_text)
 
         locked = self.active_balls > 0
@@ -943,310 +1188,154 @@ class PlinkoGame:
         self.launch_button.configure(state=tk.NORMAL if launch_enabled else tk.DISABLED)
 
         self.draw_board()
-        self.draw_payout_strip()
         self.draw_landing_history()
 
-    def draw_payout_strip(self) -> None:
-        c = self.payout_canvas
-        c.delete("all")
-        w = 322
-        cell_w = w / 9
-        values = PAYOUTS[self.risk_level]
-        for i, payout in enumerate(values):
-            x1 = round(i * cell_w)
-            x2 = round((i + 1) * cell_w)
-            if payout > 1:
-                fill = Theme.SLOT_GOOD
-                fg = Theme.GREEN
-            elif payout < 1:
-                fill = Theme.SLOT_BAD
-                fg = Theme.RED
-            else:
-                fill = Theme.SLOT_NEUTRAL
-                fg = Theme.AMBER
-            c.create_rectangle(x1, 1, x2, 54, fill=fill, outline=Theme.BORDER, width=1)
-            text = f"{int(payout)}×" if float(payout).is_integer() else f"{payout:.1f}×"
-            c.create_text(
-                (x1 + x2) / 2, 18, text=str(i + 1),
-                fill=Theme.TEXT_MUTED, font=(Theme.FONT, 8, "bold")
-            )
-            c.create_text(
-                (x1 + x2) / 2, 38, text=text,
-                fill=fg, font=(Theme.FONT, 8, "bold")
-            )
+    # ------------------------------------------------------------------
+    # History strip (3 rows of 8, newest on the top-left)
+    # ------------------------------------------------------------------
+
+    def _reload_history(self) -> None:
+        mode = RISK_KEY[self.risk_level]
+        try:
+            values = load_landing_log()["_paid_multipliers"][mode][-self.HISTORY_VISIBLE:]
+        except Exception:
+            values = []
+        # Newest first.
+        values = list(reversed(values))
+        self._history_values = values + [None] * (self.HISTORY_VISIBLE - len(values))
 
     def draw_landing_history(self) -> None:
-        """Show the latest 8 landings as payout multipliers.
-
-        Plinko.json continues to store the raw final slot number (1-9).
-        The display converts each slot to the payout multiplier belonging
-        to the currently selected risk mode.
-        """
+        """3 rows of 8 chevrons. Newest in the top-left, oldest in the bottom-right."""
         c = self.history_canvas
         c.delete("all")
+        w = 41
+        h = 45
+        indent_x = 8
+        indent_y = 8
 
-        mode = RISK_KEY[self.risk_level]
-        slot_values = _extract_mode_values(load_landing_log(), mode)[-8:]
-        payout_values = PAYOUTS[self.risk_level]
+        for i, value in enumerate(self._history_values):
+            if i >= self.HISTORY_VISIBLE:
+                break
+            row = i // self.HISTORY_COLS
+            col = i % self.HISTORY_COLS
+            x = col * w
+            y = row * h
+            x1 = x + 1
+            y1 = y + 1
+            x2 = x + w - 1
+            y2 = y + h - 1
+            mid_y = y1 + h / 2
 
-        width = 694
-        gap = 5
-        cell_width = (width - gap * 7) / 8
-        cell_height = 42
-
-        for index in range(8):
-            x1 = round(index * (cell_width + gap))
-            x2 = round(x1 + cell_width)
-            y1 = 2
-            y2 = y1 + cell_height
-
-            if index < len(slot_values):
-                slot = int(slot_values[index])
-                payout = float(payout_values[slot - 1])
-
-                if payout > 1.0:
-                    fill = Theme.SLOT_GOOD
-                    fg = Theme.GREEN
-                elif payout < 1.0:
-                    fill = Theme.SLOT_BAD
-                    fg = Theme.RED
-                else:
-                    fill = Theme.SLOT_NEUTRAL
-                    fg = Theme.AMBER
-
-                payout_text = (
-                    f"{int(payout)}×"
-                    if payout.is_integer()
-                    else f"{payout:.1f}×"
-                )
-
-                c.create_rectangle(
-                    x1, y1, x2, y2,
-                    fill=fill,
-                    outline=Theme.BORDER_SOFT,
-                    width=1,
-                )
-                c.create_text(
-                    (x1 + x2) / 2,
-                    14,
-                    text=f"{index + 1:02d}",
-                    fill=Theme.TEXT_MUTED,
-                    font=(Theme.FONT, 7, "bold"),
-                )
-                c.create_text(
-                    (x1 + x2) / 2,
-                    29,
-                    text=payout_text,
-                    fill=fg,
-                    font=(Theme.FONT, 12, "bold"),
-                )
+            if value is None:
+                fill = Theme.PANEL_ALT
+                outline = Theme.BORDER_SOFT
+                text = "--"
+                text_color = Theme.TEXT_DIM
+            elif value > 1:
+                fill = Theme.SLOT_GOOD
+                outline = Theme.GREEN
+                text = _format_history_value(value)
+                text_color = "#1B3320"
+            elif value < 1:
+                fill = Theme.SLOT_BAD
+                outline = Theme.RED
+                text = _format_history_value(value)
+                text_color = "#3D1213"
             else:
-                c.create_rectangle(
-                    x1, y1, x2, y2,
-                    fill=Theme.PANEL,
-                    outline=Theme.BORDER_SOFT,
-                    width=1,
-                )
-                c.create_text(
-                    (x1 + x2) / 2,
-                    14,
-                    text=f"{index + 1:02d}",
-                    fill=Theme.TEXT_DIM,
-                    font=(Theme.FONT, 7, "bold"),
-                )
-                c.create_text(
-                    (x1 + x2) / 2,
-                    29,
-                    text="--",
-                    fill=Theme.TEXT_DIM,
-                    font=(Theme.FONT, 12, "bold"),
-                )
+                fill = Theme.SLOT_NEUTRAL
+                outline = Theme.AMBER
+                text = "1"
+                text_color = "#3D2D10"
+
+            # Right-pointing chevron shape.
+            c.create_polygon(
+                x1, mid_y,
+                x1 + indent_x, y1,
+                x2 - indent_x, y1,
+                x2, mid_y,
+                x2 - indent_x, y2,
+                x1 + indent_x, y2,
+                fill=fill, outline=outline, width=1,
+            )
+            c.create_text(
+                x1 + w / 2 - 2, mid_y,
+                text=text,
+                fill=text_color,
+                font=(Theme.FONT, 9, "bold"),
+            )
 
     # ------------------------------------------------------------------
-    # Board rendering
+    # Shared rendering / collision geometry
     # ------------------------------------------------------------------
 
     def _board_geometry(self, width: int, height: int) -> dict:
-        top_y = 44
-        bottom_y = height - 96
-        top_width = 46
-        bottom_width = width - 126
-        start_x = (width - bottom_width) / 2
-        slot_width = bottom_width / 9
-        return {
-            "top_y": top_y,
-            "bottom_y": bottom_y,
-            "top_width": top_width,
-            "bottom_width": bottom_width,
-            "start_x": start_x,
-            "slot_width": slot_width,
-        }
+        p = self.physics
+        return {"start_x": p.left, "top_y": p.top, "bottom_y": p.bottom,
+                "bottom_width": p.right-p.left, "slot_width": p.slot_width}
 
     def draw_board(self) -> None:
-        c = self.board_canvas
+        c, p = self.board_canvas, self.physics
         c.delete("all")
-        width = self.BOARD_WIDTH
-        height = self.BOARD_HEIGHT
-        geo = self._board_geometry(width, height)
-        top_y = geo["top_y"]
-        bottom_y = geo["bottom_y"]
-        top_width = geo["top_width"]
-        bottom_width = geo["bottom_width"]
-
-        # Warm board well and subtle horizontal bands.
-        c.create_rectangle(0, 0, width, height, fill=Theme.BOARD, outline="")
-        for y in range(34, height, 48):
-            c.create_line(0, y, width, y, fill=Theme.BOARD_DARK, width=1, stipple="gray50")
-
-        left_top = width / 2 - top_width / 2
-        right_top = width / 2 + top_width / 2
-        left_bottom = width / 2 - bottom_width / 2
-        right_bottom = width / 2 + bottom_width / 2
-
-        c.create_polygon(
-            left_top, top_y,
-            right_top, top_y,
-            right_bottom, bottom_y,
-            left_bottom, bottom_y,
-            fill=Theme.CANVAS_BG,
-            outline=Theme.BOARD_EDGE,
-            width=2,
-        )
-
-        # Launch throat.
-        c.create_rectangle(
-            width / 2 - 28, 11, width / 2 + 28, top_y + 7,
-            fill=Theme.PANEL_ALT, outline=Theme.BORDER, width=2,
-        )
-        c.create_text(
-            width / 2, 27, text="DROP",
-            fill=Theme.ACCENT, font=(Theme.FONT, 9, "bold"),
-        )
-
-        self._draw_pegs(width, height, geo)
-        self._draw_slots(width, height, geo)
-
-        # Dynamic balls are tagged separately so animation frames do not have
-        # to rebuild the board, pegs and slots.
+        c.create_rectangle(0, 0, self.BOARD_WIDTH, self.BOARD_HEIGHT,
+                           fill=Theme.BOARD, outline="")
+        c.create_rectangle(p.left, p.top, p.right, p.bottom,
+                           fill="#15332e", outline="#D8B46A", width=2)
+        for segment in p.funnel:
+            c.create_line(*segment, fill="#D8B46A", width=3, capstyle=tk.ROUND)
+        c.create_rectangle(p.centre-20, p.top+7, p.centre+20, p.top+16,
+                           fill="#FFDE35", outline="#B8860B", width=2)
+        self.pegs = p.pegs
+        self.peg_rows = p.peg_rows
+        for x, y in p.pegs:
+            r = p.PEG_RADIUS
+            c.create_oval(x-r, y-r, x+r, y+r, fill=Theme.PEG,
+                          outline=Theme.PEG_BORDER, width=1)
+        for i, payout in enumerate(PAYOUTS[self.risk_level]):
+            x = p.left+i*p.slot_width
+            c.create_rectangle(x, p.floor, x+p.slot_width, p.bottom,
+                               fill="#426658" if payout >= 1 else "#654B43",
+                               outline="#D8B46A")
+            c.create_text(x+p.slot_width/2, p.floor+9, text=str(i+1),
+                          fill="#DFDBC6", font=(Theme.FONT, 7))
+            c.create_text(x+p.slot_width/2, p.floor+23,
+                          text=format_multiplier(payout),
+                          fill="white", font=(Theme.FONT, 8, "bold"))
+            if i:
+                c.create_line(x, p.divider_top, x, p.floor,
+                              fill="#D8B46A", width=2, capstyle=tk.ROUND)
+        # Only the stake amount (as an integer) at the top-left of the board.
+        c.create_text(p.left+14, p.top+16,
+                      text=f"${int(round(self.current_bet))}",
+                      anchor=tk.W, fill="#F2E6C9",
+                      font=(Theme.FONT_CJK, 16, "bold"))
         self._draw_ball_layer(clear_existing=False)
 
-        # Current stake tag.
-        c.create_rectangle(
-            14, 12, 160, 64,
-            fill=Theme.PANEL_ALT, outline=Theme.BORDER_SOFT, width=1,
-        )
-        c.create_text(
-            25, 26, text="每颗弹珠",
-            fill=Theme.TEXT_MUTED, font=(Theme.FONT_CJK, 8, "bold"),
-            anchor=tk.W,
-        )
-        c.create_text(
-            25, 48, text=f"${self.current_bet:,.2f}",
-            fill=Theme.CYAN, font=(Theme.FONT, 14, "bold"),
-            anchor=tk.W,
-        )
+    def _draw_rotors(self) -> None:
+        c, p = self.board_canvas, self.physics
+        c.delete("rotor_dynamic")
+        r = p.ROTOR_RADIUS
+        for cx, cy, px, py, _ in p.rotor_segments():
+            c.create_line(cx, cy, px, py, fill="#FFD46B", width=2*r,
+                          capstyle=tk.ROUND, tags=("rotor_dynamic",))
+        for x, y, _ in p.rotors:
+            c.create_oval(x-r, y-r, x+r, y+r, fill="#704F2A",
+                          outline="#FFE5A1", width=1, tags=("rotor_dynamic",))
 
     def _draw_ball_layer(self, *, clear_existing: bool = True) -> None:
-        """Redraw only the moving balls.
-
-        A long painted trail makes a physically correct trajectory look like a
-        scripted spline, so the rigid-body version deliberately draws only the
-        current ball position.
-        """
         c = self.board_canvas
         if clear_existing:
             c.delete("ball_dynamic")
-
+        self._draw_rotors()
+        r = self.ball_radius
         for ball in self.balls:
             if ball.get("finished"):
                 continue
-            x = float(ball.get("x", 0.0))
-            y = float(ball.get("y", 0.0))
-            c.create_oval(
-                x - self.ball_radius, y - self.ball_radius,
-                x + self.ball_radius, y + self.ball_radius,
-                fill=ball["color"],
-                outline=Theme.BALL_OUTLINE,
-                width=2,
-                tags=("ball_dynamic",),
-            )
-
-    def _peg_layout(self, width: int, geo: dict) -> list[list[tuple[float, float]]]:
-        """Return the exact triangular peg lattice used by drawing and physics."""
-        top_y = geo["top_y"] + 30
-        bottom_y = geo["bottom_y"] - 42
-        top_width = 64
-        bottom_width = geo["bottom_width"] - 70
-        rows: list[list[tuple[float, float]]] = []
-
-        for row in range(8):
-            progress = row / 7.0
-            current_width = top_width + (bottom_width - top_width) * progress
-            y = top_y + (bottom_y - top_y) * progress
-            peg_count = row + 1
-            spacing = current_width / (peg_count + 1)
-            rows.append([
-                (width / 2 - current_width / 2 + spacing * (index + 1), y)
-                for index in range(peg_count)
-            ])
-        return rows
-
-    def _draw_pegs(self, width: int, height: int, geo: dict) -> None:
-        c = self.board_canvas
-        self.peg_rows = self._peg_layout(width, geo)
-        self.pegs = [peg for row in self.peg_rows for peg in row]
-
-        for row in self.peg_rows:
-            for x, y in row:
-                c.create_oval(
-                    x - self.peg_radius, y - self.peg_radius,
-                    x + self.peg_radius, y + self.peg_radius,
-                    fill=Theme.PEG,
-                    outline=Theme.PEG_BORDER,
-                    width=1,
-                )
-
-    def _draw_slots(self, width: int, height: int, geo: dict) -> None:
-        c = self.board_canvas
-        start_x = geo["start_x"]
-        slot_width = geo["slot_width"]
-        start_y = geo["bottom_y"] + 8
-        slot_height = 50
-        values = PAYOUTS[self.risk_level]
-
-        for i, payout in enumerate(values):
-            x1 = start_x + i * slot_width
-            x2 = start_x + (i + 1) * slot_width
-            if payout > 1:
-                fill = Theme.SLOT_GOOD
-                fg = Theme.GREEN
-            elif payout < 1:
-                fill = Theme.SLOT_BAD
-                fg = Theme.RED
-            else:
-                fill = Theme.SLOT_NEUTRAL
-                fg = Theme.AMBER
-
-            c.create_rectangle(
-                x1, start_y, x2, start_y + slot_height,
-                fill=fill, outline=Theme.SLOT_EDGE, width=1,
-            )
-            payout_text = f"{int(payout)}×" if float(payout).is_integer() else f"{payout:.1f}×"
-            c.create_text(
-                (x1 + x2) / 2, start_y + 17,
-                text=payout_text,
-                fill=fg,
-                font=(Theme.FONT, 10, "bold"),
-            )
-            c.create_text(
-                (x1 + x2) / 2, start_y + 36,
-                text=f"槽 {i + 1}",
-                fill=Theme.TEXT_MUTED,
-                font=(Theme.FONT_CJK, 7, "bold"),
-            )
+            x, y = ball["x"], ball["y"]
+            c.create_oval(x-r, y-r, x+r, y+r, fill=ball["color"],
+                          outline=Theme.BALL_OUTLINE, width=1, tags=("ball_dynamic",))
 
     # ------------------------------------------------------------------
-    # Gameplay / physics
+    # Betting and continuous physical simulation
     # ------------------------------------------------------------------
 
     def launch_ball(self) -> None:
@@ -1264,232 +1353,43 @@ class PlinkoGame:
         update_balance_in_json(self.username, self.balance)
 
         self._add_ball(stake=stake, risk=risk)
-        if not self.animation_running:
-            self.animation_running = True
-            self._last_frame_time = time.monotonic()
-            self.root.after(self.frame_interval_ms, self.animate_balls)
         self.update_display()
 
-    @staticmethod
-    def _choose_target_route() -> tuple[list[int], int]:
-        """Lock eight fair left/right peg decisions before animation starts."""
-        route = [1 if random.random() < 0.5 else -1 for _ in range(8)]
-        target_slot = 1 + sum(1 for direction in route if direction > 0)
-        return route, target_slot
-
-    def _build_contact_plan(
-        self,
-        route: list[int],
-        geo: dict,
-    ) -> tuple[list[tuple[float, float]], tuple[float, float]]:
-        """Create physically valid contact points on the selected side of pegs.
-
-        For a right deflection the ball touches the upper-right surface of the
-        peg; for a left deflection it touches the upper-left surface.  The
-        previous version used the opposite side, which visually made the ball
-        pass through a peg before changing direction.
-        """
-        if not self.peg_rows:
-            self.peg_rows = self._peg_layout(self.BOARD_WIDTH, geo)
-            self.pegs = [peg for row in self.peg_rows for peg in row]
-
-        separation = self.ball_radius + self.peg_radius + 0.20
-        contacts: list[tuple[float, float]] = []
-        rights_before = 0
-
-        for row_index, direction in enumerate(route):
-            peg_x, peg_y = self.peg_rows[row_index][rights_before]
-
-            # Varying the normal angle changes both the impact soundless "kick"
-            # and the following arc without ever moving the contact off the peg.
-            angle = math.radians(random.uniform(35.0, 43.5))
-            normal_x = direction * math.sin(angle)
-            normal_y = -math.cos(angle)
-            contacts.append((
-                peg_x + normal_x * separation,
-                peg_y + normal_y * separation,
-            ))
-
-            if direction > 0:
-                rights_before += 1
-
-        target_slot = rights_before + 1
-        slot_centre = geo["start_x"] + (target_slot - 0.5) * geo["slot_width"]
-        landing_margin = geo["slot_width"] * 0.13
-        final_point = (
-            slot_centre + random.uniform(-landing_margin, landing_margin),
-            geo["bottom_y"] + 2.0,
-        )
-        return contacts, final_point
-
-    def _set_flight_event(
-        self,
-        ball: dict,
-        target: tuple[float, float],
-        *,
-        event_kind: str,
-        launch_segment: bool = False,
-    ) -> None:
-        """Set one genuine free-flight segment ending at a collision event."""
-        x0 = float(ball["x"])
-        y0 = float(ball["y"])
-        x1, y1 = target
-        dx = x1 - x0
-        dy = y1 - y0
-        gravity = float(ball["gravity"])
-
-        if launch_segment:
-            # The ball exits the throat with downward velocity and reaches the
-            # first peg without any invisible horizontal attraction.
-            duration = random.uniform(0.175, 0.205)
-            vx = dx / duration
-            vy = (dy - 0.5 * gravity * duration * duration) / duration
-        else:
-            # Convert incoming impact energy into a small upward rebound.  The
-            # next collision time follows from the vertical kinematic equation;
-            # horizontal speed is then the exact speed required to reach the
-            # next visible peg surface.
-            incoming_speed = math.hypot(float(ball["vx"]), float(ball["vy"]))
-            rebound_speed = max(
-                54.0,
-                min(98.0, incoming_speed * random.uniform(0.21, 0.285)),
-            )
-            vy = -rebound_speed
-            discriminant = max(0.0, vy * vy + 2.0 * gravity * max(0.1, dy))
-            duration = (-vy + math.sqrt(discriminant)) / gravity
-            duration = max(0.22, duration)
-            vx = dx / duration
-
-        ball["vx"] = vx
-        ball["vy"] = vy
-        ball["event_x"] = float(x1)
-        ball["event_y"] = float(y1)
-        ball["event_kind"] = event_kind
-        ball["time_to_event"] = float(duration)
-
     def _add_ball(self, *, stake: float, risk: str) -> None:
-        geo = self._board_geometry(self.BOARD_WIDTH, self.BOARD_HEIGHT)
-        colors = ("#B75B55", "#4D7893", "#5E875F", "#C19643", "#9B648B")
-
-        route, target_slot = self._choose_target_route()
-        contacts, final_point = self._build_contact_plan(route, geo)
-
-        # A very small launch-side offset is enough to make the first impact
-        # readable while the throat still appears centred.
-        start_x = self.BOARD_WIDTH / 2 + route[0] * random.uniform(0.7, 1.7)
-        start_y = geo["top_y"] - 4.0
-
-        ball = {
-            "x": start_x,
-            "y": start_y,
-            "vx": 0.0,
-            "vy": 0.0,
-            "gravity": random.uniform(955.0, 1010.0),
-            "color": random.choice(colors),
-            "finished": False,
-            "slot": None,
-            "target_slot": target_slot,
-            "route": route,
-            "contacts": contacts,
-            "final_point": final_point,
-            "next_contact": 0,
-            "event_kind": "peg",
-            "time_to_event": 0.0,
-            "stake": stake,
-            "risk": risk,
-            "start_time": time.monotonic(),
-        }
-        self._set_flight_event(
-            ball,
-            contacts[0],
-            event_kind="peg",
-            launch_segment=True,
-        )
-        self.balls.append(ball)
+        # Initial release variation only. No further randomness or outcome steering.
+        self.balls.append({
+            "x": self.physics.centre+random.uniform(-5., 5.),
+            "y": self.physics.top+30.,
+            "vx": random.uniform(-24., 24.), "vy": 0., "spin": 0.,
+            "color": random.choice(("#F5D25B", "#8CBEE0", "#EAA09A", "#B8D49C")),
+            "finished": False, "slot": None, "rest_time": 0.,
+            "stake": float(stake), "risk": risk, "start_time": time.monotonic(),
+        })
         self.active_balls += 1
 
-    def _handle_peg_impact(self, ball: dict) -> None:
-        """Apply the route-control impulse only while touching a visible peg."""
-        row_index = int(ball["next_contact"])
-        ball["x"] = float(ball["event_x"])
-        ball["y"] = float(ball["event_y"])
-        ball["next_contact"] = row_index + 1
-
-        if row_index + 1 < len(ball["contacts"]):
-            target = ball["contacts"][row_index + 1]
-            self._set_flight_event(ball, target, event_kind="peg")
-        else:
-            self._set_flight_event(
-                ball,
-                ball["final_point"],
-                event_kind="landing",
-            )
-
-    def _advance_ball(self, ball: dict, frame_dt: float) -> None:
-        """Advance a ball analytically, splitting the frame at impacts."""
-        remaining = max(0.0, float(frame_dt))
-        gravity = float(ball["gravity"])
-
-        while remaining > 1e-7 and not ball.get("finished"):
-            event_time = max(0.0, float(ball["time_to_event"]))
-            step = min(remaining, event_time)
-
-            ball["x"] += ball["vx"] * step
-            ball["y"] += ball["vy"] * step + 0.5 * gravity * step * step
-            ball["vy"] += gravity * step
-            ball["time_to_event"] = event_time - step
-            remaining -= step
-
-            if ball["time_to_event"] <= 1e-7:
-                # Snap only the sub-pixel integration error at the exact moment
-                # of contact. This is not a visible route correction.
-                ball["x"] = float(ball["event_x"])
-                ball["y"] = float(ball["event_y"])
-
-                if ball["event_kind"] == "peg":
-                    self._handle_peg_impact(ball)
-                else:
-                    ball["slot"] = int(ball["target_slot"])
-                    ball["finished"] = True
-
     def animate_balls(self) -> None:
-        if not self.balls:
-            self.animation_running = False
-            self.active_balls = 0
-            self.update_display()
+        self._animation_job = None
+        if self._closed:
             return
-
         now = time.monotonic()
-        frame_dt = min(self.max_frame_dt, max(0.001, now - self._last_frame_time))
+        frame_dt = min(.10, max(0., now - self._last_frame_time))
+        # Fixed small substeps avoid frame-rate-dependent collisions. A stalled
+        # GUI pauses excess simulation time instead of teleporting falling balls.
+        self._physics_accumulator += frame_dt
         self._last_frame_time = now
-
-        finished_indices: list[int] = []
-        active_count = 0
-
-        for index, ball in enumerate(self.balls):
-            if ball.get("finished"):
-                finished_indices.append(index)
-                continue
-            self._advance_ball(ball, frame_dt)
-            if ball.get("finished"):
-                finished_indices.append(index)
-            else:
-                active_count += 1
-
-        self.active_balls = active_count
-        if finished_indices:
-            self._process_finished_balls(finished_indices)
+        while self._physics_accumulator >= self.physics.DT:
+            self.physics.step(self.balls)
+            self._physics_accumulator -= self.physics.DT
+        finished = [i for i, b in enumerate(self.balls) if b.get("finished")]
+        self.active_balls = sum(not b.get("finished") for b in self.balls)
+        if finished:
+            self._process_finished_balls(finished)
             self.update_display()
         else:
             self.active_var.set(str(self.active_balls))
             self._draw_ball_layer()
-
-        if self.balls:
-            self.root.after(self.frame_interval_ms, self.animate_balls)
-        else:
-            self.animation_running = False
-            self.active_balls = 0
-            self.update_display()
+        # Keep ticking with zero balls so all SEVEN rotors always rotate.
+        self._animation_job = self.root.after(self.frame_interval_ms, self.animate_balls)
 
     def _process_finished_balls(self, indices: list[int]) -> None:
         valid = sorted(
@@ -1511,9 +1411,9 @@ class PlinkoGame:
             update_balance_in_json(self.username, self.balance)
 
             mode = RISK_KEY[risk]
-            record_landing(mode, slot)
+            record_landing(mode, slot, payout)
 
-            payout_text = f"{int(payout)}×" if payout.is_integer() else f"{payout:.1f}×"
+            payout_text = format_multiplier(payout)
             self.last_result_text = f"槽 {slot} · {payout_text} · ${winnings:,.2f}"
             self._show_ball_result(slot, payout_text, winnings)
 
@@ -1521,6 +1421,9 @@ class PlinkoGame:
             self.balls.pop(index)
 
         self.active_balls = sum(1 for ball in self.balls if not ball.get("finished"))
+
+        if valid:
+            self._reload_history()
 
     def _show_ball_result(self, slot: int, payout_text: str, winnings: float) -> None:
         c = self.board_canvas
@@ -1531,7 +1434,7 @@ class PlinkoGame:
             x, y,
             text=f"{payout_text}\n${winnings:,.2f}",
             fill=Theme.AMBER,
-            font=(Theme.FONT, 10, "bold"),
+            font=(Theme.FONT, 9, "bold"),
             justify=tk.CENTER,
         )
         try:
@@ -1543,7 +1446,22 @@ class PlinkoGame:
     # Closing / embedding
     # ------------------------------------------------------------------
 
+    def stop_game(self) -> None:
+        self._closed = True
+        self.animation_running = False
+        if self._animation_job is not None:
+            try:
+                self.root.after_cancel(self._animation_job)
+            except tk.TclError:
+                pass
+            self._animation_job = None
+
+    def _on_destroy(self, event) -> None:
+        if event.widget is self.root:
+            self.stop_game()
+
     def on_closing(self) -> None:
+        self.stop_game()
         update_balance_in_json(self.username, self.balance)
         finish = getattr(self.root, "finish", None)
         if callable(finish):
